@@ -39,12 +39,17 @@ def print_issues(issues: list[Issue]) -> None:
 
 
 @app.command()
-def gui() -> None:
+def gui(
+    project: Annotated[
+        Path | None,
+        typer.Option("--project", "-p", help="Project folder to open when the window starts."),
+    ] = None,
+) -> None:
     """Open the labcatalog window."""
     # Imported here so other commands do not pay for loading the GUI stack.
     from labcatalog.gui import launch
 
-    launch()
+    launch(project)
 
 
 @app.command()
