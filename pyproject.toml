@@ -8,6 +8,10 @@ version = "0.1.0"
 description = "Build a browsable catalog of a lab's study data: instruments, variables across waves, scoring code, and summary statistics."
 readme = "README.md"
 requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors =[{ name = "Qiuyu Yu", email = "qiuyuyu.psych@gmail.com" }]
+maintainers = [{ name = "Qiuyu Yu", email = "qiuyuyu.psych@gmail.com" }]
 dependencies = [
     "pydantic>=2.7",
     "pyyaml>=6.0",
