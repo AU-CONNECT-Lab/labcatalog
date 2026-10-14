@@ -45,6 +45,8 @@ class ScoreSummary(BaseModel):
     alpha: float | None = None
     n_complete: int = 0
     item_total: list[ItemTotal] = []
+    item_columns: list[str] = []
+    item_correlations: list[list[float | None]] = []
 
 
 class InstrumentCompleteness(BaseModel):
@@ -59,7 +61,7 @@ class DatasetSummary(BaseModel):
     dataset: str
     n_rows: int
     n_ids: int
-    n_families: int | None = None
+    n_groups: int | None = None
     first_date: date | None = None
     last_date: date | None = None
     collected_by_month: dict[str, int] = {}
@@ -78,10 +80,10 @@ class WaveRetention(BaseModel):
     n_new: int | None = None
 
 
-class WaveFamilies(BaseModel):
+class WaveGroups(BaseModel):
     study: str
     wave: str
-    families: int
+    groups: int
     with_every_reporter: int
 
 
@@ -91,6 +93,7 @@ class Correlation(BaseModel):
     keys: list[str]
     r: list[list[float | None]]
     n: list[list[int]]
+    n_ambiguous: int = 0
 
 
 class Summary(BaseModel):
@@ -98,7 +101,8 @@ class Summary(BaseModel):
     scores: list[ScoreSummary]
     datasets: list[DatasetSummary]
     retention: list[WaveRetention]
-    families: list[WaveFamilies]
+    group_name: str | None = None
+    groups: list[WaveGroups] = []
     correlations: list[Correlation]
 
 
@@ -123,8 +127,9 @@ def summarize(
             summarize_dataset(loaded, catalog, variables, config) for loaded in datasets.values()
         ],
         retention=retention(datasets),
-        families=wave_families(datasets),
-        correlations=correlations(catalog, datasets, scores),
+        group_name=config.ids.group.name if config.ids.group else None,
+        groups=wave_groups(datasets),
+        correlations=correlations(catalog, datasets, scores, config.stats.correlate_by),
     )
 
 
@@ -168,10 +173,13 @@ def summarize_score(loaded: LoadedDataset, score: ResolvedScore, values: pd.Seri
         median=float(valid.median()) if len(valid) else None,
     )
     if scorable(loaded.frame, score):
-        complete = score_items(loaded.frame, score).dropna()
+        items = score_items(loaded.frame, score)
+        complete = items.dropna()
         summary.n_complete = len(complete)
         summary.alpha = cronbach_alpha(complete)
         summary.item_total = item_total(complete) if summary.alpha is not None else []
+        summary.item_columns = list(items.columns)
+        summary.item_correlations = item_correlations(items)
     return summary
 
 
@@ -235,6 +243,12 @@ def item_total(complete: pd.DataFrame) -> list[ItemTotal]:
     return rows
 
 
+def item_correlations(items: pd.DataFrame) -> list[list[float | None]]:
+    # Spearman suits ordinal answers; items are already reverse-scored, so a negative r stands out.
+    matrix = items.corr(method="spearman", min_periods=defaults.MIN_CORRELATION_N)
+    return [[None if pd.isna(r) else float(r) for r in row] for row in matrix.to_numpy()]
+
+
 def summarize_dataset(
     loaded: LoadedDataset,
     catalog: Catalog,
@@ -257,7 +271,7 @@ def summarize_dataset(
         dataset=name,
         n_rows=len(frame),
         n_ids=int(frame[loaded.id_column].nunique()),
-        n_families=None if loaded.family is None else int(loaded.family.nunique()),
+        n_groups=None if loaded.group is None else int(loaded.group.nunique()),
         first_date=dates.min().date() if dates is not None and len(dates) else None,
         last_date=dates.max().date() if dates is not None and len(dates) else None,
         collected_by_month=collected_by_month(dates) if dates is not None else {},
@@ -284,9 +298,7 @@ def completeness(
         options = [str(option.value) for option in variable.response_options]
         values = frame[variable.column]
         numeric = pd.to_numeric(values, errors="coerce")
-        valid = values.isin(options) | numeric.isin(
-            [float(v) for v in options if is_number(v)]
-        )
+        valid = values.isin(options) | numeric.isin([float(v) for v in options if is_number(v)])
         by_instrument.setdefault(variable.instrument_id, []).append(valid)
     rows = []
     for instrument_id, columns in by_instrument.items():
@@ -327,21 +339,21 @@ def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
     return rows
 
 
-def wave_families(datasets: dict[str, LoadedDataset]) -> list[WaveFamilies]:
+def wave_groups(datasets: dict[str, LoadedDataset]) -> list[WaveGroups]:
     waves: dict[tuple[str, str], dict[str, set[str]]] = {}
     for loaded in datasets.values():
-        if loaded.family is None:
+        if loaded.group is None:
             continue
         reporters = waves.setdefault((loaded.config.study, loaded.config.wave), {})
-        reporters.setdefault(loaded.config.reporter, set()).update(loaded.family.dropna())
+        reporters.setdefault(loaded.config.reporter, set()).update(loaded.group.dropna())
     rows = []
     for (study, wave), reporters in sorted(waves.items(), key=lambda kv: wave_order(kv[0][1])):
         sets = list(reporters.values())
         rows.append(
-            WaveFamilies(
+            WaveGroups(
                 study=study,
                 wave=wave,
-                families=len(set().union(*sets)),
+                groups=len(set().union(*sets)),
                 with_every_reporter=len(set.intersection(*sets)),
             )
         )
@@ -349,19 +361,28 @@ def wave_families(datasets: dict[str, LoadedDataset]) -> list[WaveFamilies]:
 
 
 def correlations(
-    catalog: Catalog, datasets: dict[str, LoadedDataset], scores: dict[str, pd.DataFrame]
+    catalog: Catalog,
+    datasets: dict[str, LoadedDataset],
+    scores: dict[str, pd.DataFrame],
+    correlate_by: str,
 ) -> list[Correlation]:
+    if correlate_by == "none":
+        return []
     waves: dict[tuple[str, str], dict[str, pd.Series]] = {}
+    ambiguous: dict[tuple[str, str], set] = {}
     for score in catalog.scores:
         loaded = datasets[score.dataset]
         values = scores[score.dataset][score.key]
         if values.notna().sum() == 0:
             continue
-        # Different reporters sit in different files, so scores meet on the family ID.
-        link = loaded.family if loaded.family is not None else loaded.frame[loaded.id_column]
+        by_id = correlate_by == "id" or loaded.group is None
+        link = loaded.frame[loaded.id_column] if by_id else loaded.group
         linked = pd.Series(values.to_numpy(), index=link.to_numpy())
-        linked = linked[~linked.index.duplicated() & linked.index.notna()]
-        waves.setdefault((loaded.config.study, loaded.config.wave), {})[score.key] = linked
+        # A link value that repeats within a file (two children in one family) is ambiguous.
+        repeated = linked.index.duplicated(keep=False)
+        wave_key = (loaded.config.study, loaded.config.wave)
+        ambiguous.setdefault(wave_key, set()).update(linked.index[repeated])
+        waves.setdefault(wave_key, {})[score.key] = linked[~repeated & linked.index.notna()]
     rows = []
     for (study, wave), series in sorted(waves.items(), key=lambda kv: wave_order(kv[0][1])):
         if len(series) < 2:
@@ -383,7 +404,16 @@ def correlations(
                     r_row.append(None if pd.isna(r) else float(r))
             r_rows.append(r_row)
             n_rows.append(n_row)
-        rows.append(Correlation(study=study, wave=wave, keys=keys, r=r_rows, n=n_rows))
+        rows.append(
+            Correlation(
+                study=study,
+                wave=wave,
+                keys=keys,
+                r=r_rows,
+                n=n_rows,
+                n_ambiguous=len(ambiguous.get((study, wave), set())),
+            )
+        )
     return rows
 
 

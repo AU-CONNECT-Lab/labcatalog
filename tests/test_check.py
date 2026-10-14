@@ -24,8 +24,9 @@ def change_csv(path, change) -> None:
 
 def test_mock_reports_only_the_planted_problems(mock_project):
     report = run_check(mock_project)
-    assert found(report).keys() == {"unexpected_value", "id_whitespace"}
-    assert report.has_errors()
+    errors = {i.code for i in report.issues if i.level == "error"}
+    assert errors == {"unexpected_value", "id_whitespace"}
+    assert "1023C" in found(report)["same_answer"][-1]
 
 
 def test_metadata_errors_stop_before_reading_data(mock_project):
@@ -52,7 +53,7 @@ def test_duplicate_and_malformed_ids(mock_project):
 
     change_csv(mock_project / "data" / "child_w2.csv", change)
     codes = found(run_check(mock_project))
-    assert "id_duplicate" in codes and "id_pattern" in codes and "family_missing" in codes
+    assert "id_duplicate" in codes and "id_pattern" in codes and "group_missing" in codes
 
 
 def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):

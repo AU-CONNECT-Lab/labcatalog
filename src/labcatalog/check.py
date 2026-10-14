@@ -10,6 +10,7 @@ from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
 from labcatalog.resolve import Catalog
+from labcatalog.scoring import item_values, scorable
 from labcatalog.sources import LoadedDataset
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
@@ -37,6 +38,7 @@ def check_project(
             *check_exclusions(project, datasets),
             *check_identifier_columns(project, datasets),
             *check_dates(project, datasets),
+            *check_same_answers(project, catalog, datasets),
             *check_score_agreement(project, catalog, datasets, scores),
         ]
     )
@@ -177,7 +179,31 @@ def check_dates(project: Project, datasets: dict[str, LoadedDataset]) -> list[Is
                 f"{column}: {bad.sum()} date(s) do not match {project.config.defaults.date_format}: "
                 f"{examples(values[bad])}"
             )
-            issues.append(problem("date_unparseable", message, location(project, loaded), "warning"))
+            issues.append(
+                problem("date_unparseable", message, location(project, loaded), "warning")
+            )
+    return issues
+
+
+def check_same_answers(
+    project: Project, catalog: Catalog, datasets: dict[str, LoadedDataset]
+) -> list[Issue]:
+    issues = []
+    for score in catalog.scores:
+        loaded = datasets[score.dataset]
+        # On short scales the same answer to every item is common and says little.
+        if len(score.columns) < defaults.SAME_ANSWER_MIN_ITEMS or not scorable(loaded.frame, score):
+            continue
+        raw = pd.DataFrame(
+            {c: item_values(loaded.frame[c], score.valid_values[c]) for c in score.columns}
+        )
+        same = raw.notna().all(axis=1) & (raw.nunique(axis=1) == 1)
+        if same.any():
+            message = (
+                f"{score.key}: {same.sum()} participant(s) gave the same answer to every item: "
+                f"{examples(loaded.frame.loc[same, loaded.id_column])}"
+            )
+            issues.append(problem("same_answer", message, location(project, loaded), "warning"))
     return issues
 
 

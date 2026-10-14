@@ -131,14 +131,27 @@ def test_blank_rows_left_by_excel_are_ignored(mock_project):
     assert run_validate(mock_project) == []
 
 
-def test_family_pattern_needs_one_group(mock_project):
-    edit(
-        mock_project / "labcatalog.yaml",
-        r"family_from_id: '^(\d{4})'",
-        "family_from_id: '^[0-9]{4}'",
-    )
+def test_group_pattern_needs_one_capture(mock_project):
+    edit(mock_project / "labcatalog.yaml", r"from_id: '^(\d{4})'", "from_id: '^[0-9]{4}'")
     [issue] = run_validate(mock_project)
-    assert issue.message.startswith("ids.family_from_id")
+    assert issue.message.startswith("ids.group.from_id")
+
+
+def test_correlate_by_must_name_id_none_or_the_group(mock_project):
+    edit(mock_project / "labcatalog.yaml", "correlate_by: family", "correlate_by: household")
+    [issue] = run_validate(mock_project)
+    assert "family" in issue.message and "household" in issue.message
+
+
+def test_group_column_needs_a_declared_group(mock_project):
+    text = (mock_project / "labcatalog.yaml").read_text(encoding="utf-8")
+    start = text.index("  group:")
+    end = text.index("stats:")
+    text = text[:start] + "\n" + text[end:].replace("correlate_by: family", "correlate_by: id")
+    text = text.replace("path: data/child_w2.csv,", "path: data/child_w2.csv, group_column: fam,")
+    (mock_project / "labcatalog.yaml").write_text(text, encoding="utf-8")
+    [issue] = run_validate(mock_project)
+    assert "declare ids.group" in issue.message
 
 
 def test_scored_items_need_numeric_options(mock_project):

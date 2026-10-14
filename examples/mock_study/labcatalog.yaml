@@ -17,7 +17,12 @@ defaults:
 
 ids:
   pattern: '^\d{4}[PC]$'
-  family_from_id: '^(\d{4})'
+  group:
+    name: family
+    from_id: '^(\d{4})'
+
+stats:
+  correlate_by: family
 
 studies:
   mock_study:
