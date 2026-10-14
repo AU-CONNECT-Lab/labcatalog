@@ -190,7 +190,9 @@ def check_score_agreement(
             )
             issues.append(problem("score_mismatch", message, where))
         if one_sided.any():
-            message = f"{score.key}: {one_sided.sum()} row(s) have a score on only one side ({column})"
+            message = (
+                f"{score.key}: {one_sided.sum()} row(s) have a score on only one side ({column})"
+            )
             issues.append(problem("score_coverage", message, where, "warning"))
     return issues
 

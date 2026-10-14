@@ -6,7 +6,7 @@ from nicegui import app, run, ui
 from labcatalog import __version__
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.issues import summarize_issues
-from labcatalog.pipeline import run_validate
+from labcatalog.pipeline import run_check, run_validate
 
 WINDOW_SIZE = (1100, 750)
 
@@ -46,12 +46,19 @@ def main_page() -> None:
             return
         project_root = Path(selection[0])
         folder_label.set_text(str(project_root))
-        check_button.enable()
+        for button in check_buttons:
+            button.enable()
         await check_metadata()
 
     async def check_metadata() -> None:
+        await show_issues(lambda: run_validate(project_root))
+
+    async def check_data() -> None:
+        await show_issues(lambda: run_check(project_root).issues)
+
+    async def show_issues(task) -> None:
         try:
-            issues = await run.io_bound(run_validate, project_root)
+            issues = await run.io_bound(task)
         except LabCatalogError as err:
             summary.set_text("")
             table.update_rows([])
@@ -65,7 +72,12 @@ def main_page() -> None:
         with ui.row().classes("items-center gap-4"):
             ui.button("Open project folder", icon="folder_open", on_click=open_folder)
             folder_label = ui.label("No project open").classes("text-grey-7")
-        check_button = ui.button("Check metadata", icon="fact_check", on_click=check_metadata)
-        check_button.disable()
+        with ui.row().classes("gap-2"):
+            check_buttons = [
+                ui.button("Check metadata", icon="fact_check", on_click=check_metadata),
+                ui.button("Check data", icon="table_view", on_click=check_data),
+            ]
+        for button in check_buttons:
+            button.disable()
         summary = ui.label().classes("text-lg")
         table = ui.table(columns=ISSUE_COLUMNS, rows=[], row_key="id").classes("w-full")
