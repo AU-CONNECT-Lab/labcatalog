@@ -5,7 +5,6 @@ from typing import Any
 
 from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
-from labcatalog.ids import parse_id_rules
 from labcatalog.issues import Issue, IssueLevel
 from labcatalog.project import Project
 from labcatalog.schema import Administration, Instrument
@@ -322,8 +321,6 @@ def check_variable_maps(project: Project) -> list[Issue]:
 def check_data_settings(project: Project) -> list[Issue]:
     config = project.config
     issues = []
-    _, problems = parse_id_rules(config.ids.rules)
-    issues += [problem("invalid_value", f"ids.rules: {p}", CONFIG) for p in problems]
     for name, pattern in [
         ("pattern", config.ids.pattern),
         ("family_from_id", config.ids.family_from_id),
@@ -340,9 +337,6 @@ def check_data_settings(project: Project) -> list[Issue]:
             issues.append(problem("invalid_value", message, CONFIG))
     for n, dataset in enumerate(config.datasets, start=1):
         where = f"datasets[{n}] ({dataset.name})"
-        if dataset.id_rules is not None:
-            _, problems = parse_id_rules(dataset.id_rules)
-            issues += [problem("invalid_value", f"{where}.id_rules: {p}", CONFIG) for p in problems]
         if dataset.source == "csv" and not dataset.path:
             issues.append(problem("invalid_value", f"{where}: a csv dataset needs a path", CONFIG))
     return issues

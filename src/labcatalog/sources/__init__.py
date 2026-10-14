@@ -4,9 +4,9 @@ from typing import Protocol
 
 import pandas as pd
 
-from labcatalog.config import DatasetConfig, id_column_for, id_rules_for
+from labcatalog.config import DatasetConfig, id_column_for
 from labcatalog.exceptions import DataSourceError
-from labcatalog.ids import family_ids, load_exclusions, normalize_ids, parse_id_rules
+from labcatalog.ids import family_ids, load_exclusions
 from labcatalog.paths import expand_path
 from labcatalog.project import Project
 from labcatalog.sources.csv_source import CsvSource
@@ -24,7 +24,6 @@ class LoadedDataset:
     config: DatasetConfig
     frame: pd.DataFrame
     id_column: str
-    raw_ids: pd.Series
     family: pd.Series | None
     source_path: Path | None
     n_excluded: int = 0
@@ -40,15 +39,13 @@ def load_dataset(project: Project, dataset: DatasetConfig, exclusions: set[str])
     id_column = id_column_for(config, dataset)
     if id_column not in frame:
         raise DataSourceError(f"{dataset.name}: no ID column '{id_column}'")
-    rules, _ = parse_id_rules(id_rules_for(config, dataset))
-    raw_ids = frame[id_column]
-    ids = normalize_ids(raw_ids, rules)
+    ids = frame[id_column]
 
     family = None
     if dataset.family_column:
         if dataset.family_column not in frame:
             raise DataSourceError(f"{dataset.name}: no family column '{dataset.family_column}'")
-        family = frame[dataset.family_column].str.strip()
+        family = frame[dataset.family_column]
     elif config.ids.family_from_id:
         family = family_ids(ids, config.ids.family_from_id)
 
@@ -56,12 +53,11 @@ def load_dataset(project: Project, dataset: DatasetConfig, exclusions: set[str])
     if family is not None:
         excluded |= family.isin(exclusions)
     keep = ~excluded
-    frame = frame.assign(**{id_column: ids})[keep].reset_index(drop=True)
+    frame = frame[keep].reset_index(drop=True)
     return LoadedDataset(
         config=dataset,
         frame=frame,
         id_column=id_column,
-        raw_ids=raw_ids[keep].reset_index(drop=True),
         family=None if family is None else family[keep].reset_index(drop=True),
         source_path=expand_path(dataset.path, project.root) if dataset.path else None,
         n_excluded=int(excluded.sum()),

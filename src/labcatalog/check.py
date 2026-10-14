@@ -7,15 +7,8 @@ from labcatalog.resolve import Catalog
 from labcatalog.sources import LoadedDataset
 
 
-class IdChange(BaseModel):
-    dataset: str
-    n_changed: int
-    examples: list[tuple[str, str]]
-
-
 class CheckReport(BaseModel):
     issues: list[Issue] = []
-    id_changes: list[IdChange] = []
 
     def has_errors(self) -> bool:
         raise NotImplementedError
@@ -33,7 +26,7 @@ def check_values(
 
 def check_ids(
     datasets: dict[str, LoadedDataset], config: ProjectConfig
-) -> tuple[list[Issue], list[IdChange]]:
+) -> list[Issue]:
     raise NotImplementedError
 
 

@@ -26,11 +26,9 @@ def test_loads_every_dataset_as_text(mock_project):
     assert "" in set(frame["eps_1_w1"])
 
 
-def test_ids_are_normalized_and_families_derived(mock_project):
+def test_ids_are_read_as_is_and_families_derived(mock_project):
     parent = load_datasets(load_project(mock_project))["parent_w1"]
-    changed = parent.raw_ids != parent.frame["pid"]
-    assert parent.raw_ids[changed].tolist() == [" 1031P"]
-    assert parent.frame.loc[changed, "pid"].tolist() == ["1031P"]
+    assert " 1031P" in set(parent.frame["pid"])
     assert parent.family.iloc[0] == parent.frame["pid"].iloc[0][:4]
 
 

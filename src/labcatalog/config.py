@@ -31,7 +31,6 @@ class Defaults(StrictModel):
 class IdConfig(StrictModel):
     pattern: str | None = None
     family_from_id: str | None = None
-    rules: list[str | dict[str, Any]] = list(defaults.ID_RULES)
 
 
 class WaveConfig(StrictModel):
@@ -55,7 +54,6 @@ class DatasetConfig(StrictModel):
     url: str | None = None
     table: str | None = None
     id_column: str | None = None
-    id_rules: list[str | dict[str, Any]] | None = None
     family_column: str | None = None
     date_column: str | None = None
     snapshot_date: date | None = None
@@ -111,6 +109,3 @@ def missing_codes_for(config: ProjectConfig, dataset: DatasetConfig) -> list[Mis
 def id_column_for(config: ProjectConfig, dataset: DatasetConfig) -> str:
     return dataset.id_column or config.defaults.id_column
 
-
-def id_rules_for(config: ProjectConfig, dataset: DatasetConfig) -> list[str | dict[str, Any]]:
-    return dataset.id_rules if dataset.id_rules is not None else config.ids.rules

@@ -10,7 +10,6 @@ OUTPUT_DIR = "site"
 MANIFEST_FILENAME = "manifest.json"
 
 ID_COLUMN = "id"
-ID_RULES = ("strip",)
 DATE_FORMAT = "%Y-%m-%d"
 DEFAULT_MODALITIES = ("questionnaire",)
 
