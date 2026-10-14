@@ -1,10 +1,16 @@
+import hashlib
+import subprocess
 from datetime import date, datetime
 from pathlib import Path
 
 from pydantic import BaseModel
 
+from labcatalog import __version__
+from labcatalog.paths import portable_path
 from labcatalog.project import Project
 from labcatalog.sources import LoadedDataset
+
+CHUNK = 1 << 20
 
 
 class FileRecord(BaseModel):
@@ -23,12 +29,44 @@ class Manifest(BaseModel):
 
 
 def file_sha256(path: Path) -> str:
-    raise NotImplementedError
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(CHUNK):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def git_commit(root: Path) -> str | None:
-    raise NotImplementedError
+    # Metadata outside git, or a machine without git, simply has no commit to record.
+    try:
+        head = run_git(root, "rev-parse", "--short", "HEAD")
+        changed = run_git(root, "status", "--porcelain", "--", ".")
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return f"{head}-modified" if changed else head
+
+
+def run_git(root: Path, *args: str) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(root), *args], capture_output=True, text=True, check=True
+    )
+    return result.stdout.strip()
 
 
 def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Manifest:
-    raise NotImplementedError
+    return Manifest(
+        built_at=datetime.now().replace(microsecond=0),
+        tool_version=__version__,
+        metadata_commit=git_commit(project.root),
+        files=[
+            FileRecord(
+                dataset=name,
+                path=portable_path(loaded.source_path, project.root).as_posix(),
+                sha256=file_sha256(loaded.source_path),
+                rows=len(loaded.frame),
+                snapshot_date=loaded.config.snapshot_date,
+            )
+            for name, loaded in datasets.items()
+            if loaded.source_path is not None
+        ],
+    )
