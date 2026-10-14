@@ -1,9 +1,11 @@
+import re
 from collections import Counter
 from datetime import date
 from typing import Any
 
 from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
+from labcatalog.ids import parse_id_rules
 from labcatalog.issues import Issue, IssueLevel
 from labcatalog.project import Project
 from labcatalog.schema import Administration, Instrument
@@ -18,6 +20,7 @@ def validate_project(project: Project) -> list[Issue]:
         *check_custom_fields(project),
         *check_missing_code_collisions(project),
         *check_variable_maps(project),
+        *check_data_settings(project),
     ]
 
 
@@ -299,6 +302,35 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 shown = ", ".join(unmapped[:5]) + (" ..." if len(unmapped) > 5 else "")
                 message = f"{instrument_id}: {len(unmapped)} item(s) have no column: {shown}"
                 issues.append(problem("unmapped_item", message, location, level="warning"))
+    return issues
+
+
+def check_data_settings(project: Project) -> list[Issue]:
+    config = project.config
+    issues = []
+    _, problems = parse_id_rules(config.ids.rules)
+    issues += [problem("invalid_value", f"ids.rules: {p}", CONFIG) for p in problems]
+    for name, pattern in [
+        ("pattern", config.ids.pattern),
+        ("family_from_id", config.ids.family_from_id),
+    ]:
+        if pattern is None:
+            continue
+        try:
+            groups = re.compile(pattern).groups
+        except re.error as err:
+            issues.append(problem("invalid_value", f"ids.{name}: invalid pattern: {err}", CONFIG))
+            continue
+        if name == "family_from_id" and groups != 1:
+            message = "ids.family_from_id: needs exactly one (...) group around the family part"
+            issues.append(problem("invalid_value", message, CONFIG))
+    for n, dataset in enumerate(config.datasets, start=1):
+        where = f"datasets[{n}] ({dataset.name})"
+        if dataset.id_rules is not None:
+            _, problems = parse_id_rules(dataset.id_rules)
+            issues += [problem("invalid_value", f"{where}.id_rules: {p}", CONFIG) for p in problems]
+        if dataset.source == "csv" and not dataset.path:
+            issues.append(problem("invalid_value", f"{where}: a csv dataset needs a path", CONFIG))
     return issues
 
 

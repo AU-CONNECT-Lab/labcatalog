@@ -31,7 +31,7 @@ class Defaults(StrictModel):
 class IdConfig(StrictModel):
     pattern: str | None = None
     family_from_id: str | None = None
-    rules: list[str | dict[str, Any]] = []
+    rules: list[str | dict[str, Any]] = list(defaults.ID_RULES)
 
 
 class WaveConfig(StrictModel):
@@ -50,7 +50,7 @@ class DatasetConfig(StrictModel):
     study: str
     wave: str
     reporter: str
-    source: str
+    source: Literal["csv"]
     path: str | None = None
     url: str | None = None
     table: str | None = None
@@ -101,16 +101,16 @@ def load_config(path: Path) -> ProjectConfig:
 
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:
-    raise NotImplementedError
+    return next(dataset for dataset in config.datasets if dataset.name == name)
 
 
 def missing_codes_for(config: ProjectConfig, dataset: DatasetConfig) -> list[MissingCode]:
-    raise NotImplementedError
+    return dataset.missing_codes if dataset.missing_codes is not None else config.missing_codes
 
 
 def id_column_for(config: ProjectConfig, dataset: DatasetConfig) -> str:
-    raise NotImplementedError
+    return dataset.id_column or config.defaults.id_column
 
 
 def id_rules_for(config: ProjectConfig, dataset: DatasetConfig) -> list[str | dict[str, Any]]:
-    raise NotImplementedError
+    return dataset.id_rules if dataset.id_rules is not None else config.ids.rules

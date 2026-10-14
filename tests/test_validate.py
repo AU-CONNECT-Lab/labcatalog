@@ -129,3 +129,13 @@ def test_blank_rows_left_by_excel_are_ignored(mock_project):
     path = mock_project / "maps" / "child_w2.csv"
     path.write_text(path.read_text(encoding="utf-8") + ",,\n,,\n", encoding="utf-8")
     assert run_validate(mock_project) == []
+
+
+def test_id_settings_are_checked_before_reading_data(mock_project):
+    edit(
+        mock_project / "labcatalog.yaml",
+        r"family_from_id: '^(\d{4})'",
+        "family_from_id: '^[0-9]{4}'\n  rules: [trim]",
+    )
+    issues = run_validate(mock_project)
+    assert {i.message.split(":")[0] for i in issues} == {"ids.rules", "ids.family_from_id"}
