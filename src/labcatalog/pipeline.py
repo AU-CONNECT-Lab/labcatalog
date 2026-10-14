@@ -2,11 +2,14 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from labcatalog.check import CheckReport
+from labcatalog.check import CheckReport, check_project
 from labcatalog.exceptions import MetadataError
-from labcatalog.issues import Issue
+from labcatalog.issues import Issue, has_errors
 from labcatalog.manifest import Manifest
-from labcatalog.project import load_project
+from labcatalog.project import Project, load_project
+from labcatalog.resolve import resolve_catalog
+from labcatalog.scoring import compute_scores
+from labcatalog.sources import load_datasets
 from labcatalog.validate import validate_project
 
 
@@ -17,15 +20,26 @@ class BuildResult(BaseModel):
 
 
 def run_validate(root: Path) -> list[Issue]:
-    try:
-        project = load_project(root)
-    except MetadataError as err:
-        return err.issues
-    return validate_project(project)
+    return load_validated(root)[1]
 
 
 def run_check(root: Path) -> CheckReport:
-    raise NotImplementedError
+    project, issues = load_validated(root)
+    if project is None:
+        return CheckReport(issues=issues)
+    catalog = resolve_catalog(project)
+    datasets = load_datasets(project)
+    report = check_project(project, catalog, datasets, compute_scores(catalog, datasets))
+    return CheckReport(issues=[*issues, *report.issues])
+
+
+def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
+    try:
+        project = load_project(root)
+    except MetadataError as err:
+        return None, err.issues
+    issues = validate_project(project)
+    return (None if has_errors(issues) else project), issues
 
 
 def run_build(root: Path) -> BuildResult:

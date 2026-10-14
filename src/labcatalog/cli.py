@@ -8,7 +8,7 @@ import typer
 from labcatalog import defaults
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.issues import Issue, has_errors, summarize_issues
-from labcatalog.pipeline import run_validate
+from labcatalog.pipeline import run_check, run_validate
 
 app = typer.Typer(
     help="Build a browsable catalog of a lab's study data.",
@@ -73,7 +73,9 @@ def validate(project: ProjectOption = Path(".")) -> None:
 @app.command()
 def check(project: ProjectOption = Path(".")) -> None:
     """Read the data and report mismatches with the metadata."""
-    raise NotImplementedError
+    report = run_check(project)
+    print_issues(report.issues)
+    raise typer.Exit(EXIT_ISSUES if report.has_errors() else EXIT_OK)
 
 
 @app.command()
