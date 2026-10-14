@@ -112,11 +112,12 @@ def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issu
             repeated = ids[duplicated].unique()
             message = f"{len(repeated)} ID(s) appear more than once: {examples(repeated)}"
             issues.append(problem("id_duplicate", message, where))
-        if loaded.family is not None:
-            no_family = clean & loaded.family.isna()
-            if no_family.any():
-                message = f"{no_family.sum()} ID(s) give no family ID: {examples(ids[no_family])}"
-                issues.append(problem("family_missing", message, where, "warning"))
+        if loaded.group is not None:
+            no_group = clean & loaded.group.isna()
+            if no_group.any():
+                name = project.config.ids.group.name if project.config.ids.group else "group"
+                message = f"{no_group.sum()} ID(s) give no {name} ID: {examples(ids[no_group])}"
+                issues.append(problem("group_missing", message, where, "warning"))
     return issues
 
 
@@ -128,11 +129,11 @@ def check_exclusions(project: Project, datasets: dict[str, LoadedDataset]) -> li
     for loaded in datasets.values():
         ids = loaded.frame[loaded.id_column]
         hits = ids.isin(excluded)
-        if loaded.family is not None:
-            hits |= loaded.family.isin(excluded)
+        if loaded.group is not None:
+            hits |= loaded.group.isin(excluded)
         if hits.any():
             message = (
-                f"{hits.sum()} row(s) belong to people or families on the exclusion list: "
+                f"{hits.sum()} row(s) belong to people or groups on the exclusion list: "
                 f"{examples(ids[hits])}"
             )
             issues.append(problem("excluded_present", message, location(project, loaded)))

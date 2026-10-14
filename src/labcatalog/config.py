@@ -28,9 +28,14 @@ class Defaults(StrictModel):
     date_format: str = defaults.DATE_FORMAT
 
 
+class GroupConfig(StrictModel):
+    name: str
+    from_id: str | None = None
+
+
 class IdConfig(StrictModel):
     pattern: str | None = None
-    family_from_id: str | None = None
+    group: GroupConfig | None = None
 
 
 class WaveConfig(StrictModel):
@@ -54,7 +59,7 @@ class DatasetConfig(StrictModel):
     url: str | None = None
     table: str | None = None
     id_column: str | None = None
-    family_column: str | None = None
+    group_column: str | None = None
     date_column: str | None = None
     snapshot_date: date | None = None
     missing_codes: list[MissingCode] | None = None
@@ -75,6 +80,10 @@ class ReferencesConfig(StrictModel):
     mode: Literal["link", "copy"] = defaults.REFERENCES_MODE
 
 
+class StatsConfig(StrictModel):
+    correlate_by: str = defaults.CORRELATE_BY
+
+
 class OutputConfig(StrictModel):
     dir: str = defaults.OUTPUT_DIR
 
@@ -91,6 +100,7 @@ class ProjectConfig(StrictModel):
     custom_fields: list[CustomFieldDef] = []
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     exclusions: str | None = None
+    stats: StatsConfig = Field(default_factory=StatsConfig)
     output: OutputConfig = Field(default_factory=OutputConfig)
 
 

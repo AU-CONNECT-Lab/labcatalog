@@ -6,7 +6,7 @@ import pandas as pd
 
 from labcatalog.config import DatasetConfig, id_column_for
 from labcatalog.exceptions import DataSourceError
-from labcatalog.ids import family_ids
+from labcatalog.ids import group_ids
 from labcatalog.paths import expand_path
 from labcatalog.project import Project
 from labcatalog.sources.csv_source import CsvSource
@@ -24,7 +24,7 @@ class LoadedDataset:
     config: DatasetConfig
     frame: pd.DataFrame
     id_column: str
-    family: pd.Series | None
+    group: pd.Series | None
     source_path: Path | None
 
 
@@ -40,19 +40,19 @@ def load_dataset(project: Project, dataset: DatasetConfig) -> LoadedDataset:
         raise DataSourceError(f"{dataset.name}: no ID column '{id_column}'")
     ids = frame[id_column]
 
-    family = None
-    if dataset.family_column:
-        if dataset.family_column not in frame:
-            raise DataSourceError(f"{dataset.name}: no family column '{dataset.family_column}'")
-        family = frame[dataset.family_column]
-    elif config.ids.family_from_id:
-        family = family_ids(ids, config.ids.family_from_id)
+    group = None
+    if dataset.group_column:
+        if dataset.group_column not in frame:
+            raise DataSourceError(f"{dataset.name}: no group column '{dataset.group_column}'")
+        group = frame[dataset.group_column]
+    elif config.ids.group and config.ids.group.from_id:
+        group = group_ids(ids, config.ids.group.from_id)
 
     return LoadedDataset(
         config=dataset,
         frame=frame,
         id_column=id_column,
-        family=family,
+        group=group,
         source_path=expand_path(dataset.path, project.root) if dataset.path else None,
     )
 

@@ -13,6 +13,8 @@ ID_COLUMN = "id"
 DATE_FORMAT = "%Y-%m-%d"
 BLANK_LABEL = "blank"
 MIN_CORRELATION_N = 3
+CORRELATE_BY = "id"
+SAME_ANSWER_MIN_ITEMS = 5
 DEFAULT_MODALITIES = ("questionnaire",)
 
 REFERENCES_MODE = "link"

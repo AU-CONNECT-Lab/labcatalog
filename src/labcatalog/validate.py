@@ -321,9 +321,10 @@ def check_variable_maps(project: Project) -> list[Issue]:
 def check_data_settings(project: Project) -> list[Issue]:
     config = project.config
     issues = []
+    group = config.ids.group
     for name, pattern in [
         ("pattern", config.ids.pattern),
-        ("family_from_id", config.ids.family_from_id),
+        ("group.from_id", group.from_id if group else None),
     ]:
         if pattern is None:
             continue
@@ -332,13 +333,23 @@ def check_data_settings(project: Project) -> list[Issue]:
         except re.error as err:
             issues.append(problem("invalid_value", f"ids.{name}: invalid pattern: {err}", CONFIG))
             continue
-        if name == "family_from_id" and groups != 1:
-            message = "ids.family_from_id: needs exactly one (...) group around the family part"
+        if name == "group.from_id" and groups != 1:
+            message = "ids.group.from_id: needs exactly one (...) around the group part of the ID"
             issues.append(problem("invalid_value", message, CONFIG))
     for n, dataset in enumerate(config.datasets, start=1):
         where = f"datasets[{n}] ({dataset.name})"
         if dataset.source == "csv" and not dataset.path:
             issues.append(problem("invalid_value", f"{where}: a csv dataset needs a path", CONFIG))
+        if dataset.group_column and group is None:
+            message = f"{where}.group_column: declare ids.group (its name) first"
+            issues.append(problem("invalid_value", message, CONFIG))
+        if group and not group.from_id and not dataset.group_column:
+            message = f"{where}: needs group_column, or ids.group.from_id for every dataset"
+            issues.append(problem("invalid_value", message, CONFIG))
+    allowed = {"id", "none"} | ({group.name} if group else set())
+    if config.stats.correlate_by not in allowed:
+        message = f"stats.correlate_by: '{config.stats.correlate_by}' is not one of {', '.join(sorted(allowed))}"
+        issues.append(problem("invalid_value", message, CONFIG))
     return issues
 
 

@@ -6,7 +6,7 @@ import pandas as pd
 from labcatalog.exceptions import DataSourceError
 
 
-def family_ids(ids: pd.Series, pattern: str) -> pd.Series:
+def group_ids(ids: pd.Series, pattern: str) -> pd.Series:
     return ids.str.extract(pattern, expand=False)
 
 
