@@ -212,7 +212,9 @@ def histogram(
     else:
         edges = np.linspace(low, high, defaults.HISTOGRAM_BINS + 1)
     counts, _ = np.histogram(values, bins=edges)
-    return [(float(a), float(b), int(c)) for a, b, c in zip(edges[:-1], edges[1:], counts)]
+    return [
+        (float(a), float(b), int(c)) for a, b, c in zip(edges[:-1], edges[1:], counts, strict=True)
+    ]
 
 
 def cronbach_alpha(items: pd.DataFrame) -> float | None:

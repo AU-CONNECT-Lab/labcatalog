@@ -4,7 +4,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.config import missing_codes_for, missing_labels_for
+from labcatalog.config import missing_labels_for
 from labcatalog.ids import load_exclusions
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
