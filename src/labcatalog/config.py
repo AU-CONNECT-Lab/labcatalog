@@ -77,15 +77,10 @@ class CustomFieldDef(StrictModel):
 
 class ReferencesConfig(StrictModel):
     root: str | None = None
-    mode: Literal["link", "copy"] = defaults.REFERENCES_MODE
 
 
 class StatsConfig(StrictModel):
     correlate_by: str = defaults.CORRELATE_BY
-
-
-class OutputConfig(StrictModel):
-    dir: str = defaults.OUTPUT_DIR
 
 
 class ProjectConfig(StrictModel):
@@ -101,7 +96,6 @@ class ProjectConfig(StrictModel):
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)
-    output: OutputConfig = Field(default_factory=OutputConfig)
 
 
 def load_config(path: Path) -> ProjectConfig:

@@ -6,8 +6,6 @@ INSTRUMENTS_DIR = "instruments"
 STUDIES_DIR = "studies"
 MAPS_DIR = "maps"
 SCORE_PREFIX = "score:"
-OUTPUT_DIR = "site"
-MANIFEST_FILENAME = "manifest.json"
 
 ID_COLUMN = "id"
 DATE_FORMAT = "%Y-%m-%d"
@@ -16,10 +14,6 @@ MIN_CORRELATION_N = 3
 CORRELATE_BY = "id"
 SAME_ANSWER_MIN_ITEMS = 5
 DEFAULT_MODALITIES = ("questionnaire",)
-
-REFERENCES_MODE = "link"
-REFERENCES_ROUTE = "/_refs/"
-PREVIEW_PORT = 8000
 
 EXAMPLE_VALUES = 3
 HISTOGRAM_BINS = 20

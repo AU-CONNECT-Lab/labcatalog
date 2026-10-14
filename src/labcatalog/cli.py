@@ -5,7 +5,6 @@ from typing import Annotated
 
 import typer
 
-from labcatalog import defaults
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import run_check, run_validate
@@ -76,23 +75,6 @@ def check(project: ProjectOption = Path(".")) -> None:
     report = run_check(project)
     print_issues(report.issues)
     raise typer.Exit(EXIT_ISSUES if report.has_errors() else EXIT_OK)
-
-
-@app.command()
-def build(project: ProjectOption = Path(".")) -> None:
-    """Build the internal catalog website."""
-    raise NotImplementedError
-
-
-@app.command()
-def preview(
-    project: ProjectOption = Path("."),
-    port: Annotated[
-        int, typer.Option("--port", help="Local port to serve on.")
-    ] = defaults.PREVIEW_PORT,
-) -> None:
-    """Serve the built website locally, including linked reference PDFs."""
-    raise NotImplementedError
 
 
 @app.command()

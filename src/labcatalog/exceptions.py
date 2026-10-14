@@ -24,7 +24,3 @@ class MetadataError(LabCatalogError):
 
 class DataSourceError(LabCatalogError):
     exit_code = 4
-
-
-class BuildError(LabCatalogError):
-    exit_code = 5
