@@ -15,9 +15,11 @@ def reverse(values: pd.Series, low: float, high: float) -> pd.Series:
     return low + high - values
 
 
-def compute_score(frame: pd.DataFrame, score: ResolvedScore) -> pd.Series:
-    if score.unavailable_items or any(column not in frame for column in score.columns):
-        return pd.Series(np.nan, index=frame.index, dtype=float)
+def scorable(frame: pd.DataFrame, score: ResolvedScore) -> bool:
+    return not score.unavailable_items and all(column in frame for column in score.columns)
+
+
+def score_items(frame: pd.DataFrame, score: ResolvedScore) -> pd.DataFrame:
     items = pd.DataFrame(
         {column: item_values(frame[column], score.valid_values[column]) for column in score.columns}
     )
@@ -25,7 +27,13 @@ def compute_score(frame: pd.DataFrame, score: ResolvedScore) -> pd.Series:
         for column in score.reverse_columns:
             low, high = score.reverse_bounds[column]
             items[column] = reverse(items[column], low, high)
+    return items
 
+
+def compute_score(frame: pd.DataFrame, score: ResolvedScore) -> pd.Series:
+    if not scorable(frame, score):
+        return pd.Series(np.nan, index=frame.index, dtype=float)
+    items = score_items(frame, score)
     k = len(score.columns)
     n_valid = items.notna().sum(axis=1)
     if score.missing_rule == "complete":

@@ -4,7 +4,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.config import missing_codes_for
+from labcatalog.config import missing_codes_for, missing_labels_for
 from labcatalog.ids import load_exclusions
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
@@ -36,6 +36,7 @@ def check_project(
             *check_ids(project, datasets),
             *check_exclusions(project, datasets),
             *check_identifier_columns(project, datasets),
+            *check_dates(project, datasets),
             *check_score_agreement(project, catalog, datasets, scores),
         ]
     )
@@ -68,11 +69,12 @@ def check_values(
         loaded = datasets[variable.dataset]
         if not variable.response_options or variable.column not in loaded.frame:
             continue
-        codes = [m.code for m in missing_codes_for(project.config, loaded.config)]
+        codes = list(missing_labels_for(project.config, loaded.config))
         allowed = [option.value for option in variable.response_options] + codes
         values = loaded.frame[variable.column]
         numbers = pd.to_numeric(values, errors="coerce")
-        numeric_allowed = [float(v) for v in allowed if isinstance(v, int | float)]
+        numeric_allowed = [float(v) for v in allowed if not isinstance(v, str)]
+        numeric_allowed += [float(v) for v in codes if is_number(v)]
         ok = values.isin([str(v) for v in allowed]) | numbers.isin(numeric_allowed)
         if not ok.all():
             stray = values[~ok]
@@ -160,6 +162,24 @@ def check_identifier_columns(project: Project, datasets: dict[str, LoadedDataset
     return issues
 
 
+def check_dates(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
+    issues = []
+    for loaded in datasets.values():
+        column = loaded.config.date_column
+        if column is None or column not in loaded.frame:
+            continue
+        values = loaded.frame[column]
+        parsed = pd.to_datetime(values, format=project.config.defaults.date_format, errors="coerce")
+        bad = parsed.isna() & (values.str.strip() != "")
+        if bad.any():
+            message = (
+                f"{column}: {bad.sum()} date(s) do not match {project.config.defaults.date_format}: "
+                f"{examples(values[bad])}"
+            )
+            issues.append(problem("date_unparseable", message, location(project, loaded), "warning"))
+    return issues
+
+
 def check_score_agreement(
     project: Project,
     catalog: Catalog,
@@ -173,7 +193,7 @@ def check_score_agreement(
         if column is None or column not in loaded.frame:
             continue
         raw = loaded.frame[column]
-        codes = [str(m.code) for m in missing_codes_for(project.config, loaded.config)]
+        codes = list(missing_labels_for(project.config, loaded.config))
         existing = pd.to_numeric(raw.where(~raw.isin(codes)), errors="coerce")
         # Compare at the precision the lab's own script wrote.
         places = raw.str.extract(r"\.(\d+)$", expand=False).str.len()
@@ -195,6 +215,14 @@ def check_score_agreement(
             )
             issues.append(problem("score_coverage", message, where, "warning"))
     return issues
+
+
+def is_number(text: str) -> bool:
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
 
 
 def location(project: Project, loaded: LoadedDataset) -> str:

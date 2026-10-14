@@ -106,5 +106,12 @@ def missing_codes_for(config: ProjectConfig, dataset: DatasetConfig) -> list[Mis
     return dataset.missing_codes if dataset.missing_codes is not None else config.missing_codes
 
 
+def missing_labels_for(config: ProjectConfig, dataset: DatasetConfig) -> dict[str, str]:
+    # Blank cells always count as missing, whether or not a code for them is declared.
+    labels = {"": defaults.BLANK_LABEL}
+    labels.update({str(m.code): m.label for m in missing_codes_for(config, dataset)})
+    return labels
+
+
 def id_column_for(config: ProjectConfig, dataset: DatasetConfig) -> str:
     return dataset.id_column or config.defaults.id_column

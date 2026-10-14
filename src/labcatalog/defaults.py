@@ -11,6 +11,8 @@ MANIFEST_FILENAME = "manifest.json"
 
 ID_COLUMN = "id"
 DATE_FORMAT = "%Y-%m-%d"
+BLANK_LABEL = "blank"
+MIN_CORRELATION_N = 3
 DEFAULT_MODALITIES = ("questionnaire",)
 
 REFERENCES_MODE = "link"
