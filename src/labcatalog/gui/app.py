@@ -3,10 +3,10 @@ from pathlib import Path
 import webview
 from nicegui import app, run, ui
 
-from labcatalog import __version__
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.issues import summarize_issues
 from labcatalog.pipeline import run_check, run_validate
+from labcatalog.version import __version__
 
 WINDOW_SIZE = (1100, 750)
 

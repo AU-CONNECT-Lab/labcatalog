@@ -7,8 +7,8 @@ from labcatalog.exceptions import (
 )
 from labcatalog.pipeline import run_build, run_check, run_schema, run_validate
 from labcatalog.project import Project, init_project, load_project
+from labcatalog.version import __version__
 
-__version__ = "0.1.0"
 
 __all__ = [
     "BuildError",

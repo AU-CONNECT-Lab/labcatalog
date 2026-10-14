@@ -5,10 +5,10 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from labcatalog import __version__
 from labcatalog.paths import portable_path
 from labcatalog.project import Project
 from labcatalog.sources import LoadedDataset
+from labcatalog.version import __version__
 
 CHUNK = 1 << 20
 
