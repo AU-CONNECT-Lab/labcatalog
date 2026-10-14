@@ -1,0 +1,27 @@
+id: example_mood
+name: Example Mood Scale
+abbreviation: EMS
+construct_name: Mood and negative affect
+instructions: Think about the past two weeks. How often did you feel this way?
+response_sets:
+  - id: frequency
+    options:
+      - {value: 0, label: Never}
+      - {value: 1, label: Sometimes}
+      - {value: 2, label: Often}
+      - {value: 3, label: Always}
+default_response_set: frequency
+items:
+  - {id: ems_1, text: I felt happy., reverse: true}
+  - {id: ems_2, text: I felt sad.}
+  - {id: ems_3, text: I worried about things.}
+  - {id: ems_4, text: I enjoyed the things I did., reverse: true}
+  - {id: ems_5, text: I felt tired for no reason.}
+  - {id: ems_6, text: I felt like crying.}
+scores:
+  - {id: ems_total, label: Total score, method: sum, items: [ems_1, ems_2, ems_3, ems_4, ems_5, ems_6], min_valid: 5}
+references:
+  - citation: "Example, A., & Sample, B. (2019). Development of the Example Mood Scale. Journal of Demonstration Measures, 4(2), 101-115. (Fictional reference for the mock project.)"
+license: Free for research use (fictional)
+custom:
+  domain: emotion

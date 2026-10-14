@@ -1,0 +1,41 @@
+project:
+  name: Mock Family Study Catalog
+
+vocab:
+  modalities: [questionnaire]
+  reporters: [parent, child]
+  targets: [self, child]
+
+missing_codes:
+  - {code: -99, label: refused}
+  - {code: -98, label: not applicable}
+  - {code: -97, label: don't know}
+  - {code: "", label: blank}
+
+defaults:
+  id_column: pid
+
+ids:
+  pattern: '^\d{4}[PC]$'
+  family_from_id: '^(\d{4})'
+
+studies:
+  mock_study:
+    label: Mock Family Study
+    waves:
+      1: {start: 2025-09-01, end: 2026-05-31}
+      2: {start: 2026-09-01}
+
+datasets:
+  - {name: parent_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: parent, source: csv, path: data/parent_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: parent_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: child_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: child, source: csv, path: data/child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+
+custom_fields:
+  - name: domain
+    label: Domain
+    applies_to: instrument
+    type: choice
+    choices: [emotion, family, health, media]
+    filter: true

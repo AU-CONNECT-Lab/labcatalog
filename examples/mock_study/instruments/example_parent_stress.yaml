@@ -1,0 +1,27 @@
+id: example_parent_stress
+name: Example Parenting Stress Scale
+abbreviation: EPS
+construct_name: Parenting stress
+instructions: Please indicate how much you agree with each statement.
+response_sets:
+  - id: agreement
+    options:
+      - {value: 1, label: Strongly disagree}
+      - {value: 2, label: Disagree}
+      - {value: 3, label: Neutral}
+      - {value: 4, label: Agree}
+      - {value: 5, label: Strongly agree}
+default_response_set: agreement
+items:
+  - {id: eps_1, text: I feel overwhelmed by my responsibilities as a parent.}
+  - {id: eps_2, text: I enjoy spending time with my child., reverse: true}
+  - {id: eps_3, text: I feel tired most of the time.}
+  - {id: eps_4, text: "I find it hard to manage my child's behavior."}
+  - {id: eps_5, text: I have little time for myself.}
+scores:
+  - {id: eps_mean, label: Mean score, method: mean, items: [eps_1, eps_2, eps_3, eps_4, eps_5], min_valid: 4}
+references:
+  - citation: "Sample, B. (2017). The Example Parenting Stress Scale: A brief measure. Demonstration Quarterly, 12(1), 33-47. (Fictional reference for the mock project.)"
+license: Free for research use (fictional)
+custom:
+  domain: family

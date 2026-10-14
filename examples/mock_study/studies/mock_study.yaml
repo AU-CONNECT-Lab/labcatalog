@@ -1,0 +1,6 @@
+study: mock_study
+administrations:
+  - {instrument: example_parent_stress, datasets: [parent_w1, parent_w2], target: self, naming: "{item}_w{wave}"}
+  - {instrument: example_child_sleep, datasets: [parent_w1, parent_w2], target: child, naming: "{item}_w{wave}"}
+  - {instrument: example_mood, datasets: [child_w1, child_w2], target: self, naming: "{item}_w{wave}"}
+  - {instrument: example_screen_time, datasets: [child_w2], target: self, naming: "{item}_w{wave}"}
