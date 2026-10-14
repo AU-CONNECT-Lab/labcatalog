@@ -35,6 +35,7 @@ class Score(StrictModel):
     label: str
     method: Literal["sum", "mean"]
     items: list[str]
+    missing_rule: Literal["complete", "prorate", "zero"] = "complete"
     min_valid: int | None = None
 
 
@@ -76,9 +77,6 @@ class Administration(StrictModel):
     datasets: list[str]
     target: str | None = None
     abbreviation: str | None = None
-    naming: str | None = None
-    variables: dict[str, str] = {}
-    score_variables: dict[str, str] = {}
     reversed_in_data: bool = False
     overrides: list[ItemOverride] = []
     custom: dict[str, Any] = {}

@@ -4,6 +4,8 @@ CONFIG_FILENAME = "labcatalog.yaml"
 YAML_SUFFIXES = (".yaml", ".yml")
 INSTRUMENTS_DIR = "instruments"
 STUDIES_DIR = "studies"
+MAPS_DIR = "maps"
+SCORE_PREFIX = "score:"
 OUTPUT_DIR = "site"
 MANIFEST_FILENAME = "manifest.json"
 

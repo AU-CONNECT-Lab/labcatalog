@@ -10,6 +10,7 @@ from labcatalog.config import ProjectConfig
 from labcatalog.exceptions import MetadataError, ProjectNotFoundError
 from labcatalog.issues import Issue, issues_from_validation_error
 from labcatalog.schema import Instrument, StudyContent
+from labcatalog.varmap import MapEntry, load_variable_map
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -20,6 +21,9 @@ class Project:
     config: ProjectConfig
     instruments: dict[str, Instrument]
     studies: dict[str, StudyContent]
+    maps: dict[str, list[MapEntry]]
+    instrument_files: dict[str, str]
+    study_files: dict[str, str]
 
 
 def load_project(root: Path) -> Project:
@@ -30,11 +34,27 @@ def load_project(root: Path) -> Project:
 
     issues: list[Issue] = []
     config = load_model(config_path, ProjectConfig, root, issues)
-    instruments = load_models(root / defaults.INSTRUMENTS_DIR, Instrument, "id", root, issues)
-    studies = load_models(root / defaults.STUDIES_DIR, StudyContent, "study", root, issues)
+    instruments, instrument_files = load_models(
+        root / defaults.INSTRUMENTS_DIR, Instrument, "id", root, issues
+    )
+    studies, study_files = load_models(
+        root / defaults.STUDIES_DIR, StudyContent, "study", root, issues
+    )
+    maps = {
+        path.stem: load_variable_map(path, root, issues)
+        for path in sorted((root / defaults.MAPS_DIR).glob("*.csv"))
+    }
     if issues:
         raise MetadataError(issues)
-    return Project(root=root, config=config, instruments=instruments, studies=studies)
+    return Project(
+        root=root,
+        config=config,
+        instruments=instruments,
+        studies=studies,
+        maps=maps,
+        instrument_files=instrument_files,
+        study_files=study_files,
+    )
 
 
 def load_yaml(path: Path) -> Any:
@@ -58,7 +78,7 @@ def load_model(path: Path, model: type[ModelT], root: Path, issues: list[Issue])
 
 def load_models(
     directory: Path, model: type[ModelT], key: str, root: Path, issues: list[Issue]
-) -> dict[str, ModelT]:
+) -> tuple[dict[str, ModelT], dict[str, str]]:
     loaded: dict[str, ModelT] = {}
     seen_in: dict[str, str] = {}
     for path in sorted(p for p in directory.glob("*") if p.suffix in defaults.YAML_SUFFIXES):
@@ -79,7 +99,7 @@ def load_models(
             continue
         loaded[name] = item
         seen_in[name] = location
-    return loaded
+    return loaded, seen_in
 
 
 def yaml_issue(err: yaml.YAMLError, location: str) -> Issue:
@@ -90,26 +110,6 @@ def yaml_issue(err: yaml.YAMLError, location: str) -> Issue:
     return Issue(
         level="error", code="yaml_syntax", message=f"Invalid YAML: {problem}", location=location
     )
-
-
-def validate_project(project: Project) -> list[Issue]:
-    raise NotImplementedError
-
-
-def check_vocab(project: Project) -> list[Issue]:
-    raise NotImplementedError
-
-
-def check_cross_references(project: Project) -> list[Issue]:
-    raise NotImplementedError
-
-
-def check_custom_fields(project: Project) -> list[Issue]:
-    raise NotImplementedError
-
-
-def check_missing_code_collisions(project: Project) -> list[Issue]:
-    raise NotImplementedError
 
 
 def init_project(target: Path, example: bool = True) -> Path:

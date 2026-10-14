@@ -7,6 +7,7 @@ from labcatalog.exceptions import MetadataError
 from labcatalog.issues import Issue
 from labcatalog.manifest import Manifest
 from labcatalog.project import load_project
+from labcatalog.validate import validate_project
 
 
 class BuildResult(BaseModel):
@@ -17,10 +18,10 @@ class BuildResult(BaseModel):
 
 def run_validate(root: Path) -> list[Issue]:
     try:
-        load_project(root)
+        project = load_project(root)
     except MetadataError as err:
         return err.issues
-    return []
+    return validate_project(project)
 
 
 def run_check(root: Path) -> CheckReport:

@@ -1,0 +1,9 @@
+column,instrument,item
+pid,,
+visit_date,,
+ems_1_w1,example_mood,ems_1
+ems_2_w1,example_mood,ems_2
+ems_3_w1,example_mood,ems_3
+ems_4_w1,example_mood,ems_4
+ems_5_w1,example_mood,ems_5
+ems_6_w1,example_mood,ems_6
