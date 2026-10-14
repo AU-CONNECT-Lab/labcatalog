@@ -4,7 +4,7 @@ from labcatalog.exceptions import (
     MetadataError,
     ProjectNotFoundError,
 )
-from labcatalog.pipeline import run_check, run_schema, run_validate
+from labcatalog.pipeline import run_catalog, run_check, run_schema, run_validate
 from labcatalog.project import Project, init_project, load_project
 from labcatalog.version import __version__
 
@@ -17,6 +17,7 @@ __all__ = [
     "ProjectNotFoundError",
     "init_project",
     "load_project",
+    "run_catalog",
     "run_check",
     "run_schema",
     "run_validate",
