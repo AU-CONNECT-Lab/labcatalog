@@ -126,12 +126,26 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
         if item.response_set and item.response_set not in set_ids:
             message = f"items[{n}] ({item.id}).response_set: no response set '{item.response_set}'"
             issues.append(unknown(message, location))
-    item_ids = {item.id for item in instrument.items}
+    items = {item.id: item for item in instrument.items}
+    sets = {response_set.id: response_set for response_set in instrument.response_sets}
     for n, score in enumerate(instrument.scores, start=1):
         where = f"scores[{n}] ({score.id})"
-        absent = [item_id for item_id in score.items if item_id not in item_ids]
+        absent = [item_id for item_id in score.items if item_id not in items]
         if absent:
             issues.append(unknown(f"{where}.items: no item(s) {', '.join(absent)}", location))
+        unscorable = []
+        for item_id in score.items:
+            if item_id not in items:
+                continue
+            response_set = sets.get(items[item_id].response_set or instrument.default_response_set)
+            numeric = response_set is not None and all(
+                isinstance(option.value, int | float) for option in response_set.options
+            )
+            if not numeric:
+                unscorable.append(item_id)
+        if unscorable:
+            message = f"{where}.items: need numeric response options: {', '.join(unscorable)}"
+            issues.append(problem("invalid_value", message, location))
         if score.min_valid is not None and not 1 <= score.min_valid <= len(score.items):
             message = f"{where}.min_valid: must be between 1 and {len(score.items)}"
             issues.append(problem("invalid_value", message, location))

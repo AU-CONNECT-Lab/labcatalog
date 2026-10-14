@@ -139,3 +139,14 @@ def test_id_settings_are_checked_before_reading_data(mock_project):
     )
     issues = run_validate(mock_project)
     assert {i.message.split(":")[0] for i in issues} == {"ids.rules", "ids.family_from_id"}
+
+
+def test_scored_items_need_numeric_options(mock_project):
+    edit(
+        mock_project / "instruments" / "example_mood.yaml",
+        "{value: 3, label: Always}",
+        "{value: x, label: Always}",
+    )
+    issues = run_validate(mock_project)
+    assert codes(issues) == {"invalid_value"}
+    assert "numeric" in issues[0].message
