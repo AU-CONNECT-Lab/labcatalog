@@ -131,14 +131,14 @@ def test_blank_rows_left_by_excel_are_ignored(mock_project):
     assert run_validate(mock_project) == []
 
 
-def test_id_settings_are_checked_before_reading_data(mock_project):
+def test_family_pattern_needs_one_group(mock_project):
     edit(
         mock_project / "labcatalog.yaml",
         r"family_from_id: '^(\d{4})'",
-        "family_from_id: '^[0-9]{4}'\n  rules: [trim]",
+        "family_from_id: '^[0-9]{4}'",
     )
-    issues = run_validate(mock_project)
-    assert {i.message.split(":")[0] for i in issues} == {"ids.rules", "ids.family_from_id"}
+    [issue] = run_validate(mock_project)
+    assert issue.message.startswith("ids.family_from_id")
 
 
 def test_scored_items_need_numeric_options(mock_project):

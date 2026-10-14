@@ -33,7 +33,7 @@ def test_ids_are_read_as_is_and_families_derived(mock_project):
 
 
 def test_exclusions_by_person_and_by_family(mock_project):
-    (mock_project / "withdrawn.csv").write_text("id,reason\n1031P,withdrew\n1003,family withdrew\n")
+    (mock_project / "withdrawn.csv").write_text("id,reason\n1032P,withdrew\n1003,family withdrew\n")
     edit(
         mock_project / "labcatalog.yaml",
         "custom_fields:",
@@ -41,7 +41,7 @@ def test_exclusions_by_person_and_by_family(mock_project):
     )
     datasets = load_datasets(load_project(mock_project))
     assert datasets["parent_w1"].n_excluded == 2
-    assert "1031P" not in set(datasets["parent_w1"].frame["pid"])
+    assert "1032P" not in set(datasets["parent_w1"].frame["pid"])
     assert "1003C" not in set(datasets["child_w1"].frame["pid"])
 
 

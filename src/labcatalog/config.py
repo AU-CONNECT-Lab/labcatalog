@@ -108,4 +108,3 @@ def missing_codes_for(config: ProjectConfig, dataset: DatasetConfig) -> list[Mis
 
 def id_column_for(config: ProjectConfig, dataset: DatasetConfig) -> str:
     return dataset.id_column or config.defaults.id_column
-

@@ -24,9 +24,7 @@ def check_values(
     raise NotImplementedError
 
 
-def check_ids(
-    datasets: dict[str, LoadedDataset], config: ProjectConfig
-) -> list[Issue]:
+def check_ids(datasets: dict[str, LoadedDataset], config: ProjectConfig) -> list[Issue]:
     raise NotImplementedError
 
 
