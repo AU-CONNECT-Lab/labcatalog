@@ -10,7 +10,7 @@ from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
 from labcatalog.resolve import Catalog
-from labcatalog.scoring import item_values, scorable
+from labcatalog.scoring import raw_items, scorable
 from labcatalog.sources import LoadedDataset
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
@@ -74,7 +74,7 @@ def check_values(
         codes = list(missing_labels_for(project.config, loaded.config))
         allowed = [option.value for option in variable.response_options] + codes
         values = loaded.frame[variable.column]
-        numbers = pd.to_numeric(values, errors="coerce")
+        numbers = loaded.numbers(variable.column)
         numeric_allowed = [float(v) for v in allowed if not isinstance(v, str)]
         numeric_allowed += [float(v) for v in codes if is_number(v)]
         ok = values.isin([str(v) for v in allowed]) | numbers.isin(numeric_allowed)
@@ -145,7 +145,9 @@ def check_exclusions(project: Project, datasets: dict[str, LoadedDataset]) -> li
 def check_identifier_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
     name_patterns = [re.compile(p, re.IGNORECASE) for p in defaults.IDENTIFIER_NAME_PATTERNS]
     issues = []
-    for loaded in datasets.values():
+    for name, loaded in datasets.items():
+        # Item columns are already held to their response options by check_values.
+        items = {e.column for e in project.maps.get(name, []) if e.instrument is not None}
         for column in loaded.frame:
             if column == loaded.id_column:
                 continue
@@ -153,7 +155,9 @@ def check_identifier_columns(project: Project, datasets: dict[str, LoadedDataset
             reasons = []
             if any(p.search(column) for p in name_patterns):
                 reasons.append("its name")
-            if values.str.contains(EMAIL).any():
+            if column in items:
+                pass
+            elif values.str.contains(EMAIL).any():
                 reasons.append("values that look like email addresses")
             elif values.str.contains(PHONE).any():
                 reasons.append("values that look like phone numbers")
@@ -192,12 +196,10 @@ def check_same_answers(
     for score in catalog.scores:
         loaded = datasets[score.dataset]
         # On short scales the same answer to every item is common and says little.
-        if len(score.columns) < defaults.SAME_ANSWER_MIN_ITEMS or not scorable(loaded.frame, score):
+        if len(score.columns) < defaults.SAME_ANSWER_MIN_ITEMS or not scorable(loaded, score):
             continue
-        raw = pd.DataFrame(
-            {c: item_values(loaded.frame[c], score.valid_values[c]) for c in score.columns}
-        )
-        same = raw.notna().all(axis=1) & (raw.nunique(axis=1) == 1)
+        raw = raw_items(loaded, score)
+        same = raw.notna().all(axis=1) & (raw.max(axis=1) == raw.min(axis=1))
         if same.any():
             message = (
                 f"{score.key}: {same.sum()} participant(s) gave the same answer to every item: "
@@ -221,7 +223,7 @@ def check_score_agreement(
             continue
         raw = loaded.frame[column]
         codes = list(missing_labels_for(project.config, loaded.config))
-        existing = pd.to_numeric(raw.where(~raw.isin(codes)), errors="coerce")
+        existing = loaded.numbers(column).where(~raw.isin(codes))
         # Compare at the precision the lab's own script wrote.
         places = raw.str.extract(r"\.(\d+)$", expand=False).str.len()
         decimals = int(places.max()) if places.notna().any() else 0

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
 
@@ -26,6 +26,13 @@ class LoadedDataset:
     id_column: str
     group: pd.Series | None
     source_path: Path | None
+    numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
+
+    def numbers(self, column: str) -> pd.Series:
+        # Converting text to numbers is the slowest step on wide data, so each column is done once.
+        if column not in self.numeric_cache:
+            self.numeric_cache[column] = pd.to_numeric(self.frame[column], errors="coerce")
+        return self.numeric_cache[column]
 
 
 def get_source(name: str) -> DataSource:

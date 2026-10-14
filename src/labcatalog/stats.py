@@ -140,12 +140,12 @@ def summarize_variable(
     labels = missing_labels_for(config, loaded.config)
     missing = {label: int(values.isin([code]).sum()) for code, label in labels.items()}
     options = [option.value for option in variable.response_options]
-    numbers = pd.to_numeric(values, errors="coerce")
+    numbers = loaded.numbers(variable.column)
     counts = {
         str(v): int((values == v).sum()) if isinstance(v, str) else int((numbers == v).sum())
         for v in options
     }
-    numeric = item_values(values, [float(v) for v in options if not isinstance(v, str)])
+    numeric = item_values(numbers, [float(v) for v in options if not isinstance(v, str)])
     n_valid = sum(counts.values())
     unexpected = len(values) - n_valid - sum(missing.values())
     return VariableSummary(
@@ -172,14 +172,14 @@ def summarize_score(loaded: LoadedDataset, score: ResolvedScore, values: pd.Seri
         **describe(valid),
         median=float(valid.median()) if len(valid) else None,
     )
-    if scorable(loaded.frame, score):
-        items = score_items(loaded.frame, score)
+    if scorable(loaded, score):
+        items = score_items(loaded, score)
         complete = items.dropna()
         summary.n_complete = len(complete)
         summary.alpha = cronbach_alpha(complete)
         summary.item_total = item_total(complete) if summary.alpha is not None else []
         summary.item_columns = list(items.columns)
-        summary.item_correlations = item_correlations(items)
+        summary.item_correlations = item_correlations(complete)
     return summary
 
 
@@ -219,36 +219,51 @@ def histogram(
 
 def cronbach_alpha(items: pd.DataFrame) -> float | None:
     complete = items.dropna()
-    k = complete.shape[1]
-    if k < 2 or len(complete) < 3:
+    if complete.shape[1] < 2 or len(complete) < defaults.MIN_CORRELATION_N:
         return None
-    total_variance = complete.sum(axis=1).var(ddof=1)
-    if total_variance == 0:
+    return alpha_from_cov(np.cov(complete.to_numpy(dtype=float), rowvar=False))
+
+
+def alpha_from_cov(cov: np.ndarray) -> float | None:
+    k = cov.shape[0]
+    total = cov.sum()
+    if k < 2 or total == 0:
         return None
-    return float(k / (k - 1) * (1 - complete.var(axis=0, ddof=1).sum() / total_variance))
+    return float(k / (k - 1) * (1 - np.trace(cov) / total))
 
 
 def item_total(complete: pd.DataFrame) -> list[ItemTotal]:
-    if complete.shape[1] < 3:
+    # Everything follows from one covariance matrix, so the data is read only once.
+    k = complete.shape[1]
+    if k < 3:
         return []
+    cov = np.cov(complete.to_numpy(dtype=float), rowvar=False)
     rows = []
-    for column in complete:
-        rest = complete.drop(columns=column)
-        r = complete[column].corr(rest.sum(axis=1))
+    for i, column in enumerate(complete.columns):
+        rest = [j for j in range(k) if j != i]
+        rest_cov = cov[np.ix_(rest, rest)]
+        spread = cov[i, i] * rest_cov.sum()
+        r = cov[i, rest].sum() / np.sqrt(spread) if spread > 0 else None
         rows.append(
             ItemTotal(
                 column=column,
-                r=None if pd.isna(r) else float(r),
-                alpha_if_deleted=cronbach_alpha(rest),
+                r=None if r is None else float(r),
+                alpha_if_deleted=alpha_from_cov(rest_cov),
             )
         )
     return rows
 
 
-def item_correlations(items: pd.DataFrame) -> list[list[float | None]]:
+def item_correlations(complete: pd.DataFrame) -> list[list[float | None]]:
     # Spearman suits ordinal answers; items are already reverse-scored, so a negative r stands out.
-    matrix = items.corr(method="spearman", min_periods=defaults.MIN_CORRELATION_N)
-    return [[None if pd.isna(r) else float(r) for r in row] for row in matrix.to_numpy()]
+    if complete.shape[1] < 2 or len(complete) < defaults.MIN_CORRELATION_N:
+        return []
+    ranks = complete.rank().to_numpy(dtype=float)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        matrix = np.corrcoef(ranks, rowvar=False)
+    diagonal = np.diag_indices_from(matrix)
+    matrix[diagonal] = np.where(np.isnan(matrix[diagonal]), np.nan, 1.0)
+    return [[None if np.isnan(r) else float(r) for r in row] for row in matrix]
 
 
 def summarize_dataset(
@@ -299,7 +314,7 @@ def completeness(
             continue
         options = [str(option.value) for option in variable.response_options]
         values = frame[variable.column]
-        numeric = pd.to_numeric(values, errors="coerce")
+        numeric = loaded.numbers(variable.column)
         valid = values.isin(options) | numeric.isin([float(v) for v in options if is_number(v)])
         by_instrument.setdefault(variable.instrument_id, []).append(valid)
     rows = []
@@ -390,29 +405,16 @@ def correlations(
         if len(series) < 2:
             continue
         table = pd.DataFrame(series)
-        keys = list(table.columns)
-        r_rows, n_rows = [], []
-        for a in keys:
-            r_row, n_row = [], []
-            for b in keys:
-                pair = table[[a]].dropna() if a == b else table[[a, b]].dropna()
-                n_row.append(len(pair))
-                if a == b:
-                    r_row.append(1.0)
-                elif len(pair) < defaults.MIN_CORRELATION_N:
-                    r_row.append(None)
-                else:
-                    r = pair[a].corr(pair[b])
-                    r_row.append(None if pd.isna(r) else float(r))
-            r_rows.append(r_row)
-            n_rows.append(n_row)
+        present = table.notna().astype(float)
+        pairs = present.T @ present
+        matrix = table.corr(min_periods=defaults.MIN_CORRELATION_N)
         rows.append(
             Correlation(
                 study=study,
                 wave=wave,
-                keys=keys,
-                r=r_rows,
-                n=n_rows,
+                keys=list(table.columns),
+                r=[[None if pd.isna(r) else float(r) for r in row] for row in matrix.to_numpy()],
+                n=[[int(n) for n in row] for row in pairs.to_numpy()],
                 n_ambiguous=len(ambiguous.get((study, wave), set())),
             )
         )

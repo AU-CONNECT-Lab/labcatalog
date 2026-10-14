@@ -3,10 +3,11 @@ import math
 import pandas as pd
 import pytest
 
+from labcatalog.config import DatasetConfig
 from labcatalog.project import load_project
 from labcatalog.resolve import ResolvedScore, resolve_catalog
 from labcatalog.scoring import compute_score, compute_scores
-from labcatalog.sources import load_datasets
+from labcatalog.sources import LoadedDataset, load_datasets
 
 FRAME = pd.DataFrame(
     {
@@ -35,8 +36,19 @@ def make_score(**changes) -> ResolvedScore:
     return ResolvedScore(**{**fields, **changes})
 
 
+LOADED = LoadedDataset(
+    config=DatasetConfig(
+        name="d", modality="q", study="s", wave="1", reporter="r", source="csv", path="d.csv"
+    ),
+    frame=FRAME,
+    id_column="a",
+    group=None,
+    source_path=None,
+)
+
+
 def values(score: ResolvedScore) -> list:
-    return [None if math.isnan(v) else v for v in compute_score(FRAME, score)]
+    return [None if math.isnan(v) else v for v in compute_score(LOADED, score)]
 
 
 def test_complete_requires_every_item():

@@ -5,9 +5,8 @@ from labcatalog.resolve import Catalog, ResolvedScore
 from labcatalog.sources import LoadedDataset
 
 
-def item_values(values: pd.Series, valid: list[float]) -> pd.Series:
+def item_values(numbers: pd.Series, valid: list[float]) -> pd.Series:
     # Only real response options count; missing codes, blanks and stray values become NA.
-    numbers = pd.to_numeric(values, errors="coerce")
     return numbers.where(numbers.isin(valid))
 
 
@@ -15,14 +14,18 @@ def reverse(values: pd.Series, low: float, high: float) -> pd.Series:
     return low + high - values
 
 
-def scorable(frame: pd.DataFrame, score: ResolvedScore) -> bool:
-    return not score.unavailable_items and all(column in frame for column in score.columns)
+def scorable(loaded: LoadedDataset, score: ResolvedScore) -> bool:
+    return not score.unavailable_items and all(c in loaded.frame for c in score.columns)
 
 
-def score_items(frame: pd.DataFrame, score: ResolvedScore) -> pd.DataFrame:
-    items = pd.DataFrame(
-        {column: item_values(frame[column], score.valid_values[column]) for column in score.columns}
+def raw_items(loaded: LoadedDataset, score: ResolvedScore) -> pd.DataFrame:
+    return pd.DataFrame(
+        {c: item_values(loaded.numbers(c), score.valid_values[c]) for c in score.columns}
     )
+
+
+def score_items(loaded: LoadedDataset, score: ResolvedScore) -> pd.DataFrame:
+    items = raw_items(loaded, score)
     if not score.reversed_in_data:
         for column in score.reverse_columns:
             low, high = score.reverse_bounds[column]
@@ -30,10 +33,10 @@ def score_items(frame: pd.DataFrame, score: ResolvedScore) -> pd.DataFrame:
     return items
 
 
-def compute_score(frame: pd.DataFrame, score: ResolvedScore) -> pd.Series:
-    if not scorable(frame, score):
-        return pd.Series(np.nan, index=frame.index, dtype=float)
-    items = score_items(frame, score)
+def compute_score(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
+    if not scorable(loaded, score):
+        return pd.Series(np.nan, index=loaded.frame.index, dtype=float)
+    items = score_items(loaded, score)
     k = len(score.columns)
     n_valid = items.notna().sum(axis=1)
     if score.missing_rule == "complete":
@@ -56,7 +59,7 @@ def compute_score(frame: pd.DataFrame, score: ResolvedScore) -> pd.Series:
 def compute_scores(catalog: Catalog, datasets: dict[str, LoadedDataset]) -> dict[str, pd.DataFrame]:
     return {
         name: pd.DataFrame(
-            {score.key: compute_score(loaded.frame, score) for score in catalog.scores_for(name)},
+            {score.key: compute_score(loaded, score) for score in catalog.scores_for(name)},
             index=loaded.frame.index,
         )
         for name, loaded in datasets.items()
