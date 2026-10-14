@@ -1,0 +1,22 @@
+id: example_mood
+name: Example Mood Scale
+abbreviation: EMS
+construct_name: mood
+instructions: How often did you feel this way during the past week?
+response_sets:
+  - id: frequency
+    options:
+      - {value: 0, label: Never}
+      - {value: 1, label: Sometimes}
+      - {value: 2, label: Often}
+      - {value: 3, label: Always}
+default_response_set: frequency
+items:
+  - {id: ems_1, text: I felt cheerful., reverse: true}
+  - {id: ems_2}  # text missing on purpose
+  - {id: ems_3, text: I had trouble sleeping., revrse: true}  # misspelled on purpose
+scores:
+  - id: ems_total
+    label: Total score
+    method: sum
+    items: [ems_1, ems_2, ems_3]

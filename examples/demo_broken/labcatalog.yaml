@@ -1,0 +1,26 @@
+projct:  # misspelled on purpose
+  name: Demo Catalog
+
+vocab:
+  modalities: [questionnaire]
+  reporters: [parent, child]
+  targets: [self, child]
+
+missing_codes:
+  - {code: -99, label: refused}
+  - {code: "", label: blank}
+
+studies:
+  demo_study:
+    label: Demo Study
+    waves:
+      1: {start: 2025-09-01, end: 2026-05-31}
+
+datasets:
+  - name: parent_w1
+    modality: questionnaire
+    study: demo_study
+    wave: 1
+    reporter: parent
+    source: csv
+    path: data/parent_w1.csv

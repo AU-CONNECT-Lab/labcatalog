@@ -1,6 +1,5 @@
 from labcatalog.exceptions import (
     BuildError,
-    ConfigError,
     DataSourceError,
     LabCatalogError,
     MetadataError,
@@ -13,7 +12,6 @@ __version__ = "0.1.0"
 
 __all__ = [
     "BuildError",
-    "ConfigError",
     "DataSourceError",
     "LabCatalogError",
     "MetadataError",

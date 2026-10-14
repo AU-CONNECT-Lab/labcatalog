@@ -1,9 +1,14 @@
+import sys
+import traceback
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 from labcatalog import defaults
+from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
+from labcatalog.issues import Issue, has_errors, summarize_issues
+from labcatalog.pipeline import run_validate
 
 app = typer.Typer(
     help="Build a browsable catalog of a lab's study data.",
@@ -14,7 +19,33 @@ app = typer.Typer(
 ProjectOption = Annotated[
     Path, typer.Option("--project", "-p", help="Project folder containing labcatalog.yaml.")
 ]
-JsonOption = Annotated[bool, typer.Option("--json", help="Print machine-readable JSON to stdout.")]
+
+
+def main() -> None:
+    try:
+        app()
+    except LabCatalogError as err:
+        typer.echo(f"Error: {err}", err=True)
+        sys.exit(err.exit_code)
+    except Exception:
+        traceback.print_exc()
+        sys.exit(EXIT_UNEXPECTED)
+
+
+def print_issues(issues: list[Issue]) -> None:
+    for issue in issues:
+        prefix = f"{issue.location}: " if issue.location else ""
+        typer.echo(f"{prefix}{issue.level} [{issue.code}] {issue.message}")
+    typer.echo(summarize_issues(issues))
+
+
+@app.command()
+def gui() -> None:
+    """Open the labcatalog window."""
+    # Imported here so other commands do not pay for loading the GUI stack.
+    from labcatalog.gui import launch
+
+    launch()
 
 
 @app.command()
@@ -32,28 +63,21 @@ def init(
 
 
 @app.command()
-def validate(project: ProjectOption = Path("."), json_output: JsonOption = False) -> None:
+def validate(project: ProjectOption = Path(".")) -> None:
     """Check the metadata and configuration without reading data."""
-    raise NotImplementedError
+    issues = run_validate(project)
+    print_issues(issues)
+    raise typer.Exit(EXIT_ISSUES if has_errors(issues) else EXIT_OK)
 
 
 @app.command()
-def check(project: ProjectOption = Path("."), json_output: JsonOption = False) -> None:
+def check(project: ProjectOption = Path(".")) -> None:
     """Read the data and report mismatches with the metadata."""
     raise NotImplementedError
 
 
 @app.command()
-def build(
-    project: ProjectOption = Path("."),
-    out: Annotated[
-        Path | None,
-        typer.Option(
-            "--out", "-o", help="Output folder; defaults to output.dir in labcatalog.yaml."
-        ),
-    ] = None,
-    json_output: JsonOption = False,
-) -> None:
+def build(project: ProjectOption = Path(".")) -> None:
     """Build the internal catalog website."""
     raise NotImplementedError
 

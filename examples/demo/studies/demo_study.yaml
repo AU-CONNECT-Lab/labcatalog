@@ -1,0 +1,5 @@
+study: demo_study
+administrations:
+  - instrument: example_mood
+    datasets: [parent_w1]
+    target: child

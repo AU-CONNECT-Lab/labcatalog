@@ -3,8 +3,10 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from labcatalog.check import CheckReport
+from labcatalog.exceptions import MetadataError
 from labcatalog.issues import Issue
 from labcatalog.manifest import Manifest
+from labcatalog.project import load_project
 
 
 class BuildResult(BaseModel):
@@ -14,14 +16,18 @@ class BuildResult(BaseModel):
 
 
 def run_validate(root: Path) -> list[Issue]:
-    raise NotImplementedError
+    try:
+        load_project(root)
+    except MetadataError as err:
+        return err.issues
+    return []
 
 
 def run_check(root: Path) -> CheckReport:
     raise NotImplementedError
 
 
-def run_build(root: Path, out_dir: Path | None = None) -> BuildResult:
+def run_build(root: Path) -> BuildResult:
     raise NotImplementedError
 
 
