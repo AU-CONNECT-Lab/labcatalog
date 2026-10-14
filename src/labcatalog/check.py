@@ -176,7 +176,8 @@ def check_score_agreement(
         codes = [str(m.code) for m in missing_codes_for(project.config, loaded.config)]
         existing = pd.to_numeric(raw.where(~raw.isin(codes)), errors="coerce")
         # Compare at the precision the lab's own script wrote.
-        decimals = int(raw.str.extract(r"\.(\d+)$", expand=False).str.len().max() or 0)
+        places = raw.str.extract(r"\.(\d+)$", expand=False).str.len()
+        decimals = int(places.max()) if places.notna().any() else 0
         computed = scores[score.dataset][score.key].round(decimals)
         both = existing.notna() & computed.notna()
         differ = both & (existing.round(decimals) != computed)

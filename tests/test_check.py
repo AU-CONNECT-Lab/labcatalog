@@ -35,7 +35,6 @@ def test_metadata_errors_stop_before_reading_data(mock_project):
 
 
 def test_columns_missing_from_data_and_undescribed_columns(mock_project):
-    change_csv(mock_project / "data" / "child_w2.csv", lambda f: f.drop(columns=["est_3_w2"]).insert(2, "notes", "x") if False else None)
     path = mock_project / "data" / "child_w2.csv"
     frame = pd.read_csv(path, dtype=str, keep_default_na=False).drop(columns=["est_3_w2"])
     frame["notes"] = "x"
