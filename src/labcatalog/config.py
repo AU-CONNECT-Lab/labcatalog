@@ -1,0 +1,116 @@
+from datetime import date
+from pathlib import Path
+from typing import Any, Literal
+
+from pydantic import Field
+
+from labcatalog import defaults
+from labcatalog.schema import StrictModel
+
+
+class ProjectInfo(StrictModel):
+    name: str
+
+
+class Vocab(StrictModel):
+    modalities: list[str] = list(defaults.DEFAULT_MODALITIES)
+    reporters: list[str] = []
+    targets: list[str] = []
+
+
+class MissingCode(StrictModel):
+    code: int | float | str
+    label: str
+
+
+class Defaults(StrictModel):
+    id_column: str = defaults.ID_COLUMN
+    date_format: str = defaults.DATE_FORMAT
+
+
+class IdConfig(StrictModel):
+    pattern: str | None = None
+    family_from_id: str | None = None
+    rules: list[str | dict[str, Any]] = []
+
+
+class WaveConfig(StrictModel):
+    start: date | None = None
+    end: date | None = None
+
+
+class StudyConfig(StrictModel):
+    label: str | None = None
+    waves: dict[str, WaveConfig] = {}
+
+
+class DatasetConfig(StrictModel):
+    name: str
+    modality: str
+    study: str
+    wave: str
+    reporter: str
+    source: str
+    path: str | None = None
+    url: str | None = None
+    table: str | None = None
+    id_column: str | None = None
+    id_rules: list[str | dict[str, Any]] | None = None
+    family_column: str | None = None
+    date_column: str | None = None
+    snapshot_date: date | None = None
+    missing_codes: list[MissingCode] | None = None
+    custom: dict[str, Any] = {}
+
+
+class CustomFieldDef(StrictModel):
+    name: str
+    label: str | None = None
+    applies_to: Literal["instrument", "administration", "dataset"]
+    type: Literal["text", "number", "date", "choice"]
+    choices: list[str] | None = None
+    filter: bool = False
+
+
+class ReferencesConfig(StrictModel):
+    root: str | None = None
+    mode: Literal["link", "copy"] = defaults.REFERENCES_MODE
+
+
+class OutputConfig(StrictModel):
+    dir: str = defaults.OUTPUT_DIR
+
+
+class ProjectConfig(StrictModel):
+    schema_version: int = defaults.SCHEMA_VERSION
+    project: ProjectInfo
+    vocab: Vocab = Field(default_factory=Vocab)
+    missing_codes: list[MissingCode] = []
+    defaults: Defaults = Field(default_factory=Defaults)
+    ids: IdConfig = Field(default_factory=IdConfig)
+    studies: dict[str, StudyConfig] = {}
+    datasets: list[DatasetConfig] = []
+    custom_fields: list[CustomFieldDef] = []
+    references: ReferencesConfig = Field(default_factory=ReferencesConfig)
+    exclusions: str | None = None
+    output: OutputConfig = Field(default_factory=OutputConfig)
+
+
+def load_config(path: Path) -> ProjectConfig:
+    raise NotImplementedError
+
+
+def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:
+    raise NotImplementedError
+
+
+def missing_codes_for(config: ProjectConfig, dataset: DatasetConfig) -> list[MissingCode]:
+    raise NotImplementedError
+
+
+def id_column_for(config: ProjectConfig, dataset: DatasetConfig) -> str:
+    raise NotImplementedError
+
+
+def id_rules_for(config: ProjectConfig, dataset: DatasetConfig) -> list[str | dict[str, Any]]:
+    raise NotImplementedError
