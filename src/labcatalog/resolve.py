@@ -35,6 +35,7 @@ class ResolvedScore(BaseModel):
     columns: list[str]
     reverse_columns: list[str]
     reverse_bounds: dict[str, tuple[float, float]]
+    valid_values: dict[str, list[float]]
     reversed_in_data: bool
     missing_rule: str
     min_valid: int | None = None
@@ -146,6 +147,10 @@ def resolve_scores(
                 reverse_bounds={
                     variable.column: option_bounds(variable.response_options)
                     for variable in reversed_items
+                },
+                valid_values={
+                    variable.column: [float(option.value) for option in variable.response_options]
+                    for variable in present
                 },
                 reversed_in_data=administration.reversed_in_data,
                 missing_rule=score.missing_rule,
