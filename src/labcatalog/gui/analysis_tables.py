@@ -188,12 +188,12 @@ def group_section(
                         page.image_buttons(charts.show(fig), fig, "groups")
                     with charts.rest_column():
                         table(group_columns, group_rows)
+                        page.csv_button(group_columns, group_rows, "groups.csv")
                         table(test_columns, test_rows)
+                        page.csv_button(test_columns, test_rows, "group_test.csv")
                         left = ", ".join(f"{text} ({n})" for text, n in comparison.left_out)
                         text = f"Left out, fewer than two people: {left}. " if left else ""
                         note(f"{text}{engine}")
-                        page.csv_button(group_columns, group_rows, "groups.csv")
-                        page.csv_button(test_columns, test_rows, "group_test.csv")
 
             return content
 
