@@ -92,6 +92,17 @@ def test_a_failing_step_stops_the_rest(project_root):
     ]
 
 
+def test_steps_find_the_rscript_folder_first_on_path(project_root, tmp_path):
+    (project_root / "scripts" / "clean.py").write_text(
+        "import os\nprint(os.environ['PATH'].split(os.pathsep)[0])\n", encoding="utf-8"
+    )
+    rscript = tmp_path / "R" / "bin" / "Rscript.exe"
+    session = Session()
+    run_steps(load_project(project_root), ["clean"], session, rscript=str(rscript))
+    assert session.runs["clean"].log == [str(rscript.parent)]
+    assert os.environ["PATH"].split(os.pathsep)[0] != str(rscript.parent)
+
+
 def test_stop_ends_the_running_command(project_root):
     (project_root / "scripts" / "clean.py").write_text(
         "import time\nprint('started', flush=True)\ntime.sleep(60)\n", encoding="utf-8"

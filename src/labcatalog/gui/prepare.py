@@ -6,6 +6,7 @@ from nicegui import run, ui
 
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui import preferences
 from labcatalog.gui.common import note, open_path
 from labcatalog.prepare import FileState, Session, StepState, run_steps, step_states, stop
 from labcatalog.project import load_project
@@ -56,7 +57,10 @@ def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[Non
     async def start(chosen: list[str], outdated_only: bool = False) -> None:
         view.running = True
         steps.refresh()
-        runs = await run.io_bound(run_steps, project, chosen, view.session, outdated_only)
+        rscript = preferences.load().get(preferences.RSCRIPT)
+        runs = await run.io_bound(
+            run_steps, project, chosen, view.session, outdated_only, None, rscript
+        )
         view.running = False
         if runs:
             view.shown = runs[-1].name
@@ -108,7 +112,8 @@ def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[Non
 
     note(
         "Runs your own cleaning scripts, one command per step, in the project folder. A step "
-        "is outdated when one of its inputs is newer than its outputs."
+        "is outdated when one of its inputs is newer than its outputs. A step can call "
+        "Rscript by name once its path is set on the Settings page."
     )
     steps()
 

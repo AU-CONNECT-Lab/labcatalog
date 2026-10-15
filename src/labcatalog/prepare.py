@@ -92,6 +92,7 @@ def run_steps(
     session: Session,
     outdated_only: bool = False,
     echo: Callable[[str], None] | None = None,
+    rscript: str | None = None,
 ) -> list[StepRun]:
     session.stopping = False
     done = []
@@ -108,7 +109,7 @@ def run_steps(
         done.append(run)
         if echo:
             echo(f"== {step.name}: {step.run}")
-        execute(step, project.root, run, session, echo)
+        execute(step, project.root, run, session, echo, rscript)
         if run.exit_code != 0:
             break
     session.current = None
@@ -121,6 +122,7 @@ def execute(
     run: StepRun,
     session: Session,
     echo: Callable[[str], None] | None,
+    rscript: str | None,
 ) -> None:
     session.current = step.name
     process = subprocess.Popen(
@@ -131,6 +133,7 @@ def execute(
         stderr=subprocess.STDOUT,
         text=True,
         errors="replace",
+        env=environment(rscript),
         **NEW_GROUP,
     )
     session.process = process
@@ -141,6 +144,14 @@ def execute(
     run.exit_code = process.wait()
     run.stopped = session.stopping
     session.process = None
+
+
+def environment(rscript: str | None) -> dict[str, str] | None:
+    if not rscript:
+        return None
+    # A step can then call Rscript by name and get the R chosen on the Settings page.
+    path = os.pathsep.join([str(Path(rscript).parent), os.environ.get("PATH", "")])
+    return {**os.environ, "PATH": path}
 
 
 def stop(session: Session) -> None:
