@@ -11,9 +11,16 @@ def manifest_for(root):
 def test_records_every_data_file(mock_project):
     manifest = manifest_for(mock_project)
     records = {record.dataset: record for record in manifest.files}
-    assert set(records) == {"parent_w1", "parent_w2", "child_w1", "child_w2"}
+    assert set(records) == {
+        "parent_w1",
+        "parent_w2",
+        "parent_w3",
+        "child_w1",
+        "child_w2",
+        "child_w3",
+    }
     assert records["parent_w1"].path == "data/parent_w1.csv"
-    assert records["parent_w1"].rows == 116
+    assert records["parent_w1"].rows == 146
     assert len(records["parent_w1"].sha256) == 64
     assert str(records["parent_w1"].snapshot_date) == "2026-10-10"
 

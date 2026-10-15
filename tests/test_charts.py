@@ -11,7 +11,7 @@ def result(mock_project):
 
 
 def test_instrument_charts(result):
-    assert len(views.score_boxes(result, "example_mood").data) == 4
+    assert len(views.score_boxes(result, "example_mood").data) == 6
     assert views.score_distribution(result, "example_mood") is not None
     assert views.item_total(result, "example_mood") is not None
     assert views.item_profile(result, "example_mood") is not None
@@ -27,7 +27,7 @@ def test_subscale_radar_needs_three_subscales(result):
 
 def test_small_multiples(result):
     waves = views.wave_profiles(result, "example_mood")
-    assert [a.text for a in waves.layout.annotations] == ["Wave 1", "Wave 2"]
+    assert [a.text for a in waves.layout.annotations] == ["Wave 1", "Wave 2", "Wave 3"]
     people = views.people_profiles(result, "example_mood", "child_w1")
     assert [a.text for a in people.layout.annotations] == [
         "Sadness",
@@ -49,7 +49,11 @@ def test_means_and_stability_show_one_instrument(result):
 def test_overview_charts(result):
     everything = list(views.correlated_instruments(result))
     assert views.collection_pace(result) is not None
-    assert views.correlation_waves(result) == [("mock_study", "1"), ("mock_study", "2")]
+    assert views.correlation_waves(result) == [
+        ("mock_study", "1"),
+        ("mock_study", "2"),
+        ("mock_study", "3"),
+    ]
     assert views.score_circle(result, "mock_study", "1", everything) is not None
     assert views.score_matrices(result, everything) is not None
     assert views.score_circle(result, "mock_study", "1", []) is None

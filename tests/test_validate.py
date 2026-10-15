@@ -30,6 +30,7 @@ def test_unknown_instrument_in_study(mock_project):
         "studies/mock_study.yaml",
         "maps/child_w1.csv:4",
         "maps/child_w2.csv:4",
+        "maps/child_w3.csv:4",
     ]
     assert "example_moood" in issues[0].message
 

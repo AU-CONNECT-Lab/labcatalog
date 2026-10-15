@@ -8,11 +8,13 @@ def test_catalog_has_everything_the_gui_shows(mock_project):
     assert {d.dataset for d in result.summary.datasets} == {
         "parent_w1",
         "parent_w2",
+        "parent_w3",
         "child_w1",
         "child_w2",
+        "child_w3",
     }
     assert set(result.snippets) == {s.key for s in result.catalog.scores}
-    assert len(result.manifest.files) == 4
+    assert len(result.manifest.files) == 6
 
 
 def test_metadata_errors_return_only_the_report(mock_project):

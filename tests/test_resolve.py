@@ -12,9 +12,9 @@ def test_every_mapped_item_becomes_a_variable(mock_project):
     catalog = resolve_catalog(load_project(mock_project))
     counts = {
         name: len(catalog.variables_for(name))
-        for name in ["parent_w1", "parent_w2", "child_w1", "child_w2"]
+        for name in ["parent_w1", "parent_w3", "child_w1", "child_w2", "child_w3"]
     }
-    assert counts == {"parent_w1": 9, "parent_w2": 9, "child_w1": 6, "child_w2": 9}
+    assert counts == {"parent_w1": 9, "parent_w3": 9, "child_w1": 6, "child_w2": 9, "child_w3": 9}
     variable = next(v for v in catalog.variables if v.column == "ecs_1_w2")
     assert (variable.study, variable.wave, variable.reporter, variable.target) == (
         "mock_study",
@@ -32,14 +32,14 @@ def test_scores_know_their_columns_and_reverse_bounds(mock_project):
     assert score.columns == [f"ems_{n}_w1" for n in range(1, 7)]
     assert score.reverse_bounds == {"ems_1_w1": (0.0, 3.0), "ems_4_w1": (0.0, 3.0)}
     assert (score.missing_rule, score.min_valid, score.unavailable_items) == ("prorate", 5, [])
-    assert len(catalog.scores) == 12
+    assert len(catalog.scores) == 30
 
 
 def test_overrides_change_one_wave_only(mock_project):
     edit(
         mock_project / "studies" / "mock_study.yaml",
-        "{instrument: example_mood, datasets: [child_w1, child_w2], target: self}",
-        "{instrument: example_mood, datasets: [child_w1, child_w2], target: self, overrides: "
+        "{instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self}",
+        "{instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self, overrides: "
         "[{item: ems_2, dataset: child_w2, text: I felt down.}, {item: ems_6, dataset: child_w2, dropped: true}]}",
     )
     catalog = resolve_catalog(load_project(mock_project))
