@@ -18,6 +18,8 @@ items:
   - {id: ecs_4, text: My child seems tired during the day.}
 scores:
   - {id: ecs_total, label: Total score, method: sum, items: [ecs_1, ecs_2, ecs_3, ecs_4]}
+  - {id: ecs_settling, label: Settling, method: sum, items: [ecs_1, ecs_2]}
+  - {id: ecs_waking, label: Waking, method: sum, items: [ecs_3, ecs_4]}
 references:
   - citation: "Demo, C. (2021). Measuring sleep habits in school-age children. Journal of Demonstration Measures, 6(3), 210-224. (Fictional reference for the mock project.)"
 license: Free for research use (fictional)

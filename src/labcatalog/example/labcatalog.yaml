@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=schemas/labcatalog.schema.json
 # Settings for one labcatalog project. Instruments live in instruments/, studies in studies/, and each dataset's column map in maps/.
-# This example is fictional and contains a few deliberate data problems (values outside the options, an ID with a space, people who gave the same answer to every item) so that the Problems page has something to show.
+# This example is fictional and contains a few deliberate data problems (values outside the options, an ID with a space, an ID used twice, people who gave the same answer to every item, a column the map does not describe) so that the Problems page has something to show.
 
 project:
   name: Mock Family Study Catalog
@@ -38,15 +38,18 @@ studies:
   mock_study:
     label: Mock Family Study
     waves:
-      1: {start: 2025-09-01, end: 2026-05-31}
-      2: {start: 2026-09-01}
+      1: {start: 2024-09-01, end: 2025-05-31}
+      2: {start: 2025-09-01, end: 2026-05-31}
+      3: {start: 2026-09-01}
 
 # One entry per data file: which study, wave and reporter it holds, and where it is.
 datasets:
   - {name: parent_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: parent, source: csv, path: data/parent_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: parent_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: parent_w3, modality: questionnaire, study: mock_study, wave: 3, reporter: parent, source: csv, path: data/parent_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: child, source: csv, path: data/child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: child_w3, modality: questionnaire, study: mock_study, wave: 3, reporter: child, source: csv, path: data/child_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
 
 # Extra fields your lab wants on instruments, administrations or datasets; choice and tags fields can be used as filters.
 custom_fields:
