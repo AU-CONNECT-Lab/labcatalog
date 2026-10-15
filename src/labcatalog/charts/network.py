@@ -50,6 +50,7 @@ def score_network(
         for link in links
     ]
     return {
+        "backgroundColor": "white",
         "textStyle": {"fontFamily": FONT, "color": INK},
         "title": {
             "text": title,
@@ -75,7 +76,7 @@ def score_network(
                 "roam": True,
                 "draggable": True,
                 "top": 56,
-                "bottom": 40,
+                "bottom": 64,
                 "data": data,
                 "links": edges,
                 "categories": [{"name": n, "itemStyle": {"color": c}} for n, c in categories],
@@ -86,9 +87,9 @@ def score_network(
                 "emphasis": {"focus": "adjacency", "lineStyle": {"width": 3}},
                 "force": {
                     "initLayout": "circular",
-                    "repulsion": 160,
-                    "gravity": 0.08,
-                    "edgeLength": [40, 140],
+                    "repulsion": 420,
+                    "gravity": 0.07,
+                    "edgeLength": [50, 200],
                 },
             }
         ],
