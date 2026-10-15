@@ -475,8 +475,9 @@ def default_score(result: CatalogResult, instrument_id: str) -> str:
 
 
 def default_partner(result: CatalogResult, choice: str) -> str:
-    # A total from another instrument; a score against its own instrument says little.
-    others = [c for c in score_choices(result) if c.split("|")[0] != choice.split("|")[0]]
+    # A total from another instrument that meets this score in some wave; its own subscales say little.
+    met = partners(result, choice)
+    others = [c for c in met if c.split("|")[0] != choice.split("|")[0]]
     totals = []
     for other in others:
         instrument_id, score_id = other.split("|")
@@ -485,6 +486,17 @@ def default_partner(result: CatalogResult, choice: str) -> str:
             totals.append(other)
     rest = [c for c in score_choices(result) if c != choice]
     return (totals or others or rest)[0]
+
+
+def partners(result: CatalogResult, choice: str) -> list[str]:
+    by_key = {s.key: f"{s.instrument_id}|{s.score_id}" for s in result.catalog.scores}
+    met = []
+    for corr in result.summary.correlations:
+        for i, key in enumerate(corr.keys):
+            if by_key[key] == choice:
+                met += [by_key[k] for j, k in enumerate(corr.keys) if corr.r[i][j] is not None]
+    order = list(score_choices(result))
+    return sorted(set(met) - {choice}, key=order.index)
 
 
 # ---- overview page ----
@@ -536,7 +548,9 @@ def correlated_instruments(result: CatalogResult) -> dict[str, str]:
     }
 
 
-def score_panel(result: CatalogResult, study: str, wave: str, instruments: list[str]) -> dict | None:
+def score_panel(
+    result: CatalogResult, study: str, wave: str, instruments: list[str]
+) -> dict | None:
     corr = next(c for c in result.summary.correlations if (c.study, c.wave) == (study, wave))
     by_key = {s.key: s for s in result.catalog.scores}
     order = instrument_order(result)

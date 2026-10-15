@@ -5,7 +5,9 @@ from labcatalog.charts import views
 from labcatalog.gui.common import heading, note
 from labcatalog.pipeline import CatalogResult
 
-NO_SHARED_WAVE = "These two scores never meet in one wave; see stats.correlate_by in labcatalog.yaml."
+NO_SHARED_WAVE = (
+    "These two scores never meet in one wave; see stats.correlate_by in labcatalog.yaml."
+)
 
 
 def show(fig: go.Figure | None, empty: str = "") -> None:
