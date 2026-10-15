@@ -355,7 +355,7 @@ def item_grid(result: CatalogResult, instrument_id: str, dataset: str) -> go.Fig
         [f"{a} × {b}<br>ρ = {z[i, j]:.2f}, n = {n}" for j, b in enumerate(items)]
         for i, a in enumerate(items)
     ]
-    return matrices.correlation_grid(z, items, hover, "Spearman ρ")
+    return matrices.heatmap(z, items, hover, "Spearman ρ")
 
 
 def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
@@ -1078,7 +1078,11 @@ def score_of(result: CatalogResult, key: str) -> ResolvedScore:
 
 
 def correlation_chart(
-    matrix: list[list[analysis.Correlation]], labels: list[str], style: str = "heatmap"
+    result: CatalogResult,
+    keys: list[str],
+    matrix: list[list[analysis.Correlation]],
+    labels: list[str],
+    style: str = "heatmap",
 ) -> go.Figure | None:
     z = matrices.as_matrix([[c.r for c in row] for row in matrix])
     hover = [
@@ -1091,7 +1095,17 @@ def correlation_chart(
         ]
         for i, row in enumerate(matrix)
     ]
-    return matrices.correlation_grid(z, labels, hover, "Pearson r", style)
+    if style == "dots":
+        return matrices.dot_matrix(
+            z,
+            labels,
+            hover,
+            [score_of(result, k).instrument_id for k in keys],
+            instrument_order(result),
+            instrument_names(result),
+            "Pearson r",
+        )
+    return matrices.heatmap(z, labels, hover, "Pearson r")
 
 
 def pair_scatter(

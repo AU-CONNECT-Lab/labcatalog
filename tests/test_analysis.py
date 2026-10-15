@@ -48,27 +48,23 @@ def test_the_correlation_table_reads_like_apa(result):
     assert rows[1]["c0"].startswith(".") and rows[1]["c0"].endswith("***")
     assert rows[1]["c1"] == "—"
     assert matrix[1][0].n == len(frame.dropna())
-    assert views.correlation_chart(matrix, ["EMS", "EPS"]) is None
+    assert views.correlation_chart(result, [EMS, EPS], matrix, ["EMS", "EPS"]) is None
 
 
-def test_both_styles_draw_the_lower_triangle_from_three_scores():
-    pair = analysis.Correlation(50, 0.4, 0.01)
-    alone = analysis.Correlation(50)
-    matrix = [[alone, pair, pair], [pair, alone, pair], [pair, pair, alone]]
-    heatmap = views.correlation_chart(matrix, ["A", "B", "C"])
-    heat = heatmap.data[0]
+def test_the_heatmap_is_a_lower_triangle_and_the_dots_a_full_matrix(result):
+    sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
+    keys = views.total_choices(result, sample.datasets)[:3]
+    matrix = analysis.correlation_matrix(analysis.table(result, sample, keys))
+    labels = ["A", "B", "C"]
+    heat = views.correlation_chart(result, keys, matrix, labels).data[0]
     assert (list(heat.x), list(heat.y)) == (["1", "2"], ["2. B", "3. C"])
-    assert heat.z[0][0] == pytest.approx(0.4) and heat.z[0][1] is None
-    assert heat.zmin == -1 and heat.zmax == 1
-    dotted = views.correlation_chart(matrix, ["A", "B", "C"], "dots")
-    dots = dotted.data[0]
-    assert list(zip(dots.x, dots.y, strict=True)) == [("1", "2. B"), ("1", "3. C"), ("2", "3. C")]
-    assert dots.marker.cmin == -1 and dots.marker.showscale
-    assert len(set(dots.marker.size)) == 1 and len(dotted.layout.shapes) == 3
-    assert (dotted.layout.width, dotted.layout.height) == (
-        heatmap.layout.width,
-        heatmap.layout.height,
-    )
+    assert heat.z[0][0] == pytest.approx(matrix[1][0].r) and heat.z[0][1] is None
+    dotted = views.correlation_chart(result, keys, matrix, labels, "dots")
+    assert len([s for s in dotted.layout.shapes if s.type == "circle"]) == 6
+    assert list(dotted.layout.xaxis.ticktext) == labels and dotted.layout.xaxis.side == "top"
+    names = views.instrument_names(result)
+    instruments = [views.score_of(result, k).instrument_id for k in keys]
+    assert [t.name for t in dotted.data if t.name] == [names[i] for i in instruments]
 
 
 def test_apa_numbers():

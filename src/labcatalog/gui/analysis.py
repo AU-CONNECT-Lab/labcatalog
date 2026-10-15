@@ -130,7 +130,7 @@ def correlation_section(
             # Switching the style redraws the chart only; the correlations stay as computed.
             @ui.refreshable
             def chart() -> None:
-                fig = views.correlation_chart(matrix, labels, view.style)
+                fig = views.correlation_chart(result, keys, matrix, labels, view.style)
                 if fig is None:
                     return
                 with charts.figure_column(fig):
