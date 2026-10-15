@@ -1,5 +1,4 @@
 from datetime import date
-from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import Field
@@ -100,10 +99,6 @@ class ProjectConfig(StrictModel):
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)
-
-
-def load_config(path: Path) -> ProjectConfig:
-    raise NotImplementedError
 
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:
