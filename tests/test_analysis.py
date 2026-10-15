@@ -48,17 +48,27 @@ def test_the_correlation_table_reads_like_apa(result):
     assert rows[1]["c0"].startswith(".") and rows[1]["c0"].endswith("***")
     assert rows[1]["c1"] == "—"
     assert matrix[1][0].n == len(frame.dropna())
-    assert views.correlation_heatmap(matrix, ["EMS", "EPS"]) is None
+    assert views.correlation_chart(matrix, ["EMS", "EPS"]) is None
 
 
-def test_the_heatmap_draws_the_lower_triangle_from_three_scores():
+def test_both_styles_draw_the_lower_triangle_from_three_scores():
     pair = analysis.Correlation(50, 0.4, 0.01)
     alone = analysis.Correlation(50)
     matrix = [[alone, pair, pair], [pair, alone, pair], [pair, pair, alone]]
-    heat = views.correlation_heatmap(matrix, ["A", "B", "C"]).data[0]
+    heatmap = views.correlation_chart(matrix, ["A", "B", "C"])
+    heat = heatmap.data[0]
     assert (list(heat.x), list(heat.y)) == (["1", "2"], ["2. B", "3. C"])
     assert heat.z[0][0] == pytest.approx(0.4) and heat.z[0][1] is None
     assert heat.zmin == -1 and heat.zmax == 1
+    dotted = views.correlation_chart(matrix, ["A", "B", "C"], "dots")
+    dots = dotted.data[0]
+    assert list(zip(dots.x, dots.y, strict=True)) == [("1", "2. B"), ("1", "3. C"), ("2", "3. C")]
+    assert dots.marker.cmin == -1 and dots.marker.showscale
+    assert len(set(dots.marker.size)) == 1 and len(dotted.layout.shapes) == 3
+    assert (dotted.layout.width, dotted.layout.height) == (
+        heatmap.layout.width,
+        heatmap.layout.height,
+    )
 
 
 def test_apa_numbers():

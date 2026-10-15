@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from nicegui import ui
 
 from labcatalog import analysis, analysis_script
-from labcatalog.charts import views
+from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import analysis_tables, charts
 from labcatalog.gui.common import apa, col, heading, note, section, table
@@ -25,6 +25,7 @@ class AnalysisView:
     datasets: list[str] = field(default_factory=list)
     intersect: bool = True
     scores: list[str] = field(default_factory=list)
+    style: str = "heatmap"
     xs: list[str] = field(default_factory=list)
     y: str | None = None
     measures: list[str] = field(default_factory=list)
@@ -125,13 +126,26 @@ def correlation_section(
             pairs = [matrix[i][j].n for i in range(len(matrix)) for j in range(i)]
             low, high = min(pairs), max(pairs)
             n = f"n {low}" if low == high else f"n {low} to {high}"
-            fig = views.correlation_heatmap(matrix, labels)
+
+            # Switching the style redraws the chart only; the correlations stay as computed.
+            @ui.refreshable
+            def chart() -> None:
+                fig = views.correlation_chart(matrix, labels, view.style)
+                if fig is None:
+                    return
+                with charts.figure_column(fig):
+                    ui.toggle(
+                        matrices.STYLES, value=view.style, on_change=lambda e: restyle(e.value)
+                    ).props("dense no-caps")
+                    image_buttons(charts.show(fig), fig, "correlations")
+
+            def restyle(value: str) -> None:
+                view.style = value
+                chart.refresh()
 
             def content() -> None:
                 with ui.row().classes("w-full gap-6 items-start"):
-                    if fig is not None:
-                        with charts.figure_column(fig):
-                            image_buttons(charts.show(fig), fig, "correlations")
+                    chart()
                     with charts.rest_column():
                         table(columns, rows)
                         note(

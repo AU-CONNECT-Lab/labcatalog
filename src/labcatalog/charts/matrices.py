@@ -18,64 +18,79 @@ CELL_ROOM = 360
 # Few variables get larger cells, so the plot and the colour bar beside it stay this tall.
 MIN_PLOT = 170
 COLORBAR_ROOM = 90
+STYLES = {"heatmap": "Heatmap", "dots": "Dots"}
+# A dot of r = 1 spans this share of its cell, so the largest dots never touch the lines.
+DOT_SPAN = 0.84
+CELL_LINE = "#d9d9d9"
 
 
 def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
     return np.array([[np.nan if v is None else v for v in row] for row in rows], dtype=float)
 
 
-def heatmap(
-    z: np.ndarray, labels: list[str], hover: list[list[str]], value_label: str
+def correlation_grid(
+    z: np.ndarray,
+    labels: list[str],
+    hover: list[list[str]],
+    value_label: str,
+    style: str = "heatmap",
 ) -> go.Figure | None:
-    # One pair is a single number, which the table beside the heatmap already shows.
+    # One pair is a single number, which the table beside the chart already shows.
     if len(labels) < 3:
         return None
     # The lower triangle, numbered like an APA table: rows from the second, columns to the second last.
     names = [f"{k}. {label}" for k, label in enumerate(labels, start=1)]
     rows, cols = range(1, len(labels)), range(len(labels) - 1)
     cell = max(MIN_PLOT / len(cols), min(MAX_CELL, max(MIN_CELL, CELL_ROOM / len(cols))))
-    fig = go.Figure(
-        go.Heatmap(
-            z=[
-                [float(z[i, j]) if j < i and np.isfinite(z[i, j]) else None for j in cols]
-                for i in rows
-            ],
-            x=[str(j + 1) for j in cols],
-            y=[names[i] for i in rows],
-            text=[[hover[i][j] if j < i else "" for j in cols] for i in rows],
-            hovertemplate="%{text}<extra></extra>",
-            hoverongaps=False,
-            colorscale=CORRELATION_SCALE,
-            zmin=-1,
-            zmax=1,
-            xgap=2,
-            ygap=2,
-            colorbar=dict(
-                title=dict(text=value_label, font=dict(size=11)),
-                thickness=12,
-                tickvals=COLORBAR_TICKS,
-                tickfont=dict(size=10),
-                outlinewidth=0,
-            ),
-        )
+    xs, ys = [str(j + 1) for j in cols], [names[i] for i in rows]
+    colorbar = dict(
+        title=dict(text=value_label, font=dict(size=11)),
+        thickness=12,
+        tickvals=COLORBAR_TICKS,
+        tickfont=dict(size=10),
+        outlinewidth=0,
     )
+    if style == "dots":
+        fig = dots(z, xs, ys, hover, cell, colorbar)
+    else:
+        fig = go.Figure(
+            go.Heatmap(
+                z=[
+                    [float(z[i, j]) if j < i and np.isfinite(z[i, j]) else None for j in cols]
+                    for i in rows
+                ],
+                x=xs,
+                y=ys,
+                text=[[hover[i][j] if j < i else "" for j in cols] for i in rows],
+                hovertemplate="%{text}<extra></extra>",
+                hoverongaps=False,
+                colorscale=CORRELATION_SCALE,
+                zmin=-1,
+                zmax=1,
+                xgap=2,
+                ygap=2,
+                colorbar=colorbar,
+            )
+        )
     ticks = dict(
         type="category",
+        categoryorder="array",
         showgrid=False,
         zeroline=False,
         ticks="",
         tickfont=dict(size=11, color=LABEL_INK),
     )
-    fig.update_xaxes(constrain="domain", **ticks)
+    fig.update_xaxes(categoryarray=xs, range=[-0.5, len(xs) - 0.5], constrain="domain", **ticks)
     fig.update_yaxes(
-        autorange="reversed",
+        categoryarray=ys,
+        range=[len(ys) - 0.5, -0.5],
         scaleanchor="x",
         constrain="domain",
         constraintoward="top",
         automargin=True,
         **ticks,
     )
-    left = int(LABEL_CHAR * max(len(names[i]) for i in rows)) + 16
+    left = int(LABEL_CHAR * max(len(name) for name in ys)) + 16
     side = int(cell * len(cols))
     return base_layout(
         fig,
@@ -83,6 +98,59 @@ def heatmap(
         width=left + side + COLORBAR_ROOM,
         margin=dict(l=left, r=COLORBAR_ROOM, t=20, b=40),
     )
+
+
+def dots(
+    z: np.ndarray,
+    xs: list[str],
+    ys: list[str],
+    hover: list[list[str]],
+    cell: float,
+    colorbar: dict,
+) -> go.Figure:
+    # A circle per pair, its width proportional to |r|; row i of the matrix sits on ys[i - 1].
+    pairs = [(i, j) for i in range(1, len(ys) + 1) for j in range(i) if np.isfinite(z[i, j])]
+    values = [float(z[i, j]) for i, j in pairs]
+    fig = go.Figure(
+        go.Scatter(
+            x=[xs[j] for _, j in pairs],
+            y=[ys[i - 1] for i, _ in pairs],
+            mode="markers",
+            text=[hover[i][j] for i, j in pairs],
+            hovertemplate="%{text}<extra></extra>",
+            marker=dict(
+                size=[cell * DOT_SPAN * abs(v) for v in values],
+                color=values,
+                colorscale=CORRELATION_SCALE,
+                cmin=-1,
+                cmax=1,
+                showscale=True,
+                opacity=1,
+                colorbar=colorbar,
+                line_width=0,
+            ),
+            showlegend=False,
+        )
+    )
+    # Cell outlines keep the triangle readable where the dots are small.
+    fig.update_layout(
+        shapes=[
+            dict(
+                type="rect",
+                xref="x",
+                yref="y",
+                x0=j - 0.5,
+                x1=j + 0.5,
+                y0=i - 1.5,
+                y1=i - 0.5,
+                line=dict(color=CELL_LINE, width=1),
+                layer="below",
+            )
+            for i in range(1, len(ys) + 1)
+            for j in range(i)
+        ]
+    )
+    return fig
 
 
 def answer_grid(
