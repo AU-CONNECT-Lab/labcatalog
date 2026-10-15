@@ -258,16 +258,22 @@ def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
         col("statistic", "t" if welch else "F", numeric=True),
         col("df", "df", numeric=True),
         col("p", "p", numeric=True),
-        col("effect", "d" if welch else "η²", numeric=True),
+        col("effect", "d [95% CI]" if welch else "η² [95% CI]", numeric=True, sortable=False),
     ]
     if welch:
         columns.append(col("ci", "Difference [95% CI]", numeric=True, sortable=False))
+    shown = decimal if welch else apa
+    interval = (
+        f" [{shown(comparison.effect_low)}, {shown(comparison.effect_high)}]"
+        if comparison.effect_low is not None
+        else ""
+    )
     row = {
         "test": TESTS[comparison.test],
         "statistic": decimal(comparison.statistic),
         "df": f"{comparison.df1:.1f}" if welch else f"{comparison.df1:g}, {comparison.df2:g}",
         "p": page.p_value(comparison.p),
-        "effect": decimal(comparison.effect) if welch else apa(comparison.effect),
+        "effect": f"{shown(comparison.effect)}{interval}",
     }
     if welch:
         first, second = comparison.groups[0], comparison.groups[1]

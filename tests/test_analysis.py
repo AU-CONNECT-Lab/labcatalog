@@ -41,7 +41,8 @@ def test_the_correlation_table_reads_like_apa(result):
     sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
     frame = analysis.table(result, sample, [EMS, EPS])
     matrix = analysis.correlation_matrix(frame)
-    columns, rows = page.correlation_table(frame, matrix, ["EMS", "EPS"])
+    described = [analysis.describe(frame[k]) for k in frame.columns]
+    columns, rows = page.correlation_table(described, matrix, ["EMS", "EPS"])
     assert [c["label"] for c in columns] == ["Variable", "n", "M", "SD", "1", "2"]
     assert (rows[0]["variable"], rows[0]["c0"], rows[0]["c1"]) == ("1. EMS", "—", "")
     assert rows[1]["c0"].startswith(".") and rows[1]["c0"].endswith("***")

@@ -1,6 +1,7 @@
 import base64
 import json
 import urllib.parse
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -8,7 +9,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from nicegui import ui
 
-from labcatalog import analysis
+from labcatalog import analysis, analysis_script
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import analysis_tables, charts
@@ -109,24 +110,38 @@ def correlation_section(
         if len(view.scores) < 2:
             note("Pick at least two scores.")
             return
-        frame = analysis.table(result, sample, view.scores)
-        matrix = analysis.correlation_matrix(frame)
-        labels = [choices[k] for k in view.scores]
-        columns, rows = correlation_table(frame, matrix, labels)
-        pairs = [matrix[i][j].n for i in range(len(matrix)) for j in range(i)]
-        low, high = min(pairs), max(pairs)
-        n = f"n {low}" if low == high else f"n {low} to {high}"
-        fig = views.correlation_heatmap(matrix, labels)
-        with ui.row().classes("w-full gap-6 items-start"):
-            with charts.figure_column(fig):
-                image_buttons(charts.show(fig), fig, "correlations")
-            with charts.rest_column():
-                table(columns, rows)
-                note(
-                    f"Pearson r, each pair on everyone with both scores ({n}); "
-                    "* p < .05, ** p < .01, *** p < .001."
-                )
-                csv_button(columns, rows, "correlations.csv")
+        keys = list(view.scores)
+
+        async def fill() -> Callable:
+            data = analysis_script.AnalysisData(result, sample)
+            variables = [data.score(k) for k in keys]
+            code = analysis_script.correlation_code(variables)
+            found, engine = await analysis_tables.compute(result, sample, data.frame(), code)
+            described, matrix = analysis_script.read_correlations(
+                found, [v.column for v in variables]
+            )
+            labels = [choices[k] for k in keys]
+            columns, rows = correlation_table(described, matrix, labels)
+            pairs = [matrix[i][j].n for i in range(len(matrix)) for j in range(i)]
+            low, high = min(pairs), max(pairs)
+            n = f"n {low}" if low == high else f"n {low} to {high}"
+            fig = views.correlation_heatmap(matrix, labels)
+
+            def content() -> None:
+                with ui.row().classes("w-full gap-6 items-start"):
+                    with charts.figure_column(fig):
+                        image_buttons(charts.show(fig), fig, "correlations")
+                    with charts.rest_column():
+                        table(columns, rows)
+                        note(
+                            f"Pearson r, each pair on everyone with both scores ({n}); "
+                            f"* p < .05, ** p < .01, *** p < .001. {engine}"
+                        )
+                        csv_button(columns, rows, "correlations.csv")
+
+            return content
+
+        analysis_tables.later(fill)
 
     def set_scores(value: list[str] | None) -> None:
         view.scores = value or []
@@ -145,7 +160,9 @@ def correlation_section(
 
 
 def correlation_table(
-    frame: pd.DataFrame, matrix: list[list[analysis.Correlation]], labels: list[str]
+    described: list[tuple[int, float | None, float | None]],
+    matrix: list[list[analysis.Correlation]],
+    labels: list[str],
 ) -> tuple[list[dict], list[dict]]:
     # APA layout: numbered rows, M and SD, then r below the diagonal with stars.
     columns = [
@@ -156,8 +173,7 @@ def correlation_table(
         *[col(f"c{j}", str(j + 1), numeric=True, sortable=False) for j in range(len(labels))],
     ]
     rows = []
-    for i, key in enumerate(frame.columns):
-        n, mean, sd = analysis.describe(frame[key])
+    for i, (n, mean, sd) in enumerate(described):
         row = {"variable": f"{i + 1}. {labels[i]}", "n": n, "m": number(mean), "sd": number(sd)}
         for j in range(len(labels)):
             row[f"c{j}"] = starred(matrix[i][j]) if j < i else ("—" if j == i else "")
@@ -176,23 +192,36 @@ def pair_section(
 
     @ui.refreshable
     def body() -> None:
-        y = analysis.values(result, sample, view.y)
-        fits = {
-            x: fit
-            for x in view.xs
-            if x != view.y
-            and (fit := analysis.regress(analysis.values(result, sample, x), y)) is not None
-        }
-        if not fits:
-            note("Too few people have an X score and the Y score.")
-            return
-        fig = views.pair_scatter(result, sample, list(fits), view.y)
-        plot = charts.show(fig)
-        image_buttons(plot, fig, "regression")
-        columns, rows = fit_table(fits, choices)
-        heading("Statistics")
-        table(columns, rows)
-        csv_button(columns, rows, "regression.csv")
+        xs, y_key = [x for x in view.xs if x != view.y], view.y
+
+        async def fill() -> Callable:
+            data = analysis_script.AnalysisData(result, sample)
+            y = data.score(y_key)
+            variables = {x: data.score(x) for x in xs}
+            frame = data.frame()
+            usable = {
+                x: v
+                for x, v in variables.items()
+                if analysis_script.fittable(frame, v.column, y.column)
+            }
+            if not usable:
+                return lambda: note("Too few people have an X score and the Y score.")
+            code = analysis_script.regression_code(list(usable.values()), y)
+            found, engine = await analysis_tables.compute(result, sample, frame, code)
+            fits = analysis_script.read_regressions(found, {v.column: x for x, v in usable.items()})
+            fig = views.pair_scatter(result, sample, list(fits), y_key)
+            columns, rows = fit_table(fits, choices)
+
+            def content() -> None:
+                image_buttons(charts.show(fig), fig, "regression")
+                heading("Statistics")
+                table(columns, rows)
+                note(engine)
+                csv_button(columns, rows, "regression.csv")
+
+            return content
+
+        analysis_tables.later(fill)
 
     def choose_xs(value: list[str] | None) -> None:
         view.xs = value or []

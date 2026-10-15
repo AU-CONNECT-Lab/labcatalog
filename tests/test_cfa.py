@@ -3,9 +3,10 @@ from glob import glob
 
 import pytest
 
-from labcatalog.cfa import ONE_FACTOR, SUBSCALES, build_models, fit_models, r_status
+from labcatalog.cfa import ONE_FACTOR, SUBSCALES, build_models, fit_models
 from labcatalog.exceptions import RError
 from labcatalog.pipeline import run_catalog
+from labcatalog.rbridge import CFA_PACKAGES, r_status
 from labcatalog.scoring import score_items
 
 
@@ -16,7 +17,7 @@ def rscript() -> str | None:
 
 
 def r_ready() -> bool:
-    return rscript() is not None and not r_status(rscript()).missing
+    return rscript() is not None and not r_status(rscript(), CFA_PACKAGES).missing
 
 
 needs_r = pytest.mark.skipif(not r_ready(), reason="R with lavaan and semTools is not installed")
@@ -95,6 +96,6 @@ def test_three_items_give_omega_but_no_fit_indices(result):
 
 @needs_r
 def test_r_status_reports_the_version():
-    status = r_status(rscript())
+    status = r_status(rscript(), CFA_PACKAGES)
     assert status.version.startswith("R version")
     assert status.missing == []

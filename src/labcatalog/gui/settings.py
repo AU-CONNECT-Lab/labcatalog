@@ -2,11 +2,11 @@ from collections.abc import Awaitable, Callable
 
 from nicegui import run, ui
 
-from labcatalog.cfa import INSTALL, r_status
 from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import note, section
+from labcatalog.rbridge import ALL_PACKAGES, install_command, r_status
 
 RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
 
@@ -14,9 +14,10 @@ RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
 def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable[None]]) -> None:
     section("R")
     note(
-        "Factor models (CFA) and ω run in R with the lavaan and semTools packages. Install R "
-        "and the two packages yourself, then give the path to Rscript, which is in R's bin "
-        f"folder, for example {RSCRIPT_EXAMPLE}."
+        "Factor models (CFA) and ω run in R with lavaan and semTools, and the Analysis page "
+        "uses R first, with psych and effectsize; without R it uses Python. Install R and "
+        f"the packages yourself ({install_command(ALL_PACKAGES)}), then give the path to "
+        f"Rscript, which is in R's bin folder, for example {RSCRIPT_EXAMPLE}."
     )
     path = (
         ui.input("Rscript", value=preferences.load().get(preferences.RSCRIPT, ""))
@@ -31,7 +32,7 @@ def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable
         path.value = value
         preferences.save({preferences.RSCRIPT: value})
         if not value:
-            status.set_text("No Rscript set, so factor models are skipped.")
+            status.set_text("No Rscript set: no factor models, and the Analysis page uses Python.")
             await on_rscript()
             return
         status.set_text("Checking R")
@@ -43,10 +44,10 @@ def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable
         if found.missing:
             status.set_text(
                 f"{found.version}, but it is missing {', '.join(found.missing)}; "
-                f"install them in R with: {INSTALL}"
+                f"install them in R with: {install_command(found.missing)}"
             )
-            return
-        status.set_text(f"{found.version}, with lavaan and semTools. Factor models are on.")
+        else:
+            status.set_text(f"{found.version}, with every package labcatalog uses.")
         await on_rscript()
 
     ui.button("Save and check", on_click=save).classes("mt-2")

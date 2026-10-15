@@ -21,6 +21,7 @@ dependencies = [
     "pywebview>=6.0",
     "plotly>=6.0",
     "scipy>=1.11",
+    "pingouin>=0.7",
 ]
 
 [project.optional-dependencies]

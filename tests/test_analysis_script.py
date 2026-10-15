@@ -11,6 +11,7 @@ from labcatalog import analysis
 from labcatalog import analysis_script as script
 from labcatalog.gui import analysis_tables
 from labcatalog.pipeline import run_catalog
+from labcatalog.rbridge import ANALYSIS_PACKAGES, r_status
 
 EMS = "example_mood.ems_total@child_w1"
 EPS = "example_parent_stress.eps_mean@parent_w1"
@@ -23,7 +24,11 @@ def rscript() -> str | None:
     )
 
 
-needs_r = pytest.mark.skipif(rscript() is None, reason="R is not installed")
+def r_ready() -> bool:
+    return rscript() is not None and not r_status(rscript(), ANALYSIS_PACKAGES).missing
+
+
+needs_r = pytest.mark.skipif(not r_ready(), reason="R with psych and effectsize is not installed")
 
 
 @pytest.fixture
@@ -116,7 +121,17 @@ def test_r_and_python_give_the_same_numbers(result, sample):
         for field in ("statistic", "df1", "p", "effect"):
             assert getattr(in_r, field) == pytest.approx(getattr(in_python, field), rel=1e-9)
         if two_groups:
-            assert (in_r.low, in_r.high) == pytest.approx((in_python.low, in_python.high))
+            # pingouin rounds this interval to two decimals.
+            assert (in_r.low, in_r.high) == pytest.approx(
+                (in_python.low, in_python.high), abs=0.006
+            )
+            # effectsize uses the noncentral t, pingouin an approximation.
+            assert (in_r.effect_low, in_r.effect_high) == pytest.approx(
+                (in_python.effect_low, in_python.effect_high), abs=0.01
+            )
+        else:
+            assert in_python.effect_low is None
+            assert 0 <= in_r.effect_low <= in_r.effect <= in_r.effect_high
 
 
 def page(result, sample):
@@ -160,7 +175,7 @@ def test_the_page_script_runs_in_r(result, sample, tmp_path):
     (tmp_path / "analysis.R").write_text(r_text, encoding="utf-8")
     done = subprocess.run([rscript(), "analysis.R"], cwd=tmp_path, capture_output=True, text=True)
     assert done.returncode == 0, done.stderr
-    assert "eta squared" in done.stdout
+    assert "Eta2" in done.stdout
 
 
 def test_table_one_reads_like_a_paper_table(result, sample):
@@ -180,10 +195,67 @@ def test_table_one_reads_like_a_paper_table(result, sample):
 def test_test_tables_name_the_test_and_effect(result, sample):
     welch, _ = comparison(result, sample, two_groups=True)
     columns, [row] = analysis_tables.test_table(welch)
-    assert [c["label"] for c in columns] == ["Test", "t", "df", "p", "d", "Difference [95% CI]"]
+    assert [c["label"] for c in columns] == [
+        "Test",
+        "t",
+        "df",
+        "p",
+        "d [95% CI]",
+        "Difference [95% CI]",
+    ]
     assert row["test"] == "Welch's t test"
+    assert row["effect"].count("[") == 1
     anova, _ = comparison(result, sample, two_groups=False)
     columns, [row] = analysis_tables.test_table(anova)
-    assert [c["label"] for c in columns] == ["Test", "F", "df", "p", "η²"]
+    assert [c["label"] for c in columns] == ["Test", "F", "df", "p", "η² [95% CI]"]
     assert row["df"] == f"2, {sum(g.n for g in anova.groups) - 3}"
     assert pd.notna(row["p"])
+
+
+def correlations(result, sample, rscript_path=None):
+    data = script.AnalysisData(result, sample)
+    variables = [data.score(EMS), data.score(EPS)]
+    code = script.correlation_code(variables)
+    found, _ = script.run_code(result, sample, data.frame(), code, rscript_path)
+    return script.read_correlations(found, [v.column for v in variables])
+
+
+def regressions(result, sample, rscript_path=None):
+    data = script.AnalysisData(result, sample)
+    x, y = data.score(EPS), data.score(EMS)
+    code = script.regression_code([x], y)
+    found, _ = script.run_code(result, sample, data.frame(), code, rscript_path)
+    return script.read_regressions(found, {x.column: EPS})[EPS]
+
+
+def test_correlations_and_regression_match_the_summary_numbers(result, sample):
+    ems, eps = analysis.values(result, sample, EMS), analysis.values(result, sample, EPS)
+    described, matrix = correlations(result, sample)
+    expected = analysis.correlate(ems, eps)
+    assert described[0][0] == ems.notna().sum()
+    assert (matrix[1][0].n, matrix[1][0].r, matrix[1][0].p) == (
+        expected.n,
+        pytest.approx(expected.r),
+        pytest.approx(expected.p),
+    )
+    assert matrix[0][1] is matrix[1][0] and matrix[0][0].r is None
+    fit = regressions(result, sample)
+    expected = analysis.regress(eps, ems)
+    assert (fit.slope, fit.slope_se, fit.intercept) == pytest.approx(
+        (expected.slope, expected.slope_se, expected.intercept)
+    )
+    # pingouin rounds the interval of r to two decimals.
+    assert fit.correlation.low == pytest.approx(expected.correlation.low, abs=0.006)
+
+
+@needs_r
+def test_correlations_and_regression_agree_in_r_and_python(result, sample):
+    _, in_python = correlations(result, sample)
+    described, in_r = correlations(result, sample, rscript())
+    assert (in_r[1][0].r, in_r[1][0].p) == pytest.approx((in_python[1][0].r, in_python[1][0].p))
+    assert in_r[1][0].n == in_python[1][0].n
+    py_fit, r_fit = regressions(result, sample), regressions(result, sample, rscript())
+    assert (r_fit.slope, r_fit.slope_se, r_fit.correlation.p) == pytest.approx(
+        (py_fit.slope, py_fit.slope_se, py_fit.correlation.p)
+    )
+    assert r_fit.correlation.high == pytest.approx(py_fit.correlation.high, abs=0.006)

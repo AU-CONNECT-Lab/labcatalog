@@ -8,10 +8,11 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from labcatalog import analysis
-from labcatalog.cfa import is_total, run_r
+from labcatalog import analysis, defaults
+from labcatalog.cfa import is_total
 from labcatalog.codegen import number
 from labcatalog.pipeline import CatalogResult
+from labcatalog.rbridge import install_command, package_check, run_r
 from labcatalog.resolve import ResolvedVariable, numbers_in_range
 from labcatalog.scoring import score_items
 
@@ -23,13 +24,12 @@ ITEM_PREFIX = "item:"
 MIN_GROUP = 2
 R = "R"
 PYTHON = "Python"
-TABLE_COLUMNS = ("variable", "dataset", "level", "n", "mean", "sd", "percent", "alpha")
 
 R_HEADER = """\
 # {title}
 # {sample}
 # d is the analysis data saved from the Analysis page: one row per person, scores as labcatalog
-# computed them, and each score's items reversed where the scale says so.
+# computed them, and each score's items reversed where the scale says so.{packages}
 d <- read.csv({path}, check.names = FALSE)
 """
 PYTHON_HEADER = """\
@@ -37,33 +37,32 @@ PYTHON_HEADER = """\
 # {sample}
 # d is the analysis data saved from the Analysis page: one row per person, scores as labcatalog
 # computed them, and each score's items reversed where the scale says so.
-import itertools
-
+# Needs pandas and pingouin (pip install pingouin).
 import numpy as np
 import pandas as pd
-from scipy import stats
+import pingouin as pg
 
 d = pd.read_csv({path})
 """
+R_PACKAGES = "\n# Needs the R packages {names}; install them once with: {install}"
 R_TABLE_ONE = """\
-# Table 1: N in each dataset; M (SD) for numbers and scores, with alpha; n (%) for answer options.
-alpha <- function(items) {{
-  items <- na.omit(items)
-  k <- ncol(items)
-  k / (k - 1) * (1 - sum(apply(items, 2, var)) / var(rowSums(items)))
-}}
+# Table 1: N in each dataset; n, M and SD (psych::describe) for numbers and scores, with
+# Cronbach's alpha (psych::alpha) on everyone who answered every item; n (%) for answer options.
 n_row <- function(dataset, present) {{
-  data.frame(variable = "N", dataset = dataset, level = "", n = sum(present), mean = NA, sd = NA,
-             percent = NA, alpha = NA)
+  data.frame(variable = "N", dataset = dataset, level = "", n = sum(present), mean = NA,
+             sd = NA, percent = NA, alpha = NA)
 }}
-number_row <- function(variable, dataset, x, alpha = NA) {{
-  data.frame(variable = variable, dataset = dataset, level = "", n = sum(!is.na(x)),
-             mean = mean(x, na.rm = TRUE), sd = sd(x, na.rm = TRUE), percent = NA, alpha = alpha)
+number_row <- function(variable, dataset, x, items = NULL) {{
+  described <- psych::describe(x)
+  alpha <- if (is.null(items)) NA else psych::alpha(na.omit(items), warnings = FALSE)$total$raw_alpha
+  data.frame(variable = variable, dataset = dataset, level = "", n = described$n,
+             mean = described$mean, sd = described$sd, percent = NA, alpha = alpha)
 }}
 choice_rows <- function(variable, dataset, x, levels) {{
-  n <- vapply(levels, function(value) sum(x == value, na.rm = TRUE), numeric(1))
-  data.frame(variable = variable, dataset = dataset, level = names(levels), n = n, mean = NA,
-             sd = NA, percent = 100 * n / sum(!is.na(x)), alpha = NA)
+  counts <- table(factor(x, levels = levels, labels = names(levels)))
+  data.frame(variable = variable, dataset = dataset, level = names(counts),
+             n = as.vector(counts), mean = NA, sd = NA,
+             percent = as.vector(100 * prop.table(counts)), alpha = NA)
 }}
 table1 <- rbind(
 {rows}
@@ -72,82 +71,82 @@ rownames(table1) <- NULL
 print(table1)
 """
 PYTHON_TABLE_ONE = """\
-# Table 1: N in each dataset; M (SD) for numbers and scores, with alpha; n (%) for answer options.
-def alpha(items):
-    items = items.dropna()
-    k = items.shape[1]
-    return k / (k - 1) * (1 - items.var().sum() / items.sum(axis=1).var())
-
-
+# Table 1: N in each dataset; n, M and SD for numbers and scores, with Cronbach's alpha
+# (pingouin) on everyone who answered every item; n (%) for answer options.
 def n_row(dataset, present):
-    return [dict(variable="N", dataset=dataset, level="", n=present.sum(), mean=np.nan,
-                 sd=np.nan, percent=np.nan, alpha=np.nan)]
+    return [dict(variable="N", dataset=dataset, level="", n=present.sum())]
 
 
-def number_row(variable, dataset, x, alpha=np.nan):
-    return [dict(variable=variable, dataset=dataset, level="", n=x.notna().sum(), mean=x.mean(),
-                 sd=x.std(), percent=np.nan, alpha=alpha)]
+def number_row(variable, dataset, x, items=None):
+    alpha = np.nan if items is None else pg.cronbach_alpha(items, nan_policy="listwise")[0]
+    return [dict(variable=variable, dataset=dataset, level="", n=x.count(), mean=x.mean(),
+                 sd=x.std(), alpha=alpha)]
 
 
 def choice_rows(variable, dataset, x, levels):
-    valid = x.notna().sum()
-    return [dict(variable=variable, dataset=dataset, level=label, n=(x == value).sum(),
-                 mean=np.nan, sd=np.nan, percent=100 * (x == value).sum() / valid if valid else np.nan,
-                 alpha=np.nan) for label, value in levels.items()]
+    counts = x.map({{value: label for label, value in levels.items()}}).value_counts()
+    counts = counts.reindex(list(levels), fill_value=0)
+    return [dict(variable=variable, dataset=dataset, level=label, n=n,
+                 percent=100 * n / counts.sum()) for label, n in counts.items()]
 
 
 table1 = pd.DataFrame([
 {rows}
-])
+], columns=["variable", "dataset", "level", "n", "mean", "sd", "percent", "alpha"])
 print(table1)
 """
 R_CORRELATIONS = """\
-# Correlations: M and SD of each score, then Pearson r for each pair on everyone with both scores.
+# Correlations: n, M and SD of each score (psych::describe), then Pearson r for each pair on
+# everyone with both scores (psych::corr.test, p values not adjusted).
 scores <- c({columns})
-print(data.frame(score = scores, n = colSums(!is.na(d[scores])),
-                 mean = colMeans(d[scores], na.rm = TRUE),
-                 sd = apply(d[scores], 2, sd, na.rm = TRUE), row.names = NULL))
-correlations <- do.call(rbind, lapply(combn(scores, 2, simplify = FALSE), function(pair) {{
-  test <- cor.test(d[[pair[1]]], d[[pair[2]]])
-  data.frame(x = pair[1], y = pair[2], n = sum(complete.cases(d[pair])),
-             r = unname(test$estimate), p = test$p.value)
-}}))
+descriptives <- data.frame(score = scores, psych::describe(d[scores])[c("n", "mean", "sd")],
+                           row.names = NULL)
+print(descriptives)
+test <- psych::corr.test(d[scores], adjust = "none")
+pairs <- which(lower.tri(test$r), arr.ind = TRUE)
+correlations <- data.frame(x = scores[pairs[, "col"]], y = scores[pairs[, "row"]],
+                           n = if (is.matrix(test$n)) test$n[pairs] else test$n,
+                           r = test$r[pairs], p = test$p[pairs])
 print(correlations)
 """
 PYTHON_CORRELATIONS = """\
-# Correlations: M and SD of each score, then Pearson r for each pair on everyone with both scores.
+# Correlations: n, M and SD of each score, then Pearson r for each pair on everyone with both
+# scores (pingouin, p values not adjusted).
 scores = [{columns}]
-print(d[scores].agg(["count", "mean", "std"]).T)
-rows = []
-for x, y in itertools.combinations(scores, 2):
-    both = d[[x, y]].dropna()
-    test = stats.pearsonr(both[x], both[y])
-    rows.append(dict(x=x, y=y, n=len(both), r=test.statistic, p=test.pvalue))
-correlations = pd.DataFrame(rows)
+descriptives = pd.DataFrame(dict(score=scores, n=d[scores].count().to_numpy(),
+                                 mean=d[scores].mean().to_numpy(), sd=d[scores].std().to_numpy()))
+print(descriptives)
+correlations = pg.pairwise_corr(d, columns=scores, padjust="none")[["X", "Y", "n", "r", "p_unc"]]
+correlations.columns = ["x", "y", "n", "r", "p"]
 print(correlations)
 """
 R_REGRESSION = """\
-# Regression: {y_label} on each X by itself (simple linear regression).
+# Regression: {y_label} on each X by itself (lm), with r and its 95% CI (cor.test).
 y <- {y}
 regressions <- do.call(rbind, lapply(c({xs}), function(x) {{
   fit <- lm(d[[y]] ~ d[[x]])
   coefs <- summary(fit)$coefficients
+  r <- cor.test(d[[x]], d[[y]])
+  bounds <- if (is.null(r$conf.int)) c(NA, NA) else r$conf.int
   data.frame(x = x, n = nobs(fit), slope = coefs[2, 1], slope_se = coefs[2, 2],
-             intercept = coefs[1, 1], intercept_se = coefs[1, 2],
-             r_squared = summary(fit)$r.squared, p = coefs[2, 4])
+             intercept = coefs[1, 1], intercept_se = coefs[1, 2], r = unname(r$estimate),
+             r_low = bounds[1], r_high = bounds[2], r_squared = summary(fit)$r.squared,
+             p = coefs[2, 4])
 }}))
 print(regressions)
 """
 PYTHON_REGRESSION = """\
-# Regression: {y_label} on each X by itself (simple linear regression).
+# Regression: {y_label} on each X by itself, with r and its 95% CI (pingouin).
 y = {y}
 rows = []
 for x in [{xs}]:
     both = d[[x, y]].dropna()
-    fit = stats.linregress(both[x], both[y])
-    rows.append(dict(x=x, n=len(both), slope=fit.slope, slope_se=fit.stderr,
-                     intercept=fit.intercept, intercept_se=fit.intercept_stderr,
-                     r_squared=fit.rvalue ** 2, p=fit.pvalue))
+    fit = pg.linear_regression(both[[x]], both[y])
+    r = pg.corr(both[x], both[y])
+    rows.append(dict(x=x, n=len(both), slope=fit["coef"][1], slope_se=fit["se"][1],
+                     intercept=fit["coef"][0], intercept_se=fit["se"][0], r=r["r"].iloc[0],
+                     r_low=r["CI95"].iloc[0][0], r_high=r["CI95"].iloc[0][1],
+                     r_squared=fit["r2"][0], p=fit["pval"][1]))
 regressions = pd.DataFrame(rows)
 print(regressions)
 """
@@ -164,62 +163,61 @@ groups <- data.frame(group = levels(group), n = as.vector(table(group)),
 print(groups)
 """
 R_WELCH = """\
-# Welch's t test (unequal variances) and Cohen's d with the pooled SD.
+# Welch's t test (unequal variances); Cohen's d with the pooled SD and its 95% CI (effectsize).
 test <- t.test(y ~ group)
 print(test)
-pooled_sd <- sqrt(sum((groups$n - 1) * groups$sd^2) / (sum(groups$n) - 2))
-cohens_d <- (groups$mean[1] - groups$mean[2]) / pooled_sd
-cat("Cohen's d:", cohens_d, "\\n")
+effect <- effectsize::cohens_d(y ~ group, pooled_sd = TRUE)
+print(effect)
 """
 R_ANOVA = """\
-# One-way analysis of variance and eta squared.
-anova_table <- summary(aov(y ~ group))[[1]]
+# One-way analysis of variance; eta squared and its 95% CI (effectsize).
+fit <- aov(y ~ group)
+anova_table <- summary(fit)[[1]]
 print(anova_table)
-eta_squared <- anova_table[["Sum Sq"]][1] / sum(anova_table[["Sum Sq"]])
-cat("eta squared:", eta_squared, "\\n")
+effect <- effectsize::eta_squared(fit, partial = FALSE, alternative = "two.sided")
+print(effect)
 """
 PYTHON_GROUPS = """\
 # Group comparison: {outcome_label} by {group_label}{left_out}
 levels = [{labels}]
-group = d[{group}].map({{{mapping}}})
-y = d[{outcome}]
-keep = group.notna() & y.notna()
-group, y = group[keep], y[keep]
-groups = pd.DataFrame(dict(group=levels, n=[(group == g).sum() for g in levels],
-                           mean=[y[group == g].mean() for g in levels],
-                           sd=[y[group == g].std() for g in levels]))
+data = pd.DataFrame(dict(group=d[{group}].map({{{mapping}}}), y=d[{outcome}])).dropna()
+groups = data.groupby("group")["y"].agg(["count", "mean", "std"]).reindex(levels)
+groups = groups.reset_index().set_axis(["group", "n", "mean", "sd"], axis=1)
 print(groups)
 """
 PYTHON_WELCH = """\
-# Welch's t test (unequal variances) and Cohen's d with the pooled SD.
-test = stats.ttest_ind(y[group == levels[0]], y[group == levels[1]], equal_var=False)
-low, high = test.confidence_interval()
-print(test, "95% CI of the difference:", low, high)
-pooled_sd = np.sqrt(((groups["n"] - 1) * groups["sd"] ** 2).sum() / (groups["n"].sum() - 2))
-cohens_d = (groups["mean"][0] - groups["mean"][1]) / pooled_sd
-print("Cohen's d:", cohens_d)
+# Welch's t test (unequal variances) and Cohen's d with the pooled SD and its 95% CI (pingouin).
+# pingouin gives d without a sign, so it takes the sign of t (first group minus second).
+first, second = (data.loc[data["group"] == g, "y"] for g in levels)
+test = pg.ttest(first, second, correction=True)
+print(test)
+cohens_d = np.copysign(test["cohen_d"].iloc[0], test["T"].iloc[0])
+d_low, d_high = pg.compute_esci(cohens_d, len(first), len(second), eftype="cohen", decimals=4)
+print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
 """
 PYTHON_ANOVA = """\
-# One-way analysis of variance and eta squared.
-test = stats.f_oneway(*[y[group == g] for g in levels])
+# One-way analysis of variance and eta squared (pingouin).
+test = pg.anova(data=data, dv="y", between="group", detailed=True, effsize="n2")
 print(test)
-grand = y.mean()
-eta_squared = (groups["n"] * (groups["mean"] - grand) ** 2).sum() / ((y - grand) ** 2).sum()
-print("eta squared:", eta_squared)
 """
 R_TEST_OUT = {
     "welch": "test_result <- data.frame(statistic = unname(test$statistic), "
-    "df1 = unname(test$parameter), df2 = NA, p = test$p.value, effect = cohens_d, "
-    "low = test$conf.int[1], high = test$conf.int[2])",
+    "df1 = unname(test$parameter), df2 = NA, p = test$p.value, low = test$conf.int[1], "
+    "high = test$conf.int[2], effect = effect$Cohens_d, effect_low = effect$CI_low, "
+    "effect_high = effect$CI_high)",
     "anova": 'test_result <- data.frame(statistic = anova_table[["F value"]][1], '
     'df1 = anova_table[["Df"]][1], df2 = anova_table[["Df"]][2], '
-    'p = anova_table[["Pr(>F)"]][1], effect = eta_squared, low = NA, high = NA)',
+    'p = anova_table[["Pr(>F)"]][1], low = NA, high = NA, effect = effect$Eta2, '
+    "effect_low = effect$CI_low, effect_high = effect$CI_high)",
 }
 PYTHON_TEST_OUT = {
-    "welch": "test_result = pd.DataFrame([dict(statistic=test.statistic, df1=test.df, df2=np.nan, "
-    "p=test.pvalue, effect=cohens_d, low=low, high=high)])",
-    "anova": "test_result = pd.DataFrame([dict(statistic=test.statistic, df1=len(levels) - 1, "
-    "df2=len(y) - len(levels), p=test.pvalue, effect=eta_squared, low=np.nan, high=np.nan)])",
+    "welch": "test_result = pd.DataFrame([dict(statistic=test['T'].iloc[0], "
+    "df1=test['dof'].iloc[0], df2=np.nan, p=test['p_val'].iloc[0], "
+    "low=test['CI95'].iloc[0][0], high=test['CI95'].iloc[0][1], effect=cohens_d, "
+    "effect_low=d_low, effect_high=d_high)])",
+    "anova": "test_result = pd.DataFrame([dict(statistic=test['F'][0], df1=test['DF'][0], "
+    "df2=test['DF'][1], p=test['p_unc'][0], low=np.nan, high=np.nan, effect=test['n2'][0], "
+    "effect_low=np.nan, effect_high=np.nan)])",
 }
 
 
@@ -244,6 +242,7 @@ class Code:
     outputs: tuple[str, ...] = ()
     r_footer: str = ""
     python_footer: str = ""
+    packages: tuple[str, ...] = ()
 
 
 @dataclass
@@ -272,6 +271,8 @@ class Comparison:
     effect: float
     low: float | None = None
     high: float | None = None
+    effect_low: float | None = None
+    effect_high: float | None = None
     left_out: list[tuple[str, int]] = field(default_factory=list)
 
 
@@ -433,13 +434,20 @@ def r_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def headers(result: CatalogResult, sample: analysis.Sample, path: str) -> tuple[str, str]:
+def headers(
+    result: CatalogResult, sample: analysis.Sample, path: str, packages: tuple[str, ...]
+) -> tuple[str, str]:
     matched = link_name(result)
     where = ", ".join(sample.datasets)
     title = f"Analysis of {result.project.config.project.name}, written by labcatalog."
     text = f"Sample: {len(sample.people)} people in {where}, matched by {matched}."
+    needs = (
+        R_PACKAGES.format(names=", ".join(packages), install=install_command(packages))
+        if packages
+        else ""
+    )
     return (
-        R_HEADER.format(title=title, sample=text, path=r_string(path)),
+        R_HEADER.format(title=title, sample=text, path=r_string(path), packages=needs),
         PYTHON_HEADER.format(title=title, sample=text, path=r_string(path)),
     )
 
@@ -462,8 +470,8 @@ def table_one_code(datasets: list[str], rows: list[tuple[str, list[Variable]]]) 
                 py_rows.append(f"    *choice_rows({py_args}, {{{py_levels}}}),")
             elif v.items:
                 items = ", ".join(r_string(c) for c in v.items)
-                r_rows.append(f"  number_row({args}, alpha(d[c({items})]))")
-                py_rows.append(f"    *number_row({py_args}, alpha(d[[{items}]])),")
+                r_rows.append(f"  number_row({args}, d[c({items})])")
+                py_rows.append(f"    *number_row({py_args}, d[[{items}]]),")
             else:
                 r_rows.append(f"  number_row({args})")
                 py_rows.append(f"    *number_row({py_args}),")
@@ -472,6 +480,7 @@ def table_one_code(datasets: list[str], rows: list[tuple[str, list[Variable]]]) 
         r=R_TABLE_ONE.format(rows=",\n".join(r_rows)),
         python=PYTHON_TABLE_ONE.format(rows="\n".join(py_rows)),
         outputs=("table1",),
+        packages=("psych",),
     )
 
 
@@ -481,7 +490,8 @@ def correlation_code(variables: list[Variable]) -> Code:
         title="Correlations",
         r=R_CORRELATIONS.format(columns=columns),
         python=PYTHON_CORRELATIONS.format(columns=columns),
-        outputs=("correlations",),
+        outputs=("descriptives", "correlations"),
+        packages=("psych",),
     )
 
 
@@ -493,6 +503,14 @@ def regression_code(xs: list[Variable], y: Variable) -> Code:
         r=R_REGRESSION.format(**fields),
         python=PYTHON_REGRESSION.format(**fields),
         outputs=("regressions",),
+    )
+
+
+def fittable(frame: pd.DataFrame, x: str, y: str) -> bool:
+    # A line needs three people with both scores, and both scores must vary.
+    both = frame[[x, y]].dropna()
+    return (
+        len(both) >= defaults.MIN_CORRELATION_N and both[x].nunique() > 1 and both[y].nunique() > 1
     )
 
 
@@ -536,6 +554,7 @@ def comparison_plan(
         outputs=("groups", "test_result"),
         r_footer=R_TEST_OUT[kind],
         python_footer=PYTHON_TEST_OUT[kind],
+        packages=("effectsize",),
     )
     return ComparisonPlan(kind, code, left)
 
@@ -559,14 +578,12 @@ def page_script(
     if len(scores) >= 2:
         codes.append(correlation_code([data.score(k) for k in scores]))
     if y is not None:
-        target = analysis.values(result, sample, y)
-        fitted = [
-            x
-            for x in xs
-            if x != y and analysis.regress(analysis.values(result, sample, x), target) is not None
-        ]
+        target = data.score(y)
+        variables = [data.score(x) for x in xs if x != y]
+        frame = data.frame()
+        fitted = [v for v in variables if fittable(frame, v.column, target.column)]
         if fitted:
-            codes.append(regression_code([data.score(x) for x in fitted], data.score(y)))
+            codes.append(regression_code(fitted, target))
     if group is not None and outcome is not None:
         plan = comparison_plan(data.frame(), data.item(group), data.score(outcome))
         if plan is not None:
@@ -578,7 +595,8 @@ def page_script(
 
 
 def script(result: CatalogResult, sample: analysis.Sample, codes: list[Code]) -> tuple[str, str]:
-    r_head, py_head = headers(result, sample, DATA_FILE)
+    packages = tuple(dict.fromkeys(p for c in codes for p in c.packages))
+    r_head, py_head = headers(result, sample, DATA_FILE, packages)
     return (
         "\n".join([r_head, *[c.r for c in codes]]),
         "\n".join([py_head, *[c.python for c in codes]]),
@@ -596,14 +614,17 @@ def run_code(
     with tempfile.TemporaryDirectory() as temp:
         folder = Path(temp)
         frame.to_csv(folder / DATA_FILE, index=False)
-        r_head, py_head = headers(result, sample, (folder / DATA_FILE).as_posix())
+        r_head, py_head = headers(result, sample, (folder / DATA_FILE).as_posix(), code.packages)
         if rscript:
             writes = [
                 f"write.csv({name}, {r_string((folder / f'{name}.csv').as_posix())}, row.names = FALSE)"
                 for name in code.outputs
             ]
             path = folder / "analysis.R"
-            path.write_text("\n".join([r_head, code.r, code.r_footer, *writes]), encoding="utf-8")
+            prelude = package_check(code.packages) if code.packages else ""
+            path.write_text(
+                "\n".join([prelude, r_head, code.r, code.r_footer, *writes]), encoding="utf-8"
+            )
             run_r(rscript, [str(path)])
             return {n: pd.read_csv(folder / f"{n}.csv") for n in code.outputs}, R
         names: dict = {}
@@ -628,9 +649,46 @@ def read_comparison(found: dict[str, pd.DataFrame], plan: ComparisonPlan) -> Com
         effect=float(test["effect"]),
         low=none(test["low"]),
         high=none(test["high"]),
+        effect_low=none(test["effect_low"]),
+        effect_high=none(test["effect_high"]),
         left_out=plan.left_out,
     )
 
 
 def none(value) -> float | None:
     return None if pd.isna(value) else float(value)
+
+
+def read_correlations(
+    found: dict[str, pd.DataFrame], columns: list[str]
+) -> tuple[list[tuple[int, float | None, float | None]], list[list[analysis.Correlation]]]:
+    described = [
+        (int(row.n), none(row.mean), none(row.sd)) for row in found["descriptives"].itertuples()
+    ]
+    pairs = {}
+    for row in found["correlations"].itertuples():
+        found_pair = analysis.Correlation(int(row.n), none(row.r), none(row.p))
+        pairs[(row.x, row.y)] = pairs[(row.y, row.x)] = found_pair
+    matrix = [
+        [analysis.Correlation(described[i][0]) if a == b else pairs[(a, b)] for b in columns]
+        for i, a in enumerate(columns)
+    ]
+    return described, matrix
+
+
+def read_regressions(
+    found: dict[str, pd.DataFrame], keys: dict[str, str]
+) -> dict[str, analysis.Fit]:
+    # keys maps each X column in the data back to its score key.
+    return {
+        keys[row.x]: analysis.Fit(
+            analysis.Correlation(
+                int(row.n), none(row.r), none(row.p), none(row.r_low), none(row.r_high)
+            ),
+            float(row.slope),
+            float(row.slope_se),
+            float(row.intercept),
+            float(row.intercept_se),
+        )
+        for row in found["regressions"].itertuples()
+    }

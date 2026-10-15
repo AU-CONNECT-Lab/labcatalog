@@ -1,21 +1,17 @@
-import subprocess
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
 
-from labcatalog.exceptions import RError
 from labcatalog.project import Project
+from labcatalog.rbridge import run_r
 from labcatalog.resolve import Catalog, ResolvedScore
 from labcatalog.schema import Instrument
 from labcatalog.scoring import scorable, score_items
 from labcatalog.sources import LoadedDataset
 
 R_SCRIPT = Path(__file__).parent / "cfa.R"
-PACKAGES = ("lavaan", "semTools")
-INSTALL = 'install.packages(c("lavaan", "semTools"))'
-MISSING_PACKAGES = 3
 MIN_ITEMS = 3
 SUBSCALES = "subscales"
 ONE_FACTOR = "one factor"
@@ -51,12 +47,6 @@ class CfaFit:
     loadings: dict[tuple[str, str], float] = field(default_factory=dict)
     omega: dict[str, float] = field(default_factory=dict)
     problem: str | None = None
-
-
-@dataclass
-class RStatus:
-    version: str
-    missing: list[str]
 
 
 def is_total(instrument: Instrument, score_id: str) -> bool:
@@ -143,30 +133,3 @@ def read_fit(model: CfaModel, named: tuple[str, dict[str, str]], results: pd.Dat
     if fit.fit.get("df") == 0:
         fit.fit = {"chisq": None, "df": 0.0}
     return fit
-
-
-def r_status(rscript: str) -> RStatus:
-    packages = ", ".join(f'"{p}"' for p in PACKAGES)
-    check = (
-        "cat(R.version.string, '\\n'); "
-        f"for (p in c({packages})) if (!requireNamespace(p, quietly = TRUE)) cat(p, '\\n')"
-    )
-    lines = run_r(rscript, ["-e", check]).split("\n")
-    return RStatus(version=lines[0].strip(), missing=[s.strip() for s in lines[1:] if s.strip()])
-
-
-def run_r(rscript: str, args: list[str]) -> str:
-    try:
-        done = subprocess.run(
-            [rscript, *args], capture_output=True, text=True, encoding="utf-8", errors="replace"
-        )
-    except OSError:
-        raise RError(
-            f"Rscript not found at {rscript}; check the path on the Settings page"
-        ) from None
-    if done.returncode == MISSING_PACKAGES:
-        missing = ", ".join(done.stdout.split())
-        raise RError(f"R is missing {missing}; install them in R with: {INSTALL}")
-    if done.returncode != 0:
-        raise RError(f"R stopped with an error: {done.stderr.strip()[-500:]}")
-    return done.stdout
