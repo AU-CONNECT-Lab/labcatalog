@@ -314,22 +314,18 @@ def item_correlations(result: CatalogResult, instrument_id: str) -> go.Figure | 
     return matrices.item_correlations(panels, "Spearman ρ") if panels else None
 
 
-# ---- overview page ----
-
-
-def score_means(result: CatalogResult) -> go.Figure | None:
+def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     config = result.project.config
+    instrument = result.project.instruments[instrument_id]
     retained = {
-        (r.study, r.reporter, r.instrument_id, r.score_id, r.wave): r
+        (r.study, r.reporter, r.score_id, r.wave): r
         for r in result.summary.retained
+        if r.instrument_id == instrument_id
     }
     panels = []
-    for instrument_id, instrument in result.project.instruments.items():
-        total = total_score(instrument)
-        if total is None:
-            continue
+    for score in instrument.scores:
         by_reporter: dict[tuple[str, str], list[ResolvedScore]] = {}
-        for s in resolved(result, instrument_id, total.id):
+        for s in resolved(result, instrument_id, score.id):
             d = dataset_by_name(config, s.dataset)
             by_reporter.setdefault((d.study, d.reporter), []).append(s)
         for (study, reporter), scores in by_reporter.items():
@@ -341,12 +337,14 @@ def score_means(result: CatalogResult) -> go.Figure | None:
                 summary = summary_of(result, s.key)
                 if summary.mean is not None:
                     everyone.append((wave_name(result, study, wave), summary.mean, summary.n_valid))
-                r = retained.get((study, reporter, instrument_id, total.id, wave))
+                r = retained.get((study, reporter, score.id, wave))
                 if r is not None and r.mean is not None:
                     kept.append((wave_name(result, study, wave), r.mean, r.n))
             panels.append(
                 {
-                    "title": f"{short_label(instrument, total)} ({reporter})",
+                    "title": score.label
+                    if len(by_reporter) == 1
+                    else f"{score.label} ({reporter})",
                     "series": [
                         {"name": "All participants", "color": SERIES_COLORS[0], "points": everyone},
                         {"name": "In every wave", "color": SERIES_COLORS[1], "points": kept},
@@ -354,6 +352,142 @@ def score_means(result: CatalogResult) -> go.Figure | None:
                 }
             )
     return plots.score_means(panels, all_wave_names(result)) if panels else None
+
+
+def stability(result: CatalogResult, instrument_id: str) -> go.Figure | None:
+    rows = [r for r in result.summary.stability if r.instrument_id == instrument_id]
+    if not rows:
+        return None
+    instrument = result.project.instruments[instrument_id]
+    reporters = list(dict.fromkeys(r.reporter for r in rows))
+    members = [
+        {
+            "id": (score.id, reporter),
+            "tick": score.label if len(reporters) == 1 else f"{score.label} ({reporter})",
+            "hover": f"{short_label(instrument, score)}, {reporter}",
+        }
+        for score in instrument.scores
+        for reporter in reporters
+        if any(r.score_id == score.id and r.reporter == reporter for r in rows)
+    ]
+    pairs = list(dict.fromkeys((r.study, r.from_wave, r.to_wave) for r in rows))
+    series = [
+        {
+            "name": f"{wave_name(result, study, a)} → {wave_name(result, study, b)}",
+            "color": wave_colors(result)[b],
+            "values": {
+                (r.score_id, r.reporter): r.r
+                for r in rows
+                if (r.study, r.from_wave, r.to_wave) == (study, a, b)
+            },
+        }
+        for study, a, b in pairs
+    ]
+    return plots.paired_strip(
+        [("", members)], series, "r with one wave earlier", "Stability across waves (same person)"
+    )
+
+
+def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -> go.Figure | None:
+    # This score against every other score measured in the same wave, strongest first.
+    config = result.project.config
+    by_key = {s.key: s for s in result.catalog.scores}
+    reporter = {s.key: dataset_by_name(config, s.dataset).reporter for s in result.catalog.scores}
+    reporters_of: dict[str, set[str]] = {}
+    for s in result.catalog.scores:
+        reporters_of.setdefault(s.instrument_id, set()).add(reporter[s.key])
+    own = {s.key for s in resolved(result, instrument_id, score_id)}
+    several_own = len({reporter[k] for k in own}) > 1
+    members: dict[tuple[str, str, str], dict] = {}
+    series = []
+    for corr in result.summary.correlations:
+        for i, key in enumerate(corr.keys):
+            if key not in own:
+                continue
+            values = {}
+            for j, other_key in enumerate(corr.keys):
+                other = by_key[other_key]
+                if j == i or corr.r[i][j] is None or nested(result, by_key[key], other):
+                    continue
+                member = (other.instrument_id, other.score_id, reporter[other_key])
+                values[member] = corr.r[i][j]
+                if member not in members:
+                    other_instrument = result.project.instruments[other.instrument_id]
+                    label = short_label(other_instrument, definition(result, other))
+                    several = len(reporters_of[other.instrument_id]) > 1
+                    members[member] = {
+                        "id": member,
+                        "tick": f"{label} ({member[2]})" if several else label,
+                        "hover": f"{label}, {member[2]}",
+                    }
+            name = wave_name(result, corr.study, corr.wave)
+            series.append(
+                {
+                    "name": f"{name} · {reporter[key]}" if several_own else name,
+                    "color": series_color(result, by_key[key].dataset),
+                    "values": values,
+                }
+            )
+    if not members:
+        return None
+
+    def strength(member: tuple) -> float:
+        found = [abs(s["values"][member]) for s in series if member in s["values"]]
+        return sum(found) / len(found)
+
+    ordered = sorted(members, key=strength, reverse=True)
+    instrument = result.project.instruments[instrument_id]
+    score = next(s for s in instrument.scores if s.id == score_id)
+    return plots.paired_strip(
+        [("", [members[m] for m in ordered])],
+        series,
+        "Pearson r",
+        f"{short_label(instrument, score)} against every other score",
+    )
+
+
+def nested(result: CatalogResult, a: ResolvedScore, b: ResolvedScore) -> bool:
+    # A score and its own subscale in one file share items, so their r says nothing new.
+    if a.dataset != b.dataset or a.instrument_id != b.instrument_id:
+        return False
+    items_a, items_b = set(definition(result, a).items), set(definition(result, b).items)
+    return items_a >= items_b or items_b >= items_a
+
+
+def definition(result: CatalogResult, score: ResolvedScore) -> Score:
+    instrument = result.project.instruments[score.instrument_id]
+    return next(s for s in instrument.scores if s.id == score.score_id)
+
+
+def instrument_choices(result: CatalogResult, instrument_id: str) -> dict[str, str]:
+    return {
+        choice: label
+        for choice, label in score_choices(result).items()
+        if choice.split("|")[0] == instrument_id
+    }
+
+
+def default_score(result: CatalogResult, instrument_id: str) -> str:
+    total = total_score(result.project.instruments[instrument_id])
+    choices = list(instrument_choices(result, instrument_id))
+    preferred = f"{instrument_id}|{total.id}" if total else None
+    return preferred if preferred in choices else choices[0]
+
+
+def default_partner(result: CatalogResult, choice: str) -> str:
+    # A total from another instrument; a score against its own instrument says little.
+    others = [c for c in score_choices(result) if c.split("|")[0] != choice.split("|")[0]]
+    totals = []
+    for other in others:
+        instrument_id, score_id = other.split("|")
+        instrument = result.project.instruments[instrument_id]
+        if is_total(instrument, next(s for s in instrument.scores if s.id == score_id)):
+            totals.append(other)
+    rest = [c for c in score_choices(result) if c != choice]
+    return (totals or others or rest)[0]
+
+
+# ---- overview page ----
 
 
 def collection_pace(result: CatalogResult) -> go.Figure | None:
@@ -381,48 +515,7 @@ def collection_pace(result: CatalogResult) -> go.Figure | None:
     return plots.collection_pace(facets, waves, colors)
 
 
-def stability(result: CatalogResult) -> go.Figure | None:
-    rows = result.summary.stability
-    if not rows:
-        return None
-    pairs = list(dict.fromkeys((r.study, r.from_wave, r.to_wave) for r in rows))
-    reporters = {(r.instrument_id, r.reporter) for r in rows}
-    blocks = []
-    for instrument_id, instrument in result.project.instruments.items():
-        members = []
-        for score in instrument.scores:
-            for reporter in dict.fromkeys(
-                r.reporter for r in rows if r.instrument_id == instrument_id
-            ):
-                if any(r.score_id == score.id and r.reporter == reporter for r in rows):
-                    several = sum(1 for i, _ in reporters if i == instrument_id) > 1
-                    tick = f"{score.label} ({reporter})" if several else score.label
-                    members.append(
-                        {
-                            "id": (instrument_id, score.id, reporter),
-                            "tick": tick,
-                            "hover": f"{short_label(instrument, score)}, {reporter}",
-                        }
-                    )
-        blocks.append((instrument.abbreviation or instrument_id, members))
-    series = [
-        {
-            "name": f"{wave_name(result, study, a)} → {wave_name(result, study, b)}",
-            "color": wave_colors(result)[b],
-            "values": {
-                (r.instrument_id, r.score_id, r.reporter): r.r
-                for r in rows
-                if (r.study, r.from_wave, r.to_wave) == (study, a, b)
-            },
-        }
-        for study, a, b in pairs
-    ]
-    return plots.paired_strip(
-        blocks, series, "r with one wave earlier", "Stability across waves (same person)"
-    )
-
-
-# ---- correlations page ----
+# ---- scores against each other ----
 
 
 def correlation_waves(result: CatalogResult) -> list[tuple[str, str]]:
@@ -433,7 +526,17 @@ def instrument_order(result: CatalogResult) -> list[str]:
     return list(result.project.instruments)
 
 
-def score_panel(result: CatalogResult, study: str, wave: str) -> dict:
+def correlated_instruments(result: CatalogResult) -> dict[str, str]:
+    keys = {key for c in result.summary.correlations for key in c.keys}
+    found = {s.instrument_id for s in result.catalog.scores if s.key in keys}
+    return {
+        i: result.project.instruments[i].abbreviation or i
+        for i in instrument_order(result)
+        if i in found
+    }
+
+
+def score_panel(result: CatalogResult, study: str, wave: str, instruments: list[str]) -> dict | None:
     corr = next(c for c in result.summary.correlations if (c.study, c.wave) == (study, wave))
     by_key = {s.key: s for s in result.catalog.scores}
     order = instrument_order(result)
@@ -441,26 +544,25 @@ def score_panel(result: CatalogResult, study: str, wave: str) -> dict:
     def rank(i: int) -> tuple:
         s = by_key[corr.keys[i]]
         instrument = result.project.instruments[s.instrument_id]
-        score = next(x for x in instrument.scores if x.id == s.score_id)
+        score = definition(result, s)
         return (
             order.index(s.instrument_id),
             not is_total(instrument, score),
             instrument.scores.index(score),
         )
 
-    idx = sorted(range(len(corr.keys)), key=rank)
+    picked = [i for i, key in enumerate(corr.keys) if by_key[key].instrument_id in instruments]
+    if len(picked) < 2:
+        return None
+    idx = sorted(picked, key=rank)
     resolved_scores = [by_key[corr.keys[i]] for i in idx]
-    definitions = [
-        next(x for x in result.project.instruments[s.instrument_id].scores if x.id == s.score_id)
-        for s in resolved_scores
-    ]
-    skip = set()
-    for a in range(len(idx)):
-        for b in range(a + 1, len(idx)):
-            same = resolved_scores[a].instrument_id == resolved_scores[b].instrument_id
-            items_a, items_b = set(definitions[a].items), set(definitions[b].items)
-            if same and (items_a >= items_b or items_b >= items_a):
-                skip.add((a, b))
+    definitions = [definition(result, s) for s in resolved_scores]
+    skip = {
+        (a, b)
+        for a in range(len(idx))
+        for b in range(a + 1, len(idx))
+        if nested(result, resolved_scores[a], resolved_scores[b])
+    }
     return {
         "title": wave_name(result, study, wave),
         "r": [[corr.r[i][j] for j in idx] for i in idx],
@@ -475,8 +577,12 @@ def score_panel(result: CatalogResult, study: str, wave: str) -> dict:
     }
 
 
-def score_circle(result: CatalogResult, study: str, wave: str) -> go.Figure:
-    p = score_panel(result, study, wave)
+def score_circle(
+    result: CatalogResult, study: str, wave: str, instruments: list[str]
+) -> go.Figure | None:
+    p = score_panel(result, study, wave, instruments)
+    if p is None:
+        return None
     title = f"Scores against each other, {p['title']}"
     return matrices.score_circle(
         p["r"],
@@ -490,8 +596,12 @@ def score_circle(result: CatalogResult, study: str, wave: str) -> go.Figure:
     )
 
 
-def score_matrices(result: CatalogResult) -> go.Figure | None:
-    panels = [score_panel(result, study, wave) for study, wave in correlation_waves(result)]
+def score_matrices(result: CatalogResult, instruments: list[str]) -> go.Figure | None:
+    panels = [
+        p
+        for study, wave in correlation_waves(result)
+        if (p := score_panel(result, study, wave, instruments)) is not None
+    ]
     if not panels:
         return None
     labels = {i: x.abbreviation or i for i, x in result.project.instruments.items()}
@@ -499,13 +609,13 @@ def score_matrices(result: CatalogResult) -> go.Figure | None:
 
 
 def score_choices(result: CatalogResult) -> dict[str, str]:
-    seen = dict.fromkeys((s.instrument_id, s.score_id) for s in result.catalog.scores)
-    choices = {}
-    for instrument_id, score_id in seen:
-        instrument = result.project.instruments[instrument_id]
-        score = next(s for s in instrument.scores if s.id == score_id)
-        choices[f"{instrument_id}|{score_id}"] = short_label(instrument, score)
-    return choices
+    seen = {(s.instrument_id, s.score_id): s for s in result.catalog.scores}
+    return {
+        f"{instrument_id}|{score_id}": short_label(
+            result.project.instruments[instrument_id], definition(result, s)
+        )
+        for (instrument_id, score_id), s in seen.items()
+    }
 
 
 def linked(result: CatalogResult, score: ResolvedScore) -> pd.Series:
@@ -581,7 +691,7 @@ def regression(result: CatalogResult, x_choice: str, y_choice: str) -> go.Figure
     return scatter.regression(choices[x_choice], choices[y_choice], groups)
 
 
-# ---- datasets page ----
+# ---- one instrument in one dataset ----
 
 
 def people(result: CatalogResult, dataset: str) -> list[str]:
@@ -639,11 +749,13 @@ def answer_status(
     return status, label
 
 
-def answer_grid(result: CatalogResult, dataset: str, page: int) -> go.Figure | None:
+def answer_grid(
+    result: CatalogResult, dataset: str, page: int, instrument_id: str
+) -> go.Figure | None:
     variables = [
         v
         for v in result.catalog.variables_for(dataset)
-        if v.column in result.datasets[dataset].frame
+        if v.instrument_id == instrument_id and v.column in result.datasets[dataset].frame
     ]
     if not variables:
         return None
@@ -664,10 +776,13 @@ def answer_grid(result: CatalogResult, dataset: str, page: int) -> go.Figure | N
     return matrices.answer_grid(cells, labels)
 
 
-def standardized_scores(result: CatalogResult, dataset: str, page: int) -> go.Figure | None:
-    scores = result.catalog.scores_for(dataset)
+def standardized_scores(
+    result: CatalogResult, dataset: str, page: int, instrument_id: str
+) -> go.Figure | None:
+    scores = [s for s in result.catalog.scores_for(dataset) if s.instrument_id == instrument_id]
     if not scores:
         return None
+    instrument = result.project.instruments[instrument_id]
     rows, shown = page_rows(result, dataset, page)
     points = []
     for s in scores:
@@ -675,14 +790,12 @@ def standardized_scores(result: CatalogResult, dataset: str, page: int) -> go.Fi
         if values.notna().sum() < defaults.MIN_CORRELATION_N or not values.std():
             continue
         z = (values - values.mean()) / values.std()
-        instrument = result.project.instruments[s.instrument_id]
-        score = next(x for x in instrument.scores if x.id == s.score_id)
         for row, person in zip(rows, shown, strict=True):
             if pd.notna(z.iloc[row]):
                 points.append(
                     {
                         "id": person,
-                        "variable": short_label(instrument, score),
+                        "variable": short_label(instrument, definition(result, s)),
                         "z": float(z.iloc[row]),
                         "value": float(values.iloc[row]),
                     }
@@ -771,17 +884,3 @@ def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> 
             }
         )
     return plots.small_multiples(panels, option_range(instrument), "Answer") if panels else None
-
-
-def default_pair(result: CatalogResult) -> tuple[str, str]:
-    # Two totals from different instruments; a total against its own subscale says nothing.
-    choices = list(score_choices(result))
-    totals = []
-    for choice in choices:
-        instrument_id, score_id = choice.split("|")
-        instrument = result.project.instruments[instrument_id]
-        if is_total(instrument, next(s for s in instrument.scores if s.id == score_id)):
-            totals.append(choice)
-    if len(totals) >= 2:
-        return totals[0], totals[1]
-    return choices[0], choices[1]

@@ -31,6 +31,8 @@ STATUS_NAMES = {
     "unexpected": "not an option",
     "blank": "blank",
 }
+# Past this many rows the printed numbers no longer fit their cells; hover still shows them.
+CELL_TEXT_MAX = 25
 CORRELATION_SCALE = "RdBu_r"
 SHARE_SCALE = "YlGnBu"
 FONT = 'Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif'
@@ -74,6 +76,8 @@ def scale_color(value: float, scale: str, low: float, high: float) -> str:
 
 def cell_values(fig, z, rows, cols, *, scale, low, high, row=None, col=None) -> None:
     # The ink follows each cell's own colour, so one rule serves every scale.
+    if max(len(rows), len(cols)) > CELL_TEXT_MAX:
+        return
     size = float(np.clip(150.0 / max(len(rows), len(cols), 1), 9.0, 13.0))
     groups: dict[str, list[list]] = {"white": [[], [], []], "#111111": [[], [], []]}
     for i, r in enumerate(rows):

@@ -5,7 +5,7 @@ from nicegui import app, run, ui
 
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, datasets, instruments, overview, problems
+from labcatalog.gui import datasets, instruments, overview, problems
 from labcatalog.gui.instruments import BrowseView
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.version import __version__
@@ -15,7 +15,6 @@ PAGES = (
     ("overview", "Overview", "dashboard"),
     ("instruments", "Instruments", "list_alt"),
     ("datasets", "Datasets", "table_chart"),
-    ("correlations", "Correlations", "hub"),
     ("problems", "Problems", "report_problem"),
 )
 
@@ -96,8 +95,6 @@ class Window:
                 self.instruments_panel()
             with ui.tab_panel("datasets"):
                 self.datasets_panel()
-            with ui.tab_panel("correlations"):
-                self.correlations_panel()
             with ui.tab_panel("problems"):
                 self.problems_panel()
 
@@ -144,7 +141,6 @@ class Window:
             self.overview_panel,
             self.instruments_panel,
             self.datasets_panel,
-            self.correlations_panel,
             self.problems_panel,
         ):
             panel.refresh()
@@ -176,11 +172,6 @@ class Window:
     def datasets_panel(self) -> None:
         if self.has_catalog():
             datasets.render(self.result, self.dataset, self.show_dataset)
-
-    @ui.refreshable_method
-    def correlations_panel(self) -> None:
-        if self.has_catalog():
-            charts.correlations_page(self.result)
 
     @ui.refreshable_method
     def problems_panel(self) -> None:

@@ -15,6 +15,7 @@ from labcatalog.charts.style import (
 )
 
 BLOCK_GAP = 1.4
+MEANS_PER_ROW = 4
 
 
 def score_boxes(title: str, labels: list[str], series: list[dict]) -> go.Figure:
@@ -345,14 +346,19 @@ def profile_radar(
 
 def score_means(panels: list[dict], wave_labels: list[str]) -> go.Figure:
     # Each score keeps its own y scale; sharing one would flatten the narrow-range scores.
+    cols = min(MEANS_PER_ROW, len(panels))
+    rows = -(-len(panels) // cols)
+    height = 290 + 230 * (rows - 1)
     fig = make_subplots(
-        rows=1,
-        cols=len(panels),
+        rows=rows,
+        cols=cols,
         subplot_titles=[p["title"] for p in panels],
         horizontal_spacing=0.07,
+        vertical_spacing=70 / (height - 100) if rows > 1 else 0.0,
     )
     shown = set()
-    for c, panel in enumerate(panels, start=1):
+    for k, panel in enumerate(panels):
+        r, c = k // cols + 1, k % cols + 1
         for s in panel["series"]:
             fig.add_trace(
                 go.Scatter(
@@ -367,12 +373,12 @@ def score_means(panels: list[dict], wave_labels: list[str]) -> go.Figure:
                     customdata=[[w, n] for w, _, n in s["points"]],
                     hovertemplate=f"<b>{s['name']}</b> · %{{customdata[0]}}<br>mean %{{y:.2f}} · n %{{customdata[1]}}<extra></extra>",
                 ),
-                row=1,
+                row=r,
                 col=c,
             )
             shown.add(s["name"])
         fig.update_xaxes(
-            row=1,
+            row=r,
             col=c,
             tickvals=list(range(len(wave_labels))),
             ticktext=wave_labels,
@@ -384,10 +390,15 @@ def score_means(panels: list[dict], wave_labels: list[str]) -> go.Figure:
     fig.update_yaxes(gridcolor=GRID, zeroline=False)
     return base_layout(
         fig,
-        290,
+        height,
         margin=dict(l=60, r=20, t=60, b=40),
         legend=dict(
-            orientation="h", yanchor="bottom", y=1.1, x=1, xanchor="right", font=dict(size=10)
+            orientation="h",
+            yanchor="bottom",
+            y=1 + 20 / (height - 100),
+            x=1,
+            xanchor="right",
+            font=dict(size=10),
         ),
     )
 

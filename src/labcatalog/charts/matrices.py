@@ -16,6 +16,7 @@ from labcatalog.charts.style import (
 
 CIRCLE_GAP = 12.0
 CIRCLE_SPAN = 1.42
+MATRICES_PER_ROW = 3
 
 
 def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
@@ -94,13 +95,20 @@ def score_matrices(
     panels: list[dict], group_order: list[str], group_labels: dict[str, str]
 ) -> go.Figure:
     # Scores sit together by instrument; a colour strip names each block and a rule separates blocks.
+    cols = min(MATRICES_PER_ROW, len(panels))
+    rows = -(-len(panels) // cols)
+    height = 150 + 360 * rows
     fig = make_subplots(
-        rows=1,
-        cols=len(panels),
+        rows=rows,
+        cols=cols,
         subplot_titles=[p["title"] for p in panels],
         horizontal_spacing=0.05,
+        vertical_spacing=130 / (height - 150) if rows > 1 else 0.0,
     )
-    for c, panel in enumerate(panels, start=1):
+    # Shapes and notes go in at once; adding hundreds one by one revalidates the layout each time.
+    shapes, notes = [], []
+    for k, panel in enumerate(panels):
+        row, c = k // cols + 1, k % cols + 1
         groups = panel["groups"]
         n = len(groups)
         blocks = [(g, groups.index(g), n - groups[::-1].index(g)) for g in dict.fromkeys(groups)]
@@ -114,7 +122,7 @@ def score_matrices(
                 zmin=-1,
                 zmax=1,
                 colorscale=CORRELATION_SCALE,
-                showscale=c == len(panels),
+                showscale=k == len(panels) - 1,
                 customdata=[
                     [[panel["labels"][i], panel["labels"][j], panel["n"][i][j]] for j in range(n)]
                     for i in range(n)
@@ -122,7 +130,7 @@ def score_matrices(
                 hovertemplate="%{customdata[0]} × %{customdata[1]}<br>r %{z:.2f} · n %{customdata[2]}<extra></extra>",
                 colorbar=correlation_bar("Pearson r", len=0.8),
             ),
-            row=1,
+            row=row,
             col=c,
         )
         cell_values(
@@ -133,55 +141,59 @@ def score_matrices(
             scale=CORRELATION_SCALE,
             low=-1,
             high=1,
-            row=1,
+            row=row,
             col=c,
         )
-        axis = "" if c == 1 else str(c)
+        axis = "" if k == 0 else str(k + 1)
+        ref = dict(xref=f"x{axis}", yref=f"y{axis}")
         for g, start, end in blocks:
             color = group_color(group_order.index(g))
             for x0, x1, y0, y1 in (
                 (start - 0.5, end - 0.5, -1.1, -0.75),
                 (-1.1, -0.75, start - 0.5, end - 0.5),
             ):
-                fig.add_shape(
-                    type="rect",
-                    xref=f"x{axis}",
-                    yref=f"y{axis}",
-                    x0=x0,
-                    x1=x1,
-                    y0=y0,
-                    y1=y1,
-                    fillcolor=color,
-                    line_width=0,
+                shapes.append(
+                    dict(
+                        type="rect",
+                        x0=x0,
+                        x1=x1,
+                        y0=y0,
+                        y1=y1,
+                        fillcolor=color,
+                        line_width=0,
+                        **ref,
+                    )
                 )
             if start > 0:
                 for x0, x1, y0, y1 in (
                     (start - 0.5, start - 0.5, -0.5, n - 0.5),
                     (-0.5, n - 0.5, start - 0.5, start - 0.5),
                 ):
-                    fig.add_shape(
-                        type="line",
-                        xref=f"x{axis}",
-                        yref=f"y{axis}",
-                        x0=x0,
-                        x1=x1,
-                        y0=y0,
-                        y1=y1,
-                        line=dict(color="black", width=0.8),
-                        opacity=0.7,
+                    shapes.append(
+                        dict(
+                            type="line",
+                            x0=x0,
+                            x1=x1,
+                            y0=y0,
+                            y1=y1,
+                            line=dict(color="black", width=0.8),
+                            opacity=0.7,
+                            **ref,
+                        )
                     )
-            fig.add_annotation(
-                xref=f"x{axis}",
-                yref=f"y{axis}",
-                x=(start + end - 1) / 2,
-                y=-1.2,
-                yanchor="bottom",
-                text=f"<b>{group_labels[g]}</b>",
-                showarrow=False,
-                font=dict(size=11, color=color),
+            notes.append(
+                dict(
+                    x=(start + end - 1) / 2,
+                    y=-1.2,
+                    yanchor="bottom",
+                    text=f"<b>{group_labels[g]}</b>",
+                    showarrow=False,
+                    font=dict(size=11, color=color),
+                    **ref,
+                )
             )
         fig.update_xaxes(
-            row=1,
+            row=row,
             col=c,
             range=[-1.2, n - 0.5],
             tickvals=list(range(n)),
@@ -190,7 +202,7 @@ def score_matrices(
             showgrid=False,
         )
         fig.update_yaxes(
-            row=1,
+            row=row,
             col=c,
             range=[n - 0.5, -1.6],
             tickvals=list(range(n)),
@@ -201,7 +213,8 @@ def score_matrices(
     fig.update_annotations(
         selector=dict(xref="paper"), font=dict(color=TITLE_INK, size=13), yshift=22
     )
-    return base_layout(fig, 400, margin=dict(l=110, r=16, t=60, b=90))
+    fig.update_layout(shapes=shapes, annotations=[*fig.layout.annotations, *notes])
+    return base_layout(fig, height, margin=dict(l=110, r=16, t=60, b=90))
 
 
 def ring_angles(counts: list[int], gap: float = CIRCLE_GAP, start: float = 90.0) -> np.ndarray:
@@ -247,7 +260,7 @@ def score_circle(
     threshold: float,
     title: str,
 ) -> go.Figure:
-    # The matrix is the record (every cell printed); the circle shows which pairs are strong.
+    # The matrix is the record (every pair); the circle shows which pairs are strong.
     z = as_matrix(r)
     k = len(labels)
     keep = [

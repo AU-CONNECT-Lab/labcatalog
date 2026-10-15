@@ -5,6 +5,8 @@ from labcatalog.charts import views
 from labcatalog.gui.common import heading, note
 from labcatalog.pipeline import CatalogResult
 
+NO_SHARED_WAVE = "These two scores never meet in one wave; see stats.correlate_by in labcatalog.yaml."
+
 
 def show(fig: go.Figure | None, empty: str = "") -> None:
     if fig is None:
@@ -33,6 +35,14 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
             show(views.item_total(result, instrument_id))
         with ui.column().classes("w-1/2"):
             show(views.item_profile(result, instrument_id))
+    means = views.score_means(result, instrument_id)
+    if means is not None:
+        heading("Scores across waves")
+        show(means)
+    stability = views.stability(result, instrument_id)
+    if stability is not None:
+        heading("Stability across waves")
+        show(stability)
     profiles = views.wave_profiles(result, instrument_id)
     if profiles is not None:
         heading("Each wave against the others")
@@ -45,6 +55,47 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     if correlations is not None:
         heading("Item correlations")
         show(correlations)
+    other_scores(result, instrument_id)
+
+
+def other_scores(result: CatalogResult, instrument_id: str) -> None:
+    own = views.instrument_choices(result, instrument_id)
+    if not own or len(views.score_choices(result)) < 2:
+        return
+    first = views.default_score(result, instrument_id)
+    picked = {"x": first, "y": views.default_partner(result, first)}
+
+    @ui.refreshable
+    def correlates() -> None:
+        show(
+            views.score_correlates(result, *picked["x"].split("|")),
+            "No other score was measured in the same wave.",
+        )
+
+    @ui.refreshable
+    def scatter() -> None:
+        show(views.regression(result, picked["x"], picked["y"]), NO_SHARED_WAVE)
+
+    def choose(axis: str, value: str) -> None:
+        picked[axis] = value
+        if axis == "x":
+            correlates.refresh()
+        scatter.refresh()
+
+    heading("Against other scores")
+    if len(own) > 1:
+        ui.select(own, value=first, label="Score", on_change=lambda e: choose("x", e.value)).props(
+            "dense outlined"
+        ).classes("w-72")
+    correlates()
+    ui.select(
+        views.score_choices(result),
+        value=picked["y"],
+        label="Against",
+        with_input=True,
+        on_change=lambda e: choose("y", e.value),
+    ).props("dense outlined").classes("w-72 mt-4")
+    scatter()
 
 
 def instrument_dataset_section(result: CatalogResult, instrument_id: str, dataset: str) -> None:
@@ -52,32 +103,19 @@ def instrument_dataset_section(result: CatalogResult, instrument_id: str, datase
     if profiles is not None:
         heading("Everyone's answers")
         show(profiles)
-
-
-def overview_section(result: CatalogResult) -> None:
-    means = views.score_means(result)
-    if means is not None:
-        heading("Scores across waves")
-        show(means)
-    pace = views.collection_pace(result)
-    if pace is not None:
-        heading("Collection pace")
-        show(pace)
-    stability = views.stability(result)
-    if stability is not None:
-        heading("Stability across waves")
-        show(stability)
-
-
-def dataset_section(result: CatalogResult, dataset: str) -> None:
     pages = views.page_count(result, dataset)
 
     @ui.refreshable
     def people(page: int) -> None:
         heading("Answers by participant")
-        show(views.answer_grid(result, dataset, page), "No items are mapped in this dataset.")
-        heading("Standardized scores")
-        show(views.standardized_scores(result, dataset, page), "No scores in this dataset.")
+        show(
+            views.answer_grid(result, dataset, page, instrument_id),
+            "No items of this instrument are mapped in this dataset.",
+        )
+        standardized = views.standardized_scores(result, dataset, page, instrument_id)
+        if standardized is not None:
+            heading("Standardized scores")
+            show(standardized)
 
     if pages > 1:
         with ui.row().classes("items-center gap-2 mt-6"):
@@ -88,50 +126,63 @@ def dataset_section(result: CatalogResult, dataset: str) -> None:
     people(1)
 
 
-def correlations_page(result: CatalogResult) -> None:
+def overview_section(result: CatalogResult) -> None:
+    pace = views.collection_pace(result)
+    if pace is not None:
+        heading("Collection pace")
+        show(pace)
+    score_relations(result)
+
+
+def score_relations(result: CatalogResult) -> None:
     waves = views.correlation_waves(result)
+    instruments = views.correlated_instruments(result)
     if not waves:
-        note("No wave has two or more scores to correlate.")
         return
     labels = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
+    picked = {"wave": next(iter(labels)), "instruments": list(instruments)}
 
     @ui.refreshable
-    def circle(choice: str) -> None:
-        study, wave = choice.split("|")
-        show(views.score_circle(result, study, wave))
-
-    heading("How the scores relate")
-    ui.toggle(labels, value=next(iter(labels)), on_change=lambda e: circle.refresh(e.value)).props(
-        "dense no-caps"
-    )
-    circle(next(iter(labels)))
-
-    heading("Correlations in every wave")
-    show(views.score_matrices(result))
-
-    choices = views.score_choices(result)
-    if len(choices) < 2:
-        return
-    heading("One score against another")
-    first, second = views.default_pair(result)
-    picked = {"x": first, "y": second}
-
-    @ui.refreshable
-    def scatter() -> None:
+    def circle() -> None:
+        study, wave = picked["wave"].split("|")
         show(
-            views.regression(result, picked["x"], picked["y"]),
-            "These two scores never meet in one wave; see stats.correlate_by in labcatalog.yaml.",
+            views.score_circle(result, study, wave, picked["instruments"]),
+            "Pick instruments with at least two scores measured in this wave.",
         )
 
-    def choose(axis: str, value: str) -> None:
-        picked[axis] = value
-        scatter.refresh()
+    @ui.refreshable
+    def matrices() -> None:
+        show(views.score_matrices(result, picked["instruments"]))
 
-    with ui.row().classes("gap-4"):
-        ui.select(choices, value=first, label="X", on_change=lambda e: choose("x", e.value)).props(
-            "dense outlined"
-        ).classes("w-72")
-        ui.select(choices, value=second, label="Y", on_change=lambda e: choose("y", e.value)).props(
-            "dense outlined"
-        ).classes("w-72")
-    scatter()
+    def choose_wave(value: str) -> None:
+        picked["wave"] = value
+        circle.refresh()
+
+    def choose_instruments(value: list[str] | None) -> None:
+        picked["instruments"] = value or []
+        chooser.props(f'display-value="{shown(picked["instruments"])}"')
+        circle.refresh()
+        matrices.refresh()
+
+    def shown(chosen: list[str]) -> str:
+        return f"{len(chosen)} of {len(instruments)} instruments"
+
+    heading("How the scores relate")
+    with ui.row().classes("items-center gap-4"):
+        chooser = (
+            ui.select(
+                instruments,
+                multiple=True,
+                value=picked["instruments"],
+                label="Instruments",
+                on_change=lambda e: choose_instruments(e.value),
+            )
+            .props(f'dense outlined clearable display-value="{shown(picked["instruments"])}"')
+            .classes("w-72")
+        )
+        ui.toggle(labels, value=picked["wave"], on_change=lambda e: choose_wave(e.value)).props(
+            "dense no-caps"
+        )
+    circle()
+    heading("Correlations in every wave")
+    matrices()
