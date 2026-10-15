@@ -223,42 +223,26 @@ def item_responses(result: CatalogResult, instrument_id: str) -> list[go.Figure]
     return figures
 
 
-def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    instrument = result.project.instruments[instrument_id]
-    choices = [i for i in instrument.items if i.type == "choice"]
-    if len(choices) < 3:
-        return None
-    means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
-    names = series_names(result, instrument_datasets(result, instrument_id))
-    series = []
-    for name, label in names.items():
-        values = {
-            v.item_id: means.get((name, v.column))
-            for v in result.catalog.variables_for(name)
-            if v.instrument_id == instrument_id and v.type == "choice"
-        }
-        if any(value is not None for value in values.values()):
-            series.append({"name": label, "color": series_color(result, name), "values": values})
-    axes = [i.id for i in choices]
-    hovers = [f"{i.id}: {item_text(instrument, i.id)}" for i in choices]
-    return plots.profile_radar(axes, hovers, series, option_range(instrument)) if series else None
-
-
 def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    # Each subscale's items on a radar of its own, every wave on each.
+    # Each subscale's item means on a radar of its own, every wave on each; all items on one when no subscale has enough.
     instrument = result.project.instruments[instrument_id]
+    groups = [
+        (s.label, list(s.items)) for s in subscales_of(instrument) if len(s.items) >= RADAR_AXES
+    ]
+    if not groups:
+        groups = [("All items", [i.id for i in instrument.items if i.type == "choice"])]
     names = series_names(result, instrument_datasets(result, instrument_id))
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
     panels = []
-    for subscale in subscales_of(instrument):
-        if len(subscale.items) < RADAR_AXES:
+    for title, items in groups:
+        if len(items) < RADAR_AXES:
             continue
         series = []
         for name, label in names.items():
             values = {
                 v.item_id: means.get((name, v.column))
                 for v in result.catalog.variables_for(name)
-                if v.instrument_id == instrument_id and v.item_id in subscale.items
+                if v.instrument_id == instrument_id and v.item_id in items
             }
             if any(value is not None for value in values.values()):
                 series.append(
@@ -267,9 +251,9 @@ def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | No
         if series:
             panels.append(
                 {
-                    "title": subscale.label,
-                    "axes": list(subscale.items),
-                    "hovers": [f"{i}: {item_text(instrument, i)}" for i in subscale.items],
+                    "title": title,
+                    "axes": items,
+                    "hovers": [f"{i}: {item_text(instrument, i)}" for i in items],
                     "series": series,
                 }
             )
@@ -279,6 +263,15 @@ def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | No
 def short_subscales(result: CatalogResult, instrument_id: str) -> list[str]:
     instrument = result.project.instruments[instrument_id]
     return [s.label for s in subscales_of(instrument) if len(s.items) < RADAR_AXES]
+
+
+def radar_note(result: CatalogResult, instrument_id: str) -> str:
+    short = short_subscales(result, instrument_id)
+    if not short:
+        return ""
+    if len(short) == len(subscales_of(result.project.instruments[instrument_id])):
+        return f"{', '.join(short)}: too few items each for a radar, so all items share one."
+    return f"No radar for {', '.join(short)}: a radar needs at least three items."
 
 
 def subscales_of(instrument: Instrument) -> list[Score]:
@@ -329,9 +322,7 @@ def by_subscale(instrument: Instrument, items) -> list[str]:
     )
 
 
-def item_grid(
-    result: CatalogResult, instrument_id: str, dataset: str
-) -> go.Figure | None:
+def item_grid(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
     # Items sit together by subscale.
     instrument = result.project.instruments[instrument_id]
     summary, where = item_matrix(result, instrument_id, dataset)

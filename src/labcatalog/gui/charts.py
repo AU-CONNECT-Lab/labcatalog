@@ -40,15 +40,15 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     )
     for fig in views.item_responses(result, instrument_id):
         show(fig)
-    side_by_side(
-        ("Item means", views.item_profile(result, instrument_id)),
-        ("Scores across waves", views.score_means(result, instrument_id)),
-    )
+    item_means(result, instrument_id)
+    means = views.score_means(result, instrument_id)
+    if means is not None:
+        heading("Scores across waves")
+        show(means)
     profiles = views.wave_profiles(result, instrument_id)
     if profiles is not None:
         heading("Each wave against the others")
         show(profiles)
-    subscales(result, instrument_id)
     waves = views.item_waves(result, instrument_id)
     if waves:
         heading("Item correlations")
@@ -56,15 +56,14 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     other_scores(result, instrument_id)
 
 
-def subscales(result: CatalogResult, instrument_id: str) -> None:
+def item_means(result: CatalogResult, instrument_id: str) -> None:
     radars = views.subscale_radars(result, instrument_id)
-    short = views.short_subscales(result, instrument_id)
-    if radars is None and not short:
+    if radars is None:
         return
-    heading("Subscales")
+    heading("Item means")
+    if views.radar_note(result, instrument_id):
+        note(views.radar_note(result, instrument_id))
     show(radars)
-    if short:
-        note(f"No radar for {', '.join(short)}: a radar needs at least three items.")
 
 
 def other_scores(result: CatalogResult, instrument_id: str) -> None:

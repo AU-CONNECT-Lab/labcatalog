@@ -15,8 +15,11 @@ from labcatalog.charts.style import (
 )
 
 BLOCK_GAP = 1.4
-MEANS_PER_ROW = 2
-RADARS_PER_ROW = 3
+MEANS_PER_ROW = 4
+RADARS_PER_ROW = 4
+# Usual width of a full-width chart, for charts whose height follows their width.
+PLOT_WIDTH = 900
+RADAR_MAX_ROW = 420
 ROW_HEIGHT = 24
 ROW_LINE = "#ececec"
 # Pixels above the rows for the title, the legend and the value axis.
@@ -334,55 +337,12 @@ def dot_rows(
     )
 
 
-def profile_radar(
-    axes: list[str], hovers: list[str], series: list[dict], value_range: tuple[float, float]
-) -> go.Figure:
-    fig = go.Figure()
-    for s in series:
-        values = [s["values"].get(axis) for axis in axes]
-        fig.add_trace(
-            go.Scatterpolar(
-                r=values + values[:1],
-                theta=axes + axes[:1],
-                name=s["name"],
-                mode="lines+markers",
-                fill="toself",
-                fillcolor=rgba(s["color"], 0.12),
-                line=dict(color=s["color"], width=2),
-                marker=dict(size=7, color=s["color"]),
-                customdata=hovers + hovers[:1],
-                hovertemplate=f"<b>{s['name']}</b><br>%{{customdata}}<br>mean %{{r:.2f}}<extra></extra>",
-            )
-        )
-    fig.update_layout(
-        polar=dict(
-            bgcolor="white",
-            radialaxis=dict(
-                range=list(value_range),
-                gridcolor="#eef0f3",
-                linecolor="#d8dee6",
-                tickfont=dict(color="#6c7684", size=10),
-                angle=90 + 180 / len(axes),
-                tickangle=0,
-            ),
-            angularaxis=dict(
-                gridcolor="#eef0f3", linecolor="#d8dee6", direction="clockwise", rotation=90
-            ),
-        )
-    )
-    return base_layout(
-        fig,
-        380,
-        margin=dict(l=48, r=48, t=24, b=40),
-        legend=dict(orientation="h", x=0, y=-0.04, yanchor="top"),
-    )
-
-
 def radar_grid(panels: list[dict], value_range: tuple[float, float]) -> go.Figure:
-    # profile_radar as small multiples: one radar per panel, every series on each.
+    # One radar per panel side by side, every series on each.
     cols = min(RADARS_PER_ROW, len(panels))
     rows = -(-len(panels) // cols)
-    height = 80 + 360 * rows
+    row_height = min(RADAR_MAX_ROW, PLOT_WIDTH // cols + 60)
+    height = 80 + row_height * rows
     fig = make_subplots(
         rows=rows,
         cols=cols,

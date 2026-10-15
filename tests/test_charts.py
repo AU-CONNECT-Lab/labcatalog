@@ -13,7 +13,6 @@ def result(mock_project):
 def test_instrument_charts(result):
     assert len(views.score_boxes(result, "example_mood").data) == 6
     assert views.score_distribution(result, "example_mood") is not None
-    assert views.item_profile(result, "example_mood") is not None
     assert len(views.item_responses(result, "example_screen_time")) == 2
     assert views.score_boxes(result, "example_screen_time") is None
 
@@ -23,16 +22,19 @@ def test_subscale_radars_draw_each_subscale_with_three_items(result):
         fig = views.subscale_radars(result, instrument_id)
         return None if fig is None else [a.text for a in fig.layout.annotations]
 
-    assert titles("example_mood") is None
-    assert views.short_subscales(result, "example_mood") == [
-        "Sadness",
-        "Worry and fatigue",
-        "Low positive affect",
-    ]
     assert titles("example_parent_stress") == ["Strain"]
-    assert views.short_subscales(result, "example_parent_stress") == ["Child-related"]
+    assert views.radar_note(result, "example_parent_stress").startswith(
+        "No radar for Child-related"
+    )
     radar = views.subscale_radars(result, "example_parent_stress")
     assert [trace.name for trace in radar.data] == ["Wave 1", "Wave 2", "Wave 3"]
+    assert list(radar.data[0].theta) == ["eps_1", "eps_3", "eps_5", "eps_1"]
+    # No subscale has three items, so all the items share one radar.
+    assert titles("example_mood") == ["All items"]
+    assert views.radar_note(result, "example_mood").startswith(
+        "Sadness, Worry and fatigue, Low positive affect: too few items"
+    )
+    assert titles("example_child_sleep") == ["All items"]
 
 
 def test_small_multiples(result):
@@ -140,7 +142,7 @@ def test_number_and_text_items_are_left_out_of_option_charts(result):
     assert len(views.item_responses(result, "example_demographics")) == 2
     grid = views.answer_grid(result, "parent_w2", 1, "example_demographics")
     assert all(tick.startswith(("dem_gender", "dem_edu")) for tick in grid.layout.yaxis.ticktext)
-    assert views.item_profile(result, "example_demographics") is None
+    assert views.subscale_radars(result, "example_demographics") is None
     waves = views.wave_profiles(result, "example_demographics")
     assert len(waves.data[-1].x) == 2
 
