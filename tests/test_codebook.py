@@ -90,7 +90,7 @@ def test_templates_guess_instruments_from_column_prefixes(pilot):
         "age,,,,,,,,",
         "remarks,,,,text,,,,",
     ]
-    assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == ["anx"]
+    assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == ["anx,,,,,,"]
     assert paths[SCORES].read_text(encoding="utf-8-sig").splitlines()[1:] == []
     with pytest.raises(CodebookError, match="already has codebook files"):
         write_templates(project, "pilot_w1")
@@ -144,21 +144,31 @@ def test_import_writes_instruments_and_map_that_score_like_the_data(pilot):
     (pilot / "studies" / "pilot.yaml").write_text(lines + "\n", encoding="utf-8")
     assert run_check(pilot).issues == []
     catalog = run_catalog(pilot)
-    assert catalog.scores["pilot_w1"]["anx:anx_total"].tolist() == [1.0, 4.5]
+    assert catalog.scores["pilot_w1"]["anx.anx_total@pilot_w1"].tolist() == [1.0, 4.5]
     assert catalog.project.instruments["background"].kind == "demographics"
 
 
 def test_import_reports_each_problem_by_file_and_line(pilot):
     fill(
         pilot,
-        items_choices=("anx1,anx,anx_1,I feel nervous.,,0=Never; 1=Sometimes; 2=Often", "anx1,anx,anx_1,I feel nervous.,,"),
-        items_type=("age,background,age,How old are you?,number", "age,background,age,How old are you?,numbr"),
+        items_choices=(
+            "anx1,anx,anx_1,I feel nervous.,,0=Never; 1=Sometimes; 2=Often",
+            "anx1,anx,anx_1,I feel nervous.,,",
+        ),
+        items_type=(
+            "age,background,age,How old are you?,number",
+            "age,background,age,How old are you?,numbr",
+        ),
         items_reverse=("Anything else?,text,,,", "Anything else?,text,,maybe,"),
         scores_range=("anx_1-anx_3", "anx_1-anx_9"),
     )
     result = import_codebook(load_project(pilot), "pilot_w1")
     assert [(i.level, i.location, i.message) for i in result.issues] == [
-        ("error", "codebook/pilot_w1/items.csv:4", "a choice item needs choices (or type number or text)"),
+        (
+            "error",
+            "codebook/pilot_w1/items.csv:4",
+            "a choice item needs choices (or type number or text)",
+        ),
         ("error", "codebook/pilot_w1/items.csv:8", "type must be one of choice, number, text"),
         ("error", "codebook/pilot_w1/items.csv:8", "min and max apply to number items only"),
         ("error", "codebook/pilot_w1/items.csv:9", "reverse must be yes or no, not maybe"),

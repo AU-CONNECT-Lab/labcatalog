@@ -6,8 +6,18 @@ from nicegui import app, run, ui
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import analysis, datasets, instruments, overview, preferences, problems, theme
+from labcatalog.gui import (
+    analysis,
+    codebook_import,
+    datasets,
+    instruments,
+    overview,
+    preferences,
+    problems,
+    theme,
+)
 from labcatalog.gui.analysis import AnalysisView
+from labcatalog.gui.codebook_import import ImportView
 from labcatalog.gui.instruments import BrowseView
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.version import __version__
@@ -18,6 +28,7 @@ PAGES = (
     ("instruments", "Instruments", "list_alt"),
     ("datasets", "Datasets", "table_chart"),
     ("analysis", "Analysis", "query_stats"),
+    ("import", "Import", "upload_file"),
     ("problems", "Problems", "report_problem"),
 )
 
@@ -59,6 +70,7 @@ class Window:
         self.index: BrowseIndex | None = None
         self.view = BrowseView()
         self.analysis = AnalysisView()
+        self.importing = ImportView()
         self.dataset: str | None = None
 
     def build(self) -> None:
@@ -113,6 +125,8 @@ class Window:
                 self.datasets_panel()
             with ui.tab_panel("analysis").classes("lc-paper"):
                 self.analysis_panel()
+            with ui.tab_panel("import").classes("lc-paper"):
+                self.import_panel()
             with ui.tab_panel("problems").classes("lc-paper"):
                 self.problems_panel()
 
@@ -132,6 +146,7 @@ class Window:
             if root != self.root:
                 self.view = BrowseView()
                 self.analysis = AnalysisView()
+                self.importing = ImportView()
             self.root, self.result = root, result
             self.show_result()
         finally:
@@ -167,6 +182,7 @@ class Window:
             self.instruments_panel,
             self.datasets_panel,
             self.analysis_panel,
+            self.import_panel,
             self.problems_panel,
         ):
             panel.refresh()
@@ -203,6 +219,11 @@ class Window:
     def analysis_panel(self) -> None:
         if self.has_catalog():
             analysis.render(self.result, self.analysis)
+
+    @ui.refreshable_method
+    def import_panel(self) -> None:
+        if self.has_catalog():
+            codebook_import.render(self.result, self.importing)
 
     @ui.refreshable_method
     def problems_panel(self) -> None:

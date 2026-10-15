@@ -190,9 +190,7 @@ def guess(
     if column in mapped:
         return mapped[column]
     for item_id, instrument_id in item_ids:
-        if column == item_id or (
-            column.startswith(item_id) and not column[len(item_id)].isalnum()
-        ):
+        if column == item_id or (column.startswith(item_id) and not column[len(item_id)].isalnum()):
             return instrument_id, item_id
     stem = prefix(column)
     if stem and prefixes[stem] > 1:
@@ -368,7 +366,9 @@ class Importer:
                 self.report(ITEMS, line, "column is empty")
                 continue
             if column in seen_columns:
-                self.report(ITEMS, line, f"column {column} is already on line {seen_columns[column]}")
+                self.report(
+                    ITEMS, line, f"column {column} is already on line {seen_columns[column]}"
+                )
                 continue
             seen_columns[column] = line
             if column not in columns:
@@ -545,9 +545,11 @@ class Importer:
         location = self.project.study_files.get(study, f"{defaults.STUDIES_DIR}/{study}.yaml")
         added, changed = [], []
         for instrument_id in instrument_ids:
-            administration = next(
-                (a for a in content.administrations if a.instrument == instrument_id), None
-            ) if content else None
+            administration = (
+                next((a for a in content.administrations if a.instrument == instrument_id), None)
+                if content
+                else None
+            )
             if administration is None:
                 added.append(f"  - {flow({'instrument': instrument_id, 'datasets': [name]})}")
             elif name not in administration.datasets:
@@ -563,7 +565,9 @@ class Importer:
         if added:
             steps.append((f"In {location}, add under administrations:", "\n".join(added)))
         if changed:
-            steps.append((f"In {location}, add {name} to these administrations:", "\n".join(changed)))
+            steps.append(
+                (f"In {location}, add {name} to these administrations:", "\n".join(changed))
+            )
         return steps
 
 
@@ -652,7 +656,10 @@ def instrument_yaml(draft: Draft) -> str:
             document[key] = fields[column]
     if sets:
         document["response_sets"] = [
-            {"id": names[options], "options": [{"value": v, "label": l} for v, l in options]}
+            {
+                "id": names[options],
+                "options": [{"value": value, "label": label} for value, label in options],
+            }
             for options in sets
         ]
         document["default_response_set"] = names[default]
