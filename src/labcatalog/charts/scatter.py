@@ -5,12 +5,11 @@ from scipy.stats import gaussian_kde
 
 from labcatalog.charts.style import LOLLIPOP_COLORS, base_layout, natural_key, rgba
 
-FIT_COLOR = "#d62728"
 INSET = dict(x0=0.50, x1=0.82, y0=0.03, y1=0.30)
 
 
 def regression(x_title: str, y_title: str, groups: list[dict]) -> go.Figure:
-    # Points by group, one pooled fit, each group's density on the margins, residual boxes inset.
+    # Each group's points and its own fit, its density on the margins, its residual box inset.
     fig = make_subplots(
         rows=2,
         cols=2,
@@ -24,20 +23,22 @@ def regression(x_title: str, y_title: str, groups: list[dict]) -> go.Figure:
     )
     xs = np.concatenate([g["x"] for g in groups])
     ys = np.concatenate([g["y"] for g in groups])
-    slope, intercept = np.polyfit(xs, ys, 1)
-    for g in groups:
+    fits = [np.polyfit(g["x"], g["y"], 1) for g in groups]
+    for g, (slope, intercept) in zip(groups, fits, strict=True):
+        r = np.corrcoef(g["x"], g["y"])[0, 1]
         fig.add_trace(
             go.Scatter(
                 x=g["x"],
                 y=g["y"],
                 mode="markers",
-                name=f"{g['name']} (N={len(g['x'])})",
+                name=f"{g['name']} (N={len(g['x'])}, r = {r:.2f})",
+                legendgroup=g["name"],
                 marker=dict(
                     size=9, color=g["color"], opacity=0.55, line=dict(width=0.6, color="white")
                 ),
                 customdata=g["ids"],
                 hovertemplate="<b>%{customdata}</b><br>"
-                + x_title
+                + g["name"]
                 + " %{x:.2f}<br>"
                 + y_title
                 + " %{y:.2f}<extra></extra>",
@@ -45,19 +46,20 @@ def regression(x_title: str, y_title: str, groups: list[dict]) -> go.Figure:
             row=2,
             col=1,
         )
-    line = np.linspace(xs.min(), xs.max(), 50)
-    fig.add_trace(
-        go.Scatter(
-            x=line,
-            y=intercept + slope * line,
-            mode="lines",
-            line=dict(color=FIT_COLOR, width=3, dash="dash"),
-            name=f"fit, r = {np.corrcoef(xs, ys)[0, 1]:.2f}",
-            hoverinfo="skip",
-        ),
-        row=2,
-        col=1,
-    )
+        line = np.linspace(g["x"].min(), g["x"].max(), 50)
+        fig.add_trace(
+            go.Scatter(
+                x=line,
+                y=intercept + slope * line,
+                mode="lines",
+                line=dict(color=g["color"], width=3, dash="dash"),
+                legendgroup=g["name"],
+                showlegend=False,
+                hoverinfo="skip",
+            ),
+            row=2,
+            col=1,
+        )
     grid_x = np.linspace(xs.min(), xs.max(), 200)
     grid_y = np.linspace(ys.min(), ys.max(), 200)
     for g in groups:
@@ -103,7 +105,13 @@ def regression(x_title: str, y_title: str, groups: list[dict]) -> go.Figure:
     fig.update_yaxes(visible=False, row=1, col=1)
     fig.update_xaxes(visible=False, row=2, col=2)
     fig.update_yaxes(showgrid=False, row=2, col=2, **axis)
-    residual_boxes(fig, [(g, g["y"] - (intercept + slope * g["x"])) for g in groups])
+    residual_boxes(
+        fig,
+        [
+            (g, g["y"] - (intercept + slope * g["x"]))
+            for g, (slope, intercept) in zip(groups, fits, strict=True)
+        ],
+    )
     return base_layout(
         fig,
         640,

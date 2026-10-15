@@ -24,7 +24,7 @@ class AnalysisView:
     datasets: list[str] = field(default_factory=list)
     intersect: bool = True
     scores: list[str] = field(default_factory=list)
-    x: str | None = None
+    xs: list[str] = field(default_factory=list)
     y: str | None = None
 
 
@@ -155,55 +155,82 @@ def pair_section(
 ) -> None:
     keys = list(choices)
     totals = views.total_choices(result, view.datasets) or keys
-    if view.x not in choices:
-        view.x = totals[0]
-    if view.y not in choices or view.y == view.x:
-        view.y = next(k for k in totals + keys if k != view.x)
+    view.xs = [x for x in view.xs if x in choices] or totals[:1]
+    if view.y not in choices or view.y in view.xs:
+        view.y = next((k for k in totals + keys if k not in view.xs), keys[0])
 
     @ui.refreshable
     def body() -> None:
-        x, y = analysis.values(result, sample, view.x), analysis.values(result, sample, view.y)
-        fit = analysis.regress(x, y)
-        if fit is None:
-            note("Too few people have both scores.")
+        y = analysis.values(result, sample, view.y)
+        fits = {
+            x: fit
+            for x in view.xs
+            if x != view.y
+            and (fit := analysis.regress(analysis.values(result, sample, x), y)) is not None
+        }
+        if not fits:
+            note("Too few people have an X score and the Y score.")
             return
-        fig = views.pair_scatter(result, sample, view.x, view.y)
+        fig = views.pair_scatter(result, sample, list(fits), view.y)
         plot = charts.show(fig)
-        image_buttons(plot, fig, "two_scores")
-        columns, rows = fit_table(fit)
+        image_buttons(plot, fig, "regression")
+        columns, rows = fit_table(fits, choices)
         heading("Statistics")
-        table(columns, rows).classes(remove="w-full")
-        csv_button(columns, rows, "two_scores.csv")
+        table(columns, rows)
+        csv_button(columns, rows, "regression.csv")
 
-    def choose(axis: str, value: str) -> None:
-        setattr(view, axis, value)
+    def choose_xs(value: list[str] | None) -> None:
+        view.xs = value or []
         body.refresh()
 
-    section("Two scores")
-    with ui.row().classes("items-center gap-4"):
-        for axis, label in (("x", "X"), ("y", "Y")):
-            ui.select(
-                choices,
-                value=getattr(view, axis),
-                label=label,
-                with_input=True,
-                on_change=lambda e, a=axis: choose(a, e.value),
-            ).props("dense outlined").classes("w-96")
+    def choose_y(value: str) -> None:
+        view.y = value
+        body.refresh()
+
+    section("Regression")
+    with ui.row().classes("w-full items-center gap-4"):
+        ui.select(
+            choices,
+            multiple=True,
+            value=view.xs,
+            label="X",
+            with_input=True,
+            on_change=lambda e: choose_xs(e.value),
+        ).props("dense outlined use-chips").classes("min-w-96 grow")
+        ui.select(
+            choices, value=view.y, label="Y", with_input=True, on_change=lambda e: choose_y(e.value)
+        ).props("dense outlined").classes("w-96")
     body()
 
 
-def fit_table(fit: analysis.Fit) -> tuple[list[dict], list[dict]]:
-    c = fit.correlation
-    interval = f" [{apa(c.low)}, {apa(c.high)}]" if c.low is not None else ""
-    rows = [
-        {"name": "n", "value": str(c.n)},
-        {"name": "r [95% CI]", "value": f"{apa(c.r)}{interval}"},
-        {"name": "p", "value": p_value(c.p)},
-        {"name": "Slope (SE)", "value": f"{fit.slope:.3f} ({fit.slope_se:.3f})"},
-        {"name": "Intercept (SE)", "value": f"{fit.intercept:.3f} ({fit.intercept_se:.3f})"},
-        {"name": "R²", "value": apa(c.r**2)},
+def fit_table(
+    fits: dict[str, analysis.Fit], labels: dict[str, str]
+) -> tuple[list[dict], list[dict]]:
+    columns = [
+        col("x", "X"),
+        col("n", "n", numeric=True),
+        col("r", "r [95% CI]", numeric=True),
+        col("p", "p", numeric=True),
+        col("slope", "Slope (SE)", numeric=True),
+        col("intercept", "Intercept (SE)", numeric=True),
+        col("r2", "R²", numeric=True),
     ]
-    return [col("name", "Statistic"), col("value", "Value", numeric=True)], rows
+    rows = []
+    for x, fit in fits.items():
+        c = fit.correlation
+        interval = f" [{apa(c.low)}, {apa(c.high)}]" if c.low is not None else ""
+        rows.append(
+            {
+                "x": labels[x],
+                "n": c.n,
+                "r": f"{apa(c.r)}{interval}",
+                "p": p_value(c.p),
+                "slope": f"{fit.slope:.3f} ({fit.slope_se:.3f})",
+                "intercept": f"{fit.intercept:.3f} ({fit.intercept_se:.3f})",
+                "r2": apa(c.r**2),
+            }
+        )
+    return columns, rows
 
 
 def number(value: float | None) -> str:

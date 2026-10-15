@@ -1,4 +1,5 @@
 from collections import Counter
+from collections.abc import Callable
 from datetime import date
 
 import numpy as np
@@ -225,40 +226,75 @@ def item_responses(result: CatalogResult, instrument_id: str) -> list[go.Figure]
 
 
 def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    # Each subscale's item means on a radar of its own, every wave on each; all items on one when no subscale has enough.
+    # The subscales side by side first, then each subscale's items; every wave on each.
     instrument = result.project.instruments[instrument_id]
-    groups = [
-        (s.label, list(s.items)) for s in subscales_of(instrument) if len(s.items) >= RADAR_AXES
-    ]
+    subscales = subscales_of(instrument)
+    names = series_names(result, instrument_datasets(result, instrument_id))
+    panels = []
+    if len(subscales) >= RADAR_AXES:
+        found = subscale_item_means(result, instrument_id)
+        panels.append(
+            radar_panel(
+                result,
+                names,
+                "Subscales",
+                [s.label for s in subscales],
+                [f"{s.label}: mean item score, {len(s.items)} items" for s in subscales],
+                lambda name: {s.label: found.get((s.id, name)) for s in subscales},
+            )
+        )
+    groups = [(s.label, list(s.items)) for s in subscales if len(s.items) >= RADAR_AXES]
     if not groups:
         groups = [("All items", [i.id for i in instrument.items if i.type == "choice"])]
-    names = series_names(result, instrument_datasets(result, instrument_id))
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
-    panels = []
     for title, items in groups:
         if len(items) < RADAR_AXES:
             continue
-        series = []
-        for name, label in names.items():
-            values = {
-                v.item_id: means.get((name, v.column))
-                for v in result.catalog.variables_for(name)
-                if v.instrument_id == instrument_id and v.item_id in items
-            }
-            if any(value is not None for value in values.values()):
-                series.append(
-                    {"name": label, "color": series_color(result, name), "values": values}
-                )
-        if series:
-            panels.append(
-                {
-                    "title": title,
-                    "axes": items,
-                    "hovers": [f"{i}: {item_text(instrument, i)}" for i in items],
-                    "series": series,
-                }
+        panels.append(
+            radar_panel(
+                result,
+                names,
+                title,
+                items,
+                [f"{i}: {item_text(instrument, i)}" for i in items],
+                lambda name, items=items: {
+                    v.item_id: means.get((name, v.column))
+                    for v in result.catalog.variables_for(name)
+                    if v.instrument_id == instrument_id and v.item_id in items
+                },
             )
+        )
+    panels = [p for p in panels if p is not None]
     return plots.radar_grid(panels, option_range(instrument)) if panels else None
+
+
+def radar_panel(
+    result: CatalogResult,
+    names: dict[str, str],
+    title: str,
+    axes: list[str],
+    hovers: list[str],
+    values_of: Callable[[str], dict[str, float | None]],
+) -> dict | None:
+    series = []
+    for name, label in names.items():
+        values = values_of(name)
+        if any(value is not None for value in values.values()):
+            series.append({"name": label, "color": series_color(result, name), "values": values})
+    return {"title": title, "axes": axes, "hovers": hovers, "series": series} if series else None
+
+
+def subscale_item_means(result: CatalogResult, instrument_id: str) -> dict[tuple[str, str], float]:
+    # A sum score divided by its item count, so subscales of different lengths share the option scale.
+    instrument = result.project.instruments[instrument_id]
+    per_item = {s.id: len(s.items) if s.method == "sum" else 1 for s in subscales_of(instrument)}
+    found = {}
+    for score in result.catalog.scores:
+        if score.instrument_id == instrument_id and score.score_id in per_item:
+            mean = summary_of(result, score.key).mean
+            if mean is not None:
+                found[(score.score_id, score.dataset)] = mean / per_item[score.score_id]
+    return found
 
 
 def short_subscales(result: CatalogResult, instrument_id: str) -> list[str]:
@@ -1131,17 +1167,25 @@ def score_of(result: CatalogResult, key: str) -> ResolvedScore:
 
 
 def pair_scatter(
-    result: CatalogResult, sample: analysis.Sample, x: str, y: str
+    result: CatalogResult, sample: analysis.Sample, xs: list[str], y: str
 ) -> go.Figure | None:
-    frame = analysis.table(result, sample, [x, y]).dropna()
-    if len(frame) < defaults.MIN_CORRELATION_N:
-        return None
+    # One group per X against the same Y, each with the people who have both.
     labels = variable_choices(result, sample.datasets)
-    group = {
-        "name": "Sample",
-        "color": series_color(result, score_of(result, y).dataset),
-        "x": frame[x].to_numpy(dtype=float),
-        "y": frame[y].to_numpy(dtype=float),
-        "ids": [str(i) for i in frame.index],
-    }
-    return scatter.regression(labels[x], labels[y], [group])
+    groups = []
+    for k, x in enumerate(xs):
+        frame = analysis.table(result, sample, [x, y]).dropna()
+        if len(frame) < defaults.MIN_CORRELATION_N:
+            continue
+        groups.append(
+            {
+                "name": labels[x],
+                "color": group_color(k),
+                "x": frame[x].to_numpy(dtype=float),
+                "y": frame[y].to_numpy(dtype=float),
+                "ids": [str(i) for i in frame.index],
+            }
+        )
+    if not groups:
+        return None
+    x_title = groups[0]["name"] if len(groups) == 1 else "X (see legend)"
+    return scatter.regression(x_title, labels[y], groups)
