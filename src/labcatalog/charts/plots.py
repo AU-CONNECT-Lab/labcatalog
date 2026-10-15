@@ -11,16 +11,18 @@ from labcatalog.charts.style import (
     TITLE_INK,
     base_layout,
     rgba,
-    scale_color,
     smooth,
 )
 
 BLOCK_GAP = 1.4
-MEANS_PER_ROW = 4
+MEANS_PER_ROW = 2
 RADARS_PER_ROW = 3
-LEVEL_SCALE = "YlOrRd"
-# Start of the colour scale, so short bars stay visible on white.
-LEVEL_FLOOR = 0.15
+ROW_HEIGHT = 24
+ROW_LINE = "#ececec"
+# Pixels above the rows for the title, the legend and the value axis.
+DOT_TOP = 104
+DOT_BOTTOM = 16
+TITLE_ROOM = 28
 
 
 def score_boxes(title: str, labels: list[str], series: list[dict]) -> go.Figure:
@@ -83,7 +85,6 @@ def score_boxes(title: str, labels: list[str], series: list[dict]) -> go.Figure:
         fig,
         340,
         title=dict(text=title, x=0.02, xanchor="left", font=dict(size=12)),
-        width=150 + (46 + 26 * len(series)) * k,
         margin=dict(l=58, r=14, t=34, b=70),
         boxmode="overlay",
         legend=dict(
@@ -217,91 +218,119 @@ def block_positions(blocks: list[tuple[str, list[dict]]]) -> tuple[list[dict], n
     return members, np.asarray(xs, dtype=float), spans
 
 
-def paired_strip(
-    blocks: list[tuple[str, list[dict]]], series: list[dict], label: str, title: str
+def dot_rows(
+    blocks: list[tuple[str, list[dict]]],
+    series: list[dict],
+    label: str,
+    title: str,
+    value_range: tuple[float, float] | None = None,
+    value_format: str = ".2f",
 ) -> go.Figure:
-    # A marker per series at each position, the values of one position joined, each series' mean dashed.
-    members, xs, spans = block_positions([b for b in blocks if b[1]])
+    # A row per member with a dot per series, the dots of one row joined; named blocks get a heading.
+    members, ys, spans = block_positions([b for b in blocks if b[1]])
+    headed = any(name for *_, name in spans)
     fig = go.Figure()
     seg_x, seg_y = [], []
-    for x, member in zip(xs, members, strict=True):
+    for y, member in zip(ys, members, strict=True):
         values = [s["values"].get(member["id"]) for s in series]
         values = [v for v in values if v is not None and np.isfinite(v)]
         if len(values) > 1:
-            seg_x += [x, x, None]
-            seg_y += [min(values), max(values), None]
+            seg_x += [min(values), max(values), None]
+            seg_y += [y, y, None]
     fig.add_trace(
         go.Scatter(
             x=seg_x,
             y=seg_y,
             mode="lines",
             hoverinfo="skip",
-            line=dict(color=CONNECTOR, width=1.5),
+            line=dict(color=CONNECTOR, width=2),
             showlegend=False,
         )
     )
     measured = []
     for s in series:
-        y = np.array(
+        x = np.array(
             [np.nan if s["values"].get(m["id"]) is None else s["values"][m["id"]] for m in members],
             dtype=float,
         )
-        ok = np.isfinite(y)
-        measured.append(y[ok])
+        ok = np.isfinite(x)
+        measured.append(x[ok])
+        notes = s.get("notes", {})
         fig.add_trace(
             go.Scatter(
-                x=xs[ok],
-                y=y[ok],
+                x=x[ok],
+                y=ys[ok],
                 mode="markers",
                 name=s["name"],
-                customdata=[members[i]["hover"] for i in np.flatnonzero(ok)],
-                marker=dict(size=8, color=s["color"], line=dict(width=0.8, color="white")),
-                hovertemplate="%{customdata}<br>" + label + " = %{y:.3g}<extra></extra>",
+                customdata=[
+                    [members[i]["hover"], notes.get(members[i]["id"], "")]
+                    for i in np.flatnonzero(ok)
+                ],
+                marker=dict(size=9, color=s["color"], line=dict(width=0.8, color="white")),
+                hovertemplate=f"<b>{s['name']}</b><br>%{{customdata[0]}}<br>{label} = "
+                f"%{{x:{value_format}}}%{{customdata[1]}}<extra></extra>",
             )
         )
-        if ok.any():
-            fig.add_hline(
-                y=float(np.mean(y[ok])),
-                line=dict(color=s["color"], width=1, dash="dash"),
-                opacity=0.5,
-            )
-    values = np.concatenate(measured) if any(len(m) for m in measured) else np.zeros(1)
-    low, high = float(values.min()), float(values.max())
-    span = (high - low) or abs(high) or 1.0
-    if len(spans) > 1:
-        for start, end, name in spans:
+    if value_range is None:
+        values = np.concatenate(measured) if any(len(m) for m in measured) else np.zeros(1)
+        low, high = float(values.min()), float(values.max())
+        pad = 0.06 * ((high - low) or abs(high) or 1.0)
+        value_range = (low - pad, high + pad)
+    for start, _, name in spans:
+        if name:
             fig.add_annotation(
-                x=(start + end) / 2,
-                y=0.99,
-                yref="y domain",
-                yanchor="top",
-                text=name,
+                x=0,
+                xref="x domain",
+                y=start - 0.95,
+                xanchor="left",
+                text=f"<b>{name}</b>",
                 showarrow=False,
-                font=dict(color=MUTED_INK, size=9),
+                font=dict(size=10, color=TITLE_INK),
             )
     fig.update_xaxes(
-        tickmode="array",
-        tickvals=xs,
-        ticktext=[m["tick"] for m in members],
-        tickangle=-90,
-        tickfont=dict(size=9),
-        showgrid=False,
-        zeroline=False,
-    )
-    fig.update_yaxes(
         title_text=label,
         title_font=dict(size=10),
-        tickfont=dict(size=9),
+        side="top",
+        range=list(value_range),
+        tickformat=value_format,
         gridcolor=GRID,
+        tickfont=dict(size=9),
         zeroline=False,
-        range=[low - 0.28 * span, high + 0.12 * span],
     )
+    top = -1.6 if headed else -0.7
+    fig.update_yaxes(
+        tickmode="array",
+        tickvals=ys,
+        ticktext=[m["tick"] for m in members],
+        tickfont=dict(size=10),
+        range=[ys[-1] + 0.7, top],
+        gridcolor=ROW_LINE,
+        zeroline=False,
+        automargin=True,
+    )
+    above = DOT_TOP if title else DOT_TOP - TITLE_ROOM
+    height = above + DOT_BOTTOM + int(ROW_HEIGHT * (ys[-1] + 0.7 - top))
     return base_layout(
         fig,
-        360,
-        margin=dict(l=76, r=30, t=60, b=104),
-        legend=dict(orientation="h", yanchor="bottom", y=1.015, x=0.0, font=dict(size=10)),
-        title=dict(text=title, x=0.01, y=0.97, font=dict(size=13)),
+        height,
+        margin=dict(l=10, r=24, t=above, b=DOT_BOTTOM),
+        title=dict(
+            text=title,
+            x=0.01,
+            y=1,
+            yref="container",
+            yanchor="top",
+            pad=dict(t=10),
+            font=dict(size=13, color=TITLE_INK),
+        ),
+        legend=dict(
+            orientation="h",
+            x=0,
+            y=1 - ((TITLE_ROOM if title else 0) + 6) / height,
+            yref="container",
+            yanchor="top",
+            font=dict(size=10),
+        ),
     )
 
 
@@ -601,60 +630,3 @@ def small_multiples(panels: list[dict], y_range: tuple[float, float], y_title: s
         )
     fig.update_annotations(font=dict(size=12, color=TITLE_INK))
     return base_layout(fig, 60 + 250 * rows, margin=dict(l=60, r=20, t=50, b=50))
-
-
-def score_levels(bars: list[dict], group_names: dict[str, str], value_label: str) -> go.Figure:
-    # One bar per score, each instrument a block headed by its name.
-    groups = list(dict.fromkeys(b["group"] for b in bars))
-    members, ys, spans = block_positions(
-        [(group_names[g], [b for b in bars if b["group"] == g]) for g in groups]
-    )
-    shares = [float(np.clip(b["value"], 0, 100)) for b in members]
-    fig = go.Figure(
-        go.Bar(
-            x=shares,
-            y=ys,
-            orientation="h",
-            width=0.7,
-            marker=dict(
-                color=[
-                    scale_color(LEVEL_FLOOR + (1 - LEVEL_FLOOR) * s / 100, LEVEL_SCALE, 0, 1)
-                    for s in shares
-                ],
-                line=dict(width=0.5, color="#fff"),
-            ),
-            hovertext=[b["hover"] for b in members],
-            hoverinfo="text",
-            showlegend=False,
-        )
-    )
-    for start, _, name in spans:
-        fig.add_annotation(
-            x=0,
-            y=start - 0.95,
-            xanchor="left",
-            text=f"<b>{name}</b>",
-            showarrow=False,
-            font=dict(size=10, color=TITLE_INK),
-        )
-    fig.update_xaxes(
-        title_text=value_label,
-        title_font=dict(size=10),
-        side="top",
-        ticksuffix="%",
-        range=[0, 100],
-        dtick=25,
-        gridcolor="#f5f5f5",
-        tickfont=dict(size=9),
-        zeroline=False,
-    )
-    fig.update_yaxes(
-        tickmode="array",
-        tickvals=ys,
-        ticktext=[b["label"] for b in members],
-        tickfont=dict(size=10),
-        range=[ys[-1] + 0.7, -1.6],
-        showgrid=False,
-        automargin=True,
-    )
-    return base_layout(fig, 72 + int(22 * (ys[-1] + 2.3)), margin=dict(l=10, r=24, t=56, b=12))

@@ -240,8 +240,9 @@ def score_circle(
     skip: set[tuple[int, int]],
     threshold: float,
     title: str,
+    value_label: str,
 ) -> go.Figure:
-    # Only the strong pairs, as chords coloured by r; the dot grid above holds every pair.
+    # Only the strong pairs, as chords coloured by r; the dot grid beside it holds every pair.
     z = as_matrix(r)
     k = len(labels)
     keep = [
@@ -278,13 +279,13 @@ def score_circle(
                 mode="lines",
                 line=dict(color=scale_color(value, CORRELATION_SCALE, -1, 1), width=1.6),
                 showlegend=False,
-                hovertemplate=f"{labels[i]} × {labels[j]}<br>Pearson r = {value:.3f}<extra></extra>",
+                hovertemplate=f"{labels[i]} × {labels[j]}<br>{value_label} = {value:.3f}<extra></extra>",
             )
         )
-    fig.add_trace(colorbar("Pearson r", x=1, xanchor="right", y=1, yanchor="bottom"))
+    fig.add_trace(colorbar(value_label, x=1, xanchor="right", y=1, yanchor="bottom"))
     fig.update_layout(
         title=dict(
-            text=f"{title}: |Pearson r| ≥ {threshold:g} ({len(keep)} of {k * (k - 1) // 2} pairs)",
+            text=f"{title}: |{value_label}| ≥ {threshold:g} ({len(keep)} of {k * (k - 1) // 2} pairs)",
             x=0.01,
             font=dict(size=12, color=TITLE_INK),
         ),
@@ -352,7 +353,8 @@ def answer_grid(
             tickangle=45,
             showgrid=False,
             zeroline=False,
-            range=[-0.5, len(strip) - 0.5],
+            # A short last strip keeps the column width of the full ones.
+            range=[-0.5, len(strips[0]) - 0.5],
             row=row,
             col=1,
         )
@@ -384,7 +386,6 @@ def answer_grid(
     return base_layout(
         fig,
         (cell_size * len(items) + 100) * len(strips),
-        width=cell_size * min(len(people), per_row) + 200,
-        margin=dict(t=50, b=50, l=50, r=50),
+        margin=dict(t=50, b=50, l=50, r=20),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, font=dict(size=10)),
     )

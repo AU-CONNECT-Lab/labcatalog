@@ -14,7 +14,11 @@ from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
 from labcatalog.schema import Instrument, Score
-from labcatalog.stats import Correlation, wave_order
+from labcatalog.stats import Correlation, ScoreSummary, wave_order
+
+RADAR_AXES = 3
+# Room beyond 0% and 100% so dots at either end stay whole.
+LEVEL_RANGE = (-0.03, 1.03)
 
 # ---- shared lookups ----
 
@@ -248,7 +252,7 @@ def item_total(result: CatalogResult, instrument_id: str) -> go.Figure | None:
         {"id": i, "tick": i, "hover": f"{i}: {item_text(instrument, i)}"} for i in total.items
     ]
     title = f"{short_label(instrument, total)}: item-total correlation"
-    return plots.paired_strip([("", members)], series, "Corrected item-total r", title)
+    return plots.dot_rows([("", members)], series, "Corrected item-total r", title)
 
 
 def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
@@ -273,40 +277,13 @@ def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
 
 
 def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    # The subscales on one radar, then each subscale's items on its own; a radar needs three axes.
+    # Each subscale's items on a radar of its own, every wave on each.
     instrument = result.project.instruments[instrument_id]
-    subscales = [s for s in instrument.scores if not is_total(instrument, s)]
     names = series_names(result, instrument_datasets(result, instrument_id))
-    panels = []
-    if len(subscales) >= 3:
-        series = []
-        for name, label in names.items():
-            values = {}
-            for score in subscales:
-                key = next(
-                    (s.key for s in result.catalog.scores_for(name) if s.score_id == score.id),
-                    None,
-                )
-                mean = summary_of(result, key).mean if key else None
-                # Mean per item, so subscales of different lengths share the answer scale.
-                if mean is not None:
-                    values[score.label] = mean / len(score.items) if score.method == "sum" else mean
-            if values:
-                series.append(
-                    {"name": label, "color": series_color(result, name), "values": values}
-                )
-        if series:
-            panels.append(
-                {
-                    "title": "Subscales",
-                    "axes": [s.label for s in subscales],
-                    "hovers": [f"{s.label} ({len(s.items)} items)" for s in subscales],
-                    "series": series,
-                }
-            )
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
-    for subscale in subscales:
-        if len(subscale.items) < 3:
+    panels = []
+    for subscale in subscales_of(instrument):
+        if len(subscale.items) < RADAR_AXES:
             continue
         series = []
         for name, label in names.items():
@@ -331,6 +308,15 @@ def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | No
     return plots.radar_grid(panels, option_range(instrument)) if panels else None
 
 
+def short_subscales(result: CatalogResult, instrument_id: str) -> list[str]:
+    instrument = result.project.instruments[instrument_id]
+    return [s.label for s in subscales_of(instrument) if len(s.items) < RADAR_AXES]
+
+
+def subscales_of(instrument: Instrument) -> list[Score]:
+    return [s for s in instrument.scores if not is_total(instrument, s)]
+
+
 def item_waves(result: CatalogResult, instrument_id: str) -> dict[str, str]:
     # Datasets whose total score has item correlations, named the way the other charts name waves.
     total = total_score(result.project.instruments[instrument_id])
@@ -344,37 +330,48 @@ def item_waves(result: CatalogResult, instrument_id: str) -> dict[str, str]:
     return series_names(result, found)
 
 
+def item_matrix(
+    result: CatalogResult, instrument_id: str, dataset: str
+) -> tuple[ScoreSummary, dict[str, int]]:
+    total = total_score(result.project.instruments[instrument_id])
+    score = next(s for s in resolved(result, instrument_id, total.id) if s.dataset == dataset)
+    summary = summary_of(result, score.key)
+    items = {
+        v.column: v.item_id
+        for v in result.catalog.variables_for(dataset)
+        if v.instrument_id == instrument_id
+    }
+    return summary, {items[c]: i for i, c in enumerate(summary.item_columns)}
+
+
+def item_groups(instrument: Instrument) -> tuple[list[str], dict[str, str]]:
+    # An item in several subscales sits with the first; "" holds the items in none.
+    group_of: dict[str, str] = {}
+    for subscale in subscales_of(instrument):
+        for item in subscale.items:
+            group_of.setdefault(item, subscale.id)
+    return [s.id for s in subscales_of(instrument)] + [""], group_of
+
+
+def by_subscale(instrument: Instrument, items) -> list[str]:
+    group_order, group_of = item_groups(instrument)
+    item_order = [i.id for i in instrument.items]
+    return sorted(
+        items, key=lambda item: (group_order.index(group_of.get(item, "")), item_order.index(item))
+    )
+
+
 def item_grid(
     result: CatalogResult, instrument_id: str, lower: str, upper: str
 ) -> go.Figure | None:
     # Items sit together by subscale; one wave below the diagonal and one above.
     instrument = result.project.instruments[instrument_id]
-    total = total_score(instrument)
-
-    def matrix(dataset: str) -> tuple:
-        score = next(s for s in resolved(result, instrument_id, total.id) if s.dataset == dataset)
-        summary = summary_of(result, score.key)
-        items = {
-            v.column: v.item_id
-            for v in result.catalog.variables_for(dataset)
-            if v.instrument_id == instrument_id
-        }
-        return summary, {items[c]: i for i, c in enumerate(summary.item_columns)}
-
-    below, above = matrix(lower), matrix(upper)
-    subscales = [s for s in instrument.scores if not is_total(instrument, s)]
-    group_of: dict[str, str] = {}
-    for subscale in subscales:
-        for item in subscale.items:
-            group_of.setdefault(item, subscale.id)
-    group_order = [s.id for s in subscales] + [""]
-    item_order = [i.id for i in instrument.items]
-    members = sorted(
-        set(below[1]) | set(above[1]),
-        key=lambda item: (group_order.index(group_of.get(item, "")), item_order.index(item)),
-    )
+    below, above = item_matrix(result, instrument_id, lower), item_matrix(result, instrument_id, upper)
+    members = by_subscale(instrument, set(below[1]) | set(above[1]))
     if len(members) < 2:
         return None
+    subscales = subscales_of(instrument)
+    group_order, group_of = item_groups(instrument)
     size = len(members)
     z = np.full((size, size), np.nan)
     n: list[list[int | None]] = [[None] * size for _ in range(size)]
@@ -397,6 +394,25 @@ def item_grid(
         names,
         names_of[lower],
         names_of[upper],
+        "Spearman ρ",
+    )
+
+
+def item_circle(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
+    instrument = result.project.instruments[instrument_id]
+    summary, where = item_matrix(result, instrument_id, dataset)
+    members = by_subscale(instrument, where)
+    if len(members) < 2:
+        return None
+    group_order, group_of = item_groups(instrument)
+    return matrices.score_circle(
+        [[summary.item_correlations[where[a]][where[b]] for b in members] for a in members],
+        members,
+        [group_of.get(m, "") for m in members],
+        group_order,
+        set(),
+        defaults.CHART_MIN_R,
+        item_waves(result, instrument_id)[dataset],
         "Spearman ρ",
     )
 
@@ -470,7 +486,7 @@ def stability(result: CatalogResult, instrument_id: str) -> go.Figure | None:
         }
         for study, a, b in pairs
     ]
-    return plots.paired_strip(
+    return plots.dot_rows(
         [("", members)], series, "r with one wave earlier", "Stability across waves (same person)"
     )
 
@@ -525,7 +541,7 @@ def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -
     ordered = sorted(members, key=strength, reverse=True)
     instrument = result.project.instruments[instrument_id]
     score = next(s for s in instrument.scores if s.id == score_id)
-    return plots.paired_strip(
+    return plots.dot_rows(
         [("", [members[m] for m in ordered])],
         series,
         "Pearson r",
@@ -614,47 +630,47 @@ def collection_pace(result: CatalogResult) -> go.Figure | None:
     return plots.collection_pace(facets, waves, colors)
 
 
-def level_waves(result: CatalogResult) -> list[tuple[str, str]]:
-    config = result.project.config
-    measured = {
-        (dataset_by_name(config, s.dataset).study, dataset_by_name(config, s.dataset).wave)
-        for s in result.catalog.scores
-        if summary_of(result, s.key).mean is not None
-    }
-    return [
-        (study, wave)
-        for study, study_config in config.studies.items()
-        for wave in sorted(study_config.waves, key=wave_order)
-        if (study, wave) in measured
-    ]
-
-
-def score_levels(result: CatalogResult, study: str, wave: str) -> go.Figure | None:
+def score_levels(result: CatalogResult) -> go.Figure | None:
     # Scores differ in range, so each mean is shown as its place within the possible range.
     config = result.project.config
-    found: dict[Member, ResolvedScore] = {}
+    found: dict[tuple[str, str], dict[Member, ResolvedScore]] = {}
     for s in result.catalog.scores:
         d = dataset_by_name(config, s.dataset)
-        if (d.study, d.wave) == (study, wave) and summary_of(result, s.key).mean is not None:
-            found[(s.instrument_id, s.score_id, d.reporter)] = s
+        if summary_of(result, s.key).mean is not None:
+            found.setdefault((d.study, d.wave), {})[(s.instrument_id, s.score_id, d.reporter)] = s
     if not found:
         return None
-    members = sorted(found, key=lambda m: member_rank(result, m))
-    bars = []
-    for member, label in zip(members, member_labels(result, members), strict=True):
-        summary = summary_of(result, found[member].key)
-        low, high = summary.possible_range
-        share = (summary.mean - low) / (high - low) * 100 if high > low else 0.0
-        bars.append(
-            {
-                "group": member[0],
-                "label": label,
-                "value": share,
-                "hover": f"<b>{label}</b><br>mean {summary.mean:.2f}, possible {low:g} to {high:g}"
-                f"<br>{share:.0f}% of the possible range<br>n = {summary.n_valid}",
-            }
-        )
-    return plots.score_levels(bars, instrument_names(result), "% of possible range")
+    series = []
+    for study, study_config in config.studies.items():
+        for wave in sorted(study_config.waves, key=wave_order):
+            values, notes = {}, {}
+            for member, s in found.get((study, wave), {}).items():
+                summary = summary_of(result, s.key)
+                low, high = summary.possible_range
+                values[member] = (summary.mean - low) / (high - low) if high > low else 0.0
+                notes[member] = (
+                    f"<br>mean {summary.mean:.2f}, possible {low:g} to {high:g}"
+                    f"<br>n = {summary.n_valid}"
+                )
+            if values:
+                series.append(
+                    {
+                        "name": wave_name(result, study, wave),
+                        "color": wave_colors(result)[wave],
+                        "values": values,
+                        "notes": notes,
+                    }
+                )
+    members = sorted(
+        {m for scores in found.values() for m in scores}, key=lambda m: member_rank(result, m)
+    )
+    labels = dict(zip(members, member_labels(result, members), strict=True))
+    names = instrument_names(result)
+    blocks = [
+        (names[i], [{"id": m, "tick": labels[m], "hover": labels[m]} for m in members if m[0] == i])
+        for i in dict.fromkeys(m[0] for m in members)
+    ]
+    return plots.dot_rows(blocks, series, "% of possible range", "", LEVEL_RANGE, ".0%")
 
 
 def instrument_names(result: CatalogResult) -> dict[str, str]:
@@ -742,6 +758,7 @@ def score_circle(
         p["skip"],
         defaults.CHART_MIN_R,
         p["title"],
+        "Pearson r",
     )
 
 
