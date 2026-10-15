@@ -71,7 +71,7 @@ class DatasetConfig(StrictModel):
 class CustomFieldDef(StrictModel):
     name: str
     label: str | None = None
-    applies_to: Literal["instrument", "administration", "dataset"]
+    applies_to: Literal["instrument", "score", "administration", "dataset"]
     type: Literal["text", "number", "date", "choice", "tags"]
     choices: list[str] | None = None
 

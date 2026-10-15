@@ -197,7 +197,10 @@ def check_custom_fields(project: Project) -> list[Issue]:
                 issues.append(problem("invalid_value", f"{where}custom.{key}: {reason}", location))
 
     for instrument_id, instrument in project.instruments.items():
-        check("instrument", instrument.custom, "", project.instrument_files[instrument_id])
+        location = project.instrument_files[instrument_id]
+        check("instrument", instrument.custom, "", location)
+        for n, score in enumerate(instrument.scores, start=1):
+            check("score", score.custom, f"scores[{n}] ({score.id}).", location)
     for name, content in project.studies.items():
         for n, administration in enumerate(content.administrations, start=1):
             where = f"administrations[{n}]."

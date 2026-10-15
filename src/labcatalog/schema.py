@@ -45,6 +45,7 @@ class Score(StrictModel):
     items: list[str]
     missing_rule: Literal["complete", "prorate", "zero"] = "complete"
     min_valid: int | None = None
+    custom: dict[str, Any] = {}
 
 
 class Reference(StrictModel):
