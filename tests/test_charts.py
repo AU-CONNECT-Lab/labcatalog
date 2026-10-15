@@ -5,6 +5,7 @@ import pytest
 from labcatalog import analysis
 from labcatalog.charts import views
 from labcatalog.charts.style import STATUS_COLORS
+from labcatalog.gui import charts as gui_charts
 from labcatalog.pipeline import run_catalog
 
 
@@ -97,8 +98,8 @@ def test_overview_charts(result):
         ("mock_study", "2"),
         ("mock_study", "3"),
     ]
-    assert views.score_grid(result, everything, ("mock_study", "1")) is not None
-    assert views.score_grid(result, [], ("mock_study", "1")) is None
+    assert views.score_network(result, "mock_study", "1", everything, "instrument") is not None
+    assert views.score_network(result, "mock_study", "1", [], "instrument") is None
 
 
 def test_score_levels_put_every_wave_on_one_row_per_score(result):
@@ -116,29 +117,19 @@ def test_score_levels_put_every_wave_on_one_row_per_score(result):
     assert all(0 <= share <= 1 for w in waves for share in w.x)
 
 
-def test_dot_grid_shows_one_wave_both_sides_of_the_diagonal(result):
-    everything = list(views.correlated_instruments(result))
-    grid = views.score_grid(result, everything, ("mock_study", "2"))
-    hover = next(trace for trace in grid.data if trace.customdata is not None)
-    assert {wave for wave, *_ in hover.customdata} == {"Wave 2"}
-    cells = {
-        (x, y): r for (_, _, _, r, _), x, y in zip(hover.customdata, hover.x, hover.y, strict=True)
-    }
-    assert all(cells[(y, x)] == r for (x, y), r in cells.items())
-    assert all(x != y for x, y in cells)
-    title = next(a.text for a in grid.layout.annotations if a.xref == "x2 domain")
-    assert title.startswith("Wave 2: |Pearson r| ≥ 0.3")
-
-
-def test_item_grid_groups_items_by_subscale(result):
+def test_item_heatmap_and_table_keep_the_item_order_below_the_diagonal(result):
     first = next(iter(views.item_waves(result, "example_mood")))
-    grid = views.item_grid(result, "example_mood", first)
-    by_subscale = ["ems_2", "ems_6", "ems_7", "ems_3", "ems_5", "ems_8", "ems_1", "ems_4", "ems_9"]
-    assert list(grid.layout.xaxis.ticktext) == by_subscale
-    around = [a.text for a in grid.layout.annotations if a.xref == "x2"]
-    assert around == by_subscale
-    title = next(a.text for a in grid.layout.annotations if a.xref == "x2 domain")
-    assert title.startswith("Wave 1: |Spearman ρ| ≥ 0.3")
+    items, z, _ = views.item_correlations(result, "example_mood", first)
+    assert items == [f"ems_{k}" for k in range(1, 10)]
+    grid = views.item_grid(result, "example_mood", first).data[0]
+    assert list(grid.x) == [str(k) for k in range(1, 9)]
+    assert list(grid.y) == [f"{k}. ems_{k}" for k in range(2, 10)]
+    assert grid.z[0][0] == pytest.approx(z[1, 0])
+    assert all(v is None for k, row in enumerate(grid.z) for v in row[k + 1 :])
+    columns, rows = gui_charts.matrix_table(items, z)
+    assert [c["label"] for c in columns] == ["Item", *[str(k) for k in range(1, 10)]]
+    assert (rows[0]["variable"], rows[0]["c0"], rows[0]["c1"]) == ("1. ems_1", "—", "")
+    assert rows[1]["c0"] == gui_charts.apa(z[1, 0])
 
 
 def test_score_correlates_skip_own_subscales_and_put_strongest_first(result):

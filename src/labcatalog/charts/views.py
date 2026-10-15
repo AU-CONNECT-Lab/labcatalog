@@ -16,7 +16,7 @@ from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
 from labcatalog.schema import Instrument, Score
-from labcatalog.stats import Correlation, ScoreSummary, wave_order
+from labcatalog.stats import wave_order
 
 RADAR_AXES = 3
 # Room beyond 0% and 100% so dots at either end stay whole.
@@ -342,9 +342,7 @@ def item_correlations(
     }
     where = {c: i for i, c in enumerate(summary.item_columns)}
     items = [
-        i.id
-        for i in result.project.instruments[instrument_id].items
-        if columns.get(i.id) in where
+        i.id for i in result.project.instruments[instrument_id].items if columns.get(i.id) in where
     ]
     rows = [where[columns[item]] for item in items]
     z = matrices.as_matrix([[summary.item_correlations[a][b] for b in rows] for a in rows])
@@ -1081,9 +1079,7 @@ def score_of(result: CatalogResult, key: str) -> ResolvedScore:
     return next(s for s in result.catalog.scores if s.key == key)
 
 
-def correlation_heatmap(
-    matrix: list[list[analysis.Correlation]], labels: list[str]
-) -> go.Figure:
+def correlation_heatmap(matrix: list[list[analysis.Correlation]], labels: list[str]) -> go.Figure:
     z = matrices.as_matrix([[c.r for c in row] for row in matrix])
     hover = [
         [

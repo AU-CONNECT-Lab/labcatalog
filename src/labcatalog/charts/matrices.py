@@ -11,7 +11,7 @@ from labcatalog.charts.style import (
 )
 
 COLORBAR_TICKS = [-1, -0.5, 0, 0.5, 1]
-LABEL_CHAR = 6.2
+LABEL_CHAR = 5.8
 MIN_CELL, MAX_CELL = 18, 40
 # Pixels the cells share before they reach their minimum size.
 CELL_ROOM = 360
@@ -24,14 +24,19 @@ def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
     return np.array([[np.nan if v is None else v for v in row] for row in rows], dtype=float)
 
 
-def heatmap(z: np.ndarray, labels: list[str], hover: list[list[str]], value_label: str) -> go.Figure:
+def heatmap(
+    z: np.ndarray, labels: list[str], hover: list[list[str]], value_label: str
+) -> go.Figure:
     # The lower triangle, numbered like an APA table: rows from the second, columns to the second last.
     names = [f"{k}. {label}" for k, label in enumerate(labels, start=1)]
     rows, cols = range(1, len(labels)), range(len(labels) - 1)
     cell = int(min(MAX_CELL, max(MIN_CELL, CELL_ROOM / len(cols))))
     fig = go.Figure(
         go.Heatmap(
-            z=[[float(z[i, j]) if j < i and np.isfinite(z[i, j]) else None for j in cols] for i in rows],
+            z=[
+                [float(z[i, j]) if j < i and np.isfinite(z[i, j]) else None for j in cols]
+                for i in rows
+            ],
             x=[str(j + 1) for j in cols],
             y=[names[i] for i in rows],
             text=[[hover[i][j] if j < i else "" for j in cols] for i in rows],
@@ -71,7 +76,7 @@ def heatmap(z: np.ndarray, labels: list[str], hover: list[list[str]], value_labe
         automargin=True,
         **ticks,
     )
-    left = int(LABEL_CHAR * max(len(name) for name in names)) + 16
+    left = int(LABEL_CHAR * max(len(names[i]) for i in rows)) + 16
     side = cell * len(cols)
     return base_layout(
         fig,

@@ -1,6 +1,7 @@
 import pytest
 
 from labcatalog import analysis
+from labcatalog.charts import views
 from labcatalog.gui import analysis as page
 from labcatalog.pipeline import run_catalog
 
@@ -38,13 +39,18 @@ def test_a_pair_matches_the_correlation_of_the_summary(result):
 
 def test_the_correlation_table_reads_like_apa(result):
     sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
-    keys = [EMS, EPS]
-    columns, rows, pairs = page.correlation_table(result, sample, keys, {EMS: "EMS", EPS: "EPS"})
+    frame = analysis.table(result, sample, [EMS, EPS])
+    matrix = analysis.correlation_matrix(frame)
+    columns, rows = page.correlation_table(frame, matrix, ["EMS", "EPS"])
     assert [c["label"] for c in columns] == ["Variable", "n", "M", "SD", "1", "2"]
     assert (rows[0]["variable"], rows[0]["c0"], rows[0]["c1"]) == ("1. EMS", "—", "")
     assert rows[1]["c0"].startswith(".") and rows[1]["c0"].endswith("***")
     assert rows[1]["c1"] == "—"
-    assert pairs == [len(analysis.table(result, sample, keys).dropna())]
+    assert matrix[1][0].n == len(frame.dropna())
+    heat = views.correlation_heatmap(matrix, ["EMS", "EPS"]).data[0]
+    assert (list(heat.x), list(heat.y)) == (["1"], ["2. EPS"])
+    assert heat.z[0][0] == pytest.approx(matrix[1][0].r)
+    assert heat.zmin == -1 and heat.zmax == 1
 
 
 def test_apa_numbers():
