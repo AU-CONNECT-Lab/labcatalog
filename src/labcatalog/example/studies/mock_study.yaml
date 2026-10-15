@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schemas/study.schema.json
 study: mock_study
 administrations:
   - {instrument: example_parent_stress, datasets: [parent_w1, parent_w2], target: self}

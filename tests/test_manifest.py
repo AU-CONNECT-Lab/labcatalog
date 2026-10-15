@@ -1,10 +1,8 @@
-from pathlib import Path
 
 from labcatalog.manifest import build_manifest, git_commit
-from labcatalog.project import load_project
+from labcatalog.project import EXAMPLE_DIR, load_project
 from labcatalog.sources import load_datasets
 
-REPO = Path(__file__).resolve().parents[1]
 
 
 def manifest_for(root):
@@ -36,5 +34,5 @@ def test_metadata_outside_git_has_no_commit(tmp_path):
 
 
 def test_metadata_inside_git_records_the_commit():
-    commit = git_commit(REPO / "examples" / "mock_study")
+    commit = git_commit(EXAMPLE_DIR)
     assert commit is not None and len(commit.removesuffix("-modified")) >= 7

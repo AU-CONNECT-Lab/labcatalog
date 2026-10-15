@@ -1,29 +1,39 @@
+# yaml-language-server: $schema=schemas/labcatalog.schema.json
+# Settings for one labcatalog project. Instruments live in instruments/, studies in studies/, and each dataset's column map in maps/.
+# This example is fictional and contains a few deliberate data problems (values outside the options, an ID with a space, people who gave the same answer to every item) so that the Problems page has something to show.
+
 project:
   name: Mock Family Study Catalog
 
+# Allowed words for each dataset's modality and reporter, and for each administration's target.
 vocab:
   modalities: [questionnaire]
   reporters: [parent, child]
   targets: [self, child]
 
+# Codes in the data that mean "no answer"; they are counted, never scored. Blank cells always count as missing.
 missing_codes:
   - {code: -99, label: refused}
   - {code: -98, label: not applicable}
   - {code: -97, label: don't know}
   - {code: "", label: blank}
 
+# Used when a dataset does not say otherwise.
 defaults:
   id_column: pid
 
+# The ID format to check, and how to read a group (here a family) from each ID so parents and children can be linked.
 ids:
   pattern: '^\d{4}[PC]$'
   group:
     name: family
     from_id: '^(\d{4})'
 
+# Score correlations link a parent and a child through their family.
 stats:
   correlate_by: family
 
+# Each study and its waves; a wave with no end date is still collecting.
 studies:
   mock_study:
     label: Mock Family Study
@@ -31,12 +41,14 @@ studies:
       1: {start: 2025-09-01, end: 2026-05-31}
       2: {start: 2026-09-01}
 
+# One entry per data file: which study, wave and reporter it holds, and where it is.
 datasets:
   - {name: parent_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: parent, source: csv, path: data/parent_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: parent_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: child, source: csv, path: data/child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
 
+# Extra fields your lab wants on instruments, administrations or datasets; choice and tags fields can be used as filters.
 custom_fields:
   - name: domain
     label: Domain
@@ -44,5 +56,6 @@ custom_fields:
     type: choice
     choices: [emotion, family, health, media]
 
+# The filters on the Instruments page, in this order.
 browse:
   facets: [study, wave, reporter, domain]

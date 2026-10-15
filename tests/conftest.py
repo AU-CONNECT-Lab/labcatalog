@@ -3,6 +3,8 @@ from pathlib import Path
 
 import pytest
 
+from labcatalog.project import EXAMPLE_DIR
+
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
 
@@ -16,5 +18,5 @@ def demo_project(tmp_path: Path) -> Path:
 @pytest.fixture
 def mock_project(tmp_path: Path) -> Path:
     root = tmp_path / "mock_study"
-    shutil.copytree(EXAMPLES / "mock_study", root)
+    shutil.copytree(EXAMPLE_DIR, root)
     return root

@@ -113,4 +113,28 @@ def yaml_issue(err: yaml.YAMLError, location: str) -> Issue:
 
 
 def init_project(target: Path, example: bool = True) -> Path:
-    raise NotImplementedError
+    if target.exists() and any(target.iterdir()):
+        raise ProjectExistsError(f"{target} is not empty; choose a new or empty folder")
+    if example:
+        shutil.copytree(EXAMPLE_DIR, target, dirs_exist_ok=True)
+    else:
+        for name in (defaults.INSTRUMENTS_DIR, defaults.STUDIES_DIR, defaults.MAPS_DIR, "data"):
+            (target / name).mkdir(parents=True, exist_ok=True)
+        # A JSON string is valid YAML, so any folder name is quoted safely.
+        config = BLANK_CONFIG.read_text(encoding="utf-8").replace(
+            "PROJECT_NAME", json.dumps(target.name)
+        )
+        (target / defaults.CONFIG_FILENAME).write_text(config, encoding="utf-8")
+    write_schemas(target / defaults.SCHEMAS_DIR)
+    return target
+
+
+def write_schemas(out_dir: Path) -> list[Path]:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    paths = []
+    for name, model in SCHEMA_MODELS.items():
+        path = out_dir / f"{name}.schema.json"
+        schema = model.model_json_schema(schema_generator=LenientStrings)
+        path.write_text(json.dumps(schema, indent=2) + "\n", encoding="utf-8")
+        paths.append(path)
+    return paths

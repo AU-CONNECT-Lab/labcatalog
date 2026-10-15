@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
 id: example_child_sleep
 name: Example Child Sleep Habits
 abbreviation: ECS

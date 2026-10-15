@@ -1,6 +1,8 @@
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
+from pydantic_core import core_schema
 
 # Unknown keys are errors so typos in YAML surface at validate time.
 STRICT = ConfigDict(extra="forbid", coerce_numbers_to_str=True)
@@ -87,5 +89,7 @@ class StudyContent(StrictModel):
     administrations: list[Administration] = []
 
 
-def json_schemas() -> dict[str, dict[str, Any]]:
-    raise NotImplementedError
+class LenientStrings(GenerateJsonSchema):
+    # Text fields take YAML numbers too (wave: 1), so editors must not flag them.
+    def str_schema(self, schema: core_schema.StringSchema) -> JsonSchemaValue:
+        return {**super().str_schema(schema), "type": ["string", "number"]}
