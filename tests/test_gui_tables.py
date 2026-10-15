@@ -94,7 +94,7 @@ def test_item_total_and_stability_tables_have_a_column_per_wave(mock_project):
     total = next(
         s for s in result.summary.stability if (s.score_id, s.from_wave) == ("ems_total", "1")
     )
-    assert rows[0] == {"score": "Total score", "p0": f"{total.r:.2f} (n {total.n})", **rows[0]}
+    assert (rows[0]["score"], rows[0]["p0"]) == ("Total score", f"{total.r:.2f} (n {total.n})")
     assert [r["score"] for r in rows] == [s.label for s in mood.scores]
 
 
