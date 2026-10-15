@@ -1064,6 +1064,20 @@ def variable_choices(result: CatalogResult, datasets: list[str]) -> dict[str, st
     }
 
 
+def wave_groups(
+    result: CatalogResult,
+    datasets: list[str],
+    choices: Callable[[CatalogResult, list[str]], dict[str, str]],
+) -> dict[str, list[str]]:
+    # The choices each wave offers on its own, with every reporter of a wave together.
+    config = result.project.config
+    by_wave: dict[str, list[str]] = {}
+    for name in dataset_order(result, datasets):
+        d = dataset_by_name(config, name)
+        by_wave.setdefault(wave_name(result, d.study, d.wave), []).append(name)
+    return {wave: list(choices(result, names)) for wave, names in by_wave.items()}
+
+
 def total_choices(result: CatalogResult, datasets: list[str]) -> list[str]:
     found = []
     for key in variable_choices(result, datasets):

@@ -97,14 +97,20 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
         body.refresh()
 
     section("Table 1")
-    ui.select(
-        choices,
-        multiple=True,
-        value=view.measures,
-        label="Variables",
-        with_input=True,
-        on_change=lambda e: set_measures(e.value),
-    ).props("dense outlined use-chips").classes("w-full")
+    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+        chosen = (
+            ui.select(
+                choices,
+                multiple=True,
+                value=view.measures,
+                label="Variables",
+                with_input=True,
+                on_change=lambda e: set_measures(e.value),
+            )
+            .props("dense outlined use-chips")
+            .classes("grow")
+        )
+        page.pick_menu(chosen, views.wave_groups(result, sample.datasets, script.measures))
     body()
 
 

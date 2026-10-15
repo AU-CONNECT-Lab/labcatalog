@@ -1,6 +1,6 @@
 import pytest
 
-from labcatalog import analysis
+from labcatalog import analysis, analysis_script
 from labcatalog.charts import views
 from labcatalog.gui import analysis as page
 from labcatalog.pipeline import run_catalog
@@ -65,6 +65,18 @@ def test_the_heatmap_is_a_lower_triangle_and_the_dots_a_full_matrix(result):
     names = views.instrument_names(result)
     instruments = [views.score_of(result, k).instrument_id for k in keys]
     assert [t.name for t in dotted.data if t.name] == [names[i] for i in instruments]
+
+
+def test_wave_groups_put_every_reporter_of_a_wave_together(result):
+    datasets = ["parent_w1", "child_w1", "child_w2"]
+    groups = views.wave_groups(result, datasets, views.variable_choices)
+    assert list(groups) == ["Wave 1", "Wave 2"]
+    first = {views.score_of(result, k).dataset for k in groups["Wave 1"]}
+    assert first == {"parent_w1", "child_w1"}
+    every = set(views.variable_choices(result, datasets))
+    assert set(groups["Wave 1"]) | set(groups["Wave 2"]) == every
+    measures = views.wave_groups(result, datasets, analysis_script.measures)
+    assert set(measures["Wave 2"]) < set(analysis_script.measures(result, datasets))
 
 
 def test_apa_numbers():

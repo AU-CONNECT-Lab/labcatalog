@@ -163,15 +163,34 @@ def correlation_section(
         body.refresh()
 
     section("Correlation table")
-    ui.select(
-        choices,
-        multiple=True,
-        value=view.scores,
-        label="Scores",
-        with_input=True,
-        on_change=lambda e: set_scores(e.value),
-    ).props("dense outlined use-chips").classes("w-full")
+    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+        scores = (
+            ui.select(
+                choices,
+                multiple=True,
+                value=view.scores,
+                label="Scores",
+                with_input=True,
+                on_change=lambda e: set_scores(e.value),
+            )
+            .props("dense outlined use-chips")
+            .classes("grow")
+        )
+        pick_menu(scores, views.wave_groups(result, view.datasets, views.variable_choices))
     body()
+
+
+def pick_menu(select: ui.select, groups: dict[str, list[str]]) -> None:
+    # Adds a set of variables to what is already chosen; Clear starts over.
+    def add(keys: list[str]) -> None:
+        select.set_value(list(dict.fromkeys([*(select.value or []), *keys])))
+
+    with ui.dropdown_button("Select", auto_close=True).props("flat dense no-caps"):
+        ui.item("All", on_click=lambda: add(list(select.options)))
+        if len(groups) > 1:
+            for wave, keys in groups.items():
+                ui.item(f"All in {wave}", on_click=partial(add, keys))
+        ui.item("Clear", on_click=lambda: select.set_value([]))
 
 
 def correlation_table(
@@ -248,14 +267,19 @@ def pair_section(
 
     section("Regression")
     with ui.row().classes("w-full items-center gap-4"):
-        ui.select(
-            choices,
-            multiple=True,
-            value=view.xs,
-            label="X",
-            with_input=True,
-            on_change=lambda e: choose_xs(e.value),
-        ).props("dense outlined use-chips").classes("min-w-96 grow")
+        xs = (
+            ui.select(
+                choices,
+                multiple=True,
+                value=view.xs,
+                label="X",
+                with_input=True,
+                on_change=lambda e: choose_xs(e.value),
+            )
+            .props("dense outlined use-chips")
+            .classes("min-w-96 grow")
+        )
+        pick_menu(xs, views.wave_groups(result, view.datasets, views.variable_choices))
         ui.select(
             choices, value=view.y, label="Y", with_input=True, on_change=lambda e: choose_y(e.value)
         ).props("dense outlined").classes("w-96")
