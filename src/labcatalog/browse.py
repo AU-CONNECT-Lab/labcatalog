@@ -59,13 +59,19 @@ def build_index(project: Project) -> BrowseIndex:
                     "target": administration.target,
                     "modality": dataset.modality,
                 }
-                custom = {**dataset.custom, **instrument.custom, **administration.custom}
+                custom = {
+                    **score_values(instrument),
+                    **dataset.custom,
+                    **instrument.custom,
+                    **administration.custom,
+                }
                 values = {n: as_set(known[n] if n in known else custom.get(n)) for n in names}
                 rows.append(Administered(instrument.id, name, values))
     administered = {row.instrument_id for row in rows}
     for instrument_id, instrument in project.instruments.items():
         if instrument_id not in administered:
-            values = {n: as_set(instrument.custom.get(n)) for n in names}
+            custom = {**score_values(instrument), **instrument.custom}
+            values = {n: as_set(custom.get(n)) for n in names}
             rows.append(Administered(instrument_id, None, values))
     return BrowseIndex(
         instruments=list(project.instruments),
@@ -126,8 +132,18 @@ def text_matches(index: BrowseIndex, query: str, items: bool) -> set[str]:
 
 def search_text(instrument: Instrument) -> str:
     parts = [instrument.id, instrument.name, instrument.abbreviation, instrument.construct_name]
-    parts += [value for values in instrument.custom.values() for value in as_set(values)]
+    custom = {**score_values(instrument), **instrument.custom}
+    parts += [value for values in custom.values() for value in as_set(values)]
     return "\n".join(part for part in parts if part).lower()
+
+
+def score_values(instrument: Instrument) -> dict[str, list[str]]:
+    # A score's field values also describe its instrument, so a filter finds instruments with such a score.
+    found: dict[str, set[str]] = {}
+    for score in instrument.scores:
+        for name, value in score.custom.items():
+            found.setdefault(name, set()).update(as_set(value))
+    return {name: sorted(values) for name, values in found.items()}
 
 
 def as_set(value: object) -> set[str]:

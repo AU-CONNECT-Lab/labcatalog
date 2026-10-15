@@ -369,8 +369,22 @@ def item_ids(result: CatalogResult, dataset: str) -> dict[str, str]:
 
 def score_table(result: CatalogResult, summaries: list) -> tuple[list[dict], list[dict]]:
     scores = {s.key: s for s in result.catalog.scores}
+    custom = {
+        s.key: next(
+            d.custom
+            for d in result.project.instruments[scores[s.key].instrument_id].scores
+            if d.id == scores[s.key].score_id
+        )
+        for s in summaries
+    }
+    fields = [
+        f
+        for f in result.project.config.custom_fields
+        if f.applies_to == "score" and any(f.name in values for values in custom.values())
+    ]
     columns = [
         col("score", "Score"),
+        *[col(f"custom_{f.name}", f.label or f.name.capitalize()) for f in fields],
         col("method", "Method"),
         col("n", "N", numeric=True),
         col("mean", "Mean", numeric=True),
@@ -384,6 +398,7 @@ def score_table(result: CatalogResult, summaries: list) -> tuple[list[dict], lis
     rows = [
         {
             "score": scores[s.key].label,
+            **{f"custom_{f.name}": as_text(custom[s.key].get(f.name)) for f in fields},
             "method": f"{scores[s.key].method}, {scores[s.key].missing_rule}",
             "n": s.n_valid,
             "mean": fmt(s.mean),

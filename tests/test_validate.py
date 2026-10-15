@@ -112,6 +112,18 @@ def test_tags_field(mock_project):
     assert "brief" in issue.message
 
 
+def test_score_fields_belong_on_scores(mock_project):
+    path = mock_project / "instruments" / "example_mood.yaml"
+    edit(path, "domain: emotion", "domain: emotion\n  topics: [sleep]")
+    edit(path, "custom: {topics: [positive affect]}", "custom: {topics: [joy], domain: emotion}")
+    messages = sorted(i.message for i in run_validate(mock_project))
+    assert messages == [
+        "custom.topics: declared for score, not instrument",
+        "scores[4] (ems_low_positive).custom.domain: declared for instrument, not score",
+        "scores[4] (ems_low_positive).custom.topics: tag(s) not declared: joy",
+    ]
+
+
 def test_demographics_are_never_imputed(mock_project):
     path = mock_project / "instruments" / "example_mood.yaml"
     edit(path, "construct_name:", "kind: demographics\nconstruct_name:")

@@ -51,17 +51,22 @@ datasets:
   - {name: child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: child, source: csv, path: data/child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w3, modality: questionnaire, study: mock_study, wave: 3, reporter: child, source: csv, path: data/child_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
 
-# Extra fields your lab wants on instruments, administrations or datasets; choice and tags fields can be used as filters.
+# Extra fields your lab wants on instruments, scores, administrations or datasets; choice and tags fields can be used as filters.
 custom_fields:
   - name: domain
     label: Domain
     applies_to: instrument
     type: choice
     choices: [emotion, family, health, media]
+  - name: topics
+    label: Topics
+    applies_to: score
+    type: tags
+    choices: [negative affect, positive affect, parenting, sleep]
 
 # The filters on the Instruments page, in this order.
 browse:
-  facets: [study, wave, reporter, domain]
+  facets: [study, wave, reporter, domain, topics]
 
 # The folder holding the instruments' reference PDFs (often a shared Box or OneDrive folder; ~ and environment variables work). Each reference's pdf is a path inside it.
 references:

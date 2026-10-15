@@ -18,16 +18,16 @@ def index_for(root):
 
 def test_facets_follow_the_config_and_list_only_values_present(mock_project):
     index = index_for(mock_project)
-    assert [f.name for f in index.facets] == ["study", "wave", "reporter", "domain"]
+    assert [f.name for f in index.facets] == ["study", "wave", "reporter", "domain", "topics"]
     facets = {f.name: f for f in index.facets}
     assert facets["wave"].values == {WAVE_1: "1", WAVE_2: "2", WAVE_3: "3"}
     assert list(facets["domain"].values) == ["emotion", "family", "health", "media"]
 
 
 def test_default_facets_add_choice_and_tags_fields(mock_project):
-    edit(mock_project / "labcatalog.yaml", "facets: [study, wave, reporter, domain]", "{}")
+    edit(mock_project / "labcatalog.yaml", "facets: [study, wave, reporter, domain, topics]", "{}")
     project, _ = load_validated(mock_project)
-    assert facet_names(project.config) == ["study", "wave", "reporter", "domain"]
+    assert facet_names(project.config) == ["study", "wave", "reporter", "domain", "topics"]
 
 
 def test_selections_must_hold_within_one_administration(mock_project):
@@ -55,9 +55,21 @@ def test_counts_keep_the_facets_own_values_open(mock_project):
     assert found["domain"] == {"emotion": 1, "family": 2, "health": 1, "media": 0}
 
 
+def test_score_fields_describe_their_instrument(mock_project):
+    index = index_for(mock_project)
+    facets = {f.name: f for f in index.facets}
+    assert list(facets["topics"].values) == [
+        "negative affect",
+        "positive affect",
+        "parenting",
+        "sleep",
+    ]
+    assert list(matches(index, {"topics": {"sleep"}})) == ["example_child_sleep", "example_mood"]
+
+
 def test_search_names_and_optionally_item_text(mock_project):
     index = index_for(mock_project)
-    assert list(matches(index, {}, "sleep")) == ["example_child_sleep"]
+    assert list(matches(index, {}, "sleep")) == ["example_child_sleep", "example_mood"]
     assert matches(index, {}, "asleep") == {}
     assert list(matches(index, {}, "TIRED", items=True)) == [
         "example_child_sleep",
@@ -79,7 +91,7 @@ def test_instruments_never_administered_still_appear_unfiltered(mock_project):
 def test_browse_facets_are_validated(mock_project):
     edit(
         mock_project / "labcatalog.yaml",
-        "facets: [study, wave, reporter, domain]",
+        "facets: [study, wave, reporter, domain, topics]",
         "facets: [study, wave, cohort, note, wave]",
     )
     edit(

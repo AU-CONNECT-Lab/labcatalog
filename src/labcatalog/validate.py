@@ -151,7 +151,9 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
             if item_id not in items:
                 continue
             if items[item_id].type != "choice":
-                message = f"{where}.items: {item_id} is a {items[item_id].type} item and cannot be scored"
+                message = (
+                    f"{where}.items: {item_id} is a {items[item_id].type} item and cannot be scored"
+                )
                 issues.append(problem("invalid_value", message, location))
                 continue
             response_set = sets.get(items[item_id].response_set or instrument.default_response_set)
