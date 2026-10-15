@@ -1,0 +1,67 @@
+﻿StartDate,EndDate,Status,Progress,Duration (in seconds),Finished,RecordedDate,ResponseId,pid,eps_1_w3,eps_2_w3,eps_3_w3,eps_4_w3,eps_5_w3,eps_6_w3,ecs_1_w3,ecs_2_w3,ecs_3_w3,ecs_4_w3,ecs_5_w3,ecs_6_w3,dem_age_w3,dem_gender_w3,dem_edu_w3,dem_household_w3,dem_comment_w3
+Start Date,End Date,Response Type,Progress,Duration (in seconds),Finished,Recorded Date,Response ID,Participant ID,I feel overwhelmed by my responsibilities as a parent.,I enjoy spending time with my child.,I feel tired most of the time.,I find it hard to manage my child's behavior.,I have little time for myself.,My child is harder to care for than most children.,My child goes to bed at the same time each night.,My child has trouble falling asleep.,My child wakes up during the night.,My child seems tired during the day.,My child needs a parent nearby to fall asleep.,My child comes to our bed during the night.,How old is your child (in years)?,What is your child's gender?,What is the highest level of education you have completed?,"How many people live in your household, including you?",Is there anything else about your family's situation you would like us to know?
+"{""ImportId"": ""startDate"", ""timeZone"": ""America/Chicago""}","{""ImportId"": ""endDate"", ""timeZone"": ""America/Chicago""}","{""ImportId"": ""status""}","{""ImportId"": ""progress""}","{""ImportId"": ""duration""}","{""ImportId"": ""finished""}","{""ImportId"": ""recordedDate""}","{""ImportId"": ""_recordId""}","{""ImportId"": ""pid""}","{""ImportId"": ""QID1""}","{""ImportId"": ""QID2""}","{""ImportId"": ""QID3""}","{""ImportId"": ""QID4""}","{""ImportId"": ""QID5""}","{""ImportId"": ""QID6""}","{""ImportId"": ""QID7""}","{""ImportId"": ""QID8""}","{""ImportId"": ""QID9""}","{""ImportId"": ""QID10""}","{""ImportId"": ""QID11""}","{""ImportId"": ""QID12""}","{""ImportId"": ""QID13""}","{""ImportId"": ""QID14""}","{""ImportId"": ""QID15""}","{""ImportId"": ""QID16""}","{""ImportId"": ""QID17""}"
+2026-08-29 13:33:58,2026-08-29 13:35:33,Survey Preview,100,95,True,2026-08-29 13:35:33,R_VTRvIP7piRAMSlM,test,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1
+2026-09-01 15:13:29,2026-09-01 15:29:24,IP Address,100,955,True,2026-09-01 15:29:24,R_TELF0OKksoBIoAr,1001P,5,,4,3,4,4,1,1,1,1,1,1,11,1,1,4,
+2026-09-01 16:45:49,2026-09-01 17:04:44,IP Address,100,1135,True,2026-09-01 17:04:44,R_ShTxQSa7n85Wz1G,1002P,2,4,2,1,2,3,2,0,1,1,0,0,10,1,3,2,
+2026-09-02 15:12:37,2026-09-02 15:36:01,IP Address,100,1404,True,2026-09-02 15:36:01,R_jVMHeZiPOycMwFh,1007P,3,3,4,4,4,3,2,0,1,1,0,0,11,2,3,2,
+2026-09-02 17:33:48,2026-09-02 17:35:31,IP Address,30,103,False,2026-09-02 17:35:31,R_2afA3smjzh3mmqY,1007P,1,4,1,3,2,,,,,,,,,,,,
+2026-09-02 19:33:48,2026-09-02 19:53:21,IP Address,100,1173,True,2026-09-02 19:53:21,R_ZgOdjIXnS4uFhhU,1007P,1,4,1,3,2,2,2,1,0,1,1,,11,2,2,3,Grandmother lives with us part of the year.
+2026-09-03 13:27:32,2026-09-03 13:46:16,IP Address,100,1124,True,2026-09-03 13:46:16,R_Zxul8ZFdCE0EuxL,1017P,1,5,1,1,1,1,-97,0,-98,0,1,0,13,2,3,4,
+2026-09-04 10:56:03,2026-09-04 11:17:26,IP Address,100,1283,True,2026-09-04 11:17:26,R_w6PZe1Dtrvpvf5Q,1018P,4,3,,3,4,3,2,1,0,0,1,0,11,2,3,3,
+2026-09-04 19:21:17,2026-09-04 19:44:14,IP Address,100,1377,True,2026-09-04 19:44:14,R_SeCDxlwSi2o9oHi,1022P,3,5,3,1,2,2,0,1,0,1,1,1,8,1,2,5,My child changed schools in the spring.
+2026-09-05 15:04:25,2026-09-05 15:29:04,IP Address,100,1479,True,2026-09-05 15:29:04,R_lzER0Lyray01rbF,1023P,1,5,2,2,2,1,2,1,-98,1,1,1,13,2,1,4,
+2026-09-05 16:06:34,2026-09-05 16:29:04,IP Address,100,1350,True,2026-09-05 16:29:04,R_nKASKvcKatChN62,1027P,,3,4,4,5,4,1,1,1,1,1,1,11,2,2,6,
+2026-09-05 12:38:17,2026-09-05 12:49:09,IP Address,100,652,True,2026-09-05 12:49:09,R_kYzoWkCE8oilu6u,1029P,2,5,,2,2,1,2,0,0,0,0,0,11,2,1,6,
+2026-09-05 10:46:57,2026-09-05 11:09:37,IP Address,100,1360,True,2026-09-05 11:09:37,R_yZA31H5JFyn6YsP,1034P,3,3,4,5,3,4,1,1,1,0,2,1,10,2,3,3,My child changed schools in the spring.
+2026-09-06 17:52:09,2026-09-06 18:03:25,IP Address,100,676,True,2026-09-06 18:03:25,R_4poxpit6cZf0HBm,1037P,3,4,2,,2,3,2,0,0,0,1,0,8,2,3,6,
+2026-09-06 12:48:02,2026-09-06 13:02:42,IP Address,100,880,True,2026-09-06 13:02:42,R_XtGg3mBqb1dk81f,1038P,2,5,2,2,4,3,1,1,1,1,2,,11,1,3,4,
+2026-09-07 16:59:32,2026-09-07 17:11:38,IP Address,100,726,True,2026-09-07 17:11:38,R_29EQuNHv0a3r8QS,1042P,2,3,3,2,3,1,,1,0,0,1,0,12,2,2,5,
+2026-09-07 19:49:34,2026-09-07 20:06:31,IP Address,100,1017,True,2026-09-07 20:06:31,R_Mxl5jM24Czh6KvE,1043P,4,4,2,3,4,3,2,1,1,0,0,1,11,2,2,5,
+2026-09-08 09:55:12,2026-09-08 10:07:38,IP Address,100,746,True,2026-09-08 10:07:38,R_bn3n5fFSU9hTY5c,1047P,3,2,4,5,5,4,1,1,-98,1,1,1,12,1,2,,
+2026-09-08 17:59:41,2026-09-08 18:20:02,IP Address,100,1221,True,2026-09-08 18:20:02,R_mrvbRaOZdFMMJ48,1057P,3,-97,3,2,3,3,1,2,1,1,2,,13,1,2,7,
+2026-09-08 15:04:30,2026-09-08 15:26:04,IP Address,100,1294,True,2026-09-08 15:26:04,R_0BywTkBKXmQ7ZwD,1058P,4,2,4,4,5,5,1,0,1,1,1,0,12,1,3,4,
+2026-09-09 18:17:38,2026-09-09 18:35:39,IP Address,100,1081,True,2026-09-09 18:35:39,R_7oVcUb48rIw7WgB,1060P,3,5,4,2,3,2,1,1,1,2,1,,12,2,1,4,
+2026-09-09 15:54:33,2026-09-09 16:18:36,IP Address,100,1443,True,2026-09-09 16:18:36,R_2AgtahRgzjvOvgN,1061P,3,3,3,3,4,4,2,0,0,0,1,0,8,2,2,2,
+2026-09-10 17:36:04,2026-09-10 17:41:46,IP Address,100,342,True,2026-09-10 17:41:46,R_IE3va6rYzab98Xg,1063P,3,5,2,2,3,2,1,1,1,0,0,0,9,-99,4,3,
+2026-09-11 16:52:03,2026-09-11 17:08:26,IP Address,100,983,True,2026-09-11 17:08:26,R_Irc6OHHkTXXuqYE,1065P,3,4,4,3,4,4,2,2,0,0,0,0,10,2,2,5,
+2026-09-12 11:57:58,2026-09-12 12:09:05,IP Address,100,667,True,2026-09-12 12:09:05,R_MtOgON58y5JfCNH,1068P,3,5,3,,2,2,1,1,1,1,1,1,12,2,3,5,We moved to a new house this year.
+2026-09-12 14:10:54,2026-09-12 14:24:19,IP Address,100,805,True,2026-09-12 14:24:19,R_LPnQVaWge2Lm6gG,1069P,2,4,2,3,4,2,1,1,1,1,1,1,10,2,4,4,
+2026-09-13 10:24:15,2026-09-13 10:47:35,IP Address,100,1400,True,2026-09-13 10:47:35,R_ZuOrDRYahjXizsN,1070P,2,4,2,,3,3,1,1,2,1,1,1,12,1,1,5,
+2026-09-14 14:55:22,2026-09-14 15:07:46,IP Address,100,744,True,2026-09-14 15:07:46,R_QQDuTuJkszsZeZK,1071P,4,3,5,4,5,4,2,1,1,0,1,0,10,1,1,4,
+2026-09-15 09:59:48,2026-09-15 10:02:45,IP Address,30,177,False,2026-09-15 10:02:45,R_2XcKoDxbaXjq6wA,1072P,3,4,4,3,4,,,,,,,,,,,,
+2026-09-15 11:59:48,2026-09-15 12:09:11,IP Address,100,563,True,2026-09-15 12:09:11,R_923vInSh37AamjR,1072P,3,4,4,3,4,3,1,1,1,2,1,-97,8,2,4,2,
+2026-09-17 10:47:26,2026-09-17 11:01:42,IP Address,100,856,True,2026-09-17 11:01:42,R_ATI0ynPnNeArOx9,1073P,2,5,3,1,3,3,2,1,0,0,0,0,13,2,1,3,Our family welcomed a new baby.
+2026-09-17 17:31:15,2026-09-17 17:39:30,IP Address,100,495,True,2026-09-17 17:39:30,R_el8fJS12xbzaxf9,1074P,2,4,4,3,4,4,2,1,1,0,0,1,10,2,2,4,
+2026-09-18 11:10:33,2026-09-18 11:35:09,IP Address,100,1476,True,2026-09-18 11:35:09,R_kC8Zamhlax1IOEj,1076P,2,5,3,,3,2,1,1,1,1,1,0,11,3,1,5,Our family welcomed a new baby.
+2026-09-18 18:14:10,2026-09-18 18:38:00,IP Address,100,1430,True,2026-09-18 18:38:00,R_Zi7F6PmGeTbNl1L,1081P,1,5,1,1,1,1,1,0,0,0,1,0,9,2,4,3,
+2026-09-19 17:17:12,2026-09-19 17:41:25,IP Address,100,1453,True,2026-09-19 17:41:25,R_YsNoCjjlPyrRtPB,1082P,4,3,3,2,,3,0,1,2,1,2,2,8,2,4,2,
+2026-09-21 11:51:22,2026-09-21 12:13:09,IP Address,100,1307,True,2026-09-21 12:13:09,R_notnvo5GEZOLKmP,1083P,3,5,2,3,3,2,2,0,0,0,0,0,13,1,1,6,
+2026-09-22 13:53:43,2026-09-22 14:07:48,IP Address,100,845,True,2026-09-22 14:07:48,R_1SrBz21eQlx6uHX,1084P,2,5,2,1,,1,1,1,1,1,1,1,11,1,3,3,
+2026-09-22 13:20:45,2026-09-22 13:43:19,IP Address,100,1354,True,2026-09-22 13:43:19,R_PUGaCdtJ9UNwTku,1087P,3,5,3,2,3,2,2,0,0,0,0,0,13,2,1,3,
+2026-09-23 14:08:20,2026-09-23 14:25:02,IP Address,100,1002,True,2026-09-23 14:25:02,R_9fU9iYX8f1vBeEX,1093P,3,2,3,4,4,4,1,1,1,1,1,1,13,1,3,7,
+2026-09-23 10:53:51,2026-09-23 11:14:12,IP Address,100,1221,True,2026-09-23 11:14:12,R_iMbEfN2lYWMTQKV,1095P,4,3,3,4,4,3,1,1,2,2,1,1,9,2,1,5,
+2026-09-23 18:42:55,2026-09-23 18:58:29,IP Address,100,934,True,2026-09-23 18:58:29,R_x2WlStcbXyivmqA,1096P,2,4,2,2,2,2,1,0,1,1,1,1,8,1,3,3,
+2026-09-24 14:39:07,2026-09-24 14:56:08,IP Address,100,1021,True,2026-09-24 14:56:08,R_THUveo1KXrq5cqA,1097P,3,3,3,4,4,4,1,0,0,1,1,0,13,1,,4,My child changed schools in the spring.
+2026-09-26 19:10:52,2026-09-26 19:18:01,IP Address,100,429,True,2026-09-26 19:18:01,R_0oth6N2PBSLapOb,1100P,4,5,3,3,3,1,1,1,0,0,1,0,13,2,4,4,
+2026-09-26 09:32:29,2026-09-26 09:50:29,IP Address,100,1080,True,2026-09-26 09:50:29,R_c7pwcvZgVnMrtEN,1102P,2,5,1,1,2,1,2,0,0,0,0,0,8,2,1,5,
+2026-09-26 11:11:31,2026-09-26 11:32:59,IP Address,100,1288,True,2026-09-26 11:32:59,R_jqK3k3bCvBHDRT0,1106P,3,4,4,3,5,-99,2,1,1,1,0,1,8,1,3,5,
+2026-09-27 17:18:23,2026-09-27 17:26:29,IP Address,100,486,True,2026-09-27 17:26:29,R_UKq1JlROs4PWBic,1109P,4,5,3,2,3,2,1,1,0,1,2,1,11,1,3,5,
+2026-09-28 12:02:38,2026-09-28 12:22:13,IP Address,100,1175,True,2026-09-28 12:22:13,R_CHJFv1jcH9DwvvL,1110P,4,4,3,3,5,3,2,1,1,2,1,-97,11,1,2,5,
+2026-09-28 16:57:55,2026-09-28 17:18:02,IP Address,100,1207,True,2026-09-28 17:18:02,R_g8ggnUFC03aDP9z,1115P,2,4,2,1,2,2,2,0,0,1,0,0,9,2,3,4,Grandmother lives with us part of the year.
+2026-09-29 17:27:29,2026-09-29 17:39:26,IP Address,100,717,True,2026-09-29 17:39:26,R_EwpPy6lYZa9vzJF,1120P,2,5,1,2,1,2,2,0,0,1,0,0,10,1,4,5,
+2026-09-29 09:18:50,2026-09-29 09:28:18,IP Address,100,568,True,2026-09-29 09:28:18,R_E9zNhhFQVOU90yu,1121P,3,3,2,3,4,2,1,1,1,-97,1,1,11,2,3,5,
+2026-09-29 17:25:11,2026-09-29 17:48:17,IP Address,100,1386,True,2026-09-29 17:48:17,R_Jsyg0vX8Trl9NvR,1124P,4,2,4,3,4,4,1,0,0,0,0,0,12,1,3,4,
+2026-09-29 14:53:03,2026-09-29 15:16:19,IP Address,100,1396,True,2026-09-29 15:16:19,R_gMMS7jYEAsFiNvQ,1126P,3,,-99,-97,5,5,1,1,1,1,2,1,12,2,3,5,
+2026-09-30 10:17:52,2026-09-30 10:27:28,IP Address,100,576,True,2026-09-30 10:27:28,R_8grtp5txVN8c5d5,1127P,4,4,3,3,4,2,0,2,2,-97,2,2,8,2,1,5,
+2026-10-02 17:23:40,2026-10-02 17:45:32,IP Address,100,1312,True,2026-10-02 17:45:32,R_p9JzsKnOP4g7eOM,1130P,4,,3,3,3,3,1,1,0,0,0,0,10,2,3,2,
+2026-10-02 16:45:22,2026-10-02 17:05:41,IP Address,100,1219,True,2026-10-02 17:05:41,R_EYPF3eyoEFS2b3k,1133P,3,4,3,4,3,3,-97,1,1,2,1,1,13,1,3,4,
+2026-10-02 17:25:19,2026-10-02 17:42:27,IP Address,100,1028,True,2026-10-02 17:42:27,R_GOqztjzsuO0DEap,1136P,3,3,3,4,5,4,2,1,0,1,1,0,10,1,2,4,
+2026-10-02 14:20:59,2026-10-02 14:40:58,IP Address,100,1199,True,2026-10-02 14:40:58,R_5E8ZTYep8kglkFs,1138P,2,5,1,2,3,3,-97,1,1,1,1,1,10,1,2,6,
+2026-10-03 10:58:12,2026-10-03 11:16:47,IP Address,100,1115,True,2026-10-03 11:16:47,R_lXV4nrS5ctrr5Pd,1139P,2,5,1,1,2,2,1,-97,1,0,1,0,13,2,4,5,
+2026-10-03 16:27:31,2026-10-03 16:45:15,IP Address,100,1064,True,2026-10-03 16:45:15,R_OSdu8pzHty22pws,1140P,-97,5,1,1,1,1,2,0,1,2,0,1,12,1,3,5,
+2026-10-04 15:46:04,2026-10-04 16:03:56,IP Address,100,1072,True,2026-10-04 16:03:56,R_KruQcyncB0t1sCg,1147P,5,,5,4,3,-99,2,1,1,1,1,0,13,2,4,6,Work schedules changed a lot this year.
+2026-10-05 10:02:40,2026-10-05 10:24:57,IP Address,100,1337,True,2026-10-05 10:24:57,R_H34L0z8Rmpg1RPn,1149P,4,3,5,4,5,-97,1,1,1,1,2,1,9,2,3,5,
+2026-10-06 17:59:14,2026-10-06 18:14:15,IP Address,100,901,True,2026-10-06 18:14:15,R_2PZoIXrMczwnWUI,1152P,4,4,4,4,,,1,1,1,2,1,1,8,1,1,4,
+2026-10-06 19:22:01,2026-10-06 19:35:52,IP Address,100,831,True,2026-10-06 19:35:52,R_UDpEDGWbwvjCkg4,1154P,3,3,3,3,4,3,1,1,1,,1,1,13,2,1,4,
+2026-10-07 17:43:00,2026-10-07 17:56:57,IP Address,100,837,True,2026-10-07 17:56:57,R_Vlp6M7WnCv7f06Q,1156P,1,5,1,1,2,1,-97,1,0,0,1,0,8,1,4,2,

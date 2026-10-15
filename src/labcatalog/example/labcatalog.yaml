@@ -74,3 +74,12 @@ browse:
 # The folder holding the instruments' reference PDFs (often a shared Box or OneDrive folder; ~ and environment variables work). Each reference's pdf is a path inside it.
 references:
   root: references
+
+# Your own cleaning scripts, run in order from the Prepare page or with "labcatalog prepare". Here one script turns each survey-platform export in raw/ into the clean file the catalog reads; listing the script among the inputs marks the step outdated when the script changes.
+prepare:
+  - {name: clean_parent_w1, run: python scripts/clean_export.py raw/parent_w1_export.csv data/parent_w1.csv, inputs: [raw/parent_w1_export.csv, scripts/clean_export.py], outputs: [data/parent_w1.csv]}
+  - {name: clean_parent_w2, run: python scripts/clean_export.py raw/parent_w2_export.csv data/parent_w2.csv, inputs: [raw/parent_w2_export.csv, scripts/clean_export.py], outputs: [data/parent_w2.csv]}
+  - {name: clean_parent_w3, run: python scripts/clean_export.py raw/parent_w3_export.csv data/parent_w3.csv, inputs: [raw/parent_w3_export.csv, scripts/clean_export.py], outputs: [data/parent_w3.csv]}
+  - {name: clean_child_w1, run: python scripts/clean_export.py raw/child_w1_export.csv data/child_w1.csv, inputs: [raw/child_w1_export.csv, scripts/clean_export.py], outputs: [data/child_w1.csv]}
+  - {name: clean_child_w2, run: python scripts/clean_export.py raw/child_w2_export.csv data/child_w2.csv, inputs: [raw/child_w2_export.csv, scripts/clean_export.py], outputs: [data/child_w2.csv]}
+  - {name: clean_child_w3, run: python scripts/clean_export.py raw/child_w3_export.csv data/child_w3.csv, inputs: [raw/child_w3_export.csv, scripts/clean_export.py], outputs: [data/child_w3.csv]}
