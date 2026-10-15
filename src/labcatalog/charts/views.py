@@ -248,7 +248,8 @@ def item_total(result: CatalogResult, instrument_id: str) -> go.Figure | None:
 
 def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     instrument = result.project.instruments[instrument_id]
-    if len(instrument.items) < 3:
+    choices = [i for i in instrument.items if i.type == "choice"]
+    if len(choices) < 3:
         return None
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
     names = series_names(result, instrument_datasets(result, instrument_id))
@@ -257,12 +258,12 @@ def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
         values = {
             v.item_id: means.get((name, v.column))
             for v in result.catalog.variables_for(name)
-            if v.instrument_id == instrument_id
+            if v.instrument_id == instrument_id and v.type == "choice"
         }
         if any(value is not None for value in values.values()):
             series.append({"name": label, "color": series_color(result, name), "values": values})
-    axes = [i.id for i in instrument.items]
-    hovers = [f"{i.id}: {item_text(instrument, i.id)}" for i in instrument.items]
+    axes = [i.id for i in choices]
+    hovers = [f"{i.id}: {item_text(instrument, i.id)}" for i in choices]
     return plots.profile_radar(axes, hovers, series, option_range(instrument)) if series else None
 
 
@@ -1021,7 +1022,7 @@ def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None
     instrument = result.project.instruments[instrument_id]
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
     names = series_names(result, instrument_datasets(result, instrument_id))
-    items = [i.id for i in instrument.items]
+    items = [i.id for i in instrument.items if i.type == "choice"]
     lines = {}
     for name in names:
         by_item = {

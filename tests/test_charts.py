@@ -139,3 +139,6 @@ def test_number_and_text_items_are_left_out_of_option_charts(result):
     assert len(views.item_responses(result, "example_demographics")) == 2
     grid = views.answer_grid(result, "parent_w2", 1, "example_demographics")
     assert all(tick.startswith(("dem_gender", "dem_edu")) for tick in grid.layout.yaxis.ticktext)
+    assert views.item_profile(result, "example_demographics") is None
+    waves = views.wave_profiles(result, "example_demographics")
+    assert len(waves.data[-1].x) == 2
