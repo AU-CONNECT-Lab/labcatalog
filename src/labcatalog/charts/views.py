@@ -266,28 +266,63 @@ def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     return plots.profile_radar(axes, hovers, series, option_range(instrument)) if series else None
 
 
-def subscale_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    # Subscales are put on the answer scale (mean per item) so subscales of different lengths compare.
+def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | None:
+    # The subscales on one radar, then each subscale's items on its own; a radar needs three axes.
     instrument = result.project.instruments[instrument_id]
     subscales = [s for s in instrument.scores if not is_total(instrument, s)]
-    if len(subscales) < 3:
-        return None
     names = series_names(result, instrument_datasets(result, instrument_id))
-    series = []
-    for name, label in names.items():
-        values = {}
-        for score in subscales:
-            key = next(
-                (s.key for s in result.catalog.scores_for(name) if s.score_id == score.id), None
+    panels = []
+    if len(subscales) >= 3:
+        series = []
+        for name, label in names.items():
+            values = {}
+            for score in subscales:
+                key = next(
+                    (s.key for s in result.catalog.scores_for(name) if s.score_id == score.id),
+                    None,
+                )
+                mean = summary_of(result, key).mean if key else None
+                # Mean per item, so subscales of different lengths share the answer scale.
+                if mean is not None:
+                    values[score.label] = mean / len(score.items) if score.method == "sum" else mean
+            if values:
+                series.append(
+                    {"name": label, "color": series_color(result, name), "values": values}
+                )
+        if series:
+            panels.append(
+                {
+                    "title": "Subscales",
+                    "axes": [s.label for s in subscales],
+                    "hovers": [f"{s.label} ({len(s.items)} items)" for s in subscales],
+                    "series": series,
+                }
             )
-            mean = summary_of(result, key).mean if key else None
-            if mean is not None:
-                values[score.label] = mean / len(score.items) if score.method == "sum" else mean
-        if values:
-            series.append({"name": label, "color": series_color(result, name), "values": values})
-    axes = [s.label for s in subscales]
-    hovers = [f"{s.label} ({len(s.items)} items)" for s in subscales]
-    return plots.profile_radar(axes, hovers, series, option_range(instrument)) if series else None
+    means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
+    for subscale in subscales:
+        if len(subscale.items) < 3:
+            continue
+        series = []
+        for name, label in names.items():
+            values = {
+                v.item_id: means.get((name, v.column))
+                for v in result.catalog.variables_for(name)
+                if v.instrument_id == instrument_id and v.item_id in subscale.items
+            }
+            if any(value is not None for value in values.values()):
+                series.append(
+                    {"name": label, "color": series_color(result, name), "values": values}
+                )
+        if series:
+            panels.append(
+                {
+                    "title": subscale.label,
+                    "axes": list(subscale.items),
+                    "hovers": [f"{i}: {item_text(instrument, i)}" for i in subscale.items],
+                    "series": series,
+                }
+            )
+    return plots.radar_grid(panels, option_range(instrument)) if panels else None
 
 
 def item_waves(result: CatalogResult, instrument_id: str) -> dict[str, str]:

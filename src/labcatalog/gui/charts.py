@@ -49,7 +49,7 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     if profiles is not None:
         heading("Each wave against the others")
         show(profiles)
-    subscales = views.subscale_profile(result, instrument_id)
+    subscales = views.subscale_radars(result, instrument_id)
     if subscales is not None:
         heading("Subscales")
         show(subscales)

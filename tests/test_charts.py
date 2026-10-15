@@ -19,9 +19,14 @@ def test_instrument_charts(result):
     assert views.score_boxes(result, "example_screen_time") is None
 
 
-def test_subscale_radar_needs_three_subscales(result):
-    assert views.subscale_profile(result, "example_mood") is not None
-    assert views.subscale_profile(result, "example_parent_stress") is None
+def test_subscale_radars_need_three_axes(result):
+    def titles(instrument_id):
+        fig = views.subscale_radars(result, instrument_id)
+        return None if fig is None else [a.text for a in fig.layout.annotations]
+
+    assert titles("example_mood") == ["Subscales"]
+    assert titles("example_parent_stress") == ["Strain"]
+    assert titles("example_child_sleep") is None
 
 
 def test_small_multiples(result):
