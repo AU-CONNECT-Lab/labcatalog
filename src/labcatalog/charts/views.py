@@ -328,69 +328,38 @@ def item_waves(result: CatalogResult, instrument_id: str) -> dict[str, str]:
     return series_names(result, found)
 
 
-def item_matrix(
+def item_correlations(
     result: CatalogResult, instrument_id: str, dataset: str
-) -> tuple[ScoreSummary, dict[str, int]]:
+) -> tuple[list[str], np.ndarray, int]:
+    # Items in the instrument's own order, with the n of people who answered them all.
     total = total_score(result.project.instruments[instrument_id])
     score = next(s for s in resolved(result, instrument_id, total.id) if s.dataset == dataset)
     summary = summary_of(result, score.key)
-    items = {
-        v.column: v.item_id
+    columns = {
+        v.item_id: v.column
         for v in result.catalog.variables_for(dataset)
         if v.instrument_id == instrument_id
     }
-    return summary, {items[c]: i for i, c in enumerate(summary.item_columns)}
-
-
-def item_groups(instrument: Instrument) -> tuple[list[str], dict[str, str]]:
-    # An item in several subscales sits with the first; "" holds the items in none.
-    group_of: dict[str, str] = {}
-    for subscale in subscales_of(instrument):
-        for item in subscale.items:
-            group_of.setdefault(item, subscale.id)
-    return [s.id for s in subscales_of(instrument)] + [""], group_of
-
-
-def by_subscale(instrument: Instrument, items) -> list[str]:
-    group_order, group_of = item_groups(instrument)
-    item_order = [i.id for i in instrument.items]
-    return sorted(
-        items, key=lambda item: (group_order.index(group_of.get(item, "")), item_order.index(item))
-    )
+    where = {c: i for i, c in enumerate(summary.item_columns)}
+    items = [
+        i.id
+        for i in result.project.instruments[instrument_id].items
+        if columns.get(i.id) in where
+    ]
+    rows = [where[columns[item]] for item in items]
+    z = matrices.as_matrix([[summary.item_correlations[a][b] for b in rows] for a in rows])
+    return items, z, summary.n_complete
 
 
 def item_grid(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
-    # Items sit together by subscale.
-    instrument = result.project.instruments[instrument_id]
-    summary, where = item_matrix(result, instrument_id, dataset)
-    members = by_subscale(instrument, where)
-    if len(members) < 2:
+    items, z, n = item_correlations(result, instrument_id, dataset)
+    if len(items) < 2:
         return None
-    subscales = subscales_of(instrument)
-    group_order, group_of = item_groups(instrument)
-    size = len(members)
-    z = np.full((size, size), np.nan)
-    n: list[list[int | None]] = [[None] * size for _ in range(size)]
-    for a, ma in enumerate(members):
-        for b, mb in enumerate(members):
-            if a != b:
-                value = summary.item_correlations[where[ma]][where[mb]]
-                if value is not None:
-                    z[a, b] = value
-                    n[a][b] = summary.n_complete
-    names = {s.id: s.label for s in subscales} | {"": "In no subscale"}
-    return matrices.dot_grid(
-        z,
-        n,
-        members,
-        [group_of.get(m, "") for m in members] if subscales else None,
-        group_order,
-        names,
-        item_waves(result, instrument_id)[dataset],
-        "Spearman ρ",
-        set(),
-        defaults.CHART_MIN_R,
-    )
+    hover = [
+        [f"{a} × {b}<br>ρ = {z[i, j]:.2f}, n = {n}" for j, b in enumerate(items)]
+        for i, a in enumerate(items)
+    ]
+    return matrices.heatmap(z, items, hover, "Spearman ρ")
 
 
 def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
@@ -849,60 +818,6 @@ def score_facet(result: CatalogResult, score: ResolvedScore, name: str) -> set[s
 Member = tuple[str, str, str]
 
 
-def score_grid(
-    result: CatalogResult,
-    instruments: list[str],
-    wave: tuple[str, str],
-) -> go.Figure | None:
-    corr, where = wave_members(result, *wave, instruments)
-    members = sorted(where, key=lambda m: member_rank(result, m))
-    if len(members) < 2:
-        return None
-    size = len(members)
-    z = np.full((size, size), np.nan)
-    n: list[list[int | None]] = [[None] * size for _ in range(size)]
-    for a, ma in enumerate(members):
-        for b, mb in enumerate(members):
-            i, j = where[ma], where[mb]
-            if a != b and corr.r[i][j] is not None:
-                z[a, b] = corr.r[i][j]
-                n[a][b] = corr.n[i][j]
-    by_key = {s.key: s for s in result.catalog.scores}
-    scores = [by_key[corr.keys[where[m]]] for m in members]
-    skip = {
-        (a, b)
-        for a in range(size)
-        for b in range(a + 1, size)
-        if nested(result, scores[a], scores[b])
-    }
-    return matrices.dot_grid(
-        z,
-        n,
-        member_labels(result, members),
-        [m[0] for m in members],
-        instrument_order(result),
-        instrument_names(result),
-        wave_name(result, *wave),
-        "Pearson r",
-        skip,
-        defaults.CHART_MIN_R,
-    )
-
-
-def wave_members(
-    result: CatalogResult, study: str, wave: str, instruments: list[str]
-) -> tuple[Correlation, dict[Member, int]]:
-    corr = next(c for c in result.summary.correlations if (c.study, c.wave) == (study, wave))
-    by_key = {s.key: s for s in result.catalog.scores}
-    config = result.project.config
-    found = {}
-    for i, key in enumerate(corr.keys):
-        s = by_key[key]
-        if s.instrument_id in instruments:
-            found[(s.instrument_id, s.score_id, dataset_by_name(config, s.dataset).reporter)] = i
-    return corr, found
-
-
 def member_rank(result: CatalogResult, member: Member) -> tuple:
     instrument = result.project.instruments[member[0]]
     score = next(s for s in instrument.scores if s.id == member[1])
@@ -1164,6 +1079,23 @@ def total_choices(result: CatalogResult, datasets: list[str]) -> list[str]:
 
 def score_of(result: CatalogResult, key: str) -> ResolvedScore:
     return next(s for s in result.catalog.scores if s.key == key)
+
+
+def correlation_heatmap(
+    matrix: list[list[analysis.Correlation]], labels: list[str]
+) -> go.Figure:
+    z = matrices.as_matrix([[c.r for c in row] for row in matrix])
+    hover = [
+        [
+            f"{labels[i]} × {labels[j]}<br>r = {c.r:.2f}, n = {c.n}, "
+            + ("p < .001" if c.p < 0.001 else f"p = {c.p:.3f}")
+            if c.r is not None
+            else ""
+            for j, c in enumerate(row)
+        ]
+        for i, row in enumerate(matrix)
+    ]
+    return matrices.heatmap(z, labels, hover, "Pearson r")
 
 
 def pair_scatter(

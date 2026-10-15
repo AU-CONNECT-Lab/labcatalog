@@ -12,7 +12,7 @@ from labcatalog import analysis
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import charts
-from labcatalog.gui.common import col, heading, note, section, table
+from labcatalog.gui.common import apa, col, heading, note, section, table
 from labcatalog.pipeline import CatalogResult
 
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
@@ -103,15 +103,24 @@ def correlation_section(
         if len(view.scores) < 2:
             note("Pick at least two scores.")
             return
-        columns, rows, pairs = correlation_table(result, sample, view.scores, choices)
-        table(columns, rows)
+        frame = analysis.table(result, sample, view.scores)
+        matrix = analysis.correlation_matrix(frame)
+        labels = [choices[k] for k in view.scores]
+        columns, rows = correlation_table(frame, matrix, labels)
+        pairs = [matrix[i][j].n for i in range(len(matrix)) for j in range(i)]
         low, high = min(pairs), max(pairs)
         n = f"n {low}" if low == high else f"n {low} to {high}"
-        note(
-            f"Pearson r, each pair on everyone with both scores ({n}); "
-            "* p < .05, ** p < .01, *** p < .001."
-        )
-        csv_button(columns, rows, "correlations.csv")
+        fig = views.correlation_heatmap(matrix, labels)
+        with ui.row().classes("w-full gap-6 items-start"):
+            with charts.figure_column(fig):
+                image_buttons(charts.show(fig), fig, "correlations")
+            with charts.rest_column():
+                table(columns, rows)
+                note(
+                    f"Pearson r, each pair on everyone with both scores ({n}); "
+                    "* p < .05, ** p < .01, *** p < .001."
+                )
+                csv_button(columns, rows, "correlations.csv")
 
     def set_scores(value: list[str] | None) -> None:
         view.scores = value or []
@@ -130,27 +139,24 @@ def correlation_section(
 
 
 def correlation_table(
-    result: CatalogResult, sample: analysis.Sample, keys: list[str], choices: dict[str, str]
-) -> tuple[list[dict], list[dict], list[int]]:
+    frame: pd.DataFrame, matrix: list[list[analysis.Correlation]], labels: list[str]
+) -> tuple[list[dict], list[dict]]:
     # APA layout: numbered rows, M and SD, then r below the diagonal with stars.
-    frame = analysis.table(result, sample, keys)
-    matrix = analysis.correlation_matrix(frame)
     columns = [
         col("variable", "Variable"),
         col("n", "n", numeric=True),
         col("m", "M", numeric=True),
         col("sd", "SD", numeric=True),
-        *[col(f"c{j}", str(j + 1), numeric=True, sortable=False) for j in range(len(keys))],
+        *[col(f"c{j}", str(j + 1), numeric=True, sortable=False) for j in range(len(labels))],
     ]
     rows = []
-    for i, key in enumerate(keys):
+    for i, key in enumerate(frame.columns):
         n, mean, sd = analysis.describe(frame[key])
-        row = {"variable": f"{i + 1}. {choices[key]}", "n": n, "m": number(mean), "sd": number(sd)}
-        for j in range(len(keys)):
+        row = {"variable": f"{i + 1}. {labels[i]}", "n": n, "m": number(mean), "sd": number(sd)}
+        for j in range(len(labels)):
             row[f"c{j}"] = starred(matrix[i][j]) if j < i else ("—" if j == i else "")
         rows.append(row)
-    pairs = [matrix[i][j].n for i in range(len(keys)) for j in range(i)]
-    return columns, rows, pairs
+    return columns, rows
 
 
 def pair_section(
@@ -240,13 +246,6 @@ def number(value: float | None) -> str:
     return "" if value is None else f"{value:.2f}"
 
 
-def apa(value: float | None) -> str:
-    # Values bounded by 1 drop the leading zero.
-    if value is None:
-        return ""
-    return f"{value:.2f}".replace("0.", ".", 1)
-
-
 def p_value(p: float | None) -> str:
     if p is None:
         return ""
@@ -276,7 +275,7 @@ def image_buttons(plot: ui.plotly | None, fig: go.Figure, name: str) -> None:
     async def save(kind: str) -> None:
         options = {
             "format": kind,
-            "width": IMAGE_WIDTH,
+            "width": fig.layout.width or IMAGE_WIDTH,
             "height": fig.layout.height,
             "scale": 2 if kind == "png" else 1,
         }

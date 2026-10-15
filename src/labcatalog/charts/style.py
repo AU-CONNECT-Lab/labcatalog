@@ -66,7 +66,6 @@ STATUS_NAMES = {
     "blank": "blank",
 }
 CORRELATION_SCALE = "RdBu_r"
-CELL_LINE = "#d9d9d9"
 SHARE_SCALE = "YlGnBu"
 FONT = 'Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif'
 INK = "#1c2530"

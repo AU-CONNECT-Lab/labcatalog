@@ -60,6 +60,13 @@ def fmt(value: float | None, digits: int = 2) -> str:
     return "" if value is None else f"{value:.{digits}f}"
 
 
+def apa(value: float | None) -> str:
+    # Values bounded by 1 drop the leading zero.
+    if value is None:
+        return ""
+    return f"{value:.2f}".replace("0.", ".", 1)
+
+
 def as_text(value: object) -> str:
     if value is None:
         return ""
