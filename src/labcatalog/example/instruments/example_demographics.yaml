@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: example_demographics
+name: Example Family Background
+abbreviation: EFB
+kind: demographics
+construct_name: Demographics
+instructions: Please tell us about your child and your household.
+response_sets:
+  - id: gender
+    options:
+      - {value: 1, label: Girl}
+      - {value: 2, label: Boy}
+      - {value: 3, label: Another gender}
+  - id: education
+    options:
+      - {value: 1, label: High school or less}
+      - {value: 2, label: Some college}
+      - {value: 3, label: "Bachelor's degree"}
+      - {value: 4, label: Graduate degree}
+items:
+  - {id: dem_age, text: How old is your child (in years)?, type: number, min: 3, max: 18}
+  - {id: dem_gender, text: "What is your child's gender?", response_set: gender}
+  - {id: dem_edu, text: What is the highest level of education you have completed?, response_set: education}
+  - {id: dem_household, text: "How many people live in your household, including you?", type: number, min: 1, max: 15}
+  - {id: dem_comment, text: "Is there anything else about your family's situation you would like us to know?", type: text}
+custom:
+  domain: family

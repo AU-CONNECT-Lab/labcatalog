@@ -5,3 +5,4 @@ administrations:
   - {instrument: example_child_sleep, datasets: [parent_w1, parent_w2, parent_w3], target: child}
   - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self}
   - {instrument: example_screen_time, datasets: [child_w2, child_w3], target: self}
+  - {instrument: example_demographics, datasets: [parent_w1, parent_w2, parent_w3]}
