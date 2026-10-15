@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.exceptions import MetadataError
@@ -75,6 +76,11 @@ def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
         return None, err.issues
     issues = validate_project(project)
     return (None if has_errors(issues) else project), issues
+
+
+def run_cfa(result: CatalogResult, rscript: str) -> list[CfaFit]:
+    models = build_models(result.project, result.catalog, result.datasets)
+    return fit_models(models, rscript)
 
 
 def run_prepare(root: Path, echo: Callable[[str], None]) -> list[StepRun]:

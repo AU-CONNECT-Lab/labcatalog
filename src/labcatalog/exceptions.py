@@ -32,3 +32,7 @@ class DataSourceError(LabCatalogError):
 
 class CodebookError(LabCatalogError):
     exit_code = EXIT_ISSUES
+
+
+class RError(LabCatalogError):
+    pass
