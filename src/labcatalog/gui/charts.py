@@ -65,11 +65,7 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     if waves:
         heading("Item correlations")
         triangles(
-            waves,
-            lambda lower, upper: side_by_side(
-                ("", views.item_grid(result, instrument_id, lower, upper)),
-                ("", views.item_circle(result, instrument_id, lower)),
-            ),
+            waves, lambda lower, upper: show(views.item_grid(result, instrument_id, lower, upper))
         )
     other_scores(result, instrument_id)
 
@@ -216,17 +212,14 @@ def score_relations(result: CatalogResult) -> None:
 
     @ui.refreshable
     def grid() -> None:
-        study, wave = picked["lower"].split("|")
-        dots = views.score_grid(
-            result,
-            picked["instruments"],
-            (study, wave),
-            tuple(picked["upper"].split("|")),
-        )
-        if dots is None:
-            note("Pick instruments with at least two scores.")
-        side_by_side(
-            ("", dots), ("", views.score_circle(result, study, wave, picked["instruments"]))
+        show(
+            views.score_grid(
+                result,
+                picked["instruments"],
+                tuple(picked["lower"].split("|")),
+                tuple(picked["upper"].split("|")),
+            ),
+            "Pick instruments with at least two scores.",
         )
 
     @ui.refreshable

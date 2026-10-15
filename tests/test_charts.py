@@ -19,6 +19,15 @@ def test_instrument_charts(result):
     assert views.score_boxes(result, "example_screen_time") is None
 
 
+def test_item_diagnostics_put_each_item_against_alpha_without_it(result):
+    fig = views.item_total(result, "example_mood")
+    waves = [t for t in fig.data if t.mode == "markers"]
+    assert [t.name for t in waves] == ["Wave 1 (α 0.86)", "Wave 2 (α 0.88)", "Wave 3 (α 0.85)"]
+    assert all(len(t.x) == 6 for t in waves)
+    labels = next(t for t in fig.data if t.mode == "text")
+    assert [label.strip() for label in labels.text] == [f"ems_{i}" for i in range(1, 7)]
+
+
 def test_subscale_radars_draw_each_subscale_with_three_items(result):
     def titles(instrument_id):
         fig = views.subscale_radars(result, instrument_id)
@@ -54,7 +63,15 @@ def test_means_and_stability_show_one_instrument(result):
     labels = ["Total score", "Sadness", "Worry and fatigue", "Low positive affect"]
     assert [a.text for a in means.layout.annotations] == labels
     stability = views.stability(result, "example_mood")
-    assert list(stability.layout.yaxis.ticktext) == labels
+    assert [a.text for a in stability.layout.annotations][: len(labels)] == labels
+    total = next(
+        r
+        for r in result.summary.stability
+        if (r.score_id, r.from_wave, r.to_wave) == ("ems_total", "1", "2")
+    )
+    first_pair = stability.data[1]
+    assert len(first_pair.x) == total.n
+    assert f"r = {total.r:.2f}" in stability.layout.annotations[len(labels)].text
 
 
 def test_overview_charts(result):
@@ -65,8 +82,9 @@ def test_overview_charts(result):
         ("mock_study", "2"),
         ("mock_study", "3"),
     ]
-    assert views.score_circle(result, "mock_study", "1", everything) is not None
-    assert views.score_circle(result, "mock_study", "1", []) is None
+    waves = ("mock_study", "1"), ("mock_study", "2")
+    assert views.score_grid(result, everything, *waves) is not None
+    assert views.score_grid(result, [], *waves) is None
 
 
 def test_score_levels_put_every_wave_on_one_row_per_score(result):
@@ -103,10 +121,10 @@ def test_item_grid_groups_items_by_subscale(result):
     grid = views.item_grid(result, "example_mood", lower, upper)
     by_subscale = ["ems_2", "ems_6", "ems_3", "ems_5", "ems_1", "ems_4"]
     assert list(grid.layout.xaxis.ticktext) == by_subscale
-    circle = views.item_circle(result, "example_mood", lower)
-    labels = [a.text for a in circle.layout.annotations]
-    assert labels == by_subscale
-    assert circle.layout.title.text.startswith("Wave 1: |Spearman ρ| ≥ 0.3")
+    around = [a.text for a in grid.layout.annotations if a.xref == "x2"]
+    assert around == by_subscale
+    title = next(a.text for a in grid.layout.annotations if a.xref == "x2 domain")
+    assert title.startswith("Wave 1: |Spearman ρ| ≥ 0.3")
 
 
 def test_score_correlates_skip_own_subscales_and_put_strongest_first(result):

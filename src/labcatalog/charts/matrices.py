@@ -22,11 +22,13 @@ STRIP_ROOM = 0.95
 DOT_SPAN = 0.84
 COLORBAR_TICKS = [-1, -0.6, -0.2, 0.2, 0.6, 1]
 COLORBAR_LENGTH = 170
-# The matrices sit in half the page; heights are set for this width and a little under it.
-HALF_WIDTH = 460
+# Heights are set for a page about this wide, a little under the usual window, so nothing spills.
+PAGE_WIDTH = 960
 LABEL_CHAR = 5.8
 MIN_CELL, MAX_CELL = 18, 40
-CIRCLE_HEIGHT = 560
+# The matrix takes the left share of the width, the circle starts here.
+GRID_SHARE = 0.5
+CIRCLE_START = 0.56
 
 
 def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
@@ -71,8 +73,10 @@ def dot_grid(
     lower_name: str,
     upper_name: str,
     value_label: str,
+    skip: set[tuple[int, int]],
+    threshold: float,
 ) -> go.Figure:
-    # A corrplot: one wave below the diagonal and one above, dot diameter and colour following r.
+    # A corrplot (one wave below the diagonal, one above) with the lower wave's strong pairs as a circle beside it.
     size = len(labels)
     fig = go.Figure()
     xs, ys = [], []
@@ -181,32 +185,49 @@ def dot_grid(
         automargin=True,
     )
     fig.update_xaxes(
-        side="top", range=[low, size - 0.5], tickangle=-90, constrain="domain", **ticks
+        side="top",
+        range=[low, size - 0.5],
+        tickangle=-90,
+        constrain="domain",
+        domain=[0, GRID_SHARE],
+        **ticks,
     )
     fig.update_yaxes(
         range=[size - 0.5, low], scaleanchor="x", scaleratio=1, constrain="domain", **ticks
     )
-    fig.add_trace(
-        colorbar(value_label, x=1, xref="container", xanchor="right", y=-0.03, yanchor="top")
+    add_circle(
+        fig,
+        z,
+        labels,
+        groups or [""] * size,
+        group_order,
+        skip,
+        threshold,
+        value_label,
+        lower_name,
     )
+    fig.add_trace(colorbar(value_label, x=1, xanchor="right", y=-0.03, yanchor="top"))
     fig.update_layout(shapes=shapes)
     # Row and column labels are the same, so one length sets the room left of and above the cells.
     label_px = LABEL_CHAR * max(len(label) for label in labels)
     left = max(100, label_px + 12)
     units = size - low + 0.5
-    side = min(MAX_CELL * units, max(HALF_WIDTH - 20 - left, MIN_CELL * units))
-    bottom = max(80, 30 + 20 * len(set(groups or [])))
+    room = (PAGE_WIDTH - left - 20) * GRID_SHARE
+    side = min(MAX_CELL * units, max(room, MIN_CELL * units))
+    # A legend placed on the whole figure only reserves room below the plot, not beside it.
+    legend_rows = -(-len(set(groups or [])) // 3)
     return base_layout(
         fig,
-        int(side + label_px + 60 + bottom),
-        margin=dict(l=left, r=20, t=40, b=bottom),
+        int(side + label_px + 60 + 76 + 24 * legend_rows),
+        margin=dict(l=left, r=20, t=40, b=76),
         legend=dict(
-            orientation="v",
+            orientation="h",
             x=0.01,
             xref="container",
             xanchor="left",
-            y=-0.03,
-            yanchor="top",
+            y=0.01,
+            yref="container",
+            yanchor="bottom",
             bordercolor="#bbbbbb",
             borderwidth=1,
             font=dict(size=11),
@@ -236,6 +257,8 @@ def radial_label(fig, theta: float, radius: float, text: str) -> None:
     fig.add_annotation(
         x=float(np.cos(theta) * radius),
         y=float(np.sin(theta) * radius),
+        xref="x2",
+        yref="y2",
         text=text,
         showarrow=False,
         font=dict(size=10, color=LABEL_INK),
@@ -245,18 +268,18 @@ def radial_label(fig, theta: float, radius: float, text: str) -> None:
     )
 
 
-def score_circle(
-    r: list[list[float | None]],
+def add_circle(
+    fig: go.Figure,
+    z: np.ndarray,
     labels: list[str],
     groups: list[str],
     group_order: list[str],
     skip: set[tuple[int, int]],
     threshold: float,
-    title: str,
     value_label: str,
-) -> go.Figure:
-    # Only the strong pairs, as chords coloured by r; the dot grid beside it holds every pair.
-    z = as_matrix(r)
+    wave_name: str,
+) -> None:
+    # The pairs below the diagonal that pass the threshold, as chords coloured by r.
     k = len(labels)
     keep = [
         (i, j)
@@ -264,7 +287,7 @@ def score_circle(
         for j in range(i)
         if (j, i) not in skip and np.isfinite(z[i, j]) and abs(z[i, j]) >= threshold
     ]
-    fig = go.Figure()
+    on_circle = dict(xaxis="x2", yaxis="y2", showlegend=False)
     order = list(dict.fromkeys(groups))
     angles = ring_angles([groups.count(g) for g in order])
     xy = np.stack([np.cos(angles), np.sin(angles)], axis=1)
@@ -277,8 +300,8 @@ def score_circle(
                 y=np.sin(arc),
                 mode="lines",
                 line=dict(color=group_color(group_order.index(groups[i])), width=9),
-                showlegend=False,
                 hovertemplate=f"{label}<extra></extra>",
+                **on_circle,
             )
         )
         radial_label(fig, angles[i], 1.1, label)
@@ -291,28 +314,25 @@ def score_circle(
                 y=y,
                 mode="lines",
                 line=dict(color=scale_color(value, CORRELATION_SCALE, -1, 1), width=1.6),
-                showlegend=False,
-                hovertemplate=f"{labels[i]} × {labels[j]}<br>{value_label} = {value:.3f}<extra></extra>",
+                hovertemplate=f"{wave_name}<br>{labels[i]} × {labels[j]}<br>{value_label} = {value:.3f}<extra></extra>",
+                **on_circle,
             )
         )
-    fig.add_trace(colorbar(value_label, x=1, xanchor="right", y=1, yanchor="bottom"))
-    fig.update_layout(
-        title=dict(
-            text=f"{title}: |{value_label}| ≥ {threshold:g} ({len(keep)} of {k * (k - 1) // 2} pairs)",
-            x=0.01,
-            font=dict(size=12, color=TITLE_INK),
-        ),
-        showlegend=False,
-        xaxis=dict(visible=False, range=[-CIRCLE_SPAN, CIRCLE_SPAN], constrain="domain"),
-        yaxis=dict(
-            visible=False,
-            range=[-CIRCLE_SPAN, CIRCLE_SPAN],
-            scaleanchor="x",
-            scaleratio=1,
-            constrain="domain",
-        ),
+    fig.add_annotation(
+        x=0.5,
+        xref="x2 domain",
+        y=1,
+        yref="paper",
+        yanchor="bottom",
+        text=f"{wave_name}: |{value_label}| ≥ {threshold:g} ({len(keep)} of {k * (k - 1) // 2} pairs)",
+        showarrow=False,
+        font=dict(size=11, color=TITLE_INK),
     )
-    return base_layout(fig, CIRCLE_HEIGHT, margin=dict(l=20, r=20, t=70, b=20))
+    hidden = dict(visible=False, range=[-CIRCLE_SPAN, CIRCLE_SPAN], constrain="domain")
+    fig.update_layout(
+        xaxis2=dict(**hidden, domain=[CIRCLE_START, 1], anchor="y2"),
+        yaxis2=dict(**hidden, anchor="x2", scaleanchor="x2", scaleratio=1),
+    )
 
 
 def answer_grid(

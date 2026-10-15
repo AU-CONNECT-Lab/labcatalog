@@ -3,10 +3,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy.stats import gaussian_kde
 
-from labcatalog.charts.style import LOLLIPOP_COLORS, base_layout, natural_key, rgba
+from labcatalog.charts.style import LOLLIPOP_COLORS, TITLE_INK, base_layout, natural_key, rgba
 
 FIT_COLOR = "#d62728"
 INSET = dict(x0=0.50, x1=0.82, y0=0.03, y1=0.30)
+RETEST_PER_ROW = 2
 
 
 def regression(x_title: str, y_title: str, groups: list[dict]) -> go.Figure:
@@ -235,3 +236,97 @@ def standardized(rows: list[dict]) -> go.Figure:
     base_layout(fig, 400, margin=dict(t=40, b=60, l=60, r=60))
     fig.update_layout(hoverlabel=dict(bgcolor="rgb(40, 40, 40)", font=dict(size=10, color="white")))
     return fig
+
+
+def retest(panels: list[dict]) -> go.Figure:
+    # One panel per score: each person's earlier score against their later one, the identity line dashed.
+    cols = min(RETEST_PER_ROW, len(panels))
+    rows = -(-len(panels) // cols)
+    height = 90 + 270 * rows
+    fig = make_subplots(
+        rows=rows,
+        cols=cols,
+        subplot_titles=[p["title"] for p in panels],
+        horizontal_spacing=0.14,
+        vertical_spacing=80 / (height - 90) if rows > 1 else 0.0,
+    )
+    fig.update_annotations(font=dict(size=11, color=TITLE_INK))
+    shown = set()
+    rng = np.random.default_rng(0)
+    for k, panel in enumerate(panels):
+        row, col = k // cols + 1, k % cols + 1
+        low, high = panel["range"]
+        pad = (high - low) * 0.05 or 1.0
+        fig.add_trace(
+            go.Scatter(
+                x=[low, high],
+                y=[low, high],
+                mode="lines",
+                line=dict(color="#bbbbbb", width=1, dash="dash"),
+                hoverinfo="skip",
+                showlegend=False,
+            ),
+            row=row,
+            col=col,
+        )
+        # Scores take few values, so a little jitter keeps people from hiding behind each other.
+        spread = (high - low) * 0.015
+        for pair in panel["pairs"]:
+            x, y = np.asarray(pair["x"], dtype=float), np.asarray(pair["y"], dtype=float)
+            fig.add_trace(
+                go.Scatter(
+                    x=x + rng.uniform(-spread, spread, len(x)),
+                    y=y + rng.uniform(-spread, spread, len(y)),
+                    mode="markers",
+                    name=pair["name"],
+                    legendgroup=pair["name"],
+                    showlegend=pair["name"] not in shown,
+                    marker=dict(
+                        size=7,
+                        color=pair["color"],
+                        opacity=0.55,
+                        line=dict(width=0.5, color="white"),
+                    ),
+                    customdata=list(zip(pair["ids"], x, y, strict=True)),
+                    hovertemplate=f"<b>%{{customdata[0]}}</b> · {pair['name']}"
+                    "<br>earlier %{customdata[1]:.2f}, later %{customdata[2]:.2f}<extra></extra>",
+                ),
+                row=row,
+                col=col,
+            )
+            shown.add(pair["name"])
+        fig.add_annotation(
+            x=0.02,
+            xref=f"x{k + 1 if k else ''} domain",
+            y=0.98,
+            yref=f"y{k + 1 if k else ''} domain",
+            xanchor="left",
+            yanchor="top",
+            align="left",
+            showarrow=False,
+            text="<br>".join(
+                f"<span style='color:{p['color']}'>r = {p['r']:.2f} (n {p['n']})</span>"
+                for p in panel["pairs"]
+            ),
+            font=dict(size=10),
+            bgcolor="rgba(255,255,255,0.8)",
+        )
+        axis = dict(range=[low - pad, high + pad], gridcolor="#eeeeee", zeroline=False)
+        fig.update_xaxes(
+            title_text="Earlier wave" if row == rows else None, row=row, col=col, **axis
+        )
+        fig.update_yaxes(title_text="Later wave" if col == 1 else None, row=row, col=col, **axis)
+    fig.update_xaxes(title_font=dict(size=10), tickfont=dict(size=9))
+    fig.update_yaxes(title_font=dict(size=10), tickfont=dict(size=9))
+    return base_layout(
+        fig,
+        height,
+        margin=dict(l=60, r=20, t=70, b=50),
+        legend=dict(
+            orientation="h",
+            x=0,
+            y=1 + 40 / (height - 120),
+            yanchor="bottom",
+            font=dict(size=10),
+        ),
+    )

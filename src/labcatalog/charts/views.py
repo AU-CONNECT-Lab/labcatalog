@@ -14,7 +14,7 @@ from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
 from labcatalog.schema import Instrument, Score
-from labcatalog.stats import Correlation, ScoreSummary, wave_order
+from labcatalog.stats import Correlation, ScoreSummary, wave_order, waves_of_scores
 
 RADAR_AXES = 3
 # Room beyond 0% and 100% so dots at either end stay whole.
@@ -238,21 +238,27 @@ def item_total(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     series = []
     for s in scores:
         summary = summary_of(result, s.key)
-        alpha = f" (α {summary.alpha:.2f})" if summary.alpha is not None else ""
-        series.append(
-            {
-                "name": names[s.dataset] + alpha,
-                "color": series_color(result, s.dataset),
-                "values": {items[t.column]: t.r for t in summary.item_total},
-            }
-        )
+        points = {
+            items[t.column]: (t.r, t.alpha_if_deleted)
+            for t in summary.item_total
+            if t.r is not None and t.alpha_if_deleted is not None
+        }
+        if summary.alpha is not None and points:
+            series.append(
+                {
+                    "name": names[s.dataset],
+                    "color": series_color(result, s.dataset),
+                    "alpha": summary.alpha,
+                    "points": points,
+                }
+            )
     if not series:
         return None
-    members = [
-        {"id": i, "tick": i, "hover": f"{i}: {item_text(instrument, i)}"} for i in total.items
-    ]
-    title = f"{short_label(instrument, total)}: item-total correlation"
-    return plots.dot_rows([("", members)], series, "Corrected item-total r", title)
+    hovers = {i: f"{i}: {item_text(instrument, i)}" for i in total.items}
+    title = f"{short_label(instrument, total)}: items"
+    return plots.item_diagnostics(
+        list(total.items), hovers, series, defaults.CHART_ITEM_TOTAL_FLOOR, title
+    )
 
 
 def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
@@ -398,25 +404,8 @@ def item_grid(
         names_of[lower],
         names_of[upper],
         "Spearman ρ",
-    )
-
-
-def item_circle(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
-    instrument = result.project.instruments[instrument_id]
-    summary, where = item_matrix(result, instrument_id, dataset)
-    members = by_subscale(instrument, where)
-    if len(members) < 2:
-        return None
-    group_order, group_of = item_groups(instrument)
-    return matrices.score_circle(
-        [[summary.item_correlations[where[a]][where[b]] for b in members] for a in members],
-        members,
-        [group_of.get(m, "") for m in members],
-        group_order,
         set(),
         defaults.CHART_MIN_R,
-        item_waves(result, instrument_id)[dataset],
-        "Spearman ρ",
     )
 
 
@@ -461,37 +450,50 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
 
 
 def stability(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    rows = [r for r in result.summary.stability if r.instrument_id == instrument_id]
+    # The same people's scores one wave apart, linked by ID as the stability r is.
+    rows = [
+        r for r in result.summary.stability if r.instrument_id == instrument_id and r.r is not None
+    ]
     if not rows:
         return None
     instrument = result.project.instruments[instrument_id]
+    found = waves_of_scores(result.catalog, result.datasets, result.scores)
     reporters = list(dict.fromkeys(r.reporter for r in rows))
-    members = [
-        {
-            "id": (score.id, reporter),
-            "tick": score.label if len(reporters) == 1 else f"{score.label} ({reporter})",
-            "hover": f"{short_label(instrument, score)}, {reporter}",
-        }
-        for score in instrument.scores
-        for reporter in reporters
-        if any(r.score_id == score.id and r.reporter == reporter for r in rows)
-    ]
-    pairs = list(dict.fromkeys((r.study, r.from_wave, r.to_wave) for r in rows))
-    series = [
-        {
-            "name": f"{wave_name(result, study, a)} → {wave_name(result, study, b)}",
-            "color": wave_colors(result)[b],
-            "values": {
-                (r.score_id, r.reporter): r.r
-                for r in rows
-                if (r.study, r.from_wave, r.to_wave) == (study, a, b)
-            },
-        }
-        for study, a, b in pairs
-    ]
-    return plots.dot_rows(
-        [("", members)], series, "r with one wave earlier", "Stability across waves (same person)"
-    )
+    panels = []
+    for score in instrument.scores:
+        for reporter in reporters:
+            pairs = []
+            for r in rows:
+                if (r.score_id, r.reporter) != (score.id, reporter):
+                    continue
+                waves = found[(r.study, reporter, instrument_id, score.id)]
+                both = pd.concat(
+                    [waves[r.from_wave], waves[r.to_wave]], axis=1, join="inner"
+                ).dropna()
+                pairs.append(
+                    {
+                        "name": f"{wave_name(result, r.study, r.from_wave)} → "
+                        f"{wave_name(result, r.study, r.to_wave)}",
+                        "color": wave_colors(result)[r.to_wave],
+                        "x": both.iloc[:, 0].tolist(),
+                        "y": both.iloc[:, 1].tolist(),
+                        "ids": [str(i) for i in both.index],
+                        "r": r.r,
+                        "n": r.n,
+                    }
+                )
+            if pairs:
+                first = resolved(result, instrument_id, score.id)[0]
+                panels.append(
+                    {
+                        "title": score.label
+                        if len(reporters) == 1
+                        else f"{score.label} ({reporter})",
+                        "range": summary_of(result, first.key).possible_range,
+                        "pairs": pairs,
+                    }
+                )
+    return scatter.retest(panels)
 
 
 def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -> go.Figure | None:
@@ -747,24 +749,6 @@ def score_panel(
     }
 
 
-def score_circle(
-    result: CatalogResult, study: str, wave: str, instruments: list[str]
-) -> go.Figure | None:
-    p = score_panel(result, study, wave, instruments)
-    if p is None:
-        return None
-    return matrices.score_circle(
-        p["r"],
-        p["labels"],
-        p["groups"],
-        instrument_order(result),
-        p["skip"],
-        defaults.CHART_MIN_R,
-        p["title"],
-        "Pearson r",
-    )
-
-
 def network_colorings(result: CatalogResult) -> dict[str, str]:
     config = result.project.config
     facets = [n for n in facet_names(config) if n not in ("study", "wave")]
@@ -922,6 +906,18 @@ def score_grid(
                 if corr.r[i][j] is not None:
                     z[a, b] = corr.r[i][j]
                     n[a][b] = corr.n[i][j]
+    by_key = {s.key: s for s in result.catalog.scores}
+    corr, where = below
+    lower_scores = {m: by_key[corr.keys[i]] for m, i in where.items()}
+    skip = {
+        (a, b)
+        for a, ma in enumerate(members)
+        for b, mb in enumerate(members)
+        if a < b
+        and ma in lower_scores
+        and mb in lower_scores
+        and nested(result, lower_scores[ma], lower_scores[mb])
+    }
     return matrices.dot_grid(
         z,
         n,
@@ -932,6 +928,8 @@ def score_grid(
         wave_name(result, *lower),
         wave_name(result, *upper),
         "Pearson r",
+        skip,
+        defaults.CHART_MIN_R,
     )
 
 
