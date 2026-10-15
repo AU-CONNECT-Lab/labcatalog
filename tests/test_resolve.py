@@ -44,7 +44,11 @@ def test_overrides_change_one_wave_only(mock_project):
     )
     catalog = resolve_catalog(load_project(mock_project))
     texts = {v.column: v.text["default"] for v in catalog.variables if v.item_id == "ems_2"}
-    assert texts == {"ems_2_w1": "I felt sad.", "ems_2_w2": "I felt down."}
+    assert texts == {
+        "ems_2_w1": "I felt sad.",
+        "ems_2_w2": "I felt down.",
+        "ems_2_w3": "I felt sad.",
+    }
     assert "ems_6_w2" not in {v.column for v in catalog.variables}
     score = next(s for s in catalog.scores_for("child_w2") if s.score_id == "ems_total")
     assert score.unavailable_items == ["ems_6"]
