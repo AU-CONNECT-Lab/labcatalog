@@ -2,6 +2,7 @@ import plotly.graph_objects as go
 from nicegui import ui
 
 from labcatalog.charts import network, views
+from labcatalog.gui import theme
 from labcatalog.gui.common import heading, note, section
 from labcatalog.pipeline import CatalogResult
 
@@ -12,9 +13,9 @@ def show(fig: go.Figure | None, empty: str = "") -> None:
             note(empty)
         return
     height = (fig.layout.height or 400) + 8
-    ui.plotly({**fig.to_plotly_json(), "config": {"displayModeBar": False}}).classes(
-        "w-full"
-    ).style(f"height:{height}px")
+    ui.plotly(
+        {**theme.on_glass(fig.to_plotly_json()), "config": {"displayModeBar": False}}
+    ).classes("w-full").style(f"height:{height}px")
 
 
 def side_by_side(*panels: tuple[str, go.Figure | None]) -> None:
@@ -213,4 +214,6 @@ def score_relations(result: CatalogResult) -> None:
 def show_network(option: dict | None) -> None:
     if option is None:
         return
-    ui.echart(option).classes("w-full").style(f"height:{network.NETWORK_HEIGHT}px")
+    ui.echart(theme.echart_on_glass(option)).classes("w-full").style(
+        f"height:{network.NETWORK_HEIGHT}px"
+    )

@@ -12,11 +12,11 @@ def render(
     result: CatalogResult, on_instruments: Callable[[], None], on_problems: Callable[[], None]
 ) -> None:
     issues = result.report.issues
-    with ui.row().classes("gap-4"):
-        stat("Instruments", len(result.project.instruments), on_instruments)
-        stat("Datasets", len(result.project.config.datasets))
-        stat("Errors", sum(i.level == "error" for i in issues), on_problems)
-        stat("Warnings", sum(i.level == "warning" for i in issues), on_problems)
+    with ui.grid(columns=4).classes("w-full gap-1.5"):
+        tile("Instruments", len(result.project.instruments), "moss", on_instruments)
+        tile("Datasets", len(result.project.config.datasets), "wheat")
+        tile("Errors", sum(i.level == "error" for i in issues), "dusk", on_problems)
+        tile("Warnings", sum(i.level == "warning" for i in issues), "amber", on_problems)
 
     heading("Waves")
     table(*wave_table(result))
@@ -24,13 +24,15 @@ def render(
     charts.overview_section(result)
 
 
-def stat(label: str, value: int, on_click: Callable[[], None] | None = None) -> None:
-    card = ui.card().classes("min-w-32 px-4 py-2 gap-0")
+def tile(label: str, value: int, look: str, on_click: Callable[[], None] | None = None) -> None:
+    box = ui.element("div").classes(f"lc-tile lc-tile-{look}")
     if on_click is not None:
-        card.classes("cursor-pointer").on("click", on_click)
-    with card:
-        ui.label(str(value)).classes("text-2xl font-medium")
-        ui.label(label).classes("text-grey-7")
+        box.classes("cursor-pointer").on("click", on_click)
+    with box:
+        ui.label(label).classes("lc-tile-label")
+        if on_click is not None:
+            ui.icon("north_east").classes("lc-tile-arrow")
+        ui.label(str(value)).classes("lc-tile-value")
 
 
 def wave_table(result: CatalogResult) -> tuple[list[dict], list[dict]]:

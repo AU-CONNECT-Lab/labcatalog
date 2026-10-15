@@ -31,15 +31,15 @@ def keyed(rows: list[dict]) -> list[dict]:
 
 
 def section(text: str) -> None:
-    ui.label(text).classes("text-xl font-medium mt-10 pb-1 w-full border-b border-gray-300")
+    ui.label(text).classes("lc-section")
 
 
 def heading(text: str) -> None:
-    ui.label(text).classes("text-lg font-medium mt-6")
+    ui.label(text).classes("lc-heading")
 
 
 def note(text: str) -> None:
-    ui.label(text).classes("text-grey-7")
+    ui.label(text).classes("lc-note")
 
 
 def fmt(value: float | None, digits: int = 2) -> str:

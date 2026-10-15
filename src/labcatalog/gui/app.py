@@ -5,7 +5,7 @@ from nicegui import app, run, ui
 
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import datasets, instruments, overview, problems
+from labcatalog.gui import datasets, instruments, overview, problems, theme
 from labcatalog.gui.instruments import BrowseView
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.version import __version__
@@ -20,6 +20,7 @@ PAGES = (
 
 
 def launch(project: Path | None = None) -> None:
+    theme.install()
     ui.run(
         root=lambda: main_page(project),
         title=f"labcatalog {__version__}",
@@ -52,30 +53,30 @@ class Window:
         self.dataset: str | None = None
 
     def build(self) -> None:
-        ui.query("body").classes("bg-grey-1")
-        with ui.header().classes(
-            "items-center gap-4 px-4 py-2 bg-white text-grey-9 border-b border-gray-200"
-        ):
-            self.title = ui.label("No project open").classes("text-lg font-medium")
+        with ui.header().classes("lc-header items-center gap-4 px-5 py-3"):
+            self.title = ui.label("No project open").classes("lc-project")
             with self.title:
                 self.path_tip = ui.tooltip("")
-            self.as_of = ui.label().classes("text-grey-7")
+            self.as_of = ui.label().classes("lc-as-of")
             ui.space()
-            self.spinner = ui.spinner(size="sm")
+            self.spinner = ui.spinner(size="sm", color="white")
             self.spinner.visible = False
+            self.refresh_button = (
+                ui.button("Refresh", icon="refresh", on_click=lambda: self.load(self.root))
+                .props("flat")
+                .classes("lc-glass-btn")
+            )
+            self.refresh_button.disable()
             self.open_button = ui.button(
                 "Open project", icon="folder_open", on_click=self.choose_folder
-            ).props("flat no-caps")
-            self.refresh_button = ui.button(
-                "Refresh", icon="refresh", on_click=lambda: self.load(self.root)
-            ).props("flat no-caps")
-            self.refresh_button.disable()
+            )
 
-        with ui.left_drawer(value=True, fixed=True).props("width=190 bordered").classes("p-0"):
+        with ui.left_drawer(value=True, fixed=True).props("width=220").classes("p-0"):
+            ui.label("labcatalog").classes("lc-wordmark")
             with (
                 ui.tabs(value="overview")
                 .props("vertical inline-label no-caps")
-                .classes("w-full") as tabs
+                .classes("lc-nav w-full") as tabs
             ):
                 nav = {
                     name: ui.tab(name, label=label, icon=icon).props(
@@ -88,7 +89,7 @@ class Window:
                     self.badge.visible = False
         self.tabs = tabs
 
-        with ui.tab_panels(tabs, value="overview").classes("w-full bg-transparent"):
+        with ui.tab_panels(tabs, value="overview").classes("lc-sheet w-full"):
             with ui.tab_panel("overview"):
                 self.overview_panel()
             with ui.tab_panel("instruments"):
@@ -133,7 +134,7 @@ class Window:
         self.index = build_index(result.project) if result.project else None
         issues = result.report.issues
         self.badge.set_text(str(len(issues)))
-        self.badge.props(f"color={'negative' if result.report.has_errors() else 'orange-8'}")
+        self.badge.props(f"color={'negative' if result.report.has_errors() else 'primary'}")
         self.badge.visible = bool(issues)
         if result.project is None:
             self.tabs.set_value("problems")
@@ -176,16 +177,16 @@ class Window:
     @ui.refreshable_method
     def problems_panel(self) -> None:
         if self.result is None:
-            ui.label("Open a project folder to check it.").classes("text-grey-7")
+            ui.label("Open a project folder to check it.").classes("lc-note")
         else:
             problems.render(self.result.report.issues, self.root)
 
     def has_catalog(self) -> bool:
         if self.result is None:
-            ui.label("Open a project folder to see its catalog.").classes("text-grey-7")
+            ui.label("Open a project folder to see its catalog.").classes("lc-note")
         elif self.result.project is None:
             ui.label("The project files have errors. Fix them, then press Refresh.").classes(
-                "text-grey-7"
+                "lc-note"
             )
         return self.result is not None and self.result.project is not None
 
