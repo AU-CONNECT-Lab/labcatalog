@@ -30,6 +30,10 @@ def keyed(rows: list[dict]) -> list[dict]:
     return [{ROW_KEY: i, **row} for i, row in enumerate(rows)]
 
 
+def section(text: str) -> None:
+    ui.label(text).classes("text-xl font-medium mt-10 pb-1 w-full border-b border-gray-300")
+
+
 def heading(text: str) -> None:
     ui.label(text).classes("text-lg font-medium mt-6")
 

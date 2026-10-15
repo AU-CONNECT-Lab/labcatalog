@@ -366,7 +366,10 @@ def item_grid(
 ) -> go.Figure | None:
     # Items sit together by subscale; one wave below the diagonal and one above.
     instrument = result.project.instruments[instrument_id]
-    below, above = item_matrix(result, instrument_id, lower), item_matrix(result, instrument_id, upper)
+    below, above = (
+        item_matrix(result, instrument_id, lower),
+        item_matrix(result, instrument_id, upper),
+    )
     members = by_subscale(instrument, set(below[1]) | set(above[1]))
     if len(members) < 2:
         return None

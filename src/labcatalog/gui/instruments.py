@@ -8,7 +8,17 @@ from nicegui import app, ui
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.gui import charts
-from labcatalog.gui.common import as_text, col, fmt, heading, note, open_path, table, unique
+from labcatalog.gui.common import (
+    as_text,
+    col,
+    fmt,
+    heading,
+    note,
+    open_path,
+    section,
+    table,
+    unique,
+)
 from labcatalog.pipeline import CatalogResult
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
@@ -174,26 +184,43 @@ def detail(result: CatalogResult, instrument: Instrument, preferred: list[str]) 
             heading("Missing codes")
             table(*missing_code_table(result, instrument)).classes(remove="w-full")
 
-    if instrument.kind == "demographics":
-        heading("Sample by wave")
-        table(*sample_table(result, instrument))
-
     charts.instrument_section(result, instrument.id)
 
     datasets = administered_in(result, instrument.id)
     if not datasets:
         return
-    heading("Statistics")
     first = next((d for d in preferred if d in datasets), datasets[0])
 
+    # One switch drives the charts, tables and code of the chosen dataset further down.
     @ui.refreshable
-    def statistics(dataset: str) -> None:
+    def dataset_charts(dataset: str) -> None:
+        charts.instrument_dataset_section(result, instrument.id, dataset)
+
+    @ui.refreshable
+    def dataset_tables(dataset: str) -> None:
         dataset_statistics(result, instrument, dataset)
 
-    ui.toggle(datasets, value=first, on_change=lambda e: statistics.refresh(e.value)).props(
+    @ui.refreshable
+    def dataset_code(dataset: str) -> None:
+        scoring_code(result, instrument, dataset)
+
+    def pick(dataset: str) -> None:
+        dataset_charts.refresh(dataset)
+        dataset_tables.refresh(dataset)
+        dataset_code.refresh(dataset)
+
+    section("By dataset")
+    ui.toggle(datasets, value=first, on_change=lambda e: pick(e.value)).props(
         "dense no-caps"
-    )
-    statistics(first)
+    ).classes("mt-4")
+    dataset_charts(first)
+
+    section("Tables")
+    if instrument.kind == "demographics":
+        heading("Sample by wave")
+        table(*sample_table(result, instrument))
+    dataset_tables(first)
+    dataset_code(first)
 
 
 def about(result: CatalogResult, instrument: Instrument) -> None:
@@ -316,24 +343,28 @@ def missing_code_table(
     return columns, rows
 
 
-def dataset_statistics(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
+def score_summaries(result: CatalogResult, instrument: Instrument, dataset: str) -> list:
     scores = {s.key: s for s in result.catalog.scores}
-    summaries = [
+    return [
         s
         for s in result.summary.scores
         if s.dataset == dataset and scores[s.key].instrument_id == instrument.id
     ]
+
+
+def dataset_statistics(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
+    scores = {s.key: s for s in result.catalog.scores}
+    summaries = score_summaries(result, instrument, dataset)
     if summaries:
-        heading("Scores")
+        heading(f"Scores in {dataset}")
         table(*score_table(result, summaries))
-    heading("Items")
+    heading(f"Items in {dataset}")
     table(*variable_table(result, instrument, dataset))
-    charts.instrument_dataset_section(result, instrument.id, dataset)
     items = item_ids(result, dataset)
     for summary in summaries:
         score = scores[summary.key]
         if summary.item_total:
-            heading(f"{score.label}: item-total correlations (α {fmt(summary.alpha)})")
+            heading(f"{score.label}: item-total correlations in {dataset} (α {fmt(summary.alpha)})")
             table(
                 [
                     col("column", "Variable"),
@@ -351,7 +382,15 @@ def dataset_statistics(result: CatalogResult, instrument: Instrument, dataset: s
                     for t in summary.item_total
                 ],
             ).classes(remove="w-full")
-        heading(f"{score.label}: scoring code")
+
+
+def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
+    scores = {s.key: s for s in result.catalog.scores}
+    summaries = score_summaries(result, instrument, dataset)
+    if summaries:
+        section("Scoring code")
+    for summary in summaries:
+        heading(f"{scores[summary.key].label}: scoring code for {dataset}")
         snippets = result.snippets[summary.key]
         with ui.tabs().props("dense no-caps align=left") as tabs:
             ui.tab("r", label="R")

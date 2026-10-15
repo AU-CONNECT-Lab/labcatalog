@@ -2,7 +2,7 @@ import plotly.graph_objects as go
 from nicegui import ui
 
 from labcatalog.charts import network, views
-from labcatalog.gui.common import heading, note
+from labcatalog.gui.common import heading, note, section
 from labcatalog.pipeline import CatalogResult
 
 NO_SHARED_WAVE = (
@@ -21,43 +21,68 @@ def show(fig: go.Figure | None, empty: str = "") -> None:
     ).style(f"height:{height}px")
 
 
+def side_by_side(*panels: tuple[str, go.Figure | None]) -> None:
+    # Panels share the row equally; a missing figure leaves the row to the others.
+    shown = [(title, fig) for title, fig in panels if fig is not None]
+    if not shown:
+        return
+    with ui.row().classes("w-full gap-4 no-wrap items-start"):
+        for title, fig in shown:
+            with ui.column().classes("flex-1 min-w-0 gap-0"):
+                if title:
+                    heading(title)
+                show(fig)
+
+
+def half() -> ui.column:
+    return ui.column().classes("flex-1 min-w-0 gap-0")
+
+
 def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     if not views.instrument_datasets(result, instrument_id):
         return
-    heading("Across waves")
-    with ui.row().classes("w-full gap-4 no-wrap items-start"):
-        with ui.column().classes("w-1/2"):
-            show(views.score_boxes(result, instrument_id))
-        with ui.column().classes("w-1/2"):
-            show(views.score_distribution(result, instrument_id))
+    section("Across waves")
+    side_by_side(
+        ("", views.score_boxes(result, instrument_id)),
+        ("", views.score_distribution(result, instrument_id)),
+    )
     for fig in views.item_responses(result, instrument_id):
         show(fig)
-    with ui.row().classes("w-full gap-4 no-wrap items-start"):
-        with ui.column().classes("w-1/2"):
-            show(views.item_total(result, instrument_id))
-        with ui.column().classes("w-1/2"):
-            show(views.item_profile(result, instrument_id))
-    means = views.score_means(result, instrument_id)
-    if means is not None:
-        heading("Scores across waves")
-        show(means)
-    stability = views.stability(result, instrument_id)
-    if stability is not None:
-        heading("Stability across waves")
-        show(stability)
+    side_by_side(
+        ("", views.item_total(result, instrument_id)),
+        ("", views.item_profile(result, instrument_id)),
+    )
+    side_by_side(
+        ("Scores across waves", views.score_means(result, instrument_id)),
+        ("Stability across waves", views.stability(result, instrument_id)),
+    )
     profiles = views.wave_profiles(result, instrument_id)
     if profiles is not None:
         heading("Each wave against the others")
         show(profiles)
-    subscales = views.subscale_radars(result, instrument_id)
-    if subscales is not None:
-        heading("Subscales")
-        show(subscales)
+    subscales(result, instrument_id)
     waves = views.item_waves(result, instrument_id)
     if waves:
         heading("Item correlations")
-        triangles(waves, lambda lower, upper: views.item_grid(result, instrument_id, lower, upper))
+        triangles(
+            waves,
+            lambda lower, upper: side_by_side(
+                ("", views.item_grid(result, instrument_id, lower, upper)),
+                ("", views.item_circle(result, instrument_id, lower)),
+            ),
+        )
     other_scores(result, instrument_id)
+
+
+def subscales(result: CatalogResult, instrument_id: str) -> None:
+    radars = views.subscale_radars(result, instrument_id)
+    short = views.short_subscales(result, instrument_id)
+    if radars is None and not short:
+        return
+    heading("Subscales")
+    show(radars)
+    if short:
+        note(f"No radar for {', '.join(short)}: a radar needs at least three items.")
 
 
 def other_scores(result: CatalogResult, instrument_id: str) -> None:
@@ -85,19 +110,22 @@ def other_scores(result: CatalogResult, instrument_id: str) -> None:
         scatter.refresh()
 
     heading("Against other scores")
-    if len(own) > 1:
-        ui.select(own, value=first, label="Score", on_change=lambda e: choose("x", e.value)).props(
-            "dense outlined"
-        ).classes("w-72")
-    correlates()
-    ui.select(
-        views.score_choices(result),
-        value=picked["y"],
-        label="Against",
-        with_input=True,
-        on_change=lambda e: choose("y", e.value),
-    ).props("dense outlined").classes("w-72 mt-4")
-    scatter()
+    with ui.row().classes("w-full gap-4 no-wrap items-start"):
+        with half():
+            if len(own) > 1:
+                ui.select(
+                    own, value=first, label="Score", on_change=lambda e: choose("x", e.value)
+                ).props("dense outlined").classes("w-72")
+            correlates()
+        with half():
+            ui.select(
+                views.score_choices(result),
+                value=picked["y"],
+                label="Against",
+                with_input=True,
+                on_change=lambda e: choose("y", e.value),
+            ).props("dense outlined").classes("w-72")
+            scatter()
 
 
 def instrument_dataset_section(result: CatalogResult, instrument_id: str, dataset: str) -> None:
@@ -133,25 +161,11 @@ def overview_section(result: CatalogResult) -> None:
     if pace is not None:
         heading("Collection pace")
         show(pace)
-    score_levels(result)
+    levels = views.score_levels(result)
+    if levels is not None:
+        heading("Scores in each wave")
+        show(levels)
     score_relations(result)
-
-
-def score_levels(result: CatalogResult) -> None:
-    waves = views.level_waves(result)
-    if not waves:
-        return
-    choices = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
-
-    @ui.refreshable
-    def bars(choice: str) -> None:
-        show(views.score_levels(result, *choice.split("|")))
-
-    heading("Scores in each wave")
-    ui.toggle(choices, value=next(iter(choices)), on_change=lambda e: bars.refresh(e.value)).props(
-        "dense no-caps"
-    )
-    bars(next(iter(choices)))
 
 
 def first_two(choices: dict[str, str]) -> tuple[str, str]:
@@ -169,13 +183,13 @@ def wave_pickers(choices: dict[str, str], picked: dict, changed) -> None:
         ).props("dense outlined").classes("w-56")
 
 
-def triangles(choices: dict[str, str], build) -> None:
+def triangles(choices: dict[str, str], render) -> None:
     lower, upper = first_two(choices)
     picked = {"lower": lower, "upper": upper}
 
     @ui.refreshable
     def grid() -> None:
-        show(build(picked["lower"], picked["upper"]))
+        render(picked["lower"], picked["upper"])
 
     def changed(key: str, value: str) -> None:
         picked[key] = value
@@ -202,20 +216,18 @@ def score_relations(result: CatalogResult) -> None:
 
     @ui.refreshable
     def grid() -> None:
-        show(
-            views.score_grid(
-                result,
-                picked["instruments"],
-                tuple(picked["lower"].split("|")),
-                tuple(picked["upper"].split("|")),
-            ),
-            "Pick instruments with at least two scores.",
-        )
-
-    @ui.refreshable
-    def circle() -> None:
         study, wave = picked["lower"].split("|")
-        show(views.score_circle(result, study, wave, picked["instruments"]))
+        dots = views.score_grid(
+            result,
+            picked["instruments"],
+            (study, wave),
+            tuple(picked["upper"].split("|")),
+        )
+        if dots is None:
+            note("Pick instruments with at least two scores.")
+        side_by_side(
+            ("", dots), ("", views.score_circle(result, study, wave, picked["instruments"]))
+        )
 
     @ui.refreshable
     def graph() -> None:
@@ -229,7 +241,6 @@ def score_relations(result: CatalogResult) -> None:
         if key == "instruments":
             chooser.props(f'display-value="{shown()}"')
         grid.refresh()
-        circle.refresh()
         graph.refresh()
 
     def recolor(value: str) -> None:
@@ -254,7 +265,6 @@ def score_relations(result: CatalogResult) -> None:
         )
         wave_pickers(choices, picked, changed)
     grid()
-    circle()
     ui.select(
         views.network_colorings(result),
         value=picked["color"],
