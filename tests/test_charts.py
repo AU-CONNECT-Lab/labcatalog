@@ -20,24 +20,34 @@ def test_instrument_charts(result):
     assert views.score_boxes(result, "example_screen_time") is None
 
 
-def test_subscale_radars_draw_each_subscale_with_three_items(result):
+def test_subscale_radars_show_the_subscales_then_each_subscale(result):
     def titles(instrument_id):
         fig = views.subscale_radars(result, instrument_id)
         return None if fig is None else [a.text for a in fig.layout.annotations]
 
-    assert titles("example_parent_stress") == ["Strain"]
-    assert views.radar_note(result, "example_parent_stress").startswith(
-        "No radar for Child-related"
-    )
-    radar = views.subscale_radars(result, "example_parent_stress")
-    assert [trace.name for trace in radar.data] == ["Wave 1", "Wave 2", "Wave 3"]
-    assert list(radar.data[0].theta) == ["eps_1", "eps_3", "eps_5", "eps_1"]
-    # No subscale has three items, so all the items share one radar.
-    assert titles("example_mood") == ["All items"]
-    assert views.radar_note(result, "example_mood").startswith(
-        "Sadness, Worry and fatigue, Low positive affect: too few items"
-    )
-    assert titles("example_child_sleep") == ["All items"]
+    subscales = ["Sadness", "Worry and fatigue", "Low positive affect"]
+    assert titles("example_mood") == ["Subscales", *subscales]
+    assert views.radar_note(result, "example_mood") == ""
+    first = views.subscale_radars(result, "example_mood").data[0]
+    assert first.name == "Wave 1"
+    assert list(first.theta) == [*subscales, subscales[0]]
+    # A sum score per item, so it sits on the same 0 to 3 scale as the item radars.
+    sadness = views.summary_of(result, "example_mood.ems_sadness@child_w1")
+    assert first.r[0] == pytest.approx(sadness.mean / 3)
+    # Two subscales are too few axes for the subscale radar.
+    assert titles("example_parent_stress") == ["Strain", "Child-related"]
+    stress = views.subscale_radars(result, "example_parent_stress")
+    assert list(stress.data[0].theta) == ["eps_1", "eps_3", "eps_5", "eps_1"]
+
+
+def test_subscales_under_three_items_get_no_radar(mock_project):
+    path = mock_project / "instruments" / "example_child_sleep.yaml"
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.replace("items: [ecs_1, ecs_2, ecs_5]", "items: [ecs_1, ecs_2]"), "utf-8")
+    result = run_catalog(mock_project)
+    fig = views.subscale_radars(result, "example_child_sleep")
+    assert [a.text for a in fig.layout.annotations] == ["Waking"]
+    assert views.radar_note(result, "example_child_sleep").startswith("No radar for Settling")
 
 
 def test_small_multiples(result):
@@ -123,7 +133,7 @@ def test_dot_grid_shows_one_wave_both_sides_of_the_diagonal(result):
 def test_item_grid_groups_items_by_subscale(result):
     first = next(iter(views.item_waves(result, "example_mood")))
     grid = views.item_grid(result, "example_mood", first)
-    by_subscale = ["ems_2", "ems_6", "ems_3", "ems_5", "ems_1", "ems_4"]
+    by_subscale = ["ems_2", "ems_6", "ems_7", "ems_3", "ems_5", "ems_8", "ems_1", "ems_4", "ems_9"]
     assert list(grid.layout.xaxis.ticktext) == by_subscale
     around = [a.text for a in grid.layout.annotations if a.xref == "x2"]
     assert around == by_subscale
@@ -156,9 +166,17 @@ def test_pair_scatter_plots_the_people_of_the_sample(result):
         y,
         "example_child_sleep.ecs_total@parent_w1",
     ]
-    fig = views.pair_scatter(result, sample, x, y)
+    fig = views.pair_scatter(result, sample, [x], y)
     both = analysis.table(result, sample, [x, y]).dropna()
     assert len(fig.data[0].x) == len(both)
+    # Each X is its own group against the same Y, with the people who have both.
+    sleep = "example_child_sleep.ecs_total@parent_w1"
+    points = [
+        t for t in views.pair_scatter(result, sample, [x, sleep], y).data if t.mode == "markers"
+    ]
+    assert [t.name.split(" (N=")[0] for t in points] == [choices[x], choices[sleep]]
+    assert points[0].marker.color != points[1].marker.color
+    assert len(points[1].x) == len(analysis.table(result, sample, [sleep, y]).dropna())
 
 
 def test_answer_grid_shows_one_instrument(result):

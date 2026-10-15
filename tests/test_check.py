@@ -41,7 +41,7 @@ def test_columns_missing_from_data_and_undescribed_columns(mock_project):
     frame["notes"] = "x"
     frame.to_csv(path, index=False)
     issues = {i.code: i for i in run_check(mock_project).issues}
-    assert issues["column_missing"].location == "maps/child_w2.csv:12"
+    assert issues["column_missing"].location == "maps/child_w2.csv:15"
     assert issues["column_unmapped"].level == "warning"
     assert "notes" in issues["column_unmapped"].message
 

@@ -34,13 +34,13 @@ def test_variable_counts_add_up(mock_project):
 def test_score_summary_of_the_example(mock_project):
     summary = summary_for(mock_project)
     ems = next(s for s in summary.scores if s.key == "example_mood.ems_total@child_w1")
-    assert ems.n_valid == 136
-    assert round(ems.mean, 2) == 5.51
-    assert round(ems.alpha, 2) == 0.86
-    assert ems.possible_range == (0, 18)
-    assert sum(count for _, _, count in ems.histogram) == 136
-    assert len(ems.item_total) == 6
-    assert len(ems.item_correlations) == 6 and ems.item_correlations[0][0] == 1.0
+    assert ems.n_valid == 139
+    assert round(ems.mean, 2) == 8.39
+    assert round(ems.alpha, 2) == 0.90
+    assert ems.possible_range == (0, 27)
+    assert sum(count for _, _, count in ems.histogram) == 139
+    assert len(ems.item_total) == 9
+    assert len(ems.item_correlations) == 9 and ems.item_correlations[0][0] == 1.0
     assert all(r > 0 for row in ems.item_correlations for r in row)
 
 
