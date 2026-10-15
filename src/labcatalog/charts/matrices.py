@@ -220,7 +220,7 @@ def finish_grid(fig: go.Figure, shapes: list, notes: list, height: int, title: s
 
 
 def item_correlations(panels: list[dict], value_label: str) -> go.Figure:
-    fig, _, cols, height = matrix_grid([p["title"] for p in panels], 340)
+    fig, _, cols, height = matrix_grid([p["title"] for p in panels], 300)
     shapes, notes = [], []
     for k, panel in enumerate(panels):
         found = dot_matrix(
@@ -241,7 +241,7 @@ def score_matrices(
     panels: list[dict], group_order: list[str], group_labels: dict[str, str]
 ) -> go.Figure:
     # Scores sit together by instrument; a colour strip on each side names the block.
-    fig, _, cols, height = matrix_grid([p["title"] for p in panels], 380)
+    fig, _, cols, height = matrix_grid([p["title"] for p in panels], 330)
     shapes, notes = [], []
     for k, panel in enumerate(panels):
         found = dot_matrix(
@@ -304,7 +304,6 @@ def score_circle(
     group_labels: dict[str, str],
     skip: set[tuple[int, int]],
     threshold: float,
-    title: str,
 ) -> go.Figure:
     # The matrix is the record (every pair); the circle shows which pairs are strong.
     z = as_matrix(r)
@@ -373,7 +372,6 @@ def score_circle(
     height = 720
     fig.add_trace(colorbar("Pearson r", height - 150))
     fig.update_layout(
-        title=dict(text=title, x=0.01, xanchor="left", y=0.975, font=dict(size=14)),
         showlegend=False,
         xaxis2=dict(visible=False, range=[-CIRCLE_SPAN, CIRCLE_SPAN], constrain="domain"),
         yaxis2=dict(

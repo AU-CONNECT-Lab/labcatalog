@@ -597,7 +597,6 @@ def score_circle(
     p = score_panel(result, study, wave, instruments)
     if p is None:
         return None
-    title = f"Scores against each other, {p['title']}"
     return matrices.score_circle(
         p["r"],
         p["n"],
@@ -607,7 +606,6 @@ def score_circle(
         instrument_labels(result),
         p["skip"],
         defaults.CHART_MIN_R,
-        title,
     )
 
 
