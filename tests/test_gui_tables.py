@@ -76,3 +76,20 @@ def test_dataset_page_lists_each_file_with_the_study_citation(mock_project):
         "example_child_sleep",
         "example_demographics",
     }
+
+
+def test_sample_table_reads_like_a_table_one(mock_project):
+    result = run_catalog(mock_project)
+    columns, rows = instruments.sample_table(
+        result, result.project.instruments["example_demographics"]
+    )
+    assert [c["label"] for c in columns[2:]] == ["parent_w1", "parent_w2", "parent_w3"]
+    by_label = {(r["item"] or "", r["value"]): r for r in rows}
+    age = "How old is your child (in years)?"
+    assert by_label[(age, "n")]["d1"] == 127
+    assert [r["value"] for r in rows[1:4]] == ["Mean (SD)", "Median", "Range"]
+    girls = by_label[("", "Girl")]["d1"]
+    assert girls.endswith("%)") and int(girls.split()[0]) > 0
+    comment = "Is there anything else about your family's situation you would like us to know?"
+    assert by_label[(comment, "Answered")]["d0"] > 0
+    assert rows[-1]["value"] == "Answered"

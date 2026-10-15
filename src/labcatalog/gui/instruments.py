@@ -13,6 +13,7 @@ from labcatalog.pipeline import CatalogResult
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument, Reference, Text
+from labcatalog.stats import VariableSummary
 
 PAGE_SIZE = 50
 
@@ -173,6 +174,10 @@ def detail(result: CatalogResult, instrument: Instrument, preferred: list[str]) 
             heading("Missing codes")
             table(*missing_code_table(result, instrument)).classes(remove="w-full")
 
+    if instrument.kind == "demographics":
+        heading("Sample by wave")
+        table(*sample_table(result, instrument))
+
     charts.instrument_section(result, instrument.id)
 
     datasets = administered_in(result, instrument.id)
@@ -280,7 +285,9 @@ def item_table(result: CatalogResult, instrument: Instrument) -> tuple[list[dict
             "item": item.id,
             "text": text_of(item.text),
             "reverse": "yes" if item.reverse else "",
-            "options": item.response_set or instrument.default_response_set or "",
+            "options": (item.response_set or instrument.default_response_set or "")
+            if item.type == "choice"
+            else item.type,
             **{
                 f"d{i}": columns_by_item.get((item.id, name), "") for i, name in enumerate(datasets)
             },
@@ -419,9 +426,57 @@ def variable_table(
             "n_unexpected": v.n_unexpected or "",
             "mean": fmt(v.mean),
             "sd": fmt(v.sd),
-            "responses": ", ".join(f"{value}: {n}" for value, n in v.value_counts.items()),
+            "responses": responses_text(v),
         }
         for v in result.summary.variables
         if v.dataset == dataset and v.column in columns_here
     ]
     return columns, rows
+
+
+def responses_text(summary: VariableSummary) -> str:
+    if summary.median is not None:
+        return f"median {summary.median:g}, range {summary.minimum:g} to {summary.maximum:g}"
+    return ", ".join(f"{value}: {n}" for value, n in summary.value_counts.items())
+
+
+def sample_table(result: CatalogResult, instrument: Instrument) -> tuple[list[dict], list[dict]]:
+    datasets = administered_in(result, instrument.id)
+    columns_by_item = {
+        (v.item_id, v.dataset): v.column
+        for v in result.catalog.variables
+        if v.instrument_id == instrument.id
+    }
+    summaries = {(v.dataset, v.column): v for v in result.summary.variables}
+    sets = {response_set.id: response_set for response_set in instrument.response_sets}
+    columns = [
+        col("item", "Item", sortable=False),
+        col("value", "", sortable=False),
+        *[col(f"d{i}", name, numeric=True, sortable=False) for i, name in enumerate(datasets)],
+    ]
+    rows = []
+    for item in instrument.items:
+        cells: list[tuple[str, Callable[[VariableSummary], str | int]]] = [
+            ("Answered" if item.type == "text" else "n", lambda s: s.n_valid)
+        ]
+        if item.type == "choice":
+            options = sets[item.response_set or instrument.default_response_set].options
+            cells += [(o.label, lambda s, v=str(o.value): share(s, v)) for o in options]
+        elif item.type == "number":
+            cells += [
+                ("Mean (SD)", lambda s: f"{fmt(s.mean, 1)} ({fmt(s.sd, 1)})"),
+                ("Median", lambda s: fmt(s.median, 1)),
+                ("Range", lambda s: f"{fmt(s.minimum, 1)} to {fmt(s.maximum, 1)}"),
+            ]
+        for n, (label, cell) in enumerate(cells):
+            row = {"item": text_of(item.text) if n == 0 else "", "value": label}
+            for i, name in enumerate(datasets):
+                column = columns_by_item.get((item.id, name))
+                row[f"d{i}"] = cell(summaries[(name, column)]) if column else ""
+            rows.append(row)
+    return columns, rows
+
+
+def share(summary: VariableSummary, value: str) -> str:
+    n = summary.value_counts.get(value, 0)
+    return f"{n} ({n / summary.n_valid:.0%})" if summary.n_valid else str(n)
