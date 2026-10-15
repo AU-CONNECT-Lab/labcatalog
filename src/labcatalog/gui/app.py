@@ -150,7 +150,7 @@ class Window:
         self.instruments_panel.refresh()
         self.tabs.set_value("instruments")
 
-    def show_dataset(self, dataset: str) -> None:
+    def show_dataset(self, dataset: str | None) -> None:
         self.dataset = dataset
         self.datasets_panel.refresh()
 
@@ -171,7 +171,7 @@ class Window:
     @ui.refreshable_method
     def datasets_panel(self) -> None:
         if self.has_catalog():
-            datasets.render(self.result, self.dataset, self.show_dataset)
+            datasets.render(self.result, self.dataset, self.show_dataset, self.open_instrument)
 
     @ui.refreshable_method
     def problems_panel(self) -> None:

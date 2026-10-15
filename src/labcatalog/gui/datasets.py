@@ -12,25 +12,99 @@ from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import DatasetSummary
 
 
-def render(result: CatalogResult, selected: str | None, on_select: Callable[[str], None]) -> None:
+def render(
+    result: CatalogResult,
+    selected: str | None,
+    on_select: Callable[[str | None], None],
+    on_instrument: Callable[[str], None],
+) -> None:
     summaries = {d.dataset: d for d in result.summary.datasets}
     if not summaries:
         note(f"No datasets yet; add them under datasets in {defaults.CONFIG_FILENAME}.")
         return
-    selected = selected if selected in summaries else next(iter(summaries))
-    # Spelling out study, wave, reporter and modality lets typing in the box filter by them.
-    ui.select(
-        {name: dataset_label(result, name) for name in summaries},
-        value=selected,
-        with_input=True,
-        on_change=lambda e: on_select(e.value),
-    ).props("dense outlined").classes("w-[36rem]")
-    summary = summaries[selected]
+    if selected not in summaries:
+        studies(result, summaries, on_select)
+        return
+    ui.button("All datasets", icon="arrow_back", on_click=lambda: on_select(None)).props(
+        "flat dense no-caps"
+    )
+    detail(result, summaries[selected], on_instrument)
 
+
+def studies(
+    result: CatalogResult,
+    summaries: dict[str, DatasetSummary],
+    on_select: Callable[[str | None], None],
+) -> None:
+    config = result.project.config
+    for study, study_config in config.studies.items():
+        names = [d.name for d in config.datasets if d.study == study and d.name in summaries]
+        if not names:
+            continue
+        with ui.card().props("flat bordered").classes("w-full mb-4 gap-1"):
+            ui.label(study_config.label or study).classes("text-xl font-medium")
+            if study_config.description:
+                ui.label(study_config.description)
+            if study_config.citation or study_config.doi:
+                with ui.row().classes("items-baseline gap-2"):
+                    ui.label("How to cite").classes("text-grey-7")
+                    if study_config.citation:
+                        ui.label(study_config.citation)
+                    if study_config.doi:
+                        ui.link(
+                            f"doi:{study_config.doi}",
+                            f"https://doi.org/{study_config.doi}",
+                            new_tab=True,
+                        )
+            shown = table(*dataset_table(result, [summaries[n] for n in names])).classes("mt-2")
+            shown.classes("cursor-pointer")
+            shown.on("rowClick", lambda e: on_select(e.args[1]["name"]))
+
+
+def dataset_table(
+    result: CatalogResult, summaries: list[DatasetSummary]
+) -> tuple[list[dict], list[dict]]:
+    config = result.project.config
+    columns = [
+        col("name", "Dataset"),
+        col("wave", "Wave"),
+        col("reporter", "Reporter"),
+        col("modality", "Modality"),
+        col("n_rows", "Rows", numeric=True),
+        col("n_ids", "IDs", numeric=True),
+        col("collected", "Collected", sortable=False),
+        col("snapshot", "Data as of"),
+    ]
+    rows = []
+    for summary in summaries:
+        dataset = dataset_by_name(config, summary.dataset)
+        rows.append(
+            {
+                "name": summary.dataset,
+                "wave": dataset.wave,
+                "reporter": dataset.reporter,
+                "modality": dataset.modality,
+                "n_rows": summary.n_rows,
+                "n_ids": summary.n_ids,
+                "collected": f"{summary.first_date} to {summary.last_date}"
+                if summary.first_date
+                else "",
+                "snapshot": str(summary.snapshot_date or ""),
+            }
+        )
+    return columns, rows
+
+
+def detail(
+    result: CatalogResult, summary: DatasetSummary, on_instrument: Callable[[str], None]
+) -> None:
+    ui.label(summary.dataset).classes("text-2xl font-medium mt-4")
     facts(result, summary)
 
     heading("Instruments")
-    table(*completeness_table(result, summary)).classes(remove="w-full")
+    shown = table(*completeness_table(result, summary)).classes(remove="w-full")
+    shown.classes("cursor-pointer")
+    shown.on("rowClick", lambda e: on_instrument(e.args[1]["id"]))
 
     with ui.row().classes("w-full gap-8"):
         with ui.column().classes("gap-1"):
@@ -45,18 +119,11 @@ def render(result: CatalogResult, selected: str | None, on_select: Callable[[str
                 ).classes(remove="w-full")
 
     heading("Problems")
-    issues = dataset_issues(result, selected)
+    issues = dataset_issues(result, summary.dataset)
     if issues:
         problems.issue_table(issues, result.project.root)
     else:
         note("No problems found.")
-
-
-def dataset_label(result: CatalogResult, name: str) -> str:
-    config = result.project.config
-    dataset = dataset_by_name(config, name)
-    study = config.studies[dataset.study].label or dataset.study
-    return f"{name} ({study}, wave {dataset.wave}, {dataset.reporter}, {dataset.modality})"
 
 
 def facts(result: CatalogResult, summary: DatasetSummary) -> None:
@@ -124,6 +191,7 @@ def completeness_table(
     ]
     rows = [
         {
+            "id": c.instrument_id,
             "instrument": instruments[c.instrument_id].abbreviation or c.instrument_id,
             "n_items": c.n_items,
             "complete": c.complete,
