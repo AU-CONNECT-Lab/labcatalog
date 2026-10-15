@@ -22,3 +22,8 @@ studies: {}
 # One entry per data file, for example:
 #   - {name: parent_w1, modality: questionnaire, study: my_study, wave: 1, reporter: parent, source: csv, path: data/parent_w1.csv}
 datasets: []
+
+# Optional: your own cleaning scripts, run in order from the Prepare page or with "labcatalog prepare", for example:
+#   prepare:
+#     - {name: clean_parent_w1, run: Rscript scripts/clean_parent.R, inputs: [raw/parent_w1_export.csv, scripts/clean_parent.R], outputs: [data/parent_w1.csv]}
+# A step is outdated when one of its inputs is newer than its outputs, so list the script among the inputs.

@@ -30,6 +30,9 @@ class AnalysisView:
 
 def render(result: CatalogResult, view: AnalysisView) -> None:
     names = views.dataset_order(result, [d.name for d in result.project.config.datasets])
+    if not names:
+        note("No datasets yet.")
+        return
     view.datasets = [n for n in view.datasets if n in names] or first_wave(result, names)
 
     @ui.refreshable
