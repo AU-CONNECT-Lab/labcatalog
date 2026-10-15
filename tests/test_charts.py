@@ -15,7 +15,6 @@ def test_instrument_charts(result):
     assert views.score_distribution(result, "example_mood") is not None
     assert views.item_total(result, "example_mood") is not None
     assert views.item_profile(result, "example_mood") is not None
-    assert views.item_correlations(result, "example_mood") is not None
     assert len(views.item_responses(result, "example_screen_time")) == 2
     assert views.score_boxes(result, "example_screen_time") is None
 
@@ -55,8 +54,34 @@ def test_overview_charts(result):
         ("mock_study", "3"),
     ]
     assert views.score_circle(result, "mock_study", "1", everything) is not None
-    assert views.score_matrices(result, everything) is not None
     assert views.score_circle(result, "mock_study", "1", []) is None
+
+
+def test_dot_grid_puts_one_wave_below_the_diagonal_and_another_above(result):
+    everything = list(views.correlated_instruments(result))
+    grid = views.score_grid(result, everything, ("mock_study", "1"), ("mock_study", "2"))
+    hover = next(trace for trace in grid.data if trace.customdata is not None)
+    below = {
+        wave for (wave, *_), x, y in zip(hover.customdata, hover.x, hover.y, strict=True) if y > x
+    }
+    above = {
+        wave for (wave, *_), x, y in zip(hover.customdata, hover.x, hover.y, strict=True) if y < x
+    }
+    assert (below, above) == ({"Wave 1"}, {"Wave 2"})
+    assert all(x != y for x, y in zip(hover.x, hover.y, strict=True))
+
+
+def test_item_grid_groups_items_by_subscale(result):
+    lower, upper = list(views.item_waves(result, "example_mood"))[:2]
+    grid = views.item_grid(result, "example_mood", lower, upper)
+    assert list(grid.layout.xaxis.ticktext) == [
+        "ems_2",
+        "ems_6",
+        "ems_3",
+        "ems_5",
+        "ems_1",
+        "ems_4",
+    ]
 
 
 def test_score_correlates_skip_own_subscales_and_put_strongest_first(result):

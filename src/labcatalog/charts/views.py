@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
@@ -8,7 +9,7 @@ from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
 from labcatalog.schema import Instrument, Score
-from labcatalog.stats import wave_order
+from labcatalog.stats import Correlation, wave_order
 
 # ---- shared lookups ----
 
@@ -289,29 +290,74 @@ def subscale_profile(result: CatalogResult, instrument_id: str) -> go.Figure | N
     return plots.profile_radar(axes, hovers, series, option_range(instrument)) if series else None
 
 
-def item_correlations(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    instrument = result.project.instruments[instrument_id]
-    total = total_score(instrument)
+def item_waves(result: CatalogResult, instrument_id: str) -> dict[str, str]:
+    # Datasets whose total score has item correlations, named the way the other charts name waves.
+    total = total_score(result.project.instruments[instrument_id])
     if total is None:
-        return None
-    items = {
-        v.column: v.item_id for v in result.catalog.variables if v.instrument_id == instrument_id
-    }
-    scores = [
-        s
+        return {}
+    found = [
+        s.dataset
         for s in resolved(result, instrument_id, total.id)
         if summary_of(result, s.key).item_correlations
     ]
-    names = series_names(result, [s.dataset for s in scores])
-    panels = [
-        {
-            "title": names[s.dataset],
-            "labels": [items[c] for c in summary_of(result, s.key).item_columns],
-            "r": summary_of(result, s.key).item_correlations,
+    return series_names(result, found)
+
+
+def item_grid(
+    result: CatalogResult, instrument_id: str, lower: str, upper: str
+) -> go.Figure | None:
+    # Items sit together by subscale; one wave below the diagonal and one above.
+    instrument = result.project.instruments[instrument_id]
+    total = total_score(instrument)
+
+    def matrix(dataset: str) -> tuple:
+        score = next(s for s in resolved(result, instrument_id, total.id) if s.dataset == dataset)
+        summary = summary_of(result, score.key)
+        items = {
+            v.column: v.item_id
+            for v in result.catalog.variables_for(dataset)
+            if v.instrument_id == instrument_id
         }
-        for s in scores
-    ]
-    return matrices.item_correlations(panels, "Spearman ρ") if panels else None
+        return summary, {items[c]: i for i, c in enumerate(summary.item_columns)}
+
+    below, above = matrix(lower), matrix(upper)
+    subscales = [s for s in instrument.scores if not is_total(instrument, s)]
+    group_of: dict[str, str] = {}
+    for subscale in subscales:
+        for item in subscale.items:
+            group_of.setdefault(item, subscale.id)
+    group_order = [s.id for s in subscales] + [""]
+    item_order = [i.id for i in instrument.items]
+    members = sorted(
+        set(below[1]) | set(above[1]),
+        key=lambda item: (group_order.index(group_of.get(item, "")), item_order.index(item)),
+    )
+    if len(members) < 2:
+        return None
+    size = len(members)
+    z = np.full((size, size), np.nan)
+    n: list[list[int | None]] = [[None] * size for _ in range(size)]
+    for a, ma in enumerate(members):
+        for b, mb in enumerate(members):
+            summary, where = below if a > b else above
+            if a != b and ma in where and mb in where:
+                value = summary.item_correlations[where[ma]][where[mb]]
+                if value is not None:
+                    z[a, b] = value
+                    n[a][b] = summary.n_complete
+    names = {s.id: s.label for s in subscales} | {"": "In no subscale"}
+    names_of = item_waves(result, instrument_id)
+    return matrices.dot_grid(
+        z,
+        n,
+        members,
+        [group_of.get(m, "") for m in members] if subscales else None,
+        group_order,
+        names,
+        names_of[lower],
+        names_of[upper],
+        "Spearman ρ",
+    )
 
 
 def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
@@ -580,12 +626,10 @@ def score_panel(
     return {
         "title": wave_name(result, study, wave),
         "r": [[corr.r[i][j] for j in idx] for i in idx],
-        "n": [[corr.n[i][j] for j in idx] for i in idx],
         "labels": [
             short_label(result.project.instruments[s.instrument_id], d)
             for s, d in zip(resolved_scores, definitions, strict=True)
         ],
-        "short": [d.label for d in definitions],
         "groups": [s.instrument_id for s in resolved_scores],
         "skip": skip,
     }
@@ -599,29 +643,95 @@ def score_circle(
         return None
     return matrices.score_circle(
         p["r"],
-        p["n"],
         p["labels"],
         p["groups"],
         instrument_order(result),
-        instrument_labels(result),
         p["skip"],
         defaults.CHART_MIN_R,
+        p["title"],
     )
 
 
-def score_matrices(result: CatalogResult, instruments: list[str]) -> go.Figure | None:
-    panels = [
-        p
-        for study, wave in correlation_waves(result)
-        if (p := score_panel(result, study, wave, instruments)) is not None
-    ]
-    if not panels:
+Member = tuple[str, str, str]
+
+
+def score_grid(
+    result: CatalogResult,
+    instruments: list[str],
+    lower: tuple[str, str],
+    upper: tuple[str, str],
+) -> go.Figure | None:
+    # One wave below the diagonal and one above; a score is the same across waves by instrument, score and reporter.
+    below, above = (
+        wave_members(result, *lower, instruments),
+        wave_members(result, *upper, instruments),
+    )
+    members = sorted(set(below[1]) | set(above[1]), key=lambda m: member_rank(result, m))
+    if len(members) < 2:
         return None
-    return matrices.score_matrices(panels, instrument_order(result), instrument_labels(result))
+    size = len(members)
+    z = np.full((size, size), np.nan)
+    n: list[list[int | None]] = [[None] * size for _ in range(size)]
+    for a, ma in enumerate(members):
+        for b, mb in enumerate(members):
+            corr, where = below if a > b else above
+            if a != b and ma in where and mb in where:
+                i, j = where[ma], where[mb]
+                if corr.r[i][j] is not None:
+                    z[a, b] = corr.r[i][j]
+                    n[a][b] = corr.n[i][j]
+    names = {
+        i: f"{x.abbreviation}: {x.name}" if x.abbreviation else x.name
+        for i, x in result.project.instruments.items()
+    }
+    return matrices.dot_grid(
+        z,
+        n,
+        member_labels(result, members),
+        [m[0] for m in members],
+        instrument_order(result),
+        names,
+        wave_name(result, *lower),
+        wave_name(result, *upper),
+        "Pearson r",
+    )
 
 
-def instrument_labels(result: CatalogResult) -> dict[str, str]:
-    return {i: x.abbreviation or i for i, x in result.project.instruments.items()}
+def wave_members(
+    result: CatalogResult, study: str, wave: str, instruments: list[str]
+) -> tuple[Correlation, dict[Member, int]]:
+    corr = next(c for c in result.summary.correlations if (c.study, c.wave) == (study, wave))
+    by_key = {s.key: s for s in result.catalog.scores}
+    config = result.project.config
+    found = {}
+    for i, key in enumerate(corr.keys):
+        s = by_key[key]
+        if s.instrument_id in instruments:
+            found[(s.instrument_id, s.score_id, dataset_by_name(config, s.dataset).reporter)] = i
+    return corr, found
+
+
+def member_rank(result: CatalogResult, member: Member) -> tuple:
+    instrument = result.project.instruments[member[0]]
+    score = next(s for s in instrument.scores if s.id == member[1])
+    return (
+        instrument_order(result).index(member[0]),
+        not is_total(instrument, score),
+        instrument.scores.index(score),
+        member[2],
+    )
+
+
+def member_labels(result: CatalogResult, members: list[Member]) -> list[str]:
+    reporters: dict[str, set[str]] = {}
+    for instrument_id, _, reporter in members:
+        reporters.setdefault(instrument_id, set()).add(reporter)
+    labels = []
+    for instrument_id, score_id, reporter in members:
+        instrument = result.project.instruments[instrument_id]
+        label = short_label(instrument, next(s for s in instrument.scores if s.id == score_id))
+        labels.append(f"{label} ({reporter})" if len(reporters[instrument_id]) > 1 else label)
+    return labels
 
 
 def score_choices(result: CatalogResult) -> dict[str, str]:

@@ -53,10 +53,10 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     if subscales is not None:
         heading("Subscales")
         show(subscales)
-    correlations = views.item_correlations(result, instrument_id)
-    if correlations is not None:
+    waves = views.item_waves(result, instrument_id)
+    if waves:
         heading("Item correlations")
-        show(correlations)
+        triangles(waves, lambda lower, upper: views.item_grid(result, instrument_id, lower, upper))
     other_scores(result, instrument_id)
 
 
@@ -136,38 +136,73 @@ def overview_section(result: CatalogResult) -> None:
     score_relations(result)
 
 
-def score_relations(result: CatalogResult) -> None:
-    waves = views.correlation_waves(result)
-    instruments = views.correlated_instruments(result)
-    if not waves:
-        return
-    labels = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
-    picked = {"wave": next(iter(labels)), "instruments": list(instruments)}
+def first_two(choices: dict[str, str]) -> tuple[str, str]:
+    keys = list(choices)
+    return keys[0], keys[1] if len(keys) > 1 else keys[0]
+
+
+def wave_pickers(choices: dict[str, str], picked: dict, changed) -> None:
+    for key, label in (("lower", "Below the diagonal"), ("upper", "Above the diagonal")):
+        ui.select(
+            choices,
+            value=picked[key],
+            label=label,
+            on_change=lambda e, k=key: changed(k, e.value),
+        ).props("dense outlined").classes("w-56")
+
+
+def triangles(choices: dict[str, str], build) -> None:
+    lower, upper = first_two(choices)
+    picked = {"lower": lower, "upper": upper}
 
     @ui.refreshable
-    def circle() -> None:
-        study, wave = picked["wave"].split("|")
+    def grid() -> None:
+        show(build(picked["lower"], picked["upper"]))
+
+    def changed(key: str, value: str) -> None:
+        picked[key] = value
+        grid.refresh()
+
+    with ui.row().classes("items-center gap-4"):
+        wave_pickers(choices, picked, changed)
+    grid()
+
+
+def score_relations(result: CatalogResult) -> None:
+    waves = views.correlation_waves(result)
+    if not waves:
+        return
+    instruments = views.correlated_instruments(result)
+    choices = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
+    lower, upper = first_two(choices)
+    picked = {"lower": lower, "upper": upper, "instruments": list(instruments)}
+
+    @ui.refreshable
+    def grid() -> None:
         show(
-            views.score_circle(result, study, wave, picked["instruments"]),
-            "Pick instruments with at least two scores measured in this wave.",
+            views.score_grid(
+                result,
+                picked["instruments"],
+                tuple(picked["lower"].split("|")),
+                tuple(picked["upper"].split("|")),
+            ),
+            "Pick instruments with at least two scores.",
         )
 
     @ui.refreshable
-    def matrices() -> None:
-        show(views.score_matrices(result, picked["instruments"]))
+    def circle() -> None:
+        study, wave = picked["lower"].split("|")
+        show(views.score_circle(result, study, wave, picked["instruments"]))
 
-    def choose_wave(value: str) -> None:
-        picked["wave"] = value
+    def changed(key: str, value) -> None:
+        picked[key] = value or []
+        if key == "instruments":
+            chooser.props(f'display-value="{shown()}"')
+        grid.refresh()
         circle.refresh()
 
-    def choose_instruments(value: list[str] | None) -> None:
-        picked["instruments"] = value or []
-        chooser.props(f'display-value="{shown(picked["instruments"])}"')
-        circle.refresh()
-        matrices.refresh()
-
-    def shown(chosen: list[str]) -> str:
-        return f"{len(chosen)} of {len(instruments)} instruments"
+    def shown() -> str:
+        return f"{len(picked['instruments'])} of {len(instruments)} instruments"
 
     heading("How the scores relate")
     with ui.row().classes("items-center gap-4"):
@@ -177,14 +212,11 @@ def score_relations(result: CatalogResult) -> None:
                 multiple=True,
                 value=picked["instruments"],
                 label="Instruments",
-                on_change=lambda e: choose_instruments(e.value),
+                on_change=lambda e: changed("instruments", e.value),
             )
-            .props(f'dense outlined clearable display-value="{shown(picked["instruments"])}"')
+            .props(f'dense outlined clearable display-value="{shown()}"')
             .classes("w-72")
         )
-        ui.toggle(labels, value=picked["wave"], on_change=lambda e: choose_wave(e.value)).props(
-            "dense no-caps"
-        )
+        wave_pickers(choices, picked, changed)
+    grid()
     circle()
-    heading("Correlations in every wave")
-    matrices()
