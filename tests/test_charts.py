@@ -19,14 +19,21 @@ def test_instrument_charts(result):
     assert views.score_boxes(result, "example_screen_time") is None
 
 
-def test_subscale_radars_need_three_axes(result):
+def test_subscale_radars_draw_each_subscale_with_three_items(result):
     def titles(instrument_id):
         fig = views.subscale_radars(result, instrument_id)
         return None if fig is None else [a.text for a in fig.layout.annotations]
 
-    assert titles("example_mood") == ["Subscales"]
+    assert titles("example_mood") is None
+    assert views.short_subscales(result, "example_mood") == [
+        "Sadness",
+        "Worry and fatigue",
+        "Low positive affect",
+    ]
     assert titles("example_parent_stress") == ["Strain"]
-    assert titles("example_child_sleep") is None
+    assert views.short_subscales(result, "example_parent_stress") == ["Child-related"]
+    radar = views.subscale_radars(result, "example_parent_stress")
+    assert [trace.name for trace in radar.data] == ["Wave 1", "Wave 2", "Wave 3"]
 
 
 def test_small_multiples(result):
@@ -47,7 +54,7 @@ def test_means_and_stability_show_one_instrument(result):
     labels = ["Total score", "Sadness", "Worry and fatigue", "Low positive affect"]
     assert [a.text for a in means.layout.annotations] == labels
     stability = views.stability(result, "example_mood")
-    assert list(stability.layout.xaxis.ticktext) == labels
+    assert list(stability.layout.yaxis.ticktext) == labels
 
 
 def test_overview_charts(result):
@@ -62,20 +69,19 @@ def test_overview_charts(result):
     assert views.score_circle(result, "mock_study", "1", []) is None
 
 
-def test_score_levels_show_every_score_of_the_wave_within_its_range(result):
-    assert views.level_waves(result) == [
-        ("mock_study", "1"),
-        ("mock_study", "2"),
-        ("mock_study", "3"),
-    ]
-    bars = views.score_levels(result, "mock_study", "1").data[0]
-    scores = {
+def test_score_levels_put_every_wave_on_one_row_per_score(result):
+    fig = views.score_levels(result)
+    waves = fig.data[1:]
+    assert [w.name for w in waves] == ["Wave 1", "Wave 2", "Wave 3"]
+    scores = {(s.instrument_id, s.score_id) for s in result.catalog.scores}
+    assert len(fig.layout.yaxis.ticktext) == len(scores)
+    wave_1 = {
         (s.instrument_id, s.score_id)
         for s in result.catalog.scores
         if s.dataset in ("parent_w1", "child_w1")
     }
-    assert len(bars.y) == len(scores)
-    assert all(0 <= share <= 100 for share in bars.x)
+    assert len(waves[0].x) == len(wave_1)
+    assert all(0 <= share <= 1 for w in waves for share in w.x)
 
 
 def test_dot_grid_puts_one_wave_below_the_diagonal_and_another_above(result):
@@ -95,26 +101,24 @@ def test_dot_grid_puts_one_wave_below_the_diagonal_and_another_above(result):
 def test_item_grid_groups_items_by_subscale(result):
     lower, upper = list(views.item_waves(result, "example_mood"))[:2]
     grid = views.item_grid(result, "example_mood", lower, upper)
-    assert list(grid.layout.xaxis.ticktext) == [
-        "ems_2",
-        "ems_6",
-        "ems_3",
-        "ems_5",
-        "ems_1",
-        "ems_4",
-    ]
+    by_subscale = ["ems_2", "ems_6", "ems_3", "ems_5", "ems_1", "ems_4"]
+    assert list(grid.layout.xaxis.ticktext) == by_subscale
+    circle = views.item_circle(result, "example_mood", lower)
+    labels = [a.text for a in circle.layout.annotations]
+    assert labels == by_subscale
+    assert circle.layout.title.text.startswith("Wave 1: |Spearman ρ| ≥ 0.3")
 
 
 def test_score_correlates_skip_own_subscales_and_put_strongest_first(result):
     total = views.score_correlates(result, "example_mood", "ems_total")
-    assert not any(tick.startswith("EMS") for tick in total.layout.xaxis.ticktext)
+    assert not any(tick.startswith("EMS") for tick in total.layout.yaxis.ticktext)
     sadness = views.score_correlates(result, "example_mood", "ems_sadness")
-    assert "EMS worry and fatigue" in sadness.layout.xaxis.ticktext
-    points: dict[float, list[float]] = {}
+    assert "EMS worry and fatigue" in sadness.layout.yaxis.ticktext
+    rows: dict[float, list[float]] = {}
     for trace in sadness.data[1:]:
         for x, y in zip(trace.x, trace.y, strict=True):
-            points.setdefault(x, []).append(abs(y))
-    strengths = [sum(v) / len(v) for _, v in sorted(points.items())]
+            rows.setdefault(y, []).append(abs(x))
+    strengths = [sum(v) / len(v) for _, v in sorted(rows.items())]
     assert strengths == sorted(strengths, reverse=True)
 
 

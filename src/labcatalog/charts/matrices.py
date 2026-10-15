@@ -21,6 +21,12 @@ STRIP_ROOM = 0.95
 # A dot of r = 1 spans this share of its cell, so the largest dots never touch the lines.
 DOT_SPAN = 0.84
 COLORBAR_TICKS = [-1, -0.6, -0.2, 0.2, 0.6, 1]
+COLORBAR_LENGTH = 170
+# The matrices sit in half the page; heights are set for this width and a little under it.
+HALF_WIDTH = 460
+LABEL_CHAR = 5.8
+MIN_CELL, MAX_CELL = 18, 40
+CIRCLE_HEIGHT = 560
 
 
 def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
@@ -44,7 +50,8 @@ def colorbar(title: str, **where) -> go.Scatter:
                 title=dict(text=title, side="top", font=dict(size=11)),
                 orientation="h",
                 thickness=10,
-                len=0.28,
+                lenmode="pixels",
+                len=COLORBAR_LENGTH,
                 tickvals=COLORBAR_TICKS,
                 tickfont=dict(size=10),
                 outlinewidth=0,
@@ -179,18 +186,24 @@ def dot_grid(
     fig.update_yaxes(
         range=[size - 0.5, low], scaleanchor="x", scaleratio=1, constrain="domain", **ticks
     )
-    fig.add_trace(colorbar(value_label, x=1, xanchor="right", y=-0.03, yanchor="top"))
+    fig.add_trace(
+        colorbar(value_label, x=1, xref="container", xanchor="right", y=-0.03, yanchor="top")
+    )
     fig.update_layout(shapes=shapes)
-    # The column labels stand on top, so their length decides how much height they take.
-    cell = float(np.clip(560 / size, 18, 40))
-    label_room = 7 * max(len(label) for label in labels) + 20
+    # Row and column labels are the same, so one length sets the room left of and above the cells.
+    label_px = LABEL_CHAR * max(len(label) for label in labels)
+    left = max(100, label_px + 12)
+    units = size - low + 0.5
+    side = min(MAX_CELL * units, max(HALF_WIDTH - 20 - left, MIN_CELL * units))
+    bottom = max(80, 30 + 20 * len(set(groups or [])))
     return base_layout(
         fig,
-        int(cell * (size - low + 0.5) + label_room + 130),
-        margin=dict(l=40, r=20, t=40, b=90),
+        int(side + label_px + 60 + bottom),
+        margin=dict(l=left, r=20, t=40, b=bottom),
         legend=dict(
-            orientation="h",
-            x=0,
+            orientation="v",
+            x=0.01,
+            xref="container",
             xanchor="left",
             y=-0.03,
             yanchor="top",
@@ -299,7 +312,7 @@ def score_circle(
             constrain="domain",
         ),
     )
-    return base_layout(fig, 640, margin=dict(l=20, r=20, t=70, b=20))
+    return base_layout(fig, CIRCLE_HEIGHT, margin=dict(l=20, r=20, t=70, b=20))
 
 
 def answer_grid(
