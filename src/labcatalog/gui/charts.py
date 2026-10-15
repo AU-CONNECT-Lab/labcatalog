@@ -1,10 +1,13 @@
+import numpy as np
 import plotly.graph_objects as go
 from nicegui import ui
 
 from labcatalog.charts import network, views
 from labcatalog.gui import theme
-from labcatalog.gui.common import card, heading, note, section
+from labcatalog.gui.common import apa, card, col, heading, note, section, table
 from labcatalog.pipeline import CatalogResult
+
+TABLE_MIN = 360
 
 
 def show(fig: go.Figure | None, empty: str = "") -> ui.plotly | None:
@@ -55,8 +58,50 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     waves = views.item_waves(result, instrument_id)
     if waves:
         heading("Item correlations")
-        one_wave(waves, lambda dataset: show(views.item_grid(result, instrument_id, dataset)))
+        one_wave(waves, lambda dataset: item_correlations(result, instrument_id, dataset))
     other_scores(result, instrument_id)
+
+
+def figure_column(fig: go.Figure) -> ui.column:
+    return ui.column().classes("gap-1").style(f"width:{fig.layout.width}px")
+
+
+def rest_column() -> ui.column:
+    # Sits right of a figure_column, or wraps below it when the page is too narrow.
+    return ui.column().classes("gap-1 min-w-0").style(f"flex: 1 1 {TABLE_MIN}px")
+
+
+def item_correlations(result: CatalogResult, instrument_id: str, dataset: str) -> None:
+    fig = views.item_grid(result, instrument_id, dataset)
+    if fig is None:
+        return
+    items, z, n = views.item_correlations(result, instrument_id, dataset)
+    with ui.row().classes("w-full gap-6 items-start"):
+        with figure_column(fig):
+            show(fig)
+        with rest_column():
+            table(*matrix_table(items, z))
+            note(f"Spearman ρ on the {n} people who answered every item.")
+
+
+def matrix_table(labels: list[str], z: np.ndarray) -> tuple[list[dict], list[dict]]:
+    columns = [
+        col("variable", "Item"),
+        *[col(f"c{j}", str(j + 1), numeric=True, sortable=False) for j in range(len(labels))],
+    ]
+    rows = [
+        {
+            "variable": f"{i + 1}. {label}",
+            **{
+                f"c{j}": (apa(z[i, j]) if np.isfinite(z[i, j]) else "")
+                if j < i
+                else ("—" if j == i else "")
+                for j in range(len(labels))
+            },
+        }
+        for i, label in enumerate(labels)
+    ]
+    return columns, rows
 
 
 def item_means(result: CatalogResult, instrument_id: str) -> None:
@@ -159,32 +204,17 @@ def score_relations(result: CatalogResult) -> None:
     }
 
     @ui.refreshable
-    def grid() -> None:
-        show(
-            views.score_grid(
-                result,
-                picked["instruments"],
-                tuple(picked["wave"].split("|")),
-            ),
-            "Pick instruments with at least two scores.",
-        )
-
-    @ui.refreshable
     def graph() -> None:
         study, wave = picked["wave"].split("|")
         show_network(
-            views.score_network(result, study, wave, picked["instruments"], picked["color"])
+            views.score_network(result, study, wave, picked["instruments"], picked["color"]),
+            "Pick instruments with at least two scores.",
         )
 
     def changed(key: str, value) -> None:
         picked[key] = value or []
         if key == "instruments":
             chooser.props(f'display-value="{shown()}"')
-        grid.refresh()
-        graph.refresh()
-
-    def recolor(value: str) -> None:
-        picked["color"] = value
         graph.refresh()
 
     def shown() -> str:
@@ -204,18 +234,18 @@ def score_relations(result: CatalogResult) -> None:
                 .classes("w-64")
             )
             wave_picker(choices, picked["wave"], lambda value: changed("wave", value))
-        grid()
-        ui.select(
-            views.network_colorings(result),
-            value=picked["color"],
-            label="Color by",
-            on_change=lambda e: recolor(e.value),
-        ).props("dense outlined").classes("w-56 self-end")
+            ui.select(
+                views.network_colorings(result),
+                value=picked["color"],
+                label="Color by",
+                on_change=lambda e: changed("color", e.value),
+            ).props("dense outlined").classes("w-56")
         graph()
 
 
-def show_network(option: dict | None) -> None:
+def show_network(option: dict | None, empty: str) -> None:
     if option is None:
+        note(empty)
         return
     ui.echart(theme.echart_for_page(option)).classes("w-full").style(
         f"height:{network.NETWORK_HEIGHT}px"
