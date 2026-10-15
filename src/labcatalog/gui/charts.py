@@ -74,13 +74,14 @@ def rest_column() -> ui.column:
 
 
 def item_correlations(result: CatalogResult, instrument_id: str, dataset: str) -> None:
-    fig = views.item_grid(result, instrument_id, dataset)
-    if fig is None:
-        return
     items, z, n = views.item_correlations(result, instrument_id, dataset)
+    if len(items) < 2:
+        return
+    fig = views.item_grid(result, instrument_id, dataset)
     with ui.row().classes("w-full gap-6 items-start"):
-        with figure_column(fig):
-            show(fig)
+        if fig is not None:
+            with figure_column(fig):
+                show(fig)
         with rest_column():
             table(*matrix_table(items, z))
             note(f"Spearman ρ on the {n} people who answered every item.")

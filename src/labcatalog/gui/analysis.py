@@ -129,8 +129,9 @@ def correlation_section(
 
             def content() -> None:
                 with ui.row().classes("w-full gap-6 items-start"):
-                    with charts.figure_column(fig):
-                        image_buttons(charts.show(fig), fig, "correlations")
+                    if fig is not None:
+                        with charts.figure_column(fig):
+                            image_buttons(charts.show(fig), fig, "correlations")
                     with charts.rest_column():
                         table(columns, rows)
                         note(

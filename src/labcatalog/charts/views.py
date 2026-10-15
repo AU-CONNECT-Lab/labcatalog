@@ -351,8 +351,6 @@ def item_correlations(
 
 def item_grid(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
     items, z, n = item_correlations(result, instrument_id, dataset)
-    if len(items) < 2:
-        return None
     hover = [
         [f"{a} × {b}<br>ρ = {z[i, j]:.2f}, n = {n}" for j, b in enumerate(items)]
         for i, a in enumerate(items)
@@ -1079,7 +1077,9 @@ def score_of(result: CatalogResult, key: str) -> ResolvedScore:
     return next(s for s in result.catalog.scores if s.key == key)
 
 
-def correlation_heatmap(matrix: list[list[analysis.Correlation]], labels: list[str]) -> go.Figure:
+def correlation_heatmap(
+    matrix: list[list[analysis.Correlation]], labels: list[str]
+) -> go.Figure | None:
     z = matrices.as_matrix([[c.r for c in row] for row in matrix])
     hover = [
         [

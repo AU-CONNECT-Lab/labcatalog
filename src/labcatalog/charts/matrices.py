@@ -26,7 +26,10 @@ def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
 
 def heatmap(
     z: np.ndarray, labels: list[str], hover: list[list[str]], value_label: str
-) -> go.Figure:
+) -> go.Figure | None:
+    # One pair is a single number, which the table beside the heatmap already shows.
+    if len(labels) < 3:
+        return None
     # The lower triangle, numbered like an APA table: rows from the second, columns to the second last.
     names = [f"{k}. {label}" for k, label in enumerate(labels, start=1)]
     rows, cols = range(1, len(labels)), range(len(labels) - 1)

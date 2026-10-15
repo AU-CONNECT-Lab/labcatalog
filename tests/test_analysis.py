@@ -48,9 +48,16 @@ def test_the_correlation_table_reads_like_apa(result):
     assert rows[1]["c0"].startswith(".") and rows[1]["c0"].endswith("***")
     assert rows[1]["c1"] == "—"
     assert matrix[1][0].n == len(frame.dropna())
-    heat = views.correlation_heatmap(matrix, ["EMS", "EPS"]).data[0]
-    assert (list(heat.x), list(heat.y)) == (["1"], ["2. EPS"])
-    assert heat.z[0][0] == pytest.approx(matrix[1][0].r)
+    assert views.correlation_heatmap(matrix, ["EMS", "EPS"]) is None
+
+
+def test_the_heatmap_draws_the_lower_triangle_from_three_scores():
+    pair = analysis.Correlation(50, 0.4, 0.01)
+    alone = analysis.Correlation(50)
+    matrix = [[alone, pair, pair], [pair, alone, pair], [pair, pair, alone]]
+    heat = views.correlation_heatmap(matrix, ["A", "B", "C"]).data[0]
+    assert (list(heat.x), list(heat.y)) == (["1", "2"], ["2. B", "3. C"])
+    assert heat.z[0][0] == pytest.approx(0.4) and heat.z[0][1] is None
     assert heat.zmin == -1 and heat.zmax == 1
 
 
