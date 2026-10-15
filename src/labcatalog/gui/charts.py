@@ -5,10 +5,6 @@ from labcatalog.charts import network, views
 from labcatalog.gui.common import heading, note, section
 from labcatalog.pipeline import CatalogResult
 
-NO_SHARED_WAVE = (
-    "These two scores never meet in one wave; see stats.correlate_by in labcatalog.yaml."
-)
-
 
 def show(fig: go.Figure | None, empty: str = "") -> None:
     if fig is None:
@@ -76,40 +72,20 @@ def other_scores(result: CatalogResult, instrument_id: str) -> None:
     if not own or len(views.score_choices(result)) < 2:
         return
     first = views.default_score(result, instrument_id)
-    picked = {"x": first, "y": views.default_partner(result, first)}
 
     @ui.refreshable
-    def correlates() -> None:
+    def correlates(choice: str) -> None:
         show(
-            views.score_correlates(result, *picked["x"].split("|")),
+            views.score_correlates(result, *choice.split("|")),
             "No other score was measured in the same wave.",
         )
 
-    @ui.refreshable
-    def scatter() -> None:
-        show(views.regression(result, picked["x"], picked["y"]), NO_SHARED_WAVE)
-
-    def choose(axis: str, value: str) -> None:
-        picked[axis] = value
-        if axis == "x":
-            correlates.refresh()
-        scatter.refresh()
-
     heading("Against other scores")
-    with ui.row().classes("items-center gap-4"):
-        if len(own) > 1:
-            ui.select(
-                own, value=first, label="Score", on_change=lambda e: choose("x", e.value)
-            ).props("dense outlined").classes("w-72")
+    if len(own) > 1:
         ui.select(
-            views.score_choices(result),
-            value=picked["y"],
-            label="Against",
-            with_input=True,
-            on_change=lambda e: choose("y", e.value),
+            own, value=first, label="Score", on_change=lambda e: correlates.refresh(e.value)
         ).props("dense outlined").classes("w-72")
-    scatter()
-    correlates()
+    correlates(first)
 
 
 def instrument_dataset_section(result: CatalogResult, instrument_id: str, dataset: str) -> None:
