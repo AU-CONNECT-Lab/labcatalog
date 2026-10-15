@@ -22,6 +22,7 @@ def validate_project(project: Project) -> list[Issue]:
         *check_variable_maps(project),
         *check_data_settings(project),
         *check_references(project),
+        *check_prepare_steps(project),
     ]
 
 
@@ -424,6 +425,23 @@ def check_references(project: Project) -> list[Issue]:
                 message = f"references[{n}].pdf: file not found: {path}"
                 location = project.instrument_files[instrument_id]
                 issues.append(problem("pdf_missing", message, location, "warning"))
+    return issues
+
+
+def check_prepare_steps(project: Project) -> list[Issue]:
+    steps = project.config.prepare
+    issues = [
+        problem("duplicate_id", f"prepare: step name '{name}' is used more than once", CONFIG)
+        for name, count in Counter(step.name for step in steps).items()
+        if count > 1
+    ]
+    for n, step in enumerate(steps, start=1):
+        where = f"prepare[{n}] ({step.name})"
+        if not step.run.strip():
+            issues.append(problem("invalid_value", f"{where}.run: the command is empty", CONFIG))
+        if not step.outputs:
+            message = f"{where}.outputs: list at least one file the step writes"
+            issues.append(problem("invalid_value", message, CONFIG))
     return issues
 
 

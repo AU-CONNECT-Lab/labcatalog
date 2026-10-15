@@ -94,6 +94,13 @@ class StatsConfig(StrictModel):
     correlate_by: str = defaults.CORRELATE_BY
 
 
+class PrepareStep(StrictModel):
+    name: str
+    run: str
+    inputs: list[str] = []
+    outputs: list[str]
+
+
 class ProjectConfig(StrictModel):
     schema_version: int = defaults.SCHEMA_VERSION
     project: ProjectInfo
@@ -108,6 +115,7 @@ class ProjectConfig(StrictModel):
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)
+    prepare: list[PrepareStep] = []
 
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:

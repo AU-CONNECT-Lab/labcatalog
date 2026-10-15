@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.exceptions import MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.manifest import Manifest, build_manifest
+from labcatalog.prepare import Session, StepRun, run_steps
 from labcatalog.project import Project, load_project, write_schemas
 from labcatalog.resolve import Catalog, resolve_catalog
 from labcatalog.scoring import compute_scores
@@ -73,6 +75,12 @@ def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
         return None, err.issues
     issues = validate_project(project)
     return (None if has_errors(issues) else project), issues
+
+
+def run_prepare(root: Path, echo: Callable[[str], None]) -> list[StepRun]:
+    project = load_project(root)
+    names = [step.name for step in project.config.prepare]
+    return run_steps(project, names, Session(), echo=echo)
 
 
 def run_schema(out_dir: Path) -> list[Path]:

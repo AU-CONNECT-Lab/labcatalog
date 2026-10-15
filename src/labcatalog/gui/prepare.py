@@ -1,0 +1,187 @@
+from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from nicegui import run, ui
+
+from labcatalog import defaults
+from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui.common import note, open_path
+from labcatalog.prepare import FileState, Session, StepState, run_steps, step_states, stop
+from labcatalog.project import load_project
+
+EXAMPLE = """\
+prepare:
+  - name: clean_parent_w1
+    run: Rscript scripts/clean_parent.R
+    inputs: [raw/parent_w1_export.csv, scripts/clean_parent.R]
+    outputs: [data/parent_w1.csv]
+"""
+STATUS_COLORS = {
+    "up to date": "positive",
+    "outdated": "warning",
+    "missing output": "negative",
+    "missing input": "negative",
+}
+POLL_SECONDS = 0.3
+
+
+@dataclass
+class PrepareView:
+    session: Session = field(default_factory=Session)
+    running: bool = False
+    shown: str | None = None
+
+
+def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[None]]) -> None:
+    try:
+        project = load_project(root)
+    except LabCatalogError as err:
+        note(str(err))
+        return
+    config_path = root / defaults.CONFIG_FILENAME
+    if not project.config.prepare:
+        note(
+            f"No prepare steps yet. Add them to {defaults.CONFIG_FILENAME} like this; each step "
+            "runs one command in the project folder, and its outputs are usually the data "
+            "files listed under datasets."
+        )
+        ui.code(EXAMPLE, language="yaml").classes("w-full")
+        ui.button(
+            f"Open {defaults.CONFIG_FILENAME}", on_click=lambda: open_path(config_path)
+        ).props("flat no-caps")
+        return
+    names = [step.name for step in project.config.prepare]
+
+    async def start(chosen: list[str], outdated_only: bool = False) -> None:
+        view.running = True
+        steps.refresh()
+        runs = await run.io_bound(run_steps, project, chosen, view.session, outdated_only)
+        view.running = False
+        if runs:
+            view.shown = runs[-1].name
+        steps.refresh()
+        if not runs:
+            ui.notify("Every step is up to date")
+        elif any(r.exit_code == 0 for r in runs):
+            await on_success()
+
+    def confirm_all() -> None:
+        with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
+            ui.label("Run every step in this order? A step that fails stops the rest.")
+            for step in project.config.prepare:
+                with ui.row().classes("items-baseline gap-2 no-wrap"):
+                    ui.label(step.name).classes("font-medium")
+                    ui.label(step.run).classes("font-mono text-grey-7")
+
+            async def go() -> None:
+                dialog.close()
+                await start(names)
+
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+                ui.button("Run all", on_click=go)
+        dialog.open()
+
+    def show_log(name: str) -> None:
+        view.shown = name
+        steps.refresh()
+
+    @ui.refreshable
+    def steps() -> None:
+        with ui.row().classes("items-center gap-3"):
+            ui.button("Run all", icon="play_arrow", on_click=confirm_all).set_enabled(
+                not view.running
+            )
+            ui.button(
+                "Run outdated", icon="update", on_click=lambda: start(names, outdated_only=True)
+            ).props("outline").set_enabled(not view.running)
+            ui.button("Stop", icon="stop", on_click=lambda: stop(view.session)).props(
+                "flat no-caps"
+            ).set_enabled(view.running)
+            ui.button(
+                f"Open {defaults.CONFIG_FILENAME}", on_click=lambda: open_path(config_path)
+            ).props("flat no-caps")
+        for state in step_states(project):
+            step_row(state, view, start, show_log)
+        log_panel(view)
+
+    note(
+        "Runs your own cleaning scripts, one command per step, in the project folder. A step "
+        "is outdated when one of its inputs is newer than its outputs."
+    )
+    steps()
+
+
+def step_row(
+    state: StepState,
+    view: PrepareView,
+    start: Callable[[list[str]], Awaitable[None]],
+    show_log: Callable[[str], None],
+) -> None:
+    step = state.step
+    last = view.session.runs.get(step.name)
+    with ui.card().props("flat bordered").classes("w-full gap-1 mt-3"):
+        with ui.row().classes("w-full items-center gap-3"):
+            ui.label(step.name).classes("text-base font-medium")
+            ui.badge(state.status, color=STATUS_COLORS[state.status]).props("outline")
+            if last:
+                ui.label(f"Last run: {last.outcome}").classes("text-grey-7")
+            ui.space()
+            if last:
+                ui.button("Log", on_click=lambda: show_log(step.name)).props("flat dense no-caps")
+            ui.button("Run", icon="play_arrow", on_click=lambda: start([step.name])).props(
+                "dense outline no-caps"
+            ).set_enabled(not view.running)
+        ui.label(step.run).classes("font-mono text-grey-8")
+        with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0 items-baseline"):
+            for label, files in (("Inputs", state.inputs), ("Outputs", state.outputs)):
+                if files:
+                    ui.label(label).classes("text-grey-7")
+                    with ui.row().classes("gap-x-4 gap-y-0"):
+                        for f in files:
+                            file_label(f)
+
+
+def file_label(f: FileState) -> None:
+    when = f.modified.strftime("%Y-%m-%d %H:%M") if f.modified else "missing"
+    shown = ui.label(f"{f.path} ({when})")
+    if f.modified:
+        shown.classes("cursor-pointer").on("click", lambda: open_path(f.resolved))
+    else:
+        shown.classes("text-negative")
+
+
+def log_panel(view: PrepareView) -> None:
+    session = view.session
+    tracked = {"name": None, "lines": 0}
+
+    def current() -> str | None:
+        return session.current if view.running and session.current else view.shown
+
+    with ui.row().classes("w-full items-center mt-4"):
+        title = ui.label().classes("lc-heading")
+        ui.space()
+        copy = ui.button(
+            "Copy log",
+            icon="content_copy",
+            on_click=lambda: ui.clipboard.write("\n".join(session.runs[current()].log)),
+        ).props("flat dense no-caps")
+    log = ui.log().classes("w-full h-72 font-mono")
+
+    def poll() -> None:
+        name = current()
+        if name != tracked["name"]:
+            log.clear()
+            tracked.update(name=name, lines=0)
+            title.set_text(f"Log: {name}" if name else "Log")
+            copy.visible = name is not None
+        found = session.runs.get(name) if name else None
+        if found is None:
+            return
+        for line in found.log[tracked["lines"] :]:
+            log.push(line)
+        tracked["lines"] = len(found.log)
+
+    poll()
+    ui.timer(POLL_SECONDS, poll)

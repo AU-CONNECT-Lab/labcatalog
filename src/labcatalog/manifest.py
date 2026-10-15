@@ -6,6 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from labcatalog.paths import portable_path
+from labcatalog.prepare import step_states
 from labcatalog.project import Project
 from labcatalog.sources import LoadedDataset
 from labcatalog.version import __version__
@@ -21,11 +22,19 @@ class FileRecord(BaseModel):
     snapshot_date: date | None = None
 
 
+class InputRecord(BaseModel):
+    step: str
+    path: str
+    sha256: str
+
+
 class Manifest(BaseModel):
     built_at: datetime
     tool_version: str
     metadata_commit: str | None = None
     files: list[FileRecord]
+    # What the prepare steps read, so a number can be traced back to the raw files and scripts.
+    inputs: list[InputRecord] = []
 
 
 def file_sha256(path: Path) -> str:
@@ -68,5 +77,11 @@ def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Mani
             )
             for name, loaded in datasets.items()
             if loaded.source_path is not None
+        ],
+        inputs=[
+            InputRecord(step=state.step.name, path=f.path, sha256=file_sha256(f.resolved))
+            for state in step_states(project)
+            for f in state.inputs
+            if f.resolved.is_file()
         ],
     )

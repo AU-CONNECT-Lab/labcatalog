@@ -13,12 +13,14 @@ from labcatalog.gui import (
     instruments,
     overview,
     preferences,
+    prepare,
     problems,
     theme,
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
 from labcatalog.gui.instruments import BrowseView
+from labcatalog.gui.prepare import PrepareView
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.version import __version__
 
@@ -28,6 +30,7 @@ PAGES = (
     ("instruments", "Instruments", "list_alt"),
     ("datasets", "Datasets", "table_chart"),
     ("analysis", "Analysis", "query_stats"),
+    ("prepare", "Prepare", "play_circle"),
     ("import", "Import", "upload_file"),
     ("problems", "Problems", "report_problem"),
 )
@@ -71,7 +74,9 @@ class Window:
         self.view = BrowseView()
         self.analysis = AnalysisView()
         self.importing = ImportView()
+        self.preparing = PrepareView()
         self.dataset: str | None = None
+        self.error: str | None = None
 
     def build(self) -> None:
         with ui.header().classes("lc-header items-center gap-4 px-5 py-3"):
@@ -125,6 +130,8 @@ class Window:
                 self.datasets_panel()
             with ui.tab_panel("analysis").classes("lc-paper"):
                 self.analysis_panel()
+            with ui.tab_panel("prepare").classes("lc-paper"):
+                self.prepare_panel()
             with ui.tab_panel("import").classes("lc-paper"):
                 self.import_panel()
             with ui.tab_panel("problems").classes("lc-paper"):
@@ -140,17 +147,22 @@ class Window:
         try:
             result = await run.io_bound(run_catalog, root)
         except LabCatalogError as err:
+            # The project stays open so the Prepare page can make the missing data.
             ui.notify(str(err), type="negative", multi_line=True)
+            result, self.error = None, str(err)
         else:
+            self.error = None
+        finally:
             # Refreshing keeps the filters; opening another project starts over.
             if root != self.root:
                 self.view = BrowseView()
                 self.analysis = AnalysisView()
                 self.importing = ImportView()
-            self.root, self.result = root, result
-            self.show_result()
-        finally:
+                self.preparing = PrepareView()
+                self.root = root
             self.set_busy(False)
+        self.result = result
+        self.show_result()
 
     def set_palette(self, name: str) -> None:
         style.use_palette(name)
@@ -165,23 +177,24 @@ class Window:
 
     def show_result(self) -> None:
         result = self.result
-        self.title.set_text(
-            result.project.config.project.name if result.project else self.root.name
-        )
+        project = result.project if result else None
+        self.title.set_text(project.config.project.name if project else self.root.name)
         self.path_tip.set_text(str(self.root))
-        self.as_of.set_text(as_of_text(result))
-        self.index = build_index(result.project) if result.project else None
-        issues = result.report.issues
+        self.as_of.set_text(as_of_text(result) if result else "")
+        self.index = build_index(project) if project else None
+        issues = result.report.issues if result else []
+        failed = result is not None and result.report.has_errors()
         self.badge.set_text(str(len(issues)))
-        self.badge.props(f"color={'negative' if result.report.has_errors() else 'primary'}")
+        self.badge.props(f"color={'negative' if failed else 'primary'}")
         self.badge.visible = bool(issues)
-        if result.project is None:
+        if result is not None and project is None:
             self.tabs.set_value("problems")
         for panel in (
             self.overview_panel,
             self.instruments_panel,
             self.datasets_panel,
             self.analysis_panel,
+            self.prepare_panel,
             self.import_panel,
             self.problems_panel,
         ):
@@ -221,6 +234,13 @@ class Window:
             analysis.render(self.result, self.analysis)
 
     @ui.refreshable_method
+    def prepare_panel(self) -> None:
+        if self.root is None:
+            ui.label("Open a project folder to run its prepare steps.").classes("lc-note")
+        else:
+            prepare.render(self.root, self.preparing, lambda: self.load(self.root))
+
+    @ui.refreshable_method
     def import_panel(self) -> None:
         if self.has_catalog():
             codebook_import.render(self.result, self.importing)
@@ -228,13 +248,13 @@ class Window:
     @ui.refreshable_method
     def problems_panel(self) -> None:
         if self.result is None:
-            ui.label("Open a project folder to check it.").classes("lc-note")
+            ui.label(self.error or "Open a project folder to check it.").classes("lc-note")
         else:
             problems.render(self.result.report.issues, self.root)
 
     def has_catalog(self) -> bool:
         if self.result is None:
-            ui.label("Open a project folder to see its catalog.").classes("lc-note")
+            ui.label(self.error or "Open a project folder to see its catalog.").classes("lc-note")
         elif self.result.project is None:
             ui.label("The project files have errors. Fix them, then press Refresh.").classes(
                 "lc-note"

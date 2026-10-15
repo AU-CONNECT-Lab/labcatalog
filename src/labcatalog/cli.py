@@ -8,7 +8,7 @@ import typer
 from labcatalog import defaults
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.issues import Issue, has_errors, summarize_issues
-from labcatalog.pipeline import run_check, run_schema, run_validate
+from labcatalog.pipeline import run_check, run_prepare, run_schema, run_validate
 from labcatalog.project import init_project
 
 app = typer.Typer(
@@ -84,6 +84,19 @@ def check(project: ProjectOption = Path(".")) -> None:
     report = run_check(project)
     print_issues(report.issues)
     raise typer.Exit(EXIT_ISSUES if report.has_errors() else EXIT_OK)
+
+
+@app.command()
+def prepare(project: ProjectOption = Path(".")) -> None:
+    """Run the prepare steps in labcatalog.yaml in order, stopping at the first failure."""
+    runs = run_prepare(project, typer.echo)
+    if not runs:
+        typer.echo(f"No prepare steps in {defaults.CONFIG_FILENAME}.")
+    elif runs[-1].exit_code != 0:
+        typer.echo(f"Step {runs[-1].name} {runs[-1].outcome}.", err=True)
+        raise typer.Exit(EXIT_ISSUES)
+    else:
+        typer.echo(f"{len(runs)} step(s) succeeded.")
 
 
 @app.command()

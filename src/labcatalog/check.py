@@ -8,6 +8,7 @@ from labcatalog.config import missing_labels_for
 from labcatalog.ids import load_exclusions
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
+from labcatalog.prepare import step_states
 from labcatalog.project import Project
 from labcatalog.resolve import Catalog, ResolvedVariable, numbers_in_range
 from labcatalog.scoring import raw_items, scorable
@@ -40,6 +41,7 @@ def check_project(
             *check_dates(project, datasets),
             *check_same_answers(project, catalog, datasets),
             *check_score_agreement(project, catalog, datasets, scores),
+            *check_prepare_outputs(project),
         ]
     )
 
@@ -290,6 +292,24 @@ def examples(values) -> str:
     values = [str(value) for value in values]
     shown = ", ".join(values[: defaults.EXAMPLE_VALUES])
     return shown + (" ..." if len(values) > defaults.EXAMPLE_VALUES else "")
+
+
+def check_prepare_outputs(project: Project) -> list[Issue]:
+    issues = []
+    for state in step_states(project):
+        where = f"prepare step {state.step.name}"
+        for output in state.outputs:
+            if output.modified is None:
+                message = f"{where}: {output.path} does not exist; run the step"
+                issues.append(
+                    problem("prepare_output_missing", message, defaults.CONFIG_FILENAME, "warning")
+                )
+        if state.status == "outdated":
+            newest = max(state.inputs, key=lambda f: f.modified)
+            oldest = min(state.outputs, key=lambda f: f.modified)
+            message = f"{where}: {oldest.path} is older than {newest.path}; run the step again"
+            issues.append(problem("prepare_outdated", message, defaults.CONFIG_FILENAME, "warning"))
+    return issues
 
 
 def problem(code: str, message: str, where: str, level: IssueLevel = "error") -> Issue:
