@@ -608,6 +608,55 @@ def collection_pace(result: CatalogResult) -> go.Figure | None:
     return plots.collection_pace(facets, waves, colors)
 
 
+def ring_waves(result: CatalogResult) -> list[tuple[str, str]]:
+    config = result.project.config
+    measured = {
+        (dataset_by_name(config, s.dataset).study, dataset_by_name(config, s.dataset).wave)
+        for s in result.catalog.scores
+        if summary_of(result, s.key).mean is not None
+    }
+    return [
+        (study, wave)
+        for study, study_config in config.studies.items()
+        for wave in sorted(study_config.waves, key=wave_order)
+        if (study, wave) in measured
+    ]
+
+
+def score_ring(result: CatalogResult, study: str, wave: str) -> go.Figure | None:
+    # Scores differ in range, so each mean is shown as its place within the possible range.
+    config = result.project.config
+    found: dict[Member, ResolvedScore] = {}
+    for s in result.catalog.scores:
+        d = dataset_by_name(config, s.dataset)
+        if (d.study, d.wave) == (study, wave) and summary_of(result, s.key).mean is not None:
+            found[(s.instrument_id, s.score_id, d.reporter)] = s
+    if not found:
+        return None
+    members = sorted(found, key=lambda m: member_rank(result, m))
+    bars = []
+    for member, label in zip(members, member_labels(result, members), strict=True):
+        summary = summary_of(result, found[member].key)
+        low, high = summary.possible_range
+        share = (summary.mean - low) / (high - low) * 100 if high > low else 0.0
+        bars.append(
+            {
+                "group": member[0],
+                "label": label,
+                "value": share,
+                "hover": f"<b>{label}</b><br>mean {summary.mean:.2f}, possible {low:g} to {high:g}"
+                f"<br>{share:.0f}% of the possible range<br>n = {summary.n_valid}",
+            }
+        )
+    return plots.score_ring(
+        bars, instrument_labels(result), wave_name(result, study, wave), "% of possible range"
+    )
+
+
+def instrument_labels(result: CatalogResult) -> dict[str, str]:
+    return {i: x.abbreviation or i for i, x in result.project.instruments.items()}
+
+
 # ---- scores against each other ----
 
 

@@ -610,7 +610,9 @@ def small_multiples(panels: list[dict], y_range: tuple[float, float], y_title: s
     return base_layout(fig, 60 + 250 * rows, margin=dict(l=60, r=20, t=50, b=50))
 
 
-def score_ring(bars: list[dict], group_names: dict[str, str], centre: str, value_label: str) -> go.Figure:
+def score_ring(
+    bars: list[dict], group_names: dict[str, str], centre: str, value_label: str
+) -> go.Figure:
     # Bars grow out of a centre disc, one per score, grouped by instrument clockwise from the top.
     groups = list(dict.fromkeys(b["group"] for b in bars))
     step = (360.0 - RING_TOP_GAP - RING_GROUP_GAP * (len(groups) - 1)) / len(bars)
