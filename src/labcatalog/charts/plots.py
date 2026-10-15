@@ -3,11 +3,9 @@ import plotly.graph_objects as go
 from plotly.colors import sample_colorscale
 from plotly.subplots import make_subplots
 
-from labcatalog.charts.matrices import radial_label
 from labcatalog.charts.style import (
     CONNECTOR,
     GRID,
-    LABEL_INK,
     MUTED_INK,
     SHARE_SCALE,
     TITLE_INK,
@@ -20,14 +18,9 @@ from labcatalog.charts.style import (
 BLOCK_GAP = 1.4
 MEANS_PER_ROW = 4
 RADARS_PER_ROW = 3
-RING_HOLE = 0.42
-RING_LENGTH = 0.5
-# Degrees left open at the top for the scale, and between instruments.
-RING_TOP_GAP = 26.0
-RING_GROUP_GAP = 4.0
-RING_SPAN = 1.35
-RING_SCALE = "YlOrRd"
-RING_CENTRE = "#f3e3d0"
+LEVEL_SCALE = "YlOrRd"
+# Start of the colour scale, so short bars stay visible on white.
+LEVEL_FLOOR = 0.15
 
 
 def score_boxes(title: str, labels: list[str], series: list[dict]) -> go.Figure:
@@ -610,125 +603,58 @@ def small_multiples(panels: list[dict], y_range: tuple[float, float], y_title: s
     return base_layout(fig, 60 + 250 * rows, margin=dict(l=60, r=20, t=50, b=50))
 
 
-def score_ring(
-    bars: list[dict], group_names: dict[str, str], centre: str, value_label: str
-) -> go.Figure:
-    # Bars grow out of a centre disc, one per score, grouped by instrument clockwise from the top.
+def score_levels(bars: list[dict], group_names: dict[str, str], value_label: str) -> go.Figure:
+    # One bar per score, each instrument a block headed by its name.
     groups = list(dict.fromkeys(b["group"] for b in bars))
-    step = (360.0 - RING_TOP_GAP - RING_GROUP_GAP * (len(groups) - 1)) / len(bars)
-    angles = [
-        90.0 - RING_TOP_GAP / 2 - (k + 0.5) * step - groups.index(b["group"]) * RING_GROUP_GAP
-        for k, b in enumerate(bars)
-    ]
-    fig = go.Figure()
-    sweep = np.deg2rad(np.linspace(90.0 - RING_TOP_GAP / 2, -270.0 + RING_TOP_GAP / 2, 240))
-    for share in (0, 25, 50, 75, 100):
-        radius = RING_HOLE + RING_LENGTH * share / 100
-        fig.add_trace(
-            go.Scatter(
-                x=radius * np.cos(sweep),
-                y=radius * np.sin(sweep),
-                mode="lines",
-                line=dict(color="#cfcfcf", width=0.8, dash="dot"),
-                hoverinfo="skip",
-                showlegend=False,
-            )
-        )
-        fig.add_annotation(
-            x=0, y=radius, text=f"{share}", showarrow=False, font=dict(size=10, color=LABEL_INK)
-        )
-    disc = np.linspace(0.0, 2 * np.pi, 120)
-    fig.add_trace(
-        go.Scatter(
-            x=(RING_HOLE - 0.02) * np.cos(disc),
-            y=(RING_HOLE - 0.02) * np.sin(disc),
-            mode="lines",
-            fill="toself",
-            fillcolor=RING_CENTRE,
-            line=dict(width=0),
-            hoverinfo="skip",
-            showlegend=False,
-        )
+    members, ys, spans = block_positions(
+        [(group_names[g], [b for b in bars if b["group"] == g]) for g in groups]
     )
-    half = step * 0.4
-    for angle, bar in zip(angles, bars, strict=True):
-        outer = RING_HOLE + RING_LENGTH * float(np.clip(bar["value"], 0, 100)) / 100
-        arc = np.deg2rad(np.linspace(angle - half, angle + half, 8))
-        fig.add_trace(
-            go.Scatter(
-                x=np.concatenate([RING_HOLE * np.cos(arc), outer * np.cos(arc[::-1])]),
-                y=np.concatenate([RING_HOLE * np.sin(arc), outer * np.sin(arc[::-1])]),
-                mode="lines",
-                fill="toself",
-                fillcolor=scale_color(bar["value"], RING_SCALE, 0, 100),
-                line=dict(width=0),
-                hoveron="fills",
-                text=bar["hover"],
-                hoverinfo="text",
-                showlegend=False,
-            )
-        )
-        radial_label(fig, np.deg2rad(angle), outer + 0.03, bar["label"])
-    for g in groups:
-        members = [a for a, b in zip(angles, bars, strict=True) if b["group"] == g]
-        start, end = max(members) + half, min(members) - half
-        arc = np.deg2rad(np.linspace(start, end, 40))
-        fig.add_trace(
-            go.Scatter(
-                x=RING_HOLE * np.cos(arc),
-                y=RING_HOLE * np.sin(arc),
-                mode="lines",
-                line=dict(color="#222222", width=2),
-                hoverinfo="skip",
-                showlegend=False,
-            )
-        )
-        middle = np.deg2rad((start + end) / 2)
-        fig.add_annotation(
-            x=0.3 * np.cos(middle),
-            y=0.3 * np.sin(middle),
-            text=group_names[g],
-            showarrow=False,
-            font=dict(size=10, color="#333333"),
-        )
-    fig.add_annotation(
-        x=0, y=0, text=f"<b>{centre}</b>", showarrow=False, font=dict(size=13, color="#222222")
-    )
-    fig.add_trace(
-        go.Scatter(
-            x=[None],
-            y=[None],
-            mode="markers",
-            hoverinfo="skip",
-            showlegend=False,
+    shares = [float(np.clip(b["value"], 0, 100)) for b in members]
+    fig = go.Figure(
+        go.Bar(
+            x=shares,
+            y=ys,
+            orientation="h",
+            width=0.7,
             marker=dict(
-                colorscale=RING_SCALE,
-                cmin=0,
-                cmax=100,
-                color=[0],
-                showscale=True,
-                colorbar=dict(
-                    title=dict(text=value_label, side="right", font=dict(size=10)),
-                    thickness=10,
-                    len=0.3,
-                    x=1,
-                    y=1,
-                    yanchor="top",
-                    tickfont=dict(size=9),
-                    outlinewidth=0,
-                ),
+                color=[
+                    scale_color(LEVEL_FLOOR + (1 - LEVEL_FLOOR) * s / 100, LEVEL_SCALE, 0, 1)
+                    for s in shares
+                ],
+                line=dict(width=0.5, color="#fff"),
             ),
+            hovertext=[b["hover"] for b in members],
+            hoverinfo="text",
+            showlegend=False,
         )
     )
-    fig.update_layout(
-        showlegend=False,
-        xaxis=dict(visible=False, range=[-RING_SPAN, RING_SPAN], constrain="domain"),
-        yaxis=dict(
-            visible=False,
-            range=[-RING_SPAN, RING_SPAN],
-            scaleanchor="x",
-            scaleratio=1,
-            constrain="domain",
-        ),
+    for start, _, name in spans:
+        fig.add_annotation(
+            x=0,
+            y=start - 0.95,
+            xanchor="left",
+            text=f"<b>{name}</b>",
+            showarrow=False,
+            font=dict(size=10, color=TITLE_INK),
+        )
+    fig.update_xaxes(
+        title_text=value_label,
+        title_font=dict(size=10),
+        side="top",
+        ticksuffix="%",
+        range=[0, 100],
+        dtick=25,
+        gridcolor="#f5f5f5",
+        tickfont=dict(size=9),
+        zeroline=False,
     )
-    return base_layout(fig, 680, margin=dict(l=10, r=10, t=10, b=10))
+    fig.update_yaxes(
+        tickmode="array",
+        tickvals=ys,
+        ticktext=[b["label"] for b in members],
+        tickfont=dict(size=10),
+        range=[ys[-1] + 0.7, -1.6],
+        showgrid=False,
+        automargin=True,
+    )
+    return base_layout(fig, 72 + int(22 * (ys[-1] + 2.3)), margin=dict(l=10, r=24, t=56, b=12))

@@ -608,7 +608,7 @@ def collection_pace(result: CatalogResult) -> go.Figure | None:
     return plots.collection_pace(facets, waves, colors)
 
 
-def ring_waves(result: CatalogResult) -> list[tuple[str, str]]:
+def level_waves(result: CatalogResult) -> list[tuple[str, str]]:
     config = result.project.config
     measured = {
         (dataset_by_name(config, s.dataset).study, dataset_by_name(config, s.dataset).wave)
@@ -623,7 +623,7 @@ def ring_waves(result: CatalogResult) -> list[tuple[str, str]]:
     ]
 
 
-def score_ring(result: CatalogResult, study: str, wave: str) -> go.Figure | None:
+def score_levels(result: CatalogResult, study: str, wave: str) -> go.Figure | None:
     # Scores differ in range, so each mean is shown as its place within the possible range.
     config = result.project.config
     found: dict[Member, ResolvedScore] = {}
@@ -648,13 +648,14 @@ def score_ring(result: CatalogResult, study: str, wave: str) -> go.Figure | None
                 f"<br>{share:.0f}% of the possible range<br>n = {summary.n_valid}",
             }
         )
-    return plots.score_ring(
-        bars, instrument_labels(result), wave_name(result, study, wave), "% of possible range"
-    )
+    return plots.score_levels(bars, instrument_names(result), "% of possible range")
 
 
-def instrument_labels(result: CatalogResult) -> dict[str, str]:
-    return {i: x.abbreviation or i for i, x in result.project.instruments.items()}
+def instrument_names(result: CatalogResult) -> dict[str, str]:
+    return {
+        i: f"{x.abbreviation}: {x.name}" if x.abbreviation else x.name
+        for i, x in result.project.instruments.items()
+    }
 
 
 # ---- scores against each other ----
@@ -764,17 +765,13 @@ def score_grid(
                 if corr.r[i][j] is not None:
                     z[a, b] = corr.r[i][j]
                     n[a][b] = corr.n[i][j]
-    names = {
-        i: f"{x.abbreviation}: {x.name}" if x.abbreviation else x.name
-        for i, x in result.project.instruments.items()
-    }
     return matrices.dot_grid(
         z,
         n,
         member_labels(result, members),
         [m[0] for m in members],
         instrument_order(result),
-        names,
+        instrument_names(result),
         wave_name(result, *lower),
         wave_name(result, *upper),
         "Pearson r",

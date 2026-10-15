@@ -138,20 +138,20 @@ def overview_section(result: CatalogResult) -> None:
 
 
 def score_levels(result: CatalogResult) -> None:
-    waves = views.ring_waves(result)
+    waves = views.level_waves(result)
     if not waves:
         return
     choices = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
 
     @ui.refreshable
-    def ring(choice: str) -> None:
-        show(views.score_ring(result, *choice.split("|")))
+    def bars(choice: str) -> None:
+        show(views.score_levels(result, *choice.split("|")))
 
     heading("Scores in each wave")
-    ui.toggle(choices, value=next(iter(choices)), on_change=lambda e: ring.refresh(e.value)).props(
+    ui.toggle(choices, value=next(iter(choices)), on_change=lambda e: bars.refresh(e.value)).props(
         "dense no-caps"
     )
-    ring(next(iter(choices)))
+    bars(next(iter(choices)))
 
 
 def first_two(choices: dict[str, str]) -> tuple[str, str]:

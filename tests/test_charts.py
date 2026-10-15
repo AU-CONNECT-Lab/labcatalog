@@ -62,20 +62,20 @@ def test_overview_charts(result):
     assert views.score_circle(result, "mock_study", "1", []) is None
 
 
-def test_score_ring_shows_every_score_of_the_wave_within_its_range(result):
-    assert views.ring_waves(result) == [
+def test_score_levels_show_every_score_of_the_wave_within_its_range(result):
+    assert views.level_waves(result) == [
         ("mock_study", "1"),
         ("mock_study", "2"),
         ("mock_study", "3"),
     ]
-    ring = views.score_ring(result, "mock_study", "1")
-    bars = [trace for trace in ring.data if trace.hoveron == "fills"]
+    bars = views.score_levels(result, "mock_study", "1").data[0]
     scores = {
         (s.instrument_id, s.score_id)
         for s in result.catalog.scores
         if s.dataset in ("parent_w1", "child_w1")
     }
-    assert len(bars) == len(scores)
+    assert len(bars.y) == len(scores)
+    assert all(0 <= share <= 100 for share in bars.x)
 
 
 def test_dot_grid_puts_one_wave_below_the_diagonal_and_another_above(result):
