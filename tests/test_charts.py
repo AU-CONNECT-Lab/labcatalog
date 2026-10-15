@@ -1,5 +1,6 @@
 import pytest
 
+from labcatalog import analysis
 from labcatalog.charts import views
 from labcatalog.charts.style import STATUS_COLORS
 from labcatalog.pipeline import run_catalog
@@ -121,12 +122,21 @@ def test_score_correlates_skip_own_subscales_and_put_strongest_first(result):
     assert strengths == sorted(strengths, reverse=True)
 
 
-def test_regression_defaults_to_another_instrument(result):
-    x = views.default_score(result, "example_mood")
-    assert x == "example_mood|ems_total"
-    y = views.default_partner(result, x)
-    assert y.split("|")[0] != "example_mood"
-    assert views.regression(result, x, y) is not None
+def test_pair_scatter_plots_the_people_of_the_sample(result):
+    sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
+    choices = views.variable_choices(result, sample.datasets)
+    x, y = "example_mood.ems_total@child_w1", "example_parent_stress.eps_mean@parent_w1"
+    # Two files share Wave 1, so the labels name the reporter too.
+    assert choices[x] == "EMS total score (Wave 1 · child)"
+    assert choices[y] == "EPS mean score (Wave 1 · parent)"
+    assert views.total_choices(result, sample.datasets) == [
+        x,
+        y,
+        "example_child_sleep.ecs_total@parent_w1",
+    ]
+    fig = views.pair_scatter(result, sample, x, y)
+    both = analysis.table(result, sample, [x, y]).dropna()
+    assert len(fig.data[0].x) == len(both)
 
 
 def test_answer_grid_shows_one_instrument(result):

@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
 
-from labcatalog import defaults
+from labcatalog import analysis, defaults
 from labcatalog.browse import as_set, facet_label, facet_names, value_order
 from labcatalog.charts import matrices, network, plots, scatter
 from labcatalog.charts.style import SERIES_COLORS, group_color, natural_key, wave_color
@@ -482,31 +482,6 @@ def default_score(result: CatalogResult, instrument_id: str) -> str:
     return preferred if preferred in choices else choices[0]
 
 
-def default_partner(result: CatalogResult, choice: str) -> str:
-    # A total from another instrument that meets this score in some wave; its own subscales say little.
-    met = partners(result, choice)
-    others = [c for c in met if c.split("|")[0] != choice.split("|")[0]]
-    totals = []
-    for other in others:
-        instrument_id, score_id = other.split("|")
-        instrument = result.project.instruments[instrument_id]
-        if is_total(instrument, next(s for s in instrument.scores if s.id == score_id)):
-            totals.append(other)
-    rest = [c for c in score_choices(result) if c != choice]
-    return (totals or others or rest)[0]
-
-
-def partners(result: CatalogResult, choice: str) -> list[str]:
-    by_key = {s.key: f"{s.instrument_id}|{s.score_id}" for s in result.catalog.scores}
-    met = []
-    for corr in result.summary.correlations:
-        for i, key in enumerate(corr.keys):
-            if by_key[key] == choice:
-                met += [by_key[k] for j, k in enumerate(corr.keys) if corr.r[i][j] is not None]
-    order = list(score_choices(result))
-    return sorted(set(met) - {choice}, key=order.index)
-
-
 # ---- overview page ----
 
 
@@ -868,79 +843,6 @@ def score_choices(result: CatalogResult) -> dict[str, str]:
     }
 
 
-def linked(result: CatalogResult, score: ResolvedScore) -> pd.Series:
-    # People meet across datasets the way stats.correlate_by says; repeated keys are ambiguous.
-    loaded = result.datasets[score.dataset]
-    by_group = (
-        result.project.config.stats.correlate_by not in ("id", "none") and loaded.group is not None
-    )
-    keys = loaded.group if by_group else loaded.frame[loaded.id_column]
-    values = pd.Series(
-        result.scores[score.dataset][score.key].to_numpy(), index=keys.astype(str).to_numpy()
-    ).dropna()
-    return values[~values.index.duplicated(keep=False)]
-
-
-def regression(result: CatalogResult, x_choice: str, y_choice: str) -> go.Figure | None:
-    x_id, y_id = x_choice.split("|"), y_choice.split("|")
-    config = result.project.config
-    groups = []
-    for study, study_config in config.studies.items():
-        for wave in sorted(study_config.waves, key=wave_order):
-            xs = [
-                s
-                for s in resolved(result, *x_id)
-                if (
-                    dataset_by_name(config, s.dataset).study,
-                    dataset_by_name(config, s.dataset).wave,
-                )
-                == (study, wave)
-            ]
-            ys = [
-                s
-                for s in resolved(result, *y_id)
-                if (
-                    dataset_by_name(config, s.dataset).study,
-                    dataset_by_name(config, s.dataset).wave,
-                )
-                == (study, wave)
-            ]
-            if not xs or not ys:
-                continue
-            same = [(x, y) for x in xs for y in ys if x.dataset == y.dataset]
-            if same:
-                x, y = same[0]
-                frame = pd.DataFrame(
-                    {
-                        "x": result.scores[x.dataset][x.key],
-                        "y": result.scores[y.dataset][y.key],
-                        "id": ids_of(result, x.dataset),
-                    }
-                ).dropna()
-                frame = frame.set_index("id")
-            else:
-                frame = pd.concat(
-                    [linked(result, xs[0]).rename("x"), linked(result, ys[0]).rename("y")],
-                    axis=1,
-                    join="inner",
-                ).dropna()
-            if len(frame) < defaults.MIN_CORRELATION_N:
-                continue
-            groups.append(
-                {
-                    "name": wave_name(result, study, wave),
-                    "color": wave_colors(result)[wave],
-                    "x": frame["x"].to_numpy(dtype=float),
-                    "y": frame["y"].to_numpy(dtype=float),
-                    "ids": [str(i) for i in frame.index],
-                }
-            )
-    if not groups:
-        return None
-    choices = score_choices(result)
-    return scatter.regression(choices[x_choice], choices[y_choice], groups)
-
-
 # ---- one instrument in one dataset ----
 
 
@@ -1137,3 +1039,52 @@ def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> 
             }
         )
     return plots.small_multiples(panels, option_range(instrument), "Answer") if panels else None
+
+
+# ---- analysis page ----
+
+
+def dataset_label(result: CatalogResult, name: str) -> str:
+    d = dataset_by_name(result.project.config, name)
+    return f"{name} ({wave_name(result, d.study, d.wave)}, {d.reporter})"
+
+
+def variable_choices(result: CatalogResult, datasets: list[str]) -> dict[str, str]:
+    # Every score of the chosen files, named by score and by wave (and reporter where a wave has several).
+    names = series_names(result, dataset_order(result, datasets))
+    return {
+        s.key: f"{short_label(result.project.instruments[s.instrument_id], definition(result, s))}"
+        f" ({names[s.dataset]})"
+        for name in names
+        for s in result.catalog.scores_for(name)
+    }
+
+
+def total_choices(result: CatalogResult, datasets: list[str]) -> list[str]:
+    found = []
+    for key in variable_choices(result, datasets):
+        score = score_of(result, key)
+        if is_total(result.project.instruments[score.instrument_id], definition(result, score)):
+            found.append(key)
+    return found
+
+
+def score_of(result: CatalogResult, key: str) -> ResolvedScore:
+    return next(s for s in result.catalog.scores if s.key == key)
+
+
+def pair_scatter(
+    result: CatalogResult, sample: analysis.Sample, x: str, y: str
+) -> go.Figure | None:
+    frame = analysis.table(result, sample, [x, y]).dropna()
+    if len(frame) < defaults.MIN_CORRELATION_N:
+        return None
+    labels = variable_choices(result, sample.datasets)
+    group = {
+        "name": "Sample",
+        "color": series_color(result, score_of(result, y).dataset),
+        "x": frame[x].to_numpy(dtype=float),
+        "y": frame[y].to_numpy(dtype=float),
+        "ids": [str(i) for i in frame.index],
+    }
+    return scatter.regression(labels[x], labels[y], [group])

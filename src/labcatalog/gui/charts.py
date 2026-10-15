@@ -7,15 +7,17 @@ from labcatalog.gui.common import heading, note, section
 from labcatalog.pipeline import CatalogResult
 
 
-def show(fig: go.Figure | None, empty: str = "") -> None:
+def show(fig: go.Figure | None, empty: str = "") -> ui.plotly | None:
     if fig is None:
         if empty:
             note(empty)
-        return
+        return None
     height = (fig.layout.height or 400) + 8
-    ui.plotly(
-        {**theme.on_glass(fig.to_plotly_json()), "config": {"displayModeBar": False}}
-    ).classes("w-full").style(f"height:{height}px")
+    return (
+        ui.plotly({**theme.on_glass(fig.to_plotly_json()), "config": {"displayModeBar": False}})
+        .classes("w-full")
+        .style(f"height:{height}px")
+    )
 
 
 def side_by_side(*panels: tuple[str, go.Figure | None]) -> None:

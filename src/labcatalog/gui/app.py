@@ -5,7 +5,8 @@ from nicegui import app, run, ui
 
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import datasets, instruments, overview, problems, theme
+from labcatalog.gui import analysis, datasets, instruments, overview, problems, theme
+from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.instruments import BrowseView
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.version import __version__
@@ -15,12 +16,15 @@ PAGES = (
     ("overview", "Overview", "dashboard"),
     ("instruments", "Instruments", "list_alt"),
     ("datasets", "Datasets", "table_chart"),
+    ("analysis", "Analysis", "query_stats"),
     ("problems", "Problems", "report_problem"),
 )
 
 
 def launch(project: Path | None = None) -> None:
     theme.install()
+    # Saving a table or figure goes through the window's own save dialog.
+    app.native.settings["ALLOW_DOWNLOADS"] = True
     ui.run(
         root=lambda: main_page(project),
         title=f"labcatalog {__version__}",
@@ -50,6 +54,7 @@ class Window:
         self.result: CatalogResult | None = None
         self.index: BrowseIndex | None = None
         self.view = BrowseView()
+        self.analysis = AnalysisView()
         self.dataset: str | None = None
 
     def build(self) -> None:
@@ -96,6 +101,8 @@ class Window:
                 self.instruments_panel()
             with ui.tab_panel("datasets"):
                 self.datasets_panel()
+            with ui.tab_panel("analysis"):
+                self.analysis_panel()
             with ui.tab_panel("problems"):
                 self.problems_panel()
 
@@ -114,6 +121,7 @@ class Window:
             # Refreshing keeps the filters; opening another project starts over.
             if root != self.root:
                 self.view = BrowseView()
+                self.analysis = AnalysisView()
             self.root, self.result = root, result
             self.show_result()
         finally:
@@ -142,6 +150,7 @@ class Window:
             self.overview_panel,
             self.instruments_panel,
             self.datasets_panel,
+            self.analysis_panel,
             self.problems_panel,
         ):
             panel.refresh()
@@ -173,6 +182,11 @@ class Window:
     def datasets_panel(self) -> None:
         if self.has_catalog():
             datasets.render(self.result, self.dataset, self.show_dataset, self.open_instrument)
+
+    @ui.refreshable_method
+    def analysis_panel(self) -> None:
+        if self.has_catalog():
+            analysis.render(self.result, self.analysis)
 
     @ui.refreshable_method
     def problems_panel(self) -> None:

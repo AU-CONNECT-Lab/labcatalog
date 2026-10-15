@@ -1,0 +1,132 @@
+from dataclasses import dataclass
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+from labcatalog import defaults
+from labcatalog.pipeline import CatalogResult
+
+
+@dataclass
+class Sample:
+    datasets: list[str]
+    people: list[str]
+    # Rows left out because their ID or group repeats within a file.
+    ambiguous: int
+
+
+@dataclass
+class Correlation:
+    n: int
+    r: float | None = None
+    p: float | None = None
+    low: float | None = None
+    high: float | None = None
+
+
+@dataclass
+class Fit:
+    correlation: Correlation
+    slope: float
+    slope_se: float
+    intercept: float
+    intercept_se: float
+
+
+def link_keys(result: CatalogResult, dataset: str) -> pd.Series:
+    # People meet across files the way stats.correlate_by says; a file without the group links by ID.
+    loaded = result.datasets[dataset]
+    by_group = (
+        result.project.config.stats.correlate_by not in ("id", "none") and loaded.group is not None
+    )
+    keys = loaded.group if by_group else loaded.frame[loaded.id_column]
+    return keys.astype("string")
+
+
+def linkable(keys: pd.Series) -> np.ndarray:
+    return (keys.notna() & ~keys.duplicated(keep=False)).to_numpy()
+
+
+def build_sample(result: CatalogResult, datasets: list[str], intersect: bool) -> Sample:
+    found = []
+    for name in datasets:
+        keys = link_keys(result, name)
+        found.append(set(keys[linkable(keys)]))
+    ambiguous = sum(
+        int(link_keys(result, name).dropna().duplicated(keep=False).sum()) for name in datasets
+    )
+    if not found:
+        people: set[str] = set()
+    elif intersect:
+        people = set.intersection(*found)
+    else:
+        people = set().union(*found)
+    return Sample(list(datasets), sorted(people), ambiguous)
+
+
+def values(result: CatalogResult, sample: Sample, key: str) -> pd.Series:
+    score = next(s for s in result.catalog.scores if s.key == key)
+    keys = link_keys(result, score.dataset)
+    keep = linkable(keys)
+    found = result.scores[score.dataset][key].to_numpy(dtype=float)[keep]
+    return pd.Series(found, index=keys.to_numpy()[keep]).reindex(sample.people)
+
+
+def table(result: CatalogResult, sample: Sample, keys: list[str]) -> pd.DataFrame:
+    return pd.DataFrame({key: values(result, sample, key) for key in keys})
+
+
+def correlate(x: pd.Series, y: pd.Series) -> Correlation:
+    both = pd.concat([x, y], axis=1).dropna()
+    n = len(both)
+    if (
+        n < defaults.MIN_CORRELATION_N
+        or both.iloc[:, 0].nunique() < 2
+        or both.iloc[:, 1].nunique() < 2
+    ):
+        return Correlation(n)
+    found = stats.pearsonr(both.iloc[:, 0], both.iloc[:, 1])
+    # The Fisher z interval needs more than three people.
+    low, high = found.confidence_interval() if n > 3 else (None, None)
+    return Correlation(
+        n,
+        float(found.statistic),
+        float(found.pvalue),
+        None if low is None else float(low),
+        None if high is None else float(high),
+    )
+
+
+def regress(x: pd.Series, y: pd.Series) -> Fit | None:
+    correlation = correlate(x, y)
+    if correlation.r is None:
+        return None
+    both = pd.concat([x, y], axis=1).dropna()
+    found = stats.linregress(both.iloc[:, 0], both.iloc[:, 1])
+    return Fit(
+        correlation,
+        float(found.slope),
+        float(found.stderr),
+        float(found.intercept),
+        float(found.intercept_stderr),
+    )
+
+
+def correlation_matrix(frame: pd.DataFrame) -> list[list[Correlation]]:
+    columns = list(frame.columns)
+    return [
+        [
+            correlate(frame[a], frame[b]) if a != b else Correlation(int(frame[a].notna().sum()))
+            for b in columns
+        ]
+        for a in columns
+    ]
+
+
+def describe(series: pd.Series) -> tuple[int, float | None, float | None]:
+    found = series.dropna().to_numpy(dtype=float)
+    if not len(found):
+        return 0, None, None
+    sd = float(np.std(found, ddof=1)) if len(found) > 1 else None
+    return len(found), float(found.mean()), sd
