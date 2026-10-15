@@ -44,6 +44,9 @@ class WaveConfig(StrictModel):
 
 class StudyConfig(StrictModel):
     label: str | None = None
+    description: str | None = None
+    citation: str | None = None
+    doi: str | None = None
     waves: dict[str, WaveConfig] = {}
 
 

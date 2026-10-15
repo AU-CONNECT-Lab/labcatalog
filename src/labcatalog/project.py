@@ -11,6 +11,7 @@ from labcatalog import defaults
 from labcatalog.config import ProjectConfig
 from labcatalog.exceptions import MetadataError, ProjectExistsError, ProjectNotFoundError
 from labcatalog.issues import Issue, issues_from_validation_error
+from labcatalog.paths import expand_path
 from labcatalog.schema import Instrument, LenientStrings, StudyContent
 from labcatalog.varmap import MapEntry, load_variable_map
 
@@ -65,6 +66,15 @@ def load_project(root: Path) -> Project:
         instrument_files=instrument_files,
         study_files=study_files,
     )
+
+
+def references_root(project: Project) -> Path:
+    root = project.config.references.root
+    return expand_path(root, project.root) if root else project.root
+
+
+def reference_pdf(project: Project, pdf: str) -> Path:
+    return expand_path(pdf, references_root(project))
 
 
 def load_yaml(path: Path) -> Any:

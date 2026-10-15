@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from labcatalog.exceptions import MetadataError, ProjectNotFoundError
-from labcatalog.project import load_project
+from labcatalog.project import load_project, reference_pdf
 
 
 def load_issues(root: Path) -> list:
@@ -59,3 +59,12 @@ def test_empty_file_reports_required_fields(demo_project):
     [issue] = load_issues(demo_project)
     assert issue.code == "missing"
     assert issue.message.startswith("study:")
+
+
+def test_reference_pdfs_resolve_against_the_references_root(mock_project):
+    project = load_project(mock_project)
+    root = mock_project.resolve()
+    assert reference_pdf(project, "example_mood.pdf") == root / "references" / "example_mood.pdf"
+    assert reference_pdf(project, str(root / "other.pdf")) == root / "other.pdf"
+    project.config.references.root = None
+    assert reference_pdf(project, "papers/a.pdf") == root / "papers" / "a.pdf"

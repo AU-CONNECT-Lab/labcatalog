@@ -26,6 +26,7 @@ scores:
   - {id: ems_low_positive, label: Low positive affect, method: sum, items: [ems_1, ems_4]}
 references:
   - citation: "Example, A., & Sample, B. (2019). Development of the Example Mood Scale. Journal of Demonstration Measures, 4(2), 101-115. (Fictional reference for the mock project.)"
+    pdf: example_mood.pdf
 license: Free for research use (fictional)
 custom:
   domain: emotion

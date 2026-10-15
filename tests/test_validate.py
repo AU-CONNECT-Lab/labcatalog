@@ -164,3 +164,19 @@ def test_scored_items_need_numeric_options(mock_project):
     issues = run_validate(mock_project)
     assert codes(issues) == {"invalid_value"}
     assert "numeric" in issues[0].message
+
+
+def test_missing_reference_pdf_is_a_warning(mock_project):
+    edit(
+        mock_project / "instruments" / "example_mood.yaml", "pdf: example_mood.pdf", "pdf: gone.pdf"
+    )
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level) == ("pdf_missing", "warning")
+    assert issue.location == "instruments/example_mood.yaml"
+    assert "gone.pdf" in issue.message
+
+
+def test_missing_references_root_is_reported_once(mock_project):
+    edit(mock_project / "labcatalog.yaml", "root: references", "root: ~/not-synced-yet")
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level) == ("references_root_missing", "warning")

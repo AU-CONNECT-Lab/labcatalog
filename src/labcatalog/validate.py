@@ -6,7 +6,7 @@ from typing import Any
 from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
 from labcatalog.issues import Issue, IssueLevel
-from labcatalog.project import Project
+from labcatalog.project import Project, reference_pdf, references_root
 from labcatalog.schema import Administration, Instrument
 
 CONFIG = defaults.CONFIG_FILENAME
@@ -21,6 +21,7 @@ def validate_project(project: Project) -> list[Issue]:
         *check_missing_code_collisions(project),
         *check_variable_maps(project),
         *check_data_settings(project),
+        *check_references(project),
     ]
 
 
@@ -383,6 +384,25 @@ def check_data_settings(project: Project) -> list[Issue]:
     if config.stats.correlate_by not in allowed:
         message = f"stats.correlate_by: '{config.stats.correlate_by}' is not one of {', '.join(sorted(allowed))}"
         issues.append(problem("invalid_value", message, CONFIG))
+    return issues
+
+
+def check_references(project: Project) -> list[Issue]:
+    # A shared folder not yet synced on this computer should not block the catalog.
+    root = references_root(project)
+    if not root.is_dir():
+        message = f"references.root: folder not found: {root}"
+        return [problem("references_root_missing", message, CONFIG, "warning")]
+    issues = []
+    for instrument_id, instrument in project.instruments.items():
+        for n, reference in enumerate(instrument.references, start=1):
+            if not reference.pdf:
+                continue
+            path = reference_pdf(project, reference.pdf)
+            if not path.is_file():
+                message = f"references[{n}].pdf: file not found: {path}"
+                location = project.instrument_files[instrument_id]
+                issues.append(problem("pdf_missing", message, location, "warning"))
     return issues
 
 

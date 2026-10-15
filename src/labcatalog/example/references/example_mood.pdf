@@ -1,0 +1,61 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 681 >>
+stream
+BT
+72 720 Td
+/F1 18 Tf
+(Development of the Example Mood Scale) Tj
+0 -26 Td
+/F1 11 Tf
+(Example, A., & Sample, B. \(2019\). Journal of Demonstration Measures, 4\(2\), 101-115.) Tj
+0 -19 Td
+/F1 11 Tf
+() Tj
+0 -19 Td
+/F1 11 Tf
+(This article is fictional. It stands in for an instrument's original reference) Tj
+0 -19 Td
+/F1 11 Tf
+(so that the labcatalog example can show a PDF next to the citation.) Tj
+0 -19 Td
+/F1 11 Tf
+() Tj
+0 -19 Td
+/F1 11 Tf
+(Six items, answered on a four-point frequency scale \(0 = Never to 3 = Always\).) Tj
+0 -19 Td
+/F1 11 Tf
+(Items 1 and 4 are reverse scored. Subscales: Sadness, Worry and fatigue,) Tj
+0 -19 Td
+/F1 11 Tf
+(Low positive affect.) Tj
+0 -19 Td
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000973 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1043
+%%EOF

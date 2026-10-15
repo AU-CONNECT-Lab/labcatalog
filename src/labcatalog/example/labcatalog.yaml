@@ -62,3 +62,7 @@ custom_fields:
 # The filters on the Instruments page, in this order.
 browse:
   facets: [study, wave, reporter, domain]
+
+# The folder holding the instruments' reference PDFs (often a shared Box or OneDrive folder; ~ and environment variables work). Each reference's pdf is a path inside it.
+references:
+  root: references

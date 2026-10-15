@@ -1,15 +1,18 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
 
-from nicegui import ui
+from nicegui import app, ui
 
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.gui import charts
-from labcatalog.gui.common import as_text, col, fmt, heading, note, table, unique
+from labcatalog.gui.common import as_text, col, fmt, heading, note, open_path, table, unique
 from labcatalog.pipeline import CatalogResult
+from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
-from labcatalog.schema import Instrument, Text
+from labcatalog.schema import Instrument, Reference, Text
 
 PAGE_SIZE = 50
 
@@ -205,14 +208,41 @@ def about(result: CatalogResult, instrument: Instrument) -> None:
     if instrument.instructions:
         ui.label(text_of(instrument.instructions)).classes("italic")
     for reference in instrument.references:
-        with ui.row().classes("items-baseline gap-2"):
-            ui.label(reference.citation)
-            if reference.doi:
-                ui.link("DOI", f"https://doi.org/{reference.doi}", new_tab=True)
-            if reference.url:
-                ui.link("Link", reference.url, new_tab=True)
+        reference_row(result.project, reference)
     if instrument.license:
         note(f"License: {instrument.license}")
+
+
+def reference_row(project: Project, reference: Reference) -> None:
+    pdf = reference_pdf(project, reference.pdf) if reference.pdf else None
+    with ui.row().classes("items-baseline gap-2"):
+        ui.label(reference.citation)
+        if reference.doi:
+            ui.link("DOI", f"https://doi.org/{reference.doi}", new_tab=True)
+        if reference.url:
+            ui.link("Link", reference.url, new_tab=True)
+        if pdf and pdf.is_file():
+            ui.button("View PDF", on_click=lambda: toggle_viewer()).props("flat dense no-caps")
+            ui.button("Open", on_click=lambda: open_path(pdf)).props("flat dense no-caps")
+        elif pdf:
+            note("PDF not found")
+    viewer = ui.column().classes("w-full")
+
+    # The PDF loads only when someone asks to see it.
+    def toggle_viewer() -> None:
+        if viewer.default_slot.children:
+            viewer.clear()
+            return
+        with viewer:
+            ui.element("iframe").props(f'src="{pdf_url(pdf)}"').classes("w-full").style(
+                "height: 80vh; border: 1px solid #e0e0e0"
+            )
+
+
+# One route per file, however often the page is redrawn.
+@cache
+def pdf_url(pdf: Path) -> str:
+    return app.add_static_file(local_file=pdf, max_cache_age=0)
 
 
 def reported(variables: list) -> str:
