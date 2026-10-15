@@ -34,6 +34,7 @@ def test_selections_must_hold_within_one_administration(mock_project):
     index = index_for(mock_project)
     assert list(matches(index, {"wave": {WAVE_1}})) == [
         "example_child_sleep",
+        "example_demographics",
         "example_mood",
         "example_parent_stress",
     ]
@@ -49,9 +50,9 @@ def test_selections_must_hold_within_one_administration(mock_project):
 def test_counts_keep_the_facets_own_values_open(mock_project):
     index = index_for(mock_project)
     found = counts(index, {"wave": {WAVE_1}})
-    assert found["wave"] == {WAVE_1: 3, WAVE_2: 4, WAVE_3: 4}
-    assert found["reporter"] == {"parent": 2, "child": 1}
-    assert found["domain"] == {"emotion": 1, "family": 1, "health": 1, "media": 0}
+    assert found["wave"] == {WAVE_1: 4, WAVE_2: 5, WAVE_3: 5}
+    assert found["reporter"] == {"parent": 3, "child": 1}
+    assert found["domain"] == {"emotion": 1, "family": 2, "health": 1, "media": 0}
 
 
 def test_search_names_and_optionally_item_text(mock_project):

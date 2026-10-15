@@ -14,7 +14,7 @@ def test_every_mapped_item_becomes_a_variable(mock_project):
         name: len(catalog.variables_for(name))
         for name in ["parent_w1", "parent_w3", "child_w1", "child_w2", "child_w3"]
     }
-    assert counts == {"parent_w1": 9, "parent_w3": 9, "child_w1": 6, "child_w2": 9, "child_w3": 9}
+    assert counts == {"parent_w1": 14, "parent_w3": 14, "child_w1": 6, "child_w2": 9, "child_w3": 9}
     variable = next(v for v in catalog.variables if v.column == "ecs_1_w2")
     assert (variable.study, variable.wave, variable.reporter, variable.target) == (
         "mock_study",

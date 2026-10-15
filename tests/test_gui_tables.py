@@ -71,4 +71,8 @@ def test_dataset_page_lists_each_file_with_the_study_citation(mock_project):
         ("parent_w3", "3", "parent"),
     ]
     _, instruments = datasets.completeness_table(result, result.summary.datasets[0])
-    assert {r["id"] for r in instruments} == {"example_parent_stress", "example_child_sleep"}
+    assert {r["id"] for r in instruments} == {
+        "example_parent_stress",
+        "example_child_sleep",
+        "example_demographics",
+    }
