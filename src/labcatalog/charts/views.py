@@ -486,8 +486,8 @@ def default_score(result: CatalogResult, instrument_id: str) -> str:
 # ---- overview page ----
 
 
-def timeline(result: CatalogResult, progress: bool, today: date | None = None) -> go.Figure | None:
-    # Each wave from its start to its end, a wave still collecting up to today; milestones on their own lane.
+def timeline(result: CatalogResult, today: date | None = None) -> go.Figure | None:
+    # Each wave from its start to its end with its counts; milestones on their own lane.
     config = result.project.config
     today = today or date.today()
     counts: dict[tuple[str, str], dict[str, int]] = {}
@@ -512,21 +512,20 @@ def timeline(result: CatalogResult, progress: bool, today: date | None = None) -
                 "hover": f"<b>{lane}</b><br>{dates.start} to {dates.end or 'now, still collecting'}"
                 + "".join(f"<br>{reporter}: {n}" for reporter, n in found.items()),
             }
-            if progress:
-                before = counts.get((study, earlier), {}) if earlier else {}
-                bar["text"] = ", ".join(
-                    f"{reporter} {n}"
-                    + (
-                        f" of {before[reporter]} ({n / before[reporter]:.0%})"
-                        if ongoing and before.get(reporter)
-                        else ""
-                    )
-                    for reporter, n in found.items()
+            before = counts.get((study, earlier), {}) if earlier else {}
+            bar["text"] = ", ".join(
+                f"{reporter} {n}"
+                + (
+                    f" of {before[reporter]} ({n / before[reporter]:.0%})"
+                    if ongoing and before.get(reporter)
+                    else ""
                 )
-                # A wave still collecting is drawn as long as the one before it took.
-                previous = study_config.waves.get(earlier) if earlier else None
-                if ongoing and previous and previous.start and previous.end:
-                    bar["projected"] = dates.start + (previous.end - previous.start)
+                for reporter, n in found.items()
+            )
+            # A wave still collecting is drawn as long as the one before it took.
+            previous = study_config.waves.get(earlier) if earlier else None
+            if ongoing and previous and previous.start and previous.end:
+                bar["projected"] = dates.start + (previous.end - previous.start)
             lanes.append(lane)
             bars.append(bar)
             earlier = wave

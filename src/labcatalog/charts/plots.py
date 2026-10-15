@@ -30,6 +30,8 @@ DOT_BOTTOM = 16
 TITLE_ROOM = 28
 # Room on the calendar before the first date and after the last.
 TIMELINE_PAD = timedelta(days=30)
+# Bar thickness as a share of a lane.
+TIMELINE_BAR = 0.3
 
 
 def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date) -> go.Figure:
@@ -46,7 +48,7 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
                     x=[(end - start).total_seconds() * 1000],
                     base=[start.isoformat()],
                     orientation="h",
-                    width=0.5,
+                    width=TIMELINE_BAR,
                     marker=dict(color=rgba(bar["color"], alpha), line=dict(width=0)),
                     hovertext=[bar["hover"]],
                     hoverinfo="text",
@@ -58,7 +60,7 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
             fig.add_annotation(
                 x=bar["start"].isoformat(),
                 y=bar["lane"],
-                yshift=13,
+                yshift=8,
                 xanchor="left",
                 yanchor="bottom",
                 text=bar["text"],

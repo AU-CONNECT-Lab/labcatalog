@@ -61,17 +61,22 @@ def test_means_show_one_instrument(result):
 
 def test_timeline_draws_waves_up_to_today_and_the_milestones(result):
     today = date(2026, 10, 15)
-    plain = views.timeline(result, False, today)
-    assert list(plain.layout.yaxis.categoryarray) == ["Wave 1", "Wave 2", "Wave 3", "Milestones"]
-    bars = [t for t in plain.data if t.type == "bar"]
-    # Wave 3 has no end yet, so its bar runs from its start to today.
-    assert bars[2].base[0] == "2026-09-01"
-    assert bars[2].x[0] == (today - date(2026, 9, 1)).days * 86_400_000
-    marks = next(t for t in plain.data if t.type == "scatter")
+    fig = views.timeline(result, today)
+    assert list(fig.layout.yaxis.categoryarray) == ["Wave 1", "Wave 2", "Wave 3", "Milestones"]
+    bars = [t for t in fig.data if t.type == "bar"]
+    # Wave 3 has no end yet: a faint bar as long as wave 2 took, a solid one up to today.
+    projected, solid = bars[2], bars[3]
+    assert projected.base[0] == solid.base[0] == "2026-09-01"
+    assert projected.x[0] == (date(2026, 5, 31) - date(2025, 9, 1)).days * 86_400_000
+    assert solid.x[0] == (today - date(2026, 9, 1)).days * 86_400_000
+    marks = next(t for t in fig.data if t.type == "scatter")
     assert list(marks.text) == ["Interim report", "Wave 3 data freeze"]
-    progress = views.timeline(result, True, today)
-    texts = [a.text for a in progress.layout.annotations if a.text != "Today"]
-    assert texts[2] == "parent 60 of 128 (47%), child 56 of 116 (48%)"
+    texts = [a.text for a in fig.layout.annotations if a.text != "Today"]
+    assert texts == [
+        "parent 146, child 140",
+        "parent 128, child 116",
+        "parent 60 of 128 (47%), child 56 of 116 (48%)",
+    ]
 
 
 def test_overview_charts(result):
