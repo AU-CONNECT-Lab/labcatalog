@@ -2,7 +2,8 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from nicegui import ui
@@ -28,6 +29,19 @@ def table(columns: list[dict], rows: list[dict], pagination: int | None = None) 
 
 def keyed(rows: list[dict]) -> list[dict]:
     return [{ROW_KEY: i, **row} for i, row in enumerate(rows)]
+
+
+@contextmanager
+def card(title: str, subtitle: str = "") -> Iterator[ui.row]:
+    # Yields the header's right-hand row, for controls that belong to the card.
+    with ui.card().props("flat").classes("lc-card w-full"):
+        with ui.row().classes("w-full items-start no-wrap gap-4"):
+            with ui.column().classes("grow gap-0"):
+                ui.label(title).classes("lc-card-title")
+                if subtitle:
+                    ui.label(subtitle).classes("lc-card-subtitle")
+            tools = ui.row().classes("items-center no-wrap gap-3")
+        yield tools
 
 
 def section(text: str) -> None:

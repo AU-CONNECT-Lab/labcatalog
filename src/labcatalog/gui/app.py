@@ -64,12 +64,12 @@ class Window:
                 self.path_tip = ui.tooltip("")
             self.as_of = ui.label().classes("lc-as-of")
             ui.space()
-            self.spinner = ui.spinner(size="sm", color="white")
+            self.spinner = ui.spinner(size="sm")
             self.spinner.visible = False
             self.refresh_button = (
                 ui.button("Refresh", icon="refresh", on_click=lambda: self.load(self.root))
                 .props("flat")
-                .classes("lc-glass-btn")
+                .classes("lc-quiet-btn")
             )
             self.refresh_button.disable()
             self.open_button = ui.button(
@@ -94,16 +94,16 @@ class Window:
                     self.badge.visible = False
         self.tabs = tabs
 
-        with ui.tab_panels(tabs, value="overview").classes("lc-sheet w-full"):
-            with ui.tab_panel("overview"):
+        with ui.tab_panels(tabs, value="overview").classes("w-full bg-transparent"):
+            with ui.tab_panel("overview").classes("lc-board"):
                 self.overview_panel()
-            with ui.tab_panel("instruments"):
+            with ui.tab_panel("instruments").classes("lc-paper"):
                 self.instruments_panel()
-            with ui.tab_panel("datasets"):
+            with ui.tab_panel("datasets").classes("lc-paper"):
                 self.datasets_panel()
-            with ui.tab_panel("analysis"):
+            with ui.tab_panel("analysis").classes("lc-paper"):
                 self.analysis_panel()
-            with ui.tab_panel("problems"):
+            with ui.tab_panel("problems").classes("lc-paper"):
                 self.problems_panel()
 
     async def choose_folder(self) -> None:

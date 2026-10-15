@@ -3,7 +3,7 @@ from nicegui import ui
 
 from labcatalog.charts import network, views
 from labcatalog.gui import theme
-from labcatalog.gui.common import heading, note, section
+from labcatalog.gui.common import card, heading, note, section
 from labcatalog.pipeline import CatalogResult
 
 
@@ -14,7 +14,7 @@ def show(fig: go.Figure | None, empty: str = "") -> ui.plotly | None:
         return None
     height = (fig.layout.height or 400) + 8
     return (
-        ui.plotly({**theme.on_glass(fig.to_plotly_json()), "config": {"displayModeBar": False}})
+        ui.plotly({**theme.for_page(fig.to_plotly_json()), "config": {"displayModeBar": False}})
         .classes("w-full")
         .style(f"height:{height}px")
     )
@@ -121,12 +121,12 @@ def instrument_dataset_section(result: CatalogResult, instrument_id: str, datase
 def overview_section(result: CatalogResult) -> None:
     pace = views.collection_pace(result)
     if pace is not None:
-        heading("Collection pace")
-        show(pace)
+        with card("Collection pace", "People with data, by week since each wave started"):
+            show(pace)
     levels = views.score_levels(result)
     if levels is not None:
-        heading("Scores in each wave")
-        show(levels)
+        with card("Scores in each wave", "Mean score as a share of its possible range"):
+            show(levels)
     score_relations(result)
 
 
@@ -189,33 +189,33 @@ def score_relations(result: CatalogResult) -> None:
     def shown() -> str:
         return f"{len(picked['instruments'])} of {len(instruments)} instruments"
 
-    heading("How the scores relate")
-    with ui.row().classes("items-center gap-4"):
-        chooser = (
-            ui.select(
-                instruments,
-                multiple=True,
-                value=picked["instruments"],
-                label="Instruments",
-                on_change=lambda e: changed("instruments", e.value),
+    with card("How the scores relate", "Pearson r between scores measured in one wave") as tools:
+        with tools:
+            chooser = (
+                ui.select(
+                    instruments,
+                    multiple=True,
+                    value=picked["instruments"],
+                    label="Instruments",
+                    on_change=lambda e: changed("instruments", e.value),
+                )
+                .props(f'dense outlined clearable display-value="{shown()}"')
+                .classes("w-64")
             )
-            .props(f'dense outlined clearable display-value="{shown()}"')
-            .classes("w-72")
-        )
-        wave_picker(choices, picked["wave"], lambda value: changed("wave", value))
-    grid()
-    ui.select(
-        views.network_colorings(result),
-        value=picked["color"],
-        label="Color by",
-        on_change=lambda e: recolor(e.value),
-    ).props("dense outlined").classes("w-56 mt-4")
-    graph()
+            wave_picker(choices, picked["wave"], lambda value: changed("wave", value))
+        grid()
+        ui.select(
+            views.network_colorings(result),
+            value=picked["color"],
+            label="Color by",
+            on_change=lambda e: recolor(e.value),
+        ).props("dense outlined").classes("w-56 self-end")
+        graph()
 
 
 def show_network(option: dict | None) -> None:
     if option is None:
         return
-    ui.echart(theme.echart_on_glass(option)).classes("w-full").style(
+    ui.echart(theme.echart_for_page(option)).classes("w-full").style(
         f"height:{network.NETWORK_HEIGHT}px"
     )

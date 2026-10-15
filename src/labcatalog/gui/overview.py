@@ -4,7 +4,7 @@ from nicegui import ui
 
 from labcatalog.config import WaveConfig
 from labcatalog.gui import charts
-from labcatalog.gui.common import col, heading, sorted_waves, table, unique
+from labcatalog.gui.common import card, col, sorted_waves, table, unique
 from labcatalog.pipeline import CatalogResult
 
 
@@ -12,27 +12,37 @@ def render(
     result: CatalogResult, on_instruments: Callable[[], None], on_problems: Callable[[], None]
 ) -> None:
     issues = result.report.issues
-    with ui.grid(columns=4).classes("w-full gap-1.5"):
-        tile("Instruments", len(result.project.instruments), "moss", on_instruments)
-        tile("Datasets", len(result.project.config.datasets), "wheat")
-        tile("Errors", sum(i.level == "error" for i in issues), "dusk", on_problems)
-        tile("Warnings", sum(i.level == "warning" for i in issues), "amber", on_problems)
+    errors = sum(i.level == "error" for i in issues)
+    warnings = sum(i.level == "warning" for i in issues)
+    with ui.grid(columns=4).classes("w-full gap-4"):
+        kpi("Instruments", len(result.project.instruments), on_click=on_instruments)
+        kpi("Datasets", len(result.project.config.datasets))
+        kpi("Errors", errors, "bad" if errors else None, on_problems)
+        kpi("Warnings", warnings, "warn" if warnings else None, on_problems)
 
-    heading("Waves")
-    table(*wave_table(result))
+    with card("Waves", "People and groups with data in each wave"):
+        table(*wave_table(result))
 
     charts.overview_section(result)
 
 
-def tile(label: str, value: int, look: str, on_click: Callable[[], None] | None = None) -> None:
-    box = ui.element("div").classes(f"lc-tile lc-tile-{look}")
+def kpi(
+    label: str,
+    value: int,
+    status: str | None = None,
+    on_click: Callable[[], None] | None = None,
+) -> None:
+    box = ui.card().props("flat").classes("lc-card lc-kpi")
     if on_click is not None:
         box.classes("cursor-pointer").on("click", on_click)
     with box:
-        ui.label(label).classes("lc-tile-label")
+        with ui.row().classes("items-center gap-2"):
+            if status is not None:
+                ui.element("span").classes(f"lc-dot lc-dot-{status}")
+            ui.label(label).classes("lc-kpi-label")
         if on_click is not None:
-            ui.icon("north_east").classes("lc-tile-arrow")
-        ui.label(str(value)).classes("lc-tile-value")
+            ui.icon("north_east").classes("lc-kpi-arrow")
+        ui.label(str(value)).classes("lc-kpi-value")
 
 
 def wave_table(result: CatalogResult) -> tuple[list[dict], list[dict]]:
