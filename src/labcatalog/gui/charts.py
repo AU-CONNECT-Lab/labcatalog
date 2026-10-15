@@ -34,10 +34,6 @@ def side_by_side(*panels: tuple[str, go.Figure | None]) -> None:
                 show(fig)
 
 
-def half() -> ui.column:
-    return ui.column().classes("flex-1 min-w-0 gap-0")
-
-
 def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     if not views.instrument_datasets(result, instrument_id):
         return
@@ -100,22 +96,20 @@ def other_scores(result: CatalogResult, instrument_id: str) -> None:
         scatter.refresh()
 
     heading("Against other scores")
-    with ui.row().classes("w-full gap-4 no-wrap items-start"):
-        with half():
-            if len(own) > 1:
-                ui.select(
-                    own, value=first, label="Score", on_change=lambda e: choose("x", e.value)
-                ).props("dense outlined").classes("w-72")
-            correlates()
-        with half():
+    with ui.row().classes("items-center gap-4"):
+        if len(own) > 1:
             ui.select(
-                views.score_choices(result),
-                value=picked["y"],
-                label="Against",
-                with_input=True,
-                on_change=lambda e: choose("y", e.value),
+                own, value=first, label="Score", on_change=lambda e: choose("x", e.value)
             ).props("dense outlined").classes("w-72")
-            scatter()
+        ui.select(
+            views.score_choices(result),
+            value=picked["y"],
+            label="Against",
+            with_input=True,
+            on_change=lambda e: choose("y", e.value),
+        ).props("dense outlined").classes("w-72")
+    scatter()
+    correlates()
 
 
 def instrument_dataset_section(result: CatalogResult, instrument_id: str, dataset: str) -> None:
