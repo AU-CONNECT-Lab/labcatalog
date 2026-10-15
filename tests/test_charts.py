@@ -133,3 +133,9 @@ def test_answer_grid_shows_one_instrument(result):
     colors = [c for trace in grid.data if trace.marker.color for c in trace.marker.color]
     assert STATUS_COLORS["unexpected"] in colors
     assert views.standardized_scores(result, "parent_w1", 1, "example_parent_stress") is not None
+
+
+def test_number_and_text_items_are_left_out_of_option_charts(result):
+    assert len(views.item_responses(result, "example_demographics")) == 2
+    grid = views.answer_grid(result, "parent_w2", 1, "example_demographics")
+    assert all(tick.startswith(("dem_gender", "dem_edu")) for tick in grid.layout.yaxis.ticktext)

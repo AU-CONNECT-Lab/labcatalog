@@ -184,14 +184,14 @@ def score_distribution(result: CatalogResult, instrument_id: str) -> go.Figure |
 
 def item_responses(result: CatalogResult, instrument_id: str) -> list[go.Figure]:
     instrument = result.project.instruments[instrument_id]
-    default = instrument.default_response_set or instrument.response_sets[0].id
+    default = instrument.default_response_set
     names = series_names(result, instrument_datasets(result, instrument_id))
     counts = {(v.dataset, v.column): v.value_counts for v in result.summary.variables}
     figures = []
     for response_set in instrument.response_sets:
         rows = []
         for item in instrument.items:
-            if (item.response_set or default) != response_set.id:
+            if item.type != "choice" or (item.response_set or default) != response_set.id:
                 continue
             for v in result.catalog.variables:
                 if (
@@ -962,7 +962,10 @@ def answer_grid(
     variables = [
         v
         for v in result.catalog.variables_for(dataset)
-        if v.instrument_id == instrument_id and v.column in result.datasets[dataset].frame
+        # Number and text answers have no response options to sort them by.
+        if v.instrument_id == instrument_id
+        and v.type == "choice"
+        and v.column in result.datasets[dataset].frame
     ]
     if not variables:
         return None
@@ -1059,7 +1062,7 @@ def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> 
         return None
     subscales = [s for s in instrument.scores if not is_total(instrument, s)]
     groups = [(s.label, s.items) for s in subscales] or [
-        ("All items", [i.id for i in instrument.items])
+        ("All items", [i.id for i in instrument.items if i.type == "choice"])
     ]
     loaded = result.datasets[dataset]
     rows = len(loaded.frame)
