@@ -6,10 +6,13 @@ eps_2_w2,example_parent_stress,eps_2
 eps_3_w2,example_parent_stress,eps_3
 eps_4_w2,example_parent_stress,eps_4
 eps_5_w2,example_parent_stress,eps_5
+eps_6_w2,example_parent_stress,eps_6
 ecs_1_w2,example_child_sleep,ecs_1
 ecs_2_w2,example_child_sleep,ecs_2
 ecs_3_w2,example_child_sleep,ecs_3
 ecs_4_w2,example_child_sleep,ecs_4
+ecs_5_w2,example_child_sleep,ecs_5
+ecs_6_w2,example_child_sleep,ecs_6
 dem_age_w2,example_demographics,dem_age
 dem_gender_w2,example_demographics,dem_gender
 dem_edu_w2,example_demographics,dem_edu

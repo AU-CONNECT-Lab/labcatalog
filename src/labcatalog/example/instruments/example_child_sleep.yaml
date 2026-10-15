@@ -16,10 +16,12 @@ items:
   - {id: ecs_2, text: My child has trouble falling asleep.}
   - {id: ecs_3, text: My child wakes up during the night.}
   - {id: ecs_4, text: My child seems tired during the day.}
+  - {id: ecs_5, text: My child needs a parent nearby to fall asleep.}
+  - {id: ecs_6, text: My child comes to our bed during the night.}
 scores:
-  - {id: ecs_total, label: Total score, method: sum, items: [ecs_1, ecs_2, ecs_3, ecs_4], custom: {topics: [sleep]}}
-  - {id: ecs_settling, label: Settling, method: sum, items: [ecs_1, ecs_2], custom: {topics: [sleep]}}
-  - {id: ecs_waking, label: Waking, method: sum, items: [ecs_3, ecs_4], custom: {topics: [sleep]}}
+  - {id: ecs_total, label: Total score, method: sum, items: [ecs_1, ecs_2, ecs_3, ecs_4, ecs_5, ecs_6], custom: {topics: [sleep]}}
+  - {id: ecs_settling, label: Settling, method: sum, items: [ecs_1, ecs_2, ecs_5], custom: {topics: [sleep]}}
+  - {id: ecs_waking, label: Waking, method: sum, items: [ecs_3, ecs_4, ecs_6], custom: {topics: [sleep]}}
 references:
   - citation: "Demo, C. (2021). Measuring sleep habits in school-age children. Journal of Demonstration Measures, 6(3), 210-224. (Fictional reference for the mock project.)"
 license: Free for research use (fictional)

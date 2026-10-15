@@ -19,10 +19,11 @@ items:
   - {id: eps_3, text: I feel tired most of the time.}
   - {id: eps_4, text: "I find it hard to manage my child's behavior."}
   - {id: eps_5, text: I have little time for myself.}
+  - {id: eps_6, text: My child is harder to care for than most children.}
 scores:
-  - {id: eps_mean, label: Mean score, method: mean, items: [eps_1, eps_2, eps_3, eps_4, eps_5], missing_rule: prorate, min_valid: 4, custom: {topics: [parenting]}}
+  - {id: eps_mean, label: Mean score, method: mean, items: [eps_1, eps_2, eps_3, eps_4, eps_5, eps_6], missing_rule: prorate, min_valid: 5, custom: {topics: [parenting]}}
   - {id: eps_strain, label: Strain, method: mean, items: [eps_1, eps_3, eps_5], custom: {topics: [parenting, negative affect]}}
-  - {id: eps_child, label: Child-related, method: mean, items: [eps_2, eps_4], custom: {topics: [parenting]}}
+  - {id: eps_child, label: Child-related, method: mean, items: [eps_2, eps_4, eps_6], custom: {topics: [parenting]}}
 references:
   - citation: "Sample, B. (2017). The Example Parenting Stress Scale: A brief measure. Demonstration Quarterly, 12(1), 33-47. (Fictional reference for the mock project.)"
 license: Free for research use (fictional)

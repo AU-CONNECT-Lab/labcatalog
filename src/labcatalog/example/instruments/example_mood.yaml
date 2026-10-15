@@ -19,11 +19,14 @@ items:
   - {id: ems_4, text: I enjoyed the things I did., reverse: true}
   - {id: ems_5, text: I felt tired for no reason.}
   - {id: ems_6, text: I felt like crying.}
+  - {id: ems_7, text: I felt lonely.}
+  - {id: ems_8, text: I found it hard to stop worrying.}
+  - {id: ems_9, text: I had fun with my friends., reverse: true}
 scores:
-  - {id: ems_total, label: Total score, method: sum, items: [ems_1, ems_2, ems_3, ems_4, ems_5, ems_6], missing_rule: prorate, min_valid: 5, custom: {topics: [negative affect]}}
-  - {id: ems_sadness, label: Sadness, method: sum, items: [ems_2, ems_6], custom: {topics: [negative affect]}}
-  - {id: ems_worry, label: Worry and fatigue, method: sum, items: [ems_3, ems_5], custom: {topics: [negative affect, sleep]}}
-  - {id: ems_low_positive, label: Low positive affect, method: sum, items: [ems_1, ems_4], custom: {topics: [positive affect]}}
+  - {id: ems_total, label: Total score, method: sum, items: [ems_1, ems_2, ems_3, ems_4, ems_5, ems_6, ems_7, ems_8, ems_9], missing_rule: prorate, min_valid: 7, custom: {topics: [negative affect]}}
+  - {id: ems_sadness, label: Sadness, method: sum, items: [ems_2, ems_6, ems_7], custom: {topics: [negative affect]}}
+  - {id: ems_worry, label: Worry and fatigue, method: sum, items: [ems_3, ems_5, ems_8], custom: {topics: [negative affect, sleep]}}
+  - {id: ems_low_positive, label: Low positive affect, method: sum, items: [ems_1, ems_4, ems_9], custom: {topics: [positive affect]}}
 references:
   - citation: "Example, A., & Sample, B. (2019). Development of the Example Mood Scale. Journal of Demonstration Measures, 4(2), 101-115. (Fictional reference for the mock project.)"
     pdf: example_mood.pdf
