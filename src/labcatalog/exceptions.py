@@ -28,3 +28,7 @@ class MetadataError(LabCatalogError):
 
 class DataSourceError(LabCatalogError):
     exit_code = 4
+
+
+class CodebookError(LabCatalogError):
+    exit_code = EXIT_ISSUES
