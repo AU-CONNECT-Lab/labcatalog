@@ -4,6 +4,8 @@ import sys
 from pathlib import Path
 
 FILENAME = "gui.json"
+PALETTE = "palette"
+RSCRIPT = "rscript"
 
 
 def folder() -> Path:

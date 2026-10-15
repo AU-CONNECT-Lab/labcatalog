@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from labcatalog.browse import build_index, matches
+from labcatalog.cfa import ONE_FACTOR, SUBSCALES, CfaFit
 from labcatalog.gui import datasets, instruments, overview
 from labcatalog.gui.common import location_path
 from labcatalog.pipeline import run_catalog
@@ -113,3 +114,60 @@ def test_sample_table_reads_like_a_table_one(mock_project):
     comment = "Is there anything else about your family's situation you would like us to know?"
     assert by_label[(comment, "Answered")]["d0"] > 0
     assert rows[-1]["value"] == "Answered"
+
+
+def test_factor_tables_show_fit_loadings_and_omega(mock_project):
+    result = run_catalog(mock_project)
+    mood = result.project.instruments["example_mood"]
+    subscales = {
+        s.score_id: s.columns
+        for s in result.catalog.scores_for("child_w1")
+        if s.instrument_id == "example_mood" and s.score_id != "ems_total"
+    }
+    fits = [
+        CfaFit(
+            "example_mood",
+            "child_w1",
+            SUBSCALES,
+            subscales,
+            110,
+            fit={
+                "chisq": 23.45,
+                "df": 24.0,
+                "p": 0.493,
+                "cfi": 1.0,
+                "tli": 1.0,
+                "rmsea": 0.0,
+                "srmr": 0.033,
+            },
+            loadings={("ems_sadness", "ems_2_w1"): 0.81},
+            omega={"ems_sadness": 0.87},
+        ),
+        CfaFit(
+            "example_mood",
+            "child_w1",
+            ONE_FACTOR,
+            {"ems_total": ["ems_1_w1"]},
+            110,
+            problem="improper solution",
+        ),
+        CfaFit(
+            "example_mood",
+            "child_w1",
+            ONE_FACTOR,
+            {"ems_low_positive": ["ems_1_w1"]},
+            110,
+            fit={"chisq": None, "df": 0.0},
+        ),
+    ]
+    _, rows = instruments.fit_table(mood, fits)
+    assert rows[0]["model"] == "Subscales: Sadness, Worry and fatigue, Low positive affect"
+    assert (rows[0]["chisq"], rows[0]["p"], rows[0]["cfi"]) == ("23.45 (24)", "0.493", "1.00")
+    assert rows[1]["problem"] == "improper solution"
+    assert rows[2]["problem"].startswith("3 items")
+    columns, rows = instruments.loading_table(result, mood, "child_w1", fits)
+    assert [c["label"] for c in columns][:3] == ["Variable", "Item", "Total score"]
+    sadness = next(r for r in rows if r["column"] == "ems_2_w1")
+    assert sadness["s_ems_sadness"] == "0.81"
+    assert rows[-1]["column"] == "ω" and rows[-1]["s_ems_sadness"] == "0.87"
+    assert instruments.omegas(fits) == {"ems_sadness": 0.87}

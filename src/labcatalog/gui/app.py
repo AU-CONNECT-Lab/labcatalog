@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import webview
-from nicegui import app, run, ui
+from nicegui import app, background_tasks, run, ui
 
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
@@ -15,13 +15,21 @@ from labcatalog.gui import (
     preferences,
     prepare,
     problems,
+    settings,
     theme,
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
-from labcatalog.gui.instruments import BrowseView
+from labcatalog.gui.instruments import (
+    CFA_DONE,
+    CFA_FAILED,
+    CFA_RUNNING,
+    CFA_UNSET,
+    BrowseView,
+    CfaView,
+)
 from labcatalog.gui.prepare import PrepareView
-from labcatalog.pipeline import CatalogResult, run_catalog
+from labcatalog.pipeline import CatalogResult, run_catalog, run_cfa
 from labcatalog.version import __version__
 
 WINDOW_SIZE = (1280, 820)
@@ -33,12 +41,13 @@ PAGES = (
     ("prepare", "Prepare", "play_circle"),
     ("import", "Import", "upload_file"),
     ("problems", "Problems", "report_problem"),
+    ("settings", "Settings", "settings"),
 )
 
 
 def launch(project: Path | None = None) -> None:
     theme.install()
-    saved = preferences.load().get("palette")
+    saved = preferences.load().get(preferences.PALETTE)
     # A palette saved by another version may no longer exist.
     style.use_palette(saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
     # Saving a table or figure goes through the window's own save dialog.
@@ -75,6 +84,7 @@ class Window:
         self.analysis = AnalysisView()
         self.importing = ImportView()
         self.preparing = PrepareView()
+        self.cfa = CfaView()
         self.dataset: str | None = None
         self.error: str | None = None
 
@@ -87,12 +97,6 @@ class Window:
             ui.space()
             self.spinner = ui.spinner(size="sm")
             self.spinner.visible = False
-            ui.select(
-                {name: p.label for name, p in style.PALETTES.items()},
-                value=style.palette,
-                label="Chart colors",
-                on_change=lambda e: self.set_palette(e.value),
-            ).classes("w-44")
             self.refresh_button = (
                 ui.button("Refresh", icon="refresh", on_click=lambda: self.load(self.root))
                 .props("flat")
@@ -136,6 +140,8 @@ class Window:
                 self.import_panel()
             with ui.tab_panel("problems").classes("lc-paper"):
                 self.problems_panel()
+            with ui.tab_panel("settings").classes("lc-paper"):
+                settings.render(self.set_palette, self.start_cfa)
 
     async def choose_folder(self) -> None:
         selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)
@@ -163,10 +169,34 @@ class Window:
             self.set_busy(False)
         self.result = result
         self.show_result()
+        # R is slow, so the factor models fill in after the rest of the catalog shows.
+        background_tasks.create(self.start_cfa())
+
+    async def start_cfa(self) -> None:
+        result, cfa = self.result, self.cfa
+        rscript = preferences.load().get(preferences.RSCRIPT)
+        cfa.fits, cfa.message = [], ""
+        if result is None or result.project is None or not rscript:
+            cfa.status = CFA_UNSET
+            instruments.dataset_statistics.refresh()
+            return
+        cfa.status = CFA_RUNNING
+        instruments.dataset_statistics.refresh()
+        try:
+            fits = await run.io_bound(run_cfa, result, rscript)
+        except LabCatalogError as err:
+            fits, message, status = [], str(err), CFA_FAILED
+        else:
+            message, status = "", CFA_DONE
+        # A newer Refresh has started its own run.
+        if self.result is not result:
+            return
+        cfa.fits, cfa.message, cfa.status = fits, message, status
+        instruments.dataset_statistics.refresh()
 
     def set_palette(self, name: str) -> None:
         style.use_palette(name)
-        preferences.save({"palette": name})
+        preferences.save({preferences.PALETTE: name})
         if self.result is not None:
             self.show_result()
 
@@ -221,7 +251,7 @@ class Window:
     @ui.refreshable_method
     def instruments_panel(self) -> None:
         if self.has_catalog():
-            instruments.render(self.result, self.index, self.view, self.open_instrument)
+            instruments.render(self.result, self.index, self.view, self.open_instrument, self.cfa)
 
     @ui.refreshable_method
     def datasets_panel(self) -> None:

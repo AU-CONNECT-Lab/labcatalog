@@ -6,6 +6,7 @@ from pathlib import Path
 from nicegui import app, ui
 
 from labcatalog.browse import BrowseIndex, counts, matches
+from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.gui import charts
@@ -28,6 +29,10 @@ from labcatalog.schema import Instrument, Reference, Text
 from labcatalog.stats import VariableSummary
 
 PAGE_SIZE = 50
+CFA_UNSET = "unset"
+CFA_RUNNING = "running"
+CFA_DONE = "done"
+CFA_FAILED = "failed"
 
 
 @dataclass
@@ -38,11 +43,20 @@ class BrowseView:
     instrument: str | None = None
 
 
+@dataclass
+class CfaView:
+    # One object per window, changed in place so tables drawn earlier see the new state.
+    status: str = CFA_UNSET
+    fits: list[CfaFit] = field(default_factory=list)
+    message: str = ""
+
+
 def render(
     result: CatalogResult,
     index: BrowseIndex,
     view: BrowseView,
     on_open: Callable[[str | None], None],
+    cfa: CfaView,
 ) -> None:
     if view.instrument not in result.project.instruments:
         browser(result, index, view, on_open)
@@ -51,7 +65,7 @@ def render(
     ui.button("All instruments", icon="arrow_back", on_click=lambda: on_open(None)).props(
         "flat dense no-caps"
     )
-    detail(result, result.project.instruments[view.instrument], found.get(view.instrument, []))
+    detail(result, result.project.instruments[view.instrument], found.get(view.instrument, []), cfa)
     history(result.project, view.instrument)
 
 
@@ -169,7 +183,9 @@ def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list
     return columns, rows
 
 
-def detail(result: CatalogResult, instrument: Instrument, preferred: list[str]) -> None:
+def detail(
+    result: CatalogResult, instrument: Instrument, preferred: list[str], cfa: CfaView
+) -> None:
     about(result, instrument)
 
     heading("Items")
@@ -201,7 +217,7 @@ def detail(result: CatalogResult, instrument: Instrument, preferred: list[str]) 
 
     @ui.refreshable
     def dataset_tables(dataset: str) -> None:
-        dataset_statistics(result, instrument, dataset)
+        dataset_statistics(result, instrument, dataset, cfa)
 
     @ui.refreshable
     def dataset_code(dataset: str) -> None:
@@ -380,12 +396,18 @@ def score_summaries(result: CatalogResult, instrument: Instrument, dataset: str)
     ]
 
 
-def dataset_statistics(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
+# Module level, so a finished CFA can redraw these tables without redrawing the page.
+@ui.refreshable
+def dataset_statistics(
+    result: CatalogResult, instrument: Instrument, dataset: str, cfa: CfaView
+) -> None:
     scores = {s.key: s for s in result.catalog.scores}
     summaries = score_summaries(result, instrument, dataset)
+    fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
     if summaries:
         heading(f"Scores in {dataset}")
-        table(*score_table(result, summaries))
+        table(*score_table(result, summaries, omegas(fits)))
+        factor_structure(result, instrument, dataset, cfa, fits)
     heading(f"Items in {dataset}")
     table(*variable_table(result, instrument, dataset))
     items = item_ids(result, dataset)
@@ -508,7 +530,103 @@ def item_ids(result: CatalogResult, dataset: str) -> dict[str, str]:
     return {v.column: v.item_id for v in result.catalog.variables if v.dataset == dataset}
 
 
-def score_table(result: CatalogResult, summaries: list) -> tuple[list[dict], list[dict]]:
+def factor_structure(
+    result: CatalogResult,
+    instrument: Instrument,
+    dataset: str,
+    cfa: CfaView,
+    fits: list[CfaFit],
+) -> None:
+    heading(f"Factor structure in {dataset}")
+    if cfa.status == CFA_UNSET:
+        note("Set the path to Rscript on the Settings page to fit factor models (CFA) and get ω.")
+    elif cfa.status == CFA_RUNNING:
+        note("Fitting factor models in R.")
+    elif cfa.status == CFA_FAILED:
+        note(cfa.message)
+    elif not fits:
+        note("No factor model: no score here has three or more items.")
+    else:
+        note(
+            "lavaan, WLSMV with the items as ordered categories, people who answered every "
+            "item; standardized loadings; ω is semTools' categorical omega."
+        )
+        table(*fit_table(instrument, fits))
+        table(*loading_table(result, instrument, dataset, fits)).classes(remove="w-full")
+
+
+def omegas(fits: list[CfaFit]) -> dict[str, float]:
+    return {score: value for f in fits for score, value in f.omega.items()}
+
+
+def fit_table(instrument: Instrument, fits: list[CfaFit]) -> tuple[list[dict], list[dict]]:
+    labels = {s.id: s.label for s in instrument.scores}
+    columns = [
+        col("model", "Model"),
+        col("n", "N", numeric=True),
+        col("chisq", "χ² (df)", numeric=True),
+        col("p", "p", numeric=True),
+        col("cfi", "CFI", numeric=True),
+        col("tli", "TLI", numeric=True),
+        col("rmsea", "RMSEA", numeric=True),
+        col("srmr", "SRMR", numeric=True),
+        col("problem", "Note", sortable=False),
+    ]
+    rows = []
+    for f in fits:
+        names = ", ".join(labels[s] for s in f.factors)
+        model = f"Subscales: {names}" if f.kind == SUBSCALES else f"One factor: {names}"
+        values = f.fit
+        exact = not f.problem and values.get("df") == 0
+        rows.append(
+            {
+                "model": model,
+                "n": f.n,
+                "chisq": f"{fmt(values['chisq'])} ({values['df']:g})"
+                if values.get("chisq") is not None
+                else "",
+                "p": fmt(values.get("p"), 3),
+                **{key: fmt(values.get(key)) for key in ("cfi", "tli", "rmsea", "srmr")},
+                "problem": f.problem
+                or ("3 items: the model fits exactly, so it has no fit indices" if exact else ""),
+            }
+        )
+    return columns, rows
+
+
+def loading_table(
+    result: CatalogResult, instrument: Instrument, dataset: str, fits: list[CfaFit]
+) -> tuple[list[dict], list[dict]]:
+    used = {score for f in fits for score in f.factors}
+    scores = [s for s in instrument.scores if s.id in used]
+    loadings = {key: value for f in fits for key, value in f.loadings.items()}
+    modelled = {column for f in fits for columns in f.factors.values() for column in columns}
+    variables = [
+        v
+        for v in result.catalog.variables_for(dataset)
+        if v.instrument_id == instrument.id and v.column in modelled
+    ]
+    columns = [
+        col("column", "Variable"),
+        col("item", "Item"),
+        *[col(f"s_{s.id}", s.label, numeric=True) for s in scores],
+    ]
+    rows = [
+        {
+            "column": v.column,
+            "item": v.item_id,
+            **{f"s_{s.id}": fmt(loadings.get((s.id, v.column))) for s in scores},
+        }
+        for v in variables
+    ]
+    found = omegas(fits)
+    rows.append({"column": "ω", "item": "", **{f"s_{s.id}": fmt(found.get(s.id)) for s in scores}})
+    return columns, rows
+
+
+def score_table(
+    result: CatalogResult, summaries: list, omega: dict[str, float] | None = None
+) -> tuple[list[dict], list[dict]]:
     scores = {s.key: s for s in result.catalog.scores}
     custom = {
         s.key: next(
@@ -534,6 +652,7 @@ def score_table(result: CatalogResult, summaries: list) -> tuple[list[dict], lis
         col("observed", "Observed range"),
         col("possible", "Possible range"),
         col("alpha", "α", numeric=True),
+        col("omega", "ω", numeric=True),
         col("n_complete", "Answered all", numeric=True),
     ]
     rows = [
@@ -548,6 +667,7 @@ def score_table(result: CatalogResult, summaries: list) -> tuple[list[dict], lis
             "observed": f"{fmt(s.minimum)} to {fmt(s.maximum)}" if s.n_valid else "",
             "possible": f"{fmt(s.possible_range[0])} to {fmt(s.possible_range[1])}",
             "alpha": fmt(s.alpha),
+            "omega": fmt((omega or {}).get(scores[s.key].score_id)),
             "n_complete": s.n_complete,
         }
         for s in summaries
