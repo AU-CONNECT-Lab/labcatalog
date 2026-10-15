@@ -1,7 +1,9 @@
+import csv
 from pathlib import Path
 
 import pytest
 
+from labcatalog import redcap
 from labcatalog.codebook import (
     INSTRUMENTS,
     ITEMS,
@@ -212,6 +214,112 @@ def test_prompt_holds_column_names_but_no_data(pilot):
     assert "missing_rule: complete" in prompt
     assert "2026-01-05" not in prompt
     assert "moved house" not in prompt
+
+
+REDCAP_HEADER = [
+    "Variable / Field Name",
+    "Form Name",
+    "Section Header",
+    "Field Type",
+    "Field Label",
+    "Choices, Calculations, OR Slider Labels",
+    "Field Note",
+    "Text Validation Type OR Show Slider Number",
+    "Text Validation Min",
+    "Text Validation Max",
+    "Identifier?",
+]
+REDCAP_FIELDS = [
+    ["id", "background", "", "text", "Record ID", "", "", "", "", "", ""],
+    ["intro", "mood_scale", "", "descriptive", "<b>Please answer</b>", "", "", "", "", "", ""],
+    ["mood_1", "mood_scale", "", "radio", "<p>I feel <i>sad</i></p>", "0, Never | 1, Sometimes; often | 2, Always", "", "", "", "", ""],
+    ["mood_10", "mood_scale", "", "dropdown", "I feel tired &amp; slow", "0, Never | 1, Sometimes | 2, Always", "", "", "", "", ""],
+    ["mood_total", "mood_scale", "", "calc", "Total", "[mood_1]+[mood_10]", "", "", "", "", ""],
+    ["race", "background", "", "checkbox", "Race", "1, White | 2, Black or African American", "", "", "", "", "y"],
+    ["smoker", "background", "", "yesno", "Do you smoke?", "", "", "", "", "", ""],
+    ["age", "background", "", "text", "Age", "", "", "integer", "18", "99", ""],
+    ["pain", "background", "", "slider", "Pain today", "Low | Middle | High", "", "", "", "", ""],
+    ["remarks", "background", "", "notes", "Anything else?", "", "", "", "", "", ""],
+]  # fmt: skip
+REDCAP_DATA = """\
+id,date,mood_1_w1,mood_10_w1,mood_total,race___1,race___2,smoker,age,pain,remarks,background_complete,redcap_event_name
+A1,2026-01-05,0,2,2,1,0,1,30,55,moved,2,baseline_arm_1
+A2,2026-01-06,1,1,2,0,1,0,41,10,,2,baseline_arm_1
+"""
+
+
+def write_dictionary(path: Path, header: list[str]) -> Path:
+    with path.open("w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.writer(file)
+        writer.writerow(header)
+        writer.writerows(REDCAP_FIELDS)
+    return path
+
+
+def test_a_redcap_dictionary_fills_in_items_and_imports(pilot, tmp_path):
+    (pilot / "data" / "pilot_w1.csv").write_text(REDCAP_DATA, encoding="utf-8")
+    dictionary = write_dictionary(tmp_path / "dictionary.csv", REDCAP_HEADER)
+    project = load_project(pilot)
+    write_templates(project, "pilot_w1", dictionary)
+    paths = codebook_paths(project, "pilot_w1")
+    assert paths[ITEMS].read_text(encoding="utf-8-sig").splitlines() == [
+        "column,instrument,item,text,type,choices,reverse,min,max",
+        "id,,,,,,,,",
+        "date,,,,,,,,",
+        'mood_1_w1,mood_scale,mood_1,I feel sad,choice,"0=Never; 1=Sometimes, often; 2=Always",,,',
+        "mood_10_w1,mood_scale,mood_10,I feel tired & slow,choice,0=Never; 1=Sometimes; 2=Always,,,",
+        "mood_total,,,,,,,,",
+        "race___1,background,race___1,Race: White,choice,0=Unchecked; 1=Checked,,,",
+        "race___2,background,race___2,Race: Black or African American,choice,"
+        "0=Unchecked; 1=Checked,,,",
+        "smoker,background,smoker,Do you smoke?,choice,1=Yes; 0=No,,,",
+        "age,background,age,Age,number,,,18,99",
+        "pain,background,pain,Pain today,number,,,0,100",
+        "remarks,background,remarks,Anything else?,text,,,,",
+        "background_complete,,,,,,,,",
+        "redcap_event_name,,,,text,,,,",
+    ]
+    assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == [
+        "mood_scale,Mood scale,,,,,",
+        "background,Background,,,,,",
+    ]
+    result = import_codebook(project, "pilot_w1")
+    assert result.issues == []
+    mood = (pilot / "instruments" / "mood_scale.yaml").read_text(encoding="utf-8")
+    assert "{value: 1, label: 'Sometimes, often'}" in mood
+
+
+def test_the_redcap_api_dictionary_reads_the_same(tmp_path):
+    names = [
+        "field_name",
+        "form_name",
+        "section_header",
+        "field_type",
+        "field_label",
+        "select_choices_or_calculations",
+        "field_note",
+        "text_validation_type_or_show_slider_number",
+        "text_validation_min",
+        "text_validation_max",
+        "identifier",
+    ]
+    web = redcap.read_dictionary(write_dictionary(tmp_path / "web.csv", REDCAP_HEADER))
+    api = redcap.read_dictionary(write_dictionary(tmp_path / "api.csv", names))
+    assert api == web
+    assert set(web) == {
+        "id",
+        "mood_1",
+        "mood_10",
+        "race___1",
+        "race___2",
+        "smoker",
+        "age",
+        "pain",
+        "remarks",
+    }
+    (tmp_path / "other.csv").write_text("column,label\nx,y\n", encoding="utf-8")
+    with pytest.raises(CodebookError, match="not a REDCap data dictionary"):
+        redcap.read_dictionary(tmp_path / "other.csv")
 
 
 def test_existing_instruments_are_reused_and_the_map_matches(mock_project):

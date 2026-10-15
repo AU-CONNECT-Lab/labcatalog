@@ -10,7 +10,7 @@ from typing import Any, get_args
 import pandas as pd
 import yaml
 
-from labcatalog import defaults
+from labcatalog import defaults, redcap
 from labcatalog.config import DatasetConfig, dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.exceptions import CodebookError
 from labcatalog.issues import Issue, IssueLevel, has_errors
@@ -129,26 +129,36 @@ def unmapped_datasets(project: Project) -> list[str]:
     return [d.name for d in project.config.datasets if d.name not in project.maps]
 
 
-def write_templates(project: Project, dataset_name: str) -> list[Path]:
+def write_templates(
+    project: Project, dataset_name: str, dictionary: Path | None = None
+) -> list[Path]:
     paths = codebook_paths(project, dataset_name)
     if any(path.exists() for path in paths.values()):
         folder = relative(project, paths[ITEMS].parent)
         raise CodebookError(f"{folder} already has codebook files; delete them to start over")
     dataset = dataset_by_name(project.config, dataset_name)
-    items = template_items(project, dataset, read_data(project, dataset))
+    fields = redcap.read_dictionary(dictionary) if dictionary else None
+    items = template_items(project, dataset, read_data(project, dataset), fields)
     new = dict.fromkeys(
         row["instrument"]
         for row in items
         if row["instrument"] and row["instrument"] not in project.instruments
     )
+    forms = {field.form for field in (fields or {}).values()}
+    instruments = [
+        {"instrument": i, "name": redcap.form_name(i) if i in forms else ""} for i in new
+    ]
     write_table(paths[ITEMS], ITEMS, items)
-    write_table(paths[INSTRUMENTS], INSTRUMENTS, [{"instrument": i} for i in new])
+    write_table(paths[INSTRUMENTS], INSTRUMENTS, instruments)
     write_table(paths[SCORES], SCORES, [])
     return list(paths.values())
 
 
 def template_items(
-    project: Project, dataset: DatasetConfig, frame: pd.DataFrame
+    project: Project,
+    dataset: DatasetConfig,
+    frame: pd.DataFrame,
+    fields: dict[str, redcap.Field] | None = None,
 ) -> list[dict[str, str]]:
     config = project.config
     skipped = {id_column_for(config, dataset), dataset.group_column, dataset.date_column}
@@ -169,33 +179,49 @@ def template_items(
     )
     prefixes = Counter(prefix(column) for column in frame.columns if column not in skipped)
     missing = {str(code.code) for code in missing_codes_for(config, dataset)} | {""}
+    field_names = sorted(fields or {}, key=len, reverse=True)
     rows = []
     for column in frame.columns:
         row = {"column": column, "instrument": "", "item": ""}
         if column not in skipped:
-            instrument, item = guess(column, mapped, item_ids, prefixes)
-            row.update(instrument=instrument, item=item)
-            if instrument not in project.instruments and is_text(frame[column], missing):
+            known = known_item(column, mapped, item_ids)
+            name = None if known else next((f for f in field_names if holds(column, f)), None)
+            if known:
+                row.update(instrument=known[0], item=known[1])
+            elif name:
+                field = fields[name]
+                row.update(
+                    instrument=field.form,
+                    item=field.item,
+                    text=field.text,
+                    type=field.type,
+                    choices=field.choices,
+                    min=field.min,
+                    max=field.max,
+                )
+            # Without a dictionary, columns sharing a prefix are a guess at a new instrument.
+            elif fields is None and prefix(column) and prefixes[prefix(column)] > 1:
+                row.update(instrument=prefix(column), item=column)
+            if not known and not name and is_text(frame[column], missing):
                 row["type"] = "text"
         rows.append(row)
     return rows
 
 
-def guess(
-    column: str,
-    mapped: dict[str, tuple[str, str]],
-    item_ids: list[tuple[str, str]],
-    prefixes: Counter[str],
-) -> tuple[str, str]:
+def known_item(
+    column: str, mapped: dict[str, tuple[str, str]], item_ids: list[tuple[str, str]]
+) -> tuple[str, str] | None:
     if column in mapped:
         return mapped[column]
-    for item_id, instrument_id in item_ids:
-        if column == item_id or (column.startswith(item_id) and not column[len(item_id)].isalnum()):
-            return instrument_id, item_id
-    stem = prefix(column)
-    if stem and prefixes[stem] > 1:
-        return stem, column
-    return "", ""
+    return next(
+        ((instrument_id, item_id) for item_id, instrument_id in item_ids if holds(column, item_id)),
+        None,
+    )
+
+
+def holds(column: str, item_id: str) -> bool:
+    # eps_1 holds eps_1 and eps_1_w2, but not eps_10.
+    return column == item_id or (column.startswith(item_id) and not column[len(item_id)].isalnum())
 
 
 def prefix(column: str) -> str:

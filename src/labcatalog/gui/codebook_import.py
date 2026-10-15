@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nicegui import run, ui
+import webview
+from nicegui import app, run, ui
 
 from labcatalog import codebook, defaults
 from labcatalog.codebook import ImportResult
@@ -32,13 +33,20 @@ def render(result: CatalogResult, view: ImportView) -> None:
     if view.dataset not in names:
         view.dataset, view.issues = names[0], []
 
-    async def create() -> None:
+    async def create(dictionary: Path | None = None) -> None:
         try:
-            await run.io_bound(codebook.write_templates, project, view.dataset)
+            await run.io_bound(codebook.write_templates, project, view.dataset, dictionary)
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
             return
         steps.refresh()
+
+    async def create_from_redcap() -> None:
+        selection = await app.native.main_window.create_file_dialog(
+            webview.FileDialog.OPEN, file_types=("CSV files (*.csv)",)
+        )
+        if selection:
+            await create(Path(selection[0]))
 
     def copy_prompt() -> None:
         ui.clipboard.write(codebook.ai_prompt(project, view.dataset))
@@ -76,9 +84,17 @@ def render(result: CatalogResult, view: ImportView) -> None:
         if not any(path.exists() for path in paths.values()):
             note(
                 "labcatalog lists every column of the data file and guesses its instrument "
-                "and item from the column name."
+                "and item from the column name. Given the data dictionary of a REDCap project "
+                "(Project Setup, Data Dictionary, Download), it also fills in each item's "
+                "wording, options and type."
             )
-            ui.button("Create the three files", icon="note_add", on_click=create).classes("mt-2")
+            with ui.row().classes("items-center gap-4 mt-2"):
+                ui.button("Create the three files", icon="note_add", on_click=create)
+                ui.button(
+                    "Create from a REDCap data dictionary",
+                    icon="description",
+                    on_click=create_from_redcap,
+                ).props("outline")
             return
         with ui.row().classes("items-center gap-4 mt-2"):
             for path in paths.values():
