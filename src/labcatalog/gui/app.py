@@ -3,8 +3,10 @@ from pathlib import Path
 import webview
 from nicegui import app, run, ui
 
+from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import charts, datasets, instruments, overview, problems
+from labcatalog.gui.instruments import BrowseView
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.version import __version__
 
@@ -46,7 +48,8 @@ class Window:
     def __init__(self) -> None:
         self.root: Path | None = None
         self.result: CatalogResult | None = None
-        self.instrument: str | None = None
+        self.index: BrowseIndex | None = None
+        self.view = BrowseView()
         self.dataset: str | None = None
 
     def build(self) -> None:
@@ -110,6 +113,9 @@ class Window:
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
         else:
+            # Refreshing keeps the filters; opening another project starts over.
+            if root != self.root:
+                self.view = BrowseView()
             self.root, self.result = root, result
             self.show_result()
         finally:
@@ -127,6 +133,7 @@ class Window:
         )
         self.path_tip.set_text(str(self.root))
         self.as_of.set_text(as_of_text(result))
+        self.index = build_index(result.project) if result.project else None
         issues = result.report.issues
         self.badge.set_text(str(len(issues)))
         self.badge.props(f"color={'negative' if result.report.has_errors() else 'orange-8'}")
@@ -142,8 +149,8 @@ class Window:
         ):
             panel.refresh()
 
-    def show_instrument(self, instrument_id: str) -> None:
-        self.instrument = instrument_id
+    def open_instrument(self, instrument_id: str | None) -> None:
+        self.view.instrument = instrument_id
         self.instruments_panel.refresh()
         self.tabs.set_value("instruments")
 
@@ -155,13 +162,15 @@ class Window:
     def overview_panel(self) -> None:
         if self.has_catalog():
             overview.render(
-                self.result, self.show_instrument, lambda: self.tabs.set_value("problems")
+                self.result,
+                lambda: self.open_instrument(None),
+                lambda: self.tabs.set_value("problems"),
             )
 
     @ui.refreshable_method
     def instruments_panel(self) -> None:
         if self.has_catalog():
-            instruments.render(self.result, self.instrument, self.show_instrument)
+            instruments.render(self.result, self.index, self.view, self.open_instrument)
 
     @ui.refreshable_method
     def datasets_panel(self) -> None:

@@ -18,9 +18,9 @@ def col(name: str, label: str, *, numeric: bool = False, sortable: bool = True) 
     return {"name": name, "label": label, "field": name, "align": align, "sortable": sortable}
 
 
-def table(columns: list[dict], rows: list[dict]) -> ui.table:
+def table(columns: list[dict], rows: list[dict], pagination: int | None = None) -> ui.table:
     return (
-        ui.table(columns=columns, rows=keyed(rows), row_key=ROW_KEY)
+        ui.table(columns=columns, rows=keyed(rows), row_key=ROW_KEY, pagination=pagination)
         .props("flat bordered dense wrap-cells")
         .classes("w-full")
     )
@@ -43,15 +43,11 @@ def fmt(value: float | None, digits: int = 2) -> str:
 
 
 def as_text(value: object) -> str:
-    return ", ".join(as_list(value))
-
-
-def as_list(value: object) -> list[str]:
     if value is None:
-        return []
+        return ""
     if isinstance(value, list):
-        return [str(v) for v in value]
-    return [str(value)]
+        return ", ".join(str(v) for v in value)
+    return str(value)
 
 
 def unique(values: Iterable[str]) -> list[str]:

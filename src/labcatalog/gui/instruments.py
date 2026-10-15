@@ -1,7 +1,9 @@
 from collections.abc import Callable
+from dataclasses import dataclass, field
 
 from nicegui import ui
 
+from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.gui import charts
 from labcatalog.gui.common import as_text, col, fmt, heading, note, table, unique
@@ -9,18 +11,148 @@ from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument, Text
 
+PAGE_SIZE = 50
 
-def render(result: CatalogResult, selected: str | None, on_select: Callable[[str], None]) -> None:
-    instruments = result.project.instruments
-    selected = selected if selected in instruments else next(iter(instruments))
-    ui.select(
-        {i: label(instrument) for i, instrument in instruments.items()},
-        value=selected,
-        with_input=True,
-        on_change=lambda e: on_select(e.value),
-    ).props("dense outlined").classes("w-96")
-    instrument = instruments[selected]
 
+@dataclass
+class BrowseView:
+    selected: dict[str, set[str]] = field(default_factory=dict)
+    query: str = ""
+    items: bool = False
+    instrument: str | None = None
+
+
+def render(
+    result: CatalogResult,
+    index: BrowseIndex,
+    view: BrowseView,
+    on_open: Callable[[str | None], None],
+) -> None:
+    if view.instrument not in result.project.instruments:
+        browser(result, index, view, on_open)
+        return
+    found = matches(index, view.selected, view.query, view.items)
+    ui.button("All instruments", icon="arrow_back", on_click=lambda: on_open(None)).props(
+        "flat dense no-caps"
+    )
+    detail(result, result.project.instruments[view.instrument], found.get(view.instrument, []))
+
+
+def browser(
+    result: CatalogResult,
+    index: BrowseIndex,
+    view: BrowseView,
+    on_open: Callable[[str | None], None],
+) -> None:
+    @ui.refreshable
+    def facets() -> None:
+        facet_panel(index, view, changed)
+
+    @ui.refreshable
+    def results() -> None:
+        found = matches(index, view.selected, view.query, view.items)
+        note(f"{len(found)} of {len(index.instruments)} instruments")
+        shown = table(*list_table(result, found), pagination=PAGE_SIZE)
+        shown.classes("cursor-pointer")
+        shown.on("rowClick", lambda e: on_open(e.args[1]["id"]))
+
+    def changed() -> None:
+        facets.refresh()
+        results.refresh()
+
+    def set_query(value: str | None) -> None:
+        view.query = value or ""
+        changed()
+
+    def set_items(value: bool) -> None:
+        view.items = value
+        changed()
+
+    def clear() -> None:
+        view.selected.clear()
+        changed()
+
+    with ui.row().classes("w-full no-wrap items-start gap-6"):
+        with ui.column().classes("w-60 shrink-0 gap-1"):
+            ui.input(
+                placeholder="Search", value=view.query, on_change=lambda e: set_query(e.value)
+            ).props("dense outlined clearable").classes("w-full")
+            ui.checkbox(
+                "Also search item text", value=view.items, on_change=lambda e: set_items(e.value)
+            ).props("dense")
+            facets()
+            ui.button("Clear filters", on_click=clear).props("flat dense no-caps")
+        with ui.column().classes("grow min-w-0"):
+            results()
+
+
+def facet_panel(index: BrowseIndex, view: BrowseView, changed: Callable[[], None]) -> None:
+    def toggle(chosen: set[str], value: str, on: bool) -> None:
+        if on:
+            chosen.add(value)
+        else:
+            chosen.discard(value)
+        changed()
+
+    found = counts(index, view.selected, view.query, view.items)
+    for facet in index.facets:
+        # A facet with one value cannot narrow anything.
+        if len(facet.values) < 2:
+            continue
+        chosen = view.selected.setdefault(facet.name, set())
+        ui.label(facet.label).classes("font-medium mt-3")
+        for value, label in facet.values.items():
+            n = found[facet.name][value]
+            if n or value in chosen:
+                ui.checkbox(
+                    f"{label} ({n})",
+                    value=value in chosen,
+                    on_change=lambda e, c=chosen, v=value: toggle(c, v, e.value),
+                ).props("dense")
+
+
+def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list[dict], list[dict]]:
+    config = result.project.config
+    hit = {name for names in found.values() for name in names}
+    datasets = [d.name for d in config.datasets if d.name in hit]
+    answered = {
+        (c.instrument_id, d.dataset): c.complete + c.partial
+        for d in result.summary.datasets
+        for c in d.completeness
+    }
+    who = {(v.instrument_id, v.dataset): (v.reporter, v.target) for v in result.catalog.variables}
+    columns = [
+        col("abbreviation", "Abbr."),
+        col("name", "Name"),
+        col("construct", "Construct"),
+        col("reporters", "Reporter"),
+        col("targets", "About"),
+        col("items", "Items", numeric=True),
+        *[col(f"d{i}", name, numeric=True) for i, name in enumerate(datasets)],
+    ]
+    rows = []
+    for instrument_id, names in found.items():
+        instrument = result.project.instruments[instrument_id]
+        pairs = [who[(instrument_id, name)] for name in names if (instrument_id, name) in who]
+        rows.append(
+            {
+                "id": instrument_id,
+                "abbreviation": instrument.abbreviation or "",
+                "name": instrument.name,
+                "construct": instrument.construct_name or "",
+                "reporters": ", ".join(unique(reporter for reporter, _ in pairs)),
+                "targets": ", ".join(unique(target for _, target in pairs if target)),
+                "items": len(instrument.items),
+                **{
+                    f"d{i}": answered.get((instrument_id, name), "") if name in names else ""
+                    for i, name in enumerate(datasets)
+                },
+            }
+        )
+    return columns, rows
+
+
+def detail(result: CatalogResult, instrument: Instrument, preferred: list[str]) -> None:
     about(result, instrument)
 
     heading("Items")
@@ -44,23 +176,16 @@ def render(result: CatalogResult, selected: str | None, on_select: Callable[[str
     if not datasets:
         return
     heading("Statistics")
+    first = next((d for d in preferred if d in datasets), datasets[0])
 
     @ui.refreshable
     def statistics(dataset: str) -> None:
         dataset_statistics(result, instrument, dataset)
 
-    ui.toggle(datasets, value=datasets[0], on_change=lambda e: statistics.refresh(e.value)).props(
+    ui.toggle(datasets, value=first, on_change=lambda e: statistics.refresh(e.value)).props(
         "dense no-caps"
     )
-    statistics(datasets[0])
-
-
-def label(instrument: Instrument) -> str:
-    return (
-        f"{instrument.abbreviation}: {instrument.name}"
-        if instrument.abbreviation
-        else instrument.name
-    )
+    statistics(first)
 
 
 def about(result: CatalogResult, instrument: Instrument) -> None:

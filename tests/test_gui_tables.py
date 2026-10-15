@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from labcatalog.browse import build_index, matches
 from labcatalog.gui import datasets, instruments, overview
 from labcatalog.gui.common import location_path
 from labcatalog.pipeline import run_catalog
@@ -12,19 +13,25 @@ def test_location_path_drops_the_line_number():
     assert location_path(root, f"{outside.as_posix()}:3") == outside
 
 
-def test_overview_tables(mock_project):
+def test_wave_table(mock_project):
     result = run_catalog(mock_project)
     _, waves = overview.wave_table(result)
     assert [(w["wave"], w["n_parent"], w["n_child"]) for w in waves] == [
         ("1", 116, 111),
         ("2", 38, 34),
     ]
-    _, rows = overview.availability_table(result)
-    screen_time = next(r for r in rows if r["instrument"] == "EST")
-    assert [screen_time[f"d{i}"] for i in range(4)] == ["", "", "", 34]
-    labels, values = overview.instrument_filters(result)
-    assert labels == {"reporter": "Reporter", "custom_domain": "Domain"}
-    assert values["example_mood"] == {"reporter": {"child"}, "custom_domain": {"emotion"}}
+
+
+def test_instrument_list_shows_only_the_matched_datasets(mock_project):
+    result = run_catalog(mock_project)
+    index = build_index(result.project)
+    found = matches(index, {"reporter": {"child"}})
+    columns, rows = instruments.list_table(result, found)
+    assert [c["label"] for c in columns[-2:]] == ["child_w1", "child_w2"]
+    by_id = {r["id"]: r for r in rows}
+    assert set(by_id) == {"example_mood", "example_screen_time"}
+    assert (by_id["example_screen_time"]["d0"], by_id["example_screen_time"]["d1"]) == ("", 34)
+    assert by_id["example_mood"]["reporters"] == "child"
 
 
 def test_instrument_items_list_each_dataset_column(mock_project):

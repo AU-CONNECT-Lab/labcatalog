@@ -15,9 +15,13 @@ from labcatalog.stats import DatasetSummary
 def render(result: CatalogResult, selected: str | None, on_select: Callable[[str], None]) -> None:
     summaries = {d.dataset: d for d in result.summary.datasets}
     selected = selected if selected in summaries else next(iter(summaries))
+    # Spelling out study, wave, reporter and modality lets typing in the box filter by them.
     ui.select(
-        list(summaries), value=selected, with_input=True, on_change=lambda e: on_select(e.value)
-    ).props("dense outlined").classes("w-96")
+        {name: dataset_label(result, name) for name in summaries},
+        value=selected,
+        with_input=True,
+        on_change=lambda e: on_select(e.value),
+    ).props("dense outlined").classes("w-[36rem]")
     summary = summaries[selected]
 
     facts(result, summary)
@@ -45,6 +49,13 @@ def render(result: CatalogResult, selected: str | None, on_select: Callable[[str
         note("No problems found.")
 
     charts.dataset_section(result, selected)
+
+
+def dataset_label(result: CatalogResult, name: str) -> str:
+    config = result.project.config
+    dataset = dataset_by_name(config, name)
+    study = config.studies[dataset.study].label or dataset.study
+    return f"{name} ({study}, wave {dataset.wave}, {dataset.reporter}, {dataset.modality})"
 
 
 def facts(result: CatalogResult, summary: DatasetSummary) -> None:
