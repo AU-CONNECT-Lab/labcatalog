@@ -97,3 +97,18 @@ def test_alpha_and_histogram_edge_cases():
     assert cronbach_alpha(pd.DataFrame({"a": [1, 2, 3], "b": [1, 2, 3]})) == pytest.approx(1.0)
     bins = histogram(pd.Series([7.2, 7.0, 0.0]), 0, 18, integer=True)
     assert [count for left, _, count in bins if left == 6.5] == [2]
+
+
+def test_stability_and_retained_scores_use_the_same_people(mock_project):
+    summary = summary_for(mock_project)
+    ems = next(s for s in summary.stability if s.score_id == "ems_total")
+    assert (ems.reporter, ems.from_wave, ems.to_wave) == ("child", "1", "2")
+    assert 0 < ems.r < 1
+    kept = [r for r in summary.retained if r.score_id == "ems_total"]
+    assert [r.wave for r in kept] == ["1", "2"]
+    assert {r.n for r in kept} == {ems.n}
+
+
+def test_collected_by_day_adds_up_to_the_month_counts(mock_project):
+    parent = next(d for d in summary_for(mock_project).datasets if d.dataset == "parent_w1")
+    assert sum(parent.collected_by_day.values()) == sum(parent.collected_by_month.values())

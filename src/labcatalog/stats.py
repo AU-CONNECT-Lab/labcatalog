@@ -65,6 +65,7 @@ class DatasetSummary(BaseModel):
     first_date: date | None = None
     last_date: date | None = None
     collected_by_month: dict[str, int] = {}
+    collected_by_day: dict[str, int] = {}
     snapshot_date: date | None = None
     missing_totals: dict[str, int] = {}
     n_unexpected: int = 0
@@ -96,6 +97,28 @@ class Correlation(BaseModel):
     n_ambiguous: int = 0
 
 
+class ScoreStability(BaseModel):
+    study: str
+    reporter: str
+    instrument_id: str
+    score_id: str
+    from_wave: str
+    to_wave: str
+    r: float | None
+    n: int
+
+
+class RetainedScore(BaseModel):
+    study: str
+    reporter: str
+    instrument_id: str
+    score_id: str
+    wave: str
+    n: int
+    mean: float | None = None
+    sd: float | None = None
+
+
 class Summary(BaseModel):
     variables: list[VariableSummary]
     scores: list[ScoreSummary]
@@ -104,6 +127,8 @@ class Summary(BaseModel):
     group_name: str | None = None
     groups: list[WaveGroups] = []
     correlations: list[Correlation]
+    stability: list[ScoreStability] = []
+    retained: list[RetainedScore] = []
 
 
 def summarize(
@@ -117,6 +142,7 @@ def summarize(
         for v in catalog.variables
         if v.column in datasets[v.dataset].frame
     ]
+    by_wave = waves_of_scores(catalog, datasets, scores)
     return Summary(
         variables=variables,
         scores=[
@@ -130,6 +156,8 @@ def summarize(
         group_name=config.ids.group.name if config.ids.group else None,
         groups=wave_groups(datasets),
         correlations=correlations(catalog, datasets, scores, config.stats.correlate_by),
+        stability=stability(by_wave),
+        retained=retained(by_wave),
     )
 
 
@@ -292,6 +320,7 @@ def summarize_dataset(
         first_date=dates.min().date() if dates is not None and len(dates) else None,
         last_date=dates.max().date() if dates is not None and len(dates) else None,
         collected_by_month=collected_by_month(dates) if dates is not None else {},
+        collected_by_day=collected_by_day(dates) if dates is not None else {},
         snapshot_date=loaded.config.snapshot_date,
         missing_totals=missing_totals,
         n_unexpected=sum(v.n_unexpected for v in mine),
@@ -302,6 +331,11 @@ def summarize_dataset(
 def collected_by_month(dates: pd.Series) -> dict[str, int]:
     counts = dates.dt.strftime("%Y-%m").value_counts()
     return {month: int(counts[month]) for month in sorted(counts.index)}
+
+
+def collected_by_day(dates: pd.Series) -> dict[str, int]:
+    counts = dates.dt.strftime("%Y-%m-%d").value_counts()
+    return {day: int(counts[day]) for day in sorted(counts.index)}
 
 
 def completeness(
@@ -418,6 +452,77 @@ def correlations(
                 n_ambiguous=len(ambiguous.get((study, wave), set())),
             )
         )
+    return rows
+
+
+ScoreKey = tuple[str, str, str, str]
+
+
+def waves_of_scores(
+    catalog: Catalog, datasets: dict[str, LoadedDataset], scores: dict[str, pd.DataFrame]
+) -> dict[ScoreKey, dict[str, pd.Series]]:
+    # (study, reporter, instrument, score) -> {wave: valid scores indexed by participant ID}
+    found: dict[ScoreKey, dict[str, pd.Series]] = {}
+    for score in catalog.scores:
+        loaded = datasets[score.dataset]
+        ids = loaded.frame[loaded.id_column].to_numpy()
+        values = pd.Series(scores[score.dataset][score.key].to_numpy(), index=ids).dropna()
+        key = (loaded.config.study, loaded.config.reporter, score.instrument_id, score.score_id)
+        waves = found.setdefault(key, {})
+        wave = loaded.config.wave
+        values = pd.concat([waves[wave], values]) if wave in waves else values
+        # An ID that repeats cannot say which value belongs to the person.
+        waves[wave] = values[~values.index.duplicated(keep=False)]
+    return found
+
+
+def stability(found: dict[ScoreKey, dict[str, pd.Series]]) -> list[ScoreStability]:
+    rows = []
+    for (study, reporter, instrument_id, score_id), waves in found.items():
+        order = sorted(waves, key=wave_order)
+        for earlier, later in zip(order, order[1:], strict=False):
+            both = pd.concat([waves[earlier], waves[later]], axis=1, join="inner")
+            r = (
+                both.iloc[:, 0].corr(both.iloc[:, 1])
+                if len(both) >= defaults.MIN_CORRELATION_N
+                else None
+            )
+            rows.append(
+                ScoreStability(
+                    study=study,
+                    reporter=reporter,
+                    instrument_id=instrument_id,
+                    score_id=score_id,
+                    from_wave=earlier,
+                    to_wave=later,
+                    r=None if r is None or pd.isna(r) else float(r),
+                    n=len(both),
+                )
+            )
+    return rows
+
+
+def retained(found: dict[ScoreKey, dict[str, pd.Series]]) -> list[RetainedScore]:
+    rows = []
+    for (study, reporter, instrument_id, score_id), waves in found.items():
+        if len(waves) < 2:
+            continue
+        everyone = set.intersection(*(set(values.index) for values in waves.values()))
+        for wave in sorted(waves, key=wave_order):
+            kept = waves[wave][waves[wave].index.isin(everyone)]
+            stats = describe(kept)
+            rows.append(
+                RetainedScore(
+                    study=study,
+                    reporter=reporter,
+                    instrument_id=instrument_id,
+                    score_id=score_id,
+                    wave=wave,
+                    n=len(kept),
+                    mean=stats["mean"],
+                    sd=stats["sd"],
+                )
+            )
     return rows
 
 
