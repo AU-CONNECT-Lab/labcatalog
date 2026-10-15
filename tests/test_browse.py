@@ -1,7 +1,7 @@
 from labcatalog.browse import build_index, counts, facet_names, matches
 from labcatalog.pipeline import load_validated, run_validate
 
-WAVE_1, WAVE_2 = "mock_study/1", "mock_study/2"
+WAVE_1, WAVE_2, WAVE_3 = "mock_study/1", "mock_study/2", "mock_study/3"
 
 
 def edit(path, old, new):
@@ -20,7 +20,7 @@ def test_facets_follow_the_config_and_list_only_values_present(mock_project):
     index = index_for(mock_project)
     assert [f.name for f in index.facets] == ["study", "wave", "reporter", "domain"]
     facets = {f.name: f for f in index.facets}
-    assert facets["wave"].values == {WAVE_1: "1", WAVE_2: "2"}
+    assert facets["wave"].values == {WAVE_1: "1", WAVE_2: "2", WAVE_3: "3"}
     assert list(facets["domain"].values) == ["emotion", "family", "health", "media"]
 
 
@@ -41,15 +41,15 @@ def test_selections_must_hold_within_one_administration(mock_project):
         "example_mood": ["child_w1"]
     }
     assert matches(index, {"domain": {"media", "emotion"}, "wave": set()}) == {
-        "example_mood": ["child_w1", "child_w2"],
-        "example_screen_time": ["child_w2"],
+        "example_mood": ["child_w1", "child_w2", "child_w3"],
+        "example_screen_time": ["child_w2", "child_w3"],
     }
 
 
 def test_counts_keep_the_facets_own_values_open(mock_project):
     index = index_for(mock_project)
     found = counts(index, {"wave": {WAVE_1}})
-    assert found["wave"] == {WAVE_1: 3, WAVE_2: 4}
+    assert found["wave"] == {WAVE_1: 3, WAVE_2: 4, WAVE_3: 4}
     assert found["reporter"] == {"parent": 2, "child": 1}
     assert found["domain"] == {"emotion": 1, "family": 1, "health": 1, "media": 0}
 

@@ -27,18 +27,18 @@ def test_variable_counts_add_up(mock_project):
     eps4 = next(v for v in summary.variables if v.column == "eps_4_w1")
     assert eps4.n_unexpected == 1
     assert list(eps4.value_counts) == ["1", "2", "3", "4", "5"]
-    assert eps4.n_valid + sum(eps4.missing.values()) + eps4.n_unexpected == eps4.n_total == 116
+    assert eps4.n_valid + sum(eps4.missing.values()) + eps4.n_unexpected == eps4.n_total == 146
     assert set(eps4.missing) == {"blank", "refused", "not applicable", "don't know"}
 
 
-def test_score_summary_matches_the_prototype(mock_project):
+def test_score_summary_of_the_example(mock_project):
     summary = summary_for(mock_project)
     ems = next(s for s in summary.scores if s.key == "example_mood.ems_total@child_w1")
-    assert ems.n_valid == 110
-    assert round(ems.mean, 2) == 6.84
-    assert round(ems.alpha, 2) == 0.83
+    assert ems.n_valid == 136
+    assert round(ems.mean, 2) == 5.51
+    assert round(ems.alpha, 2) == 0.86
     assert ems.possible_range == (0, 18)
-    assert sum(count for _, _, count in ems.histogram) == 110
+    assert sum(count for _, _, count in ems.histogram) == 136
     assert len(ems.item_total) == 6
     assert len(ems.item_correlations) == 6 and ems.item_correlations[0][0] == 1.0
     assert all(r > 0 for row in ems.item_correlations for r in row)
@@ -59,20 +59,20 @@ def test_unmarked_reverse_item_shows_negative_correlations(mock_project):
 def test_dataset_summary(mock_project):
     summary = summary_for(mock_project)
     parent = next(d for d in summary.datasets if d.dataset == "parent_w1")
-    assert (parent.n_rows, parent.n_ids) == (116, 116)
+    assert (parent.n_rows, parent.n_ids) == (146, 146)
     # " 1031P" gives no family ID until the lab fixes the space.
-    assert parent.n_groups == 115
-    assert sum(parent.collected_by_month.values()) == 116
+    assert parent.n_groups == 145
+    assert sum(parent.collected_by_month.values()) == 146
     eps = next(c for c in parent.completeness if c.instrument_id == "example_parent_stress")
-    assert eps.complete + eps.partial + eps.empty == 116
+    assert eps.complete + eps.partial + eps.empty == 146
 
 
 def test_retention_and_groups(mock_project):
     summary = summary_for(mock_project)
     wave2 = next(r for r in summary.retention if r.reporter == "parent" and r.wave == "2")
-    assert wave2.n == 38 and wave2.n_from_previous + wave2.n_new == 38
+    assert wave2.n == 128 and wave2.n_from_previous + wave2.n_new == 128
     assert summary.group_name == "family"
-    assert [g.wave for g in summary.groups] == ["1", "2"]
+    assert [g.wave for g in summary.groups] == ["1", "2", "3"]
 
 
 def test_correlations_link_reporters_by_group(mock_project):
@@ -80,8 +80,8 @@ def test_correlations_link_reporters_by_group(mock_project):
     wave1 = next(c for c in summary.correlations if c.wave == "1")
     ems = wave1.keys.index("example_mood.ems_total@child_w1")
     eps = wave1.keys.index("example_parent_stress.eps_mean@parent_w1")
-    assert 0.3 < wave1.r[ems][eps] < 0.4
-    assert wave1.n[ems][eps] > 90
+    assert 0.4 < wave1.r[ems][eps] < 0.5
+    assert wave1.n[ems][eps] > 120
 
 
 def test_correlating_by_id_cannot_link_parent_and_child(mock_project):
@@ -99,14 +99,18 @@ def test_alpha_and_histogram_edge_cases():
     assert [count for left, _, count in bins if left == 6.5] == [2]
 
 
-def test_stability_and_retained_scores_use_the_same_people(mock_project):
+def test_stability_pairs_adjacent_waves_and_retained_scores_need_every_wave(mock_project):
     summary = summary_for(mock_project)
-    ems = next(s for s in summary.stability if s.score_id == "ems_total")
-    assert (ems.reporter, ems.from_wave, ems.to_wave) == ("child", "1", "2")
-    assert 0 < ems.r < 1
+    ems = [s for s in summary.stability if s.score_id == "ems_total"]
+    assert [(s.reporter, s.from_wave, s.to_wave) for s in ems] == [
+        ("child", "1", "2"),
+        ("child", "2", "3"),
+    ]
+    assert all(0 < s.r < 1 for s in ems)
     kept = [r for r in summary.retained if r.score_id == "ems_total"]
-    assert [r.wave for r in kept] == ["1", "2"]
-    assert {r.n for r in kept} == {ems.n}
+    assert [r.wave for r in kept] == ["1", "2", "3"]
+    [n] = {r.n for r in kept}
+    assert 0 < n <= min(s.n for s in ems)
 
 
 def test_collected_by_day_adds_up_to_the_month_counts(mock_project):

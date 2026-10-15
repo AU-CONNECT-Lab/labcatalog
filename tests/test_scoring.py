@@ -82,9 +82,9 @@ def test_unavailable_items_give_no_score():
     assert values(make_score(unavailable_items=["d"])) == [None] * 4
 
 
-def test_mock_scores_match_the_prototype(mock_project):
+def test_example_scores(mock_project):
     project = load_project(mock_project)
     scores = compute_scores(resolve_catalog(project), load_datasets(project))
     ems = scores["child_w1"]["example_mood.ems_total@child_w1"]
-    assert ems.notna().sum() == 110
-    assert round(ems.mean(), 2) == 6.84
+    assert ems.notna().sum() == 136
+    assert round(ems.mean(), 2) == 5.51

@@ -17,8 +17,9 @@ def test_wave_table(mock_project):
     result = run_catalog(mock_project)
     _, waves = overview.wave_table(result)
     assert [(w["wave"], w["n_parent"], w["n_child"]) for w in waves] == [
-        ("1", 116, 111),
-        ("2", 38, 34),
+        ("1", 146, 140),
+        ("2", 128, 116),
+        ("3", 60, 56),
     ]
 
 
@@ -27,18 +28,19 @@ def test_instrument_list_shows_only_the_matched_datasets(mock_project):
     index = build_index(result.project)
     found = matches(index, {"reporter": {"child"}})
     columns, rows = instruments.list_table(result, found)
-    assert [c["label"] for c in columns[-2:]] == ["child_w1", "child_w2"]
+    assert [c["label"] for c in columns[-3:]] == ["child_w1", "child_w2", "child_w3"]
     by_id = {r["id"]: r for r in rows}
     assert set(by_id) == {"example_mood", "example_screen_time"}
-    assert (by_id["example_screen_time"]["d0"], by_id["example_screen_time"]["d1"]) == ("", 34)
+    screen = by_id["example_screen_time"]
+    assert (screen["d0"], screen["d1"], screen["d2"]) == ("", 116, 56)
     assert by_id["example_mood"]["reporters"] == "child"
 
 
 def test_instrument_items_list_each_dataset_column(mock_project):
     result = run_catalog(mock_project)
     columns, rows = instruments.item_table(result, result.project.instruments["example_mood"])
-    assert [c["label"] for c in columns[-2:]] == ["child_w1", "child_w2"]
-    assert (rows[0]["d0"], rows[0]["d1"]) == ("ems_1_w1", "ems_1_w2")
+    assert [c["label"] for c in columns[-3:]] == ["child_w1", "child_w2", "child_w3"]
+    assert (rows[0]["d0"], rows[0]["d2"]) == ("ems_1_w1", "ems_1_w3")
 
 
 def test_dataset_issues_cover_its_data_file_only(mock_project):

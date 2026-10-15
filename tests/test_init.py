@@ -13,7 +13,7 @@ MODELINE = "# yaml-language-server: $schema="
 def test_example_project_is_copied_with_its_schemas(tmp_path):
     root = init_project(tmp_path / "new")
     errors = {i.code for i in run_check(root).issues if i.level == "error"}
-    assert errors == {"unexpected_value", "id_whitespace"}
+    assert errors == {"unexpected_value", "id_whitespace", "id_duplicate"}
     for path in root.rglob("*.yaml"):
         first = path.read_text(encoding="utf-8").splitlines()[0]
         assert first.startswith(MODELINE), path

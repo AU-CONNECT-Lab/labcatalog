@@ -604,6 +604,7 @@ def score_circle(
         p["labels"],
         p["groups"],
         instrument_order(result),
+        instrument_labels(result),
         p["skip"],
         defaults.CHART_MIN_R,
         title,
@@ -618,8 +619,11 @@ def score_matrices(result: CatalogResult, instruments: list[str]) -> go.Figure |
     ]
     if not panels:
         return None
-    labels = {i: x.abbreviation or i for i, x in result.project.instruments.items()}
-    return matrices.score_matrices(panels, instrument_order(result), labels)
+    return matrices.score_matrices(panels, instrument_order(result), instrument_labels(result))
+
+
+def instrument_labels(result: CatalogResult) -> dict[str, str]:
+    return {i: x.abbreviation or i for i, x in result.project.instruments.items()}
 
 
 def score_choices(result: CatalogResult) -> dict[str, str]:

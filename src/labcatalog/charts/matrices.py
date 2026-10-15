@@ -3,13 +3,13 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from labcatalog.charts.style import (
+    CELL_LINE,
     CORRELATION_SCALE,
     LABEL_INK,
     STATUS_COLORS,
     STATUS_NAMES,
     TITLE_INK,
     base_layout,
-    cell_values,
     group_color,
     scale_color,
 )
@@ -17,140 +17,101 @@ from labcatalog.charts.style import (
 CIRCLE_GAP = 12.0
 CIRCLE_SPAN = 1.42
 MATRICES_PER_ROW = 3
+# Data units left of and above the cells that hold the instrument strips.
+STRIP_ROOM = 1.6
 
 
 def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
     return np.array([[np.nan if v is None else v for v in row] for row in rows], dtype=float)
 
 
-def lower_triangle(matrix: np.ndarray) -> np.ndarray:
-    lower = matrix.copy()
-    np.fill_diagonal(lower, np.nan)
-    lower[np.triu_indices(len(lower), k=1)] = np.nan
-    return lower
-
-
-def correlation_bar(title: str, **extra) -> dict:
+def axis_refs(fig: go.Figure, row: int, col: int) -> dict:
+    sub = fig.get_subplot(row, col)
     return dict(
-        title=dict(text=title, side="right", font=dict(size=10)),
-        thickness=12,
-        tickfont=dict(size=9),
-        tickvals=[-1, -0.5, 0, 0.5, 1],
-        **extra,
+        xref=sub.xaxis.plotly_name.replace("axis", ""),
+        yref=sub.yaxis.plotly_name.replace("axis", ""),
     )
 
 
-def item_correlations(panels: list[dict], value_label: str) -> go.Figure:
-    # One lower triangle per panel, all on one colour scale.
-    fig = make_subplots(
-        rows=1,
-        cols=len(panels),
-        horizontal_spacing=0.06,
-        subplot_titles=[p["title"] for p in panels],
+def dot_matrix(
+    fig: go.Figure,
+    z: np.ndarray,
+    labels: list[str],
+    *,
+    row: int,
+    col: int,
+    value_label: str,
+    n: list[list[int]] | None = None,
+    groups: list[str] | None = None,
+    group_order: list[str] | None = None,
+    group_labels: dict[str, str] | None = None,
+    row_labels: bool = True,
+) -> tuple[list[dict], list[dict]]:
+    # Dot area follows |r| and colour its sign; circles are shapes so they scale with the cells.
+    size = len(labels)
+    ref = axis_refs(fig, row, col)
+    xs, ys = [], []
+    for k in range(size + 1):
+        xs += [k - 0.5, k - 0.5, None, -0.5, size - 0.5, None]
+        ys += [-0.5, size - 0.5, None, k - 0.5, k - 0.5, None]
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            mode="lines",
+            line=dict(color=CELL_LINE, width=0.6),
+            hoverinfo="skip",
+            showlegend=False,
+        ),
+        row=row,
+        col=col,
     )
-    for c, panel in enumerate(panels, start=1):
-        labels = panel["labels"]
-        z = lower_triangle(as_matrix(panel["r"]))
-        fig.add_trace(
-            go.Heatmap(
-                z=z,
-                x=labels,
-                y=labels,
-                zmin=-1.0,
-                zmax=1.0,
-                colorscale=CORRELATION_SCALE,
-                showscale=c == len(panels),
-                colorbar=correlation_bar(value_label, len=0.8),
-                hovertemplate="%{y}<br>%{x}<br>" + value_label + " = %{z:.3f}<extra></extra>",
-            ),
-            row=1,
-            col=c,
-        )
-        cell_values(fig, z, labels, labels, scale=CORRELATION_SCALE, low=-1, high=1, row=1, col=c)
-        fig.update_xaxes(
-            tickangle=-90,
-            tickfont=dict(size=9),
-            showgrid=False,
-            ticks="",
-            constrain="domain",
-            row=1,
-            col=c,
-        )
-        fig.update_yaxes(
-            autorange="reversed",
-            scaleanchor=f"x{c if c > 1 else ''}",
-            scaleratio=1,
-            constrain="domain",
-            tickfont=dict(size=9),
-            showgrid=False,
-            ticks="",
-            row=1,
-            col=c,
-        )
-    fig.update_annotations(font=dict(size=12, color=TITLE_INK))
-    return base_layout(fig, 380, margin=dict(l=60, r=30, t=50, b=70))
-
-
-def score_matrices(
-    panels: list[dict], group_order: list[str], group_labels: dict[str, str]
-) -> go.Figure:
-    # Scores sit together by instrument; a colour strip names each block and a rule separates blocks.
-    cols = min(MATRICES_PER_ROW, len(panels))
-    rows = -(-len(panels) // cols)
-    height = 150 + 360 * rows
-    fig = make_subplots(
-        rows=rows,
-        cols=cols,
-        subplot_titles=[p["title"] for p in panels],
-        horizontal_spacing=0.05,
-        vertical_spacing=130 / (height - 150) if rows > 1 else 0.0,
+    shapes, notes, hx, hy, data = [], [], [], [], []
+    for i in range(size):
+        for j in range(size):
+            value = z[i, j]
+            if not np.isfinite(value):
+                continue
+            radius = 0.45 * np.sqrt(abs(value))
+            shapes.append(
+                dict(
+                    type="circle",
+                    x0=j - radius,
+                    x1=j + radius,
+                    y0=i - radius,
+                    y1=i + radius,
+                    fillcolor=scale_color(value, CORRELATION_SCALE, -1, 1),
+                    line_width=0,
+                    **ref,
+                )
+            )
+            hx.append(j)
+            hy.append(i)
+            data.append([labels[i], labels[j], float(value), n[i][j] if n else ""])
+    hover = "%{customdata[0]} × %{customdata[1]}<br>" + value_label + " = %{customdata[2]:.2f}"
+    if n is not None:
+        hover += "<br>n = %{customdata[3]}"
+    fig.add_trace(
+        go.Scatter(
+            x=hx,
+            y=hy,
+            mode="markers",
+            marker=dict(size=14, color="rgba(0,0,0,0)"),
+            customdata=data,
+            hovertemplate=hover + "<extra></extra>",
+            showlegend=False,
+        ),
+        row=row,
+        col=col,
     )
-    # Shapes and notes go in at once; adding hundreds one by one revalidates the layout each time.
-    shapes, notes = [], []
-    for k, panel in enumerate(panels):
-        row, c = k // cols + 1, k % cols + 1
-        groups = panel["groups"]
-        n = len(groups)
-        blocks = [(g, groups.index(g), n - groups[::-1].index(g)) for g in dict.fromkeys(groups)]
-        z = as_matrix(panel["r"])
-        np.fill_diagonal(z, np.nan)
-        fig.add_trace(
-            go.Heatmap(
-                z=z,
-                x=list(range(n)),
-                y=list(range(n)),
-                zmin=-1,
-                zmax=1,
-                colorscale=CORRELATION_SCALE,
-                showscale=k == len(panels) - 1,
-                customdata=[
-                    [[panel["labels"][i], panel["labels"][j], panel["n"][i][j]] for j in range(n)]
-                    for i in range(n)
-                ],
-                hovertemplate="%{customdata[0]} × %{customdata[1]}<br>r %{z:.2f} · n %{customdata[2]}<extra></extra>",
-                colorbar=correlation_bar("Pearson r", len=0.8),
-            ),
-            row=row,
-            col=c,
-        )
-        cell_values(
-            fig,
-            z,
-            list(range(n)),
-            list(range(n)),
-            scale=CORRELATION_SCALE,
-            low=-1,
-            high=1,
-            row=row,
-            col=c,
-        )
-        axis = "" if k == 0 else str(k + 1)
-        ref = dict(xref=f"x{axis}", yref=f"y{axis}")
-        for g, start, end in blocks:
+    low = -0.5
+    if groups is not None:
+        low = -STRIP_ROOM
+        for i, g in enumerate(groups):
             color = group_color(group_order.index(g))
             for x0, x1, y0, y1 in (
-                (start - 0.5, end - 0.5, -1.1, -0.75),
-                (-1.1, -0.75, start - 0.5, end - 0.5),
+                (-1.35, -0.65, i - 0.4, i + 0.4),
+                (i - 0.4, i + 0.4, -1.35, -0.65),
             ):
                 shapes.append(
                     dict(
@@ -164,58 +125,141 @@ def score_matrices(
                         **ref,
                     )
                 )
-            if start > 0:
-                for x0, x1, y0, y1 in (
-                    (start - 0.5, start - 0.5, -0.5, n - 0.5),
-                    (-0.5, n - 0.5, start - 0.5, start - 0.5),
-                ):
-                    shapes.append(
-                        dict(
-                            type="line",
-                            x0=x0,
-                            x1=x1,
-                            y0=y0,
-                            y1=y1,
-                            line=dict(color="black", width=0.8),
-                            opacity=0.7,
-                            **ref,
-                        )
-                    )
+        for g in dict.fromkeys(groups):
+            start, end = groups.index(g), size - groups[::-1].index(g)
             notes.append(
                 dict(
                     x=(start + end - 1) / 2,
-                    y=-1.2,
+                    y=-1.45,
                     yanchor="bottom",
                     text=f"<b>{group_labels[g]}</b>",
                     showarrow=False,
-                    font=dict(size=11, color=color),
+                    font=dict(size=10, color=group_color(group_order.index(g))),
                     **ref,
                 )
             )
-        fig.update_xaxes(
-            row=row,
-            col=c,
-            range=[-1.2, n - 0.5],
-            tickvals=list(range(n)),
-            ticktext=panel["short"],
-            tickangle=-45,
-            showgrid=False,
-        )
-        fig.update_yaxes(
-            row=row,
-            col=c,
-            range=[n - 0.5, -1.6],
-            tickvals=list(range(n)),
-            ticktext=panel["short"],
-            showgrid=False,
-            showticklabels=c == 1,
-            automargin=True,
-        )
-    fig.update_annotations(
-        selector=dict(xref="paper"), font=dict(color=TITLE_INK, size=13), yshift=22
+    ticks = dict(
+        tickvals=list(range(size)),
+        ticktext=labels,
+        tickfont=dict(size=9, color=LABEL_INK),
+        showgrid=False,
+        zeroline=False,
+        showline=False,
+        ticks="",
     )
+    fig.update_xaxes(
+        row=row, col=col, range=[low, size - 0.5], tickangle=-90, constrain="domain", **ticks
+    )
+    fig.update_yaxes(
+        row=row,
+        col=col,
+        range=[size - 0.5, low],
+        scaleanchor=ref["xref"],
+        scaleratio=1,
+        constrain="domain",
+        showticklabels=row_labels,
+        automargin=True,
+        **ticks,
+    )
+    return shapes, notes
+
+
+def colorbar(title: str, plot_height: float) -> go.Scatter:
+    # A horizontal bar above the top right corner of the panels.
+    return go.Scatter(
+        x=[None],
+        y=[None],
+        mode="markers",
+        hoverinfo="skip",
+        showlegend=False,
+        marker=dict(
+            colorscale=CORRELATION_SCALE,
+            cmin=-1,
+            cmax=1,
+            color=[0],
+            showscale=True,
+            colorbar=dict(
+                title=dict(text=title, side="top", font=dict(size=10)),
+                orientation="h",
+                thickness=8,
+                len=0.22,
+                x=1,
+                xanchor="right",
+                y=1 + 48 / plot_height,
+                yanchor="bottom",
+                tickvals=[-1, -0.5, 0, 0.5, 1],
+                tickfont=dict(size=9),
+                outlinewidth=0,
+            ),
+        ),
+    )
+
+
+def matrix_grid(titles: list[str], height_per_row: int) -> tuple[go.Figure, int, int, int]:
+    cols = min(MATRICES_PER_ROW, len(titles))
+    rows = -(-len(titles) // cols)
+    height = 190 + height_per_row * rows
+    fig = make_subplots(
+        rows=rows,
+        cols=cols,
+        subplot_titles=titles,
+        horizontal_spacing=0.06,
+        vertical_spacing=130 / (height - 190) if rows > 1 else 0.0,
+    )
+    return fig, rows, cols, height
+
+
+def finish_grid(fig: go.Figure, shapes: list, notes: list, height: int, title: str) -> go.Figure:
+    fig.update_annotations(
+        selector=dict(xref="paper"), font=dict(color=TITLE_INK, size=13), yshift=24
+    )
+    # Shapes and notes go in at once; adding hundreds one by one revalidates the layout each time.
     fig.update_layout(shapes=shapes, annotations=[*fig.layout.annotations, *notes])
-    return base_layout(fig, height, margin=dict(l=110, r=16, t=60, b=90))
+    fig.add_trace(colorbar(title, height - 190))
+    return base_layout(fig, height, margin=dict(l=110, r=16, t=110, b=80))
+
+
+def item_correlations(panels: list[dict], value_label: str) -> go.Figure:
+    fig, _, cols, height = matrix_grid([p["title"] for p in panels], 340)
+    shapes, notes = [], []
+    for k, panel in enumerate(panels):
+        found = dot_matrix(
+            fig,
+            as_matrix(panel["r"]),
+            panel["labels"],
+            row=k // cols + 1,
+            col=k % cols + 1,
+            value_label=value_label,
+            row_labels=k % cols == 0,
+        )
+        shapes += found[0]
+        notes += found[1]
+    return finish_grid(fig, shapes, notes, height, value_label)
+
+
+def score_matrices(
+    panels: list[dict], group_order: list[str], group_labels: dict[str, str]
+) -> go.Figure:
+    # Scores sit together by instrument; a colour strip on each side names the block.
+    fig, _, cols, height = matrix_grid([p["title"] for p in panels], 380)
+    shapes, notes = [], []
+    for k, panel in enumerate(panels):
+        found = dot_matrix(
+            fig,
+            as_matrix(panel["r"]),
+            panel["short"],
+            row=k // cols + 1,
+            col=k % cols + 1,
+            value_label="Pearson r",
+            n=panel["n"],
+            groups=panel["groups"],
+            group_order=group_order,
+            group_labels=group_labels,
+            row_labels=k % cols == 0,
+        )
+        shapes += found[0]
+        notes += found[1]
+    return finish_grid(fig, shapes, notes, height, "Pearson r")
 
 
 def ring_angles(counts: list[int], gap: float = CIRCLE_GAP, start: float = 90.0) -> np.ndarray:
@@ -257,6 +301,7 @@ def score_circle(
     labels: list[str],
     groups: list[str],
     group_order: list[str],
+    group_labels: dict[str, str],
     skip: set[tuple[int, int]],
     threshold: float,
     title: str,
@@ -276,25 +321,20 @@ def score_circle(
         cols=2,
         column_widths=[0.5, 0.5],
         horizontal_spacing=0.03,
-        subplot_titles=("Pearson r", rule),
+        subplot_titles=("", rule),
     )
-    lower = lower_triangle(z)
-    fig.add_trace(
-        go.Heatmap(
-            z=lower,
-            x=labels,
-            y=labels,
-            colorscale=CORRELATION_SCALE,
-            zmin=-1,
-            zmax=1,
-            customdata=n,
-            colorbar=correlation_bar("Pearson r", len=0.72, x=1.0, y=0.46),
-            hovertemplate="%{y} × %{x}<br>Pearson r = %{z:.3f}<br>n = %{customdata}<extra></extra>",
-        ),
+    shapes, notes = dot_matrix(
+        fig,
+        z,
+        labels,
         row=1,
         col=1,
+        value_label="Pearson r",
+        n=n,
+        groups=groups,
+        group_order=group_order,
+        group_labels=group_labels,
     )
-    cell_values(fig, lower, labels, labels, scale=CORRELATION_SCALE, low=-1, high=1, row=1, col=1)
 
     order = list(dict.fromkeys(groups))
     angles = ring_angles([groups.count(g) for g in order])
@@ -330,24 +370,11 @@ def score_circle(
             row=1,
             col=2,
         )
+    height = 720
+    fig.add_trace(colorbar("Pearson r", height - 150))
     fig.update_layout(
-        title=dict(text=title, x=0.5, xanchor="center", y=0.975, font=dict(size=14)),
+        title=dict(text=title, x=0.01, xanchor="left", y=0.975, font=dict(size=14)),
         showlegend=False,
-        xaxis=dict(
-            side="bottom",
-            tickangle=-90,
-            range=[-0.5, k - 0.5],
-            showgrid=False,
-            zeroline=False,
-            constrain="domain",
-        ),
-        yaxis=dict(
-            range=[k - 0.5, -0.5],
-            showgrid=False,
-            zeroline=False,
-            scaleanchor="x",
-            constrain="domain",
-        ),
         xaxis2=dict(visible=False, range=[-CIRCLE_SPAN, CIRCLE_SPAN], constrain="domain"),
         yaxis2=dict(
             visible=False,
@@ -357,10 +384,9 @@ def score_circle(
             constrain="domain",
         ),
     )
-    for note in fig.layout.annotations[:2]:
-        note.font.size = 11
-        note.font.color = "#444444"
-    return base_layout(fig, 720, margin=dict(l=70, r=90, t=80, b=70))
+    fig.update_annotations(selector=dict(xref="paper"), font=dict(size=11, color="#444444"))
+    fig.update_layout(shapes=shapes, annotations=[*fig.layout.annotations, *notes])
+    return base_layout(fig, height, margin=dict(l=110, r=90, t=110, b=40))
 
 
 def answer_grid(
