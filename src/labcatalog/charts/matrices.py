@@ -181,10 +181,12 @@ def dot_grid(
     )
     fig.add_trace(colorbar(value_label, x=1, xanchor="right", y=-0.03, yanchor="top"))
     fig.update_layout(shapes=shapes)
+    # The column labels stand on top, so their length decides how much height they take.
     cell = float(np.clip(560 / size, 18, 40))
+    label_room = 7 * max(len(label) for label in labels) + 20
     return base_layout(
         fig,
-        int(cell * (size + 1.6)) + 260,
+        int(cell * (size - low + 0.5) + label_room + 130),
         margin=dict(l=40, r=20, t=40, b=90),
         legend=dict(
             orientation="h",
