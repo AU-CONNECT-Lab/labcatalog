@@ -714,8 +714,9 @@ def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaVi
             waves = ", ".join(
                 f"{views.wave_name(result, test.study, wave)} {n}" for wave, n in test.n.items()
             )
+            study = result.project.config.studies[test.study].label or test.study
             ui.label(f"{kind}: {names}").classes("font-medium mt-2")
-            note(f"{test.reporter} in {test.study}; people per wave: {waves}.")
+            note(f"{study}, reported by {test.reporter}; people who answered every item: {waves}.")
             if test.problem:
                 note(test.problem)
             else:

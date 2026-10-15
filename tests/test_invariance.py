@@ -88,10 +88,12 @@ def test_steps_add_constraints_and_compare_with_the_step_before(result):
     assert all(s.df_diff > 0 and 0 <= s.p_diff <= 1 for s in test.steps[1:])
 
 
-@needs_r
-def test_an_option_nobody_chose_in_one_wave_is_named(result):
+def test_an_option_nobody_chose_in_one_wave_stops_the_model_before_r(result):
     stress = models_of(result)["example_parent_stress"]
-    [test] = invariance.fit_models([stress], rscript())
+    [test] = invariance.fit_models([stress], "C:/no/such/Rscript.exe")
     assert test.steps == []
-    assert "same number of thresholds" in test.problem
-    assert "eps_1 (wave 3)" in test.problem
+    assert test.n == {wave: len(frame) for wave, frame in stress.waves.items()}
+    assert "eps_1 in wave 3 (5)" in test.problem
+    shifted = {"1": pd.DataFrame({"a": [1.0, 2.0]}), "2": pd.DataFrame({"a": [2.0, 3.0]})}
+    stress.waves = shifted
+    assert "a in wave 1 (3); a in wave 2 (1)" in invariance.unchosen_options(stress)

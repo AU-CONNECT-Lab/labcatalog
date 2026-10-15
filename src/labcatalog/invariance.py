@@ -118,6 +118,35 @@ def wave_items(
 
 
 def fit_models(models: list[InvarianceModel], rscript: str) -> list[InvarianceTest]:
+    gaps = [unchosen_options(model) for model in models]
+    ready = [model for model, gap in zip(models, gaps, strict=True) if gap is None]
+    tested = iter(fit_in_r(ready, rscript))
+    return [
+        next(tested) if gap is None else new_test(model, problem=gap)
+        for model, gap in zip(models, gaps, strict=True)
+    ]
+
+
+def unchosen_options(model: InvarianceModel) -> str | None:
+    # lavaan numbers an item's categories from the values it sees, so every wave needs the same.
+    gaps = []
+    for item in next(iter(model.waves.values())).columns:
+        chosen = {wave: set(frame[item]) for wave, frame in model.waves.items()}
+        every = set().union(*chosen.values())
+        for wave, values in chosen.items():
+            if values != every:
+                options = ", ".join(f"{v:g}" for v in sorted(every - values))
+                gaps.append(f"{item} in wave {wave} ({options})")
+    if not gaps:
+        return None
+    return (
+        "Thresholds can only be held equal when every wave uses the same options, and nobody "
+        f"chose these options that were chosen in other waves: {'; '.join(gaps)}. Merging "
+        "rarely chosen options would make the test possible."
+    )
+
+
+def fit_in_r(models: list[InvarianceModel], rscript: str) -> list[InvarianceTest]:
     if not models:
         return []
     with tempfile.TemporaryDirectory() as temp:
@@ -160,14 +189,7 @@ def read_test(
 ) -> InvarianceTest:
     name, original = named
     rows = results[results["model"] == name]
-    test = InvarianceTest(
-        model.study,
-        model.reporter,
-        model.instrument_id,
-        model.kind,
-        model.factors,
-        {wave: len(frame) for wave, frame in model.waves.items()},
-    )
+    test = new_test(model)
     steps = {step: InvarianceStep(step) for step in STEPS}
     for row in rows.itertuples():
         value = None if pd.isna(row.value) else float(row.value)
@@ -183,6 +205,19 @@ def read_test(
             setattr(step, row.item, value)
     test.steps = list(steps.values())
     return test
+
+
+def new_test(model: InvarianceModel, problem: str | None = None) -> InvarianceTest:
+    n = {wave: len(frame) for wave, frame in model.waves.items()}
+    return InvarianceTest(
+        model.study,
+        model.reporter,
+        model.instrument_id,
+        model.kind,
+        model.factors,
+        n,
+        problem=problem,
+    )
 
 
 def readable(message: str, original: dict[str, str]) -> str:
