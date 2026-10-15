@@ -180,3 +180,26 @@ def test_missing_references_root_is_reported_once(mock_project):
     edit(mock_project / "labcatalog.yaml", "root: references", "root: ~/not-synced-yet")
     [issue] = run_validate(mock_project)
     assert (issue.code, issue.level) == ("references_root_missing", "warning")
+
+
+def test_item_types(mock_project):
+    path = mock_project / "instruments" / "example_demographics.yaml"
+    edit(
+        path,
+        "type: number, min: 3, max: 18}",
+        "type: number, min: 18, max: 3, response_set: gender}",
+    )
+    edit(path, "response_set: education}", "response_set: education, max: 4}")
+    edit(
+        path,
+        "type: text}",
+        "type: choice}\nscores:\n  - {id: n, label: N, method: sum, items: [dem_household]}",
+    )
+    messages = [i.message for i in run_validate(mock_project) if i.code == "invalid_value"]
+    assert messages == [
+        "items[1] (dem_age).response_set: number items have no response options",
+        "items[1] (dem_age): min is above max",
+        "items[3] (dem_edu): min and max apply to number items only",
+        "items[5] (dem_comment): needs a response_set, or type: number or text",
+        "scores[1] (n).items: dem_household is a number item and cannot be scored",
+    ]

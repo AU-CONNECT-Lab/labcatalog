@@ -95,3 +95,18 @@ def test_existing_score_column_is_cross_checked(mock_project):
     codes = found(run_check(mock_project))
     assert "1 row(s) differ" in codes["score_mismatch"][0]
     assert "score_coverage" in codes
+
+
+def test_numbers_outside_their_range(mock_project):
+    messages = found(run_check(mock_project))["unexpected_value"]
+    [age] = [m for m in messages if m.startswith("dem_age_w2")]
+    assert "neither numbers from 3 to 18 nor missing codes: 45" in age
+
+
+def test_free_text_answers_are_searched_for_identifiers(mock_project):
+    def change(frame):
+        frame.loc[0, "dem_comment_w1"] = "Call me at 334-555-0100"
+
+    change_csv(mock_project / "data" / "parent_w1.csv", change)
+    [message] = found(run_check(mock_project))["possible_identifier"]
+    assert message.startswith("dem_comment_w1") and "phone numbers" in message

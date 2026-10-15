@@ -116,3 +116,18 @@ def test_stability_pairs_adjacent_waves_and_retained_scores_need_every_wave(mock
 def test_collected_by_day_adds_up_to_the_month_counts(mock_project):
     parent = next(d for d in summary_for(mock_project).datasets if d.dataset == "parent_w1")
     assert sum(parent.collected_by_day.values()) == sum(parent.collected_by_month.values())
+
+
+def test_number_and_text_items(mock_project):
+    summary = summary_for(mock_project)
+    by_column = {v.column: v for v in summary.variables}
+    age = by_column["dem_age_w2"]
+    assert (age.n_valid, age.n_unexpected, age.value_counts) == (127, 1, {})
+    assert 3 <= age.minimum <= age.median <= age.maximum <= 18
+    comment = by_column["dem_comment_w2"]
+    assert comment.n_valid + comment.missing["blank"] == comment.n_total
+    assert comment.mean is None
+    parent = next(d for d in summary.datasets if d.dataset == "parent_w2")
+    background = next(c for c in parent.completeness if c.instrument_id == "example_demographics")
+    # The optional comment does not make everyone a partial responder.
+    assert background.n_items == 4 and background.complete > 100
