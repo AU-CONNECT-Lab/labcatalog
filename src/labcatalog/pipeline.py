@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog.check import CheckReport, check_project
-from labcatalog.codegen import scoring_snippets
+from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.exceptions import MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.manifest import Manifest, build_manifest
@@ -24,6 +24,7 @@ class CatalogResult:
     catalog: Catalog | None = None
     summary: Summary | None = None
     snippets: dict[str, dict[str, str]] = field(default_factory=dict)
+    label_snippets: dict[str, dict[str, str]] = field(default_factory=dict)
     manifest: Manifest | None = None
     # Row-level data stays for the charts that plot people rather than summaries.
     datasets: dict[str, LoadedDataset] = field(default_factory=dict)
@@ -58,6 +59,7 @@ def run_catalog(root: Path) -> CatalogResult:
         catalog=catalog,
         summary=summarize(catalog, datasets, scores, project.config),
         snippets=scoring_snippets(catalog),
+        label_snippets=label_snippets(project.config, catalog),
         manifest=build_manifest(project, datasets),
         datasets=datasets,
         scores=scores,

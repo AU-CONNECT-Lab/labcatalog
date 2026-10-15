@@ -125,6 +125,24 @@ def detail(
     else:
         note("No problems found.")
 
+    label_code(result.label_snippets[summary.dataset])
+
+
+def label_code(snippets: dict[str, str]) -> None:
+    heading("Label code")
+    note(
+        "Puts the item wording, response labels and missing codes on the data: R with the "
+        "haven package, Python as the dictionaries pyreadstat takes to save a .sav file."
+    )
+    with ui.tabs().props("dense no-caps align=left") as tabs:
+        ui.tab("r", label="R")
+        ui.tab("python", label="Python")
+    with ui.tab_panels(tabs, value="r").classes("w-full"):
+        with ui.tab_panel("r").classes("p-0"):
+            ui.code(snippets["r"], language="r").classes("w-full")
+        with ui.tab_panel("python").classes("p-0"):
+            ui.code(snippets["python"], language="python").classes("w-full")
+
 
 def facts(result: CatalogResult, summary: DatasetSummary) -> None:
     config = result.project.config

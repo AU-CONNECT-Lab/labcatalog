@@ -7,6 +7,7 @@ import pandas as pd
 import pytest
 
 from labcatalog.codegen import output_name, score_code_python, score_code_r
+from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
 from labcatalog.resolve import ResolvedScore, resolve_catalog
 from labcatalog.scoring import compute_score
@@ -94,3 +95,55 @@ def test_unavailable_items_explain_why(mock):
     score = catalog.scores[0].model_copy(update={"unavailable_items": ["x"]})
     assert "cannot be computed" in score_code_r(score)
     assert "cannot be computed" in score_code_python(score)
+
+
+def test_python_label_code_labels_items_and_blanks_missing_codes(mock_project):
+    result = run_catalog(mock_project)
+    d = pd.read_csv(mock_project / "data" / "parent_w1.csv")
+    names = {"d": d}
+    exec(result.label_snippets["parent_w1"]["python"], names)
+    assert names["column_labels"]["dem_edu_w1"] == (
+        "What is the highest level of education you have completed?"
+    )
+    assert names["variable_value_labels"]["eps_1_w1"][1] == "Strongly disagree"
+    assert names["variable_value_labels"]["eps_1_w1"][-99] == "refused"
+    assert names["variable_value_labels"]["dem_age_w1"] == names["missing_codes"]
+    assert "dem_comment_w1" not in names["variable_value_labels"]
+    labelled = list(names["missing_ranges"])
+    assert d[labelled].isin([-99, -98, -97]).any().any()
+    assert not names["d"][labelled].isin([-99, -98, -97]).any().any()
+
+
+@pytest.mark.skipif(rscript() is None, reason="R is not installed")
+def test_r_label_code_gives_haven_what_it_needs_to_save_a_sav(mock_project, tmp_path):
+    result = run_catalog(mock_project)
+    parts = []
+    for name, snippet in result.label_snippets.items():
+        data = (mock_project / "data" / f"{name}.csv").as_posix()
+        out = (tmp_path / f"{name}.sav").as_posix()
+        parts.append(f'd <- read.csv("{data}")\n{snippet["r"]}\nwrite_sav(d, "{out}")')
+    saved = (tmp_path / "parent_w1.sav").as_posix()
+    report = (tmp_path / "report.txt").as_posix()
+    parts.append(
+        f'b <- read_sav("{saved}", user_na = TRUE)\n'
+        'writeLines(c(attr(b$eps_1_w1, "label"), names(attr(b$eps_1_w1, "labels")), '
+        f'format(attr(b$eps_1_w1, "na_values")), attr(b$dem_comment_w1, "label")), "{report}")'
+    )
+    script = tmp_path / "labels.R"
+    script.write_text("\n".join(parts), encoding="utf-8")
+    subprocess.run([rscript(), str(script)], check=True, capture_output=True)
+    assert (tmp_path / "report.txt").read_text(encoding="utf-8").splitlines() == [
+        "I feel overwhelmed by my responsibilities as a parent.",
+        "Strongly disagree",
+        "Disagree",
+        "Neutral",
+        "Agree",
+        "Strongly agree",
+        "refused",
+        "not applicable",
+        "don't know",
+        "-99",
+        "-98",
+        "-97",
+        "Is there anything else about your family's situation you would like us to know?",
+    ]

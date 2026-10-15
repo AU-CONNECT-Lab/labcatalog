@@ -20,6 +20,7 @@ from labcatalog.gui.common import (
     table,
     unique,
 )
+from labcatalog.history import file_history
 from labcatalog.pipeline import CatalogResult
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
@@ -51,6 +52,7 @@ def render(
         "flat dense no-caps"
     )
     detail(result, result.project.instruments[view.instrument], found.get(view.instrument, []))
+    history(result.project, view.instrument)
 
 
 def browser(
@@ -231,6 +233,22 @@ def detail(result: CatalogResult, instrument: Instrument, preferred: list[str]) 
         table(*stable).classes(remove="w-full")
     dataset_tables(first)
     dataset_code(first)
+
+
+def history(project: Project, instrument_id: str) -> None:
+    path = project.instrument_files[instrument_id]
+    changes = file_history(project.root, path)
+    if changes is None:
+        return
+    section("History")
+    if not changes:
+        note(f"No commits include {path} yet.")
+        return
+    note(f"Changes to {path} recorded in git; open one to see what changed.")
+    for change in changes:
+        caption = f"{change.date}, {change.author}" if change.commit else None
+        with ui.expansion(change.message, caption=caption).classes("w-full"):
+            ui.code(change.diff, language="diff").classes("w-full")
 
 
 def about(result: CatalogResult, instrument: Instrument) -> None:
