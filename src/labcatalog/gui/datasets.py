@@ -5,7 +5,7 @@ from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import problems
+from labcatalog.gui import charts, problems
 from labcatalog.gui.common import col, heading, note, open_path, table, without_line
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
@@ -43,6 +43,8 @@ def render(result: CatalogResult, selected: str | None, on_select: Callable[[str
         problems.issue_table(issues, result.project.root)
     else:
         note("No problems found.")
+
+    charts.dataset_section(result, selected)
 
 
 def facts(result: CatalogResult, summary: DatasetSummary) -> None:

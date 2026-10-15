@@ -4,6 +4,7 @@ from nicegui import ui
 
 from labcatalog.browse import facet_names
 from labcatalog.config import WaveConfig
+from labcatalog.gui import charts
 from labcatalog.gui.common import (
     as_list,
     as_text,
@@ -29,6 +30,8 @@ def render(
 
     heading("Waves")
     table(*wave_table(result))
+
+    charts.overview_section(result)
 
     heading("Instruments")
     instrument_list(result, on_instrument)

@@ -3,6 +3,7 @@ from collections.abc import Callable
 from nicegui import ui
 
 from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.gui import charts
 from labcatalog.gui.common import as_text, col, fmt, heading, note, table, unique
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import as_text_dict
@@ -36,6 +37,8 @@ def render(result: CatalogResult, selected: str | None, on_select: Callable[[str
         with ui.column().classes("gap-1"):
             heading("Missing codes")
             table(*missing_code_table(result, instrument)).classes(remove="w-full")
+
+    charts.instrument_section(result, instrument.id)
 
     datasets = administered_in(result, instrument.id)
     if not datasets:
