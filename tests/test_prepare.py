@@ -1,5 +1,6 @@
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -149,6 +150,23 @@ def test_step_names_are_unique_and_steps_need_outputs(project_root):
         "prepare: step name 'clean' is used more than once",
         "prepare[2] (clean).outputs: list at least one file the step writes",
     ]
+
+
+def test_example_steps_rebuild_the_example_data(mock_project, tmp_path):
+    steps = load_project(mock_project).config.prepare
+    assert len(steps) == 6
+    for step in steps:
+        _, script, export, clean = step.run.split()
+        out = tmp_path / Path(clean).name
+        subprocess.run(
+            [sys.executable, script, export, str(out)],
+            cwd=mock_project,
+            check=True,
+            capture_output=True,
+        )
+        assert out.read_text(encoding="utf-8") == (mock_project / clean).read_text(
+            encoding="utf-8"
+        ), step.name
 
 
 def test_cli_runs_every_step_and_reports_a_failure(project_root, monkeypatch, capsys):
