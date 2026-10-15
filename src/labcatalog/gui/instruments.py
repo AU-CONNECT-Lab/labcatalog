@@ -24,6 +24,7 @@ from labcatalog.gui.common import (
     unique,
 )
 from labcatalog.history import file_history
+from labcatalog.invariance import STEPS, InvarianceTest
 from labcatalog.pipeline import CatalogResult, run_scoring_script
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
@@ -51,6 +52,10 @@ class CfaView:
     status: str = CFA_UNSET
     fits: list[CfaFit] = field(default_factory=list)
     message: str = ""
+    # Invariance runs after the CFA, so it has its own status.
+    invariance_status: str = CFA_UNSET
+    invariance: list[InvarianceTest] = field(default_factory=list)
+    invariance_message: str = ""
 
 
 def render(
@@ -224,6 +229,7 @@ def scores_part(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> 
         heading("Stability across waves")
         note("r between the same people's scores one wave apart (n people).")
         table(*stable).classes(remove="w-full")
+        invariance_section(result, instrument, cfa)
     charts.other_scores(result, instrument.id)
 
 
@@ -436,6 +442,7 @@ def score_summaries(result: CatalogResult, instrument: Instrument, dataset: str)
 def cfa_changed() -> None:
     score_statistics.refresh()
     factor_structure.refresh()
+    invariance_section.refresh()
 
 
 # Module level, so a finished CFA can redraw this table without redrawing the page.

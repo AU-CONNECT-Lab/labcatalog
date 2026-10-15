@@ -4,11 +4,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog import invariance
 from labcatalog.ai_scoring import write_scoring_scripts
 from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.exceptions import MetadataError
+from labcatalog.invariance import InvarianceTest
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.manifest import Manifest, build_manifest
@@ -83,6 +85,11 @@ def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
 def run_cfa(result: CatalogResult, rscript: str) -> list[CfaFit]:
     models = build_models(result.project, result.catalog, result.datasets)
     return fit_models(models, rscript)
+
+
+def run_invariance(result: CatalogResult, rscript: str) -> list[InvarianceTest]:
+    models = invariance.build_models(result.project, result.catalog, result.datasets)
+    return invariance.fit_models(models, rscript)
 
 
 def run_scoring_script(
