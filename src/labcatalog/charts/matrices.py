@@ -11,7 +11,7 @@ from labcatalog.charts.style import (
 )
 
 COLORBAR_TICKS = [-1, -0.5, 0, 0.5, 1]
-LABEL_CHAR = 5.8
+LABEL_CHAR = 5.4
 MIN_CELL, MAX_CELL = 18, 40
 # Pixels the cells share before they reach their minimum size.
 CELL_ROOM = 360
