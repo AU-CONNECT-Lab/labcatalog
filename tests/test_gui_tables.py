@@ -5,6 +5,7 @@ from labcatalog.cfa import ONE_FACTOR, SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.gui import datasets, instruments, overview
 from labcatalog.gui.common import location_path
+from labcatalog.invariance import InvarianceStep, InvarianceTest
 from labcatalog.pipeline import run_catalog
 
 
@@ -177,6 +178,39 @@ def test_factor_tables_show_fit_loadings_and_omega(mock_project):
     assert sadness["s_ems_sadness"] == "0.81"
     assert rows[-1]["column"] == "ω" and rows[-1]["s_ems_sadness"] == "0.87"
     assert instruments.omegas(fits) == {"ems_sadness": 0.87}
+
+
+def test_invariance_table_shows_each_step_against_the_one_before():
+    def fit(df: float, cfi: float, rmsea: float) -> dict:
+        return {"chisq": 100.0 + df, "df": df, "cfi": cfi, "rmsea": rmsea, "srmr": 0.05}
+
+    test = InvarianceTest(
+        "mock_study",
+        "child",
+        "example_mood",
+        SUBSCALES,
+        {},
+        {"1": 110, "2": 82},
+        steps=[
+            InvarianceStep("configural", fit(111, 0.999, 0.010)),
+            InvarianceStep("thresholds", fit(120, 0.995, 0.020), 12.79, 9.0, 0.172),
+            InvarianceStep("metric", problem="improper solution"),
+            InvarianceStep("scalar", fit(132, 0.980, 0.030)),
+        ],
+    )
+    _, rows = instruments.invariance_table(test)
+    assert [r["step"] for r in rows] == [
+        "Configural",
+        "Thresholds",
+        "Metric (+ loadings)",
+        "Scalar (+ intercepts)",
+    ]
+    assert (rows[0]["chisq"], rows[0]["diff"], rows[0]["dcfi"]) == ("211.00 (111)", "", "")
+    second = rows[1]
+    assert (second["diff"], second["p"]) == ("12.79 (9)", "0.172")
+    assert (second["dcfi"], second["drmsea"]) == ("-0.004", "0.010")
+    assert (rows[2]["chisq"], rows[2]["problem"]) == ("", "improper solution")
+    assert (rows[3]["dcfi"], rows[3]["diff"]) == ("", "")
 
 
 def test_score_table_lists_every_wave_under_its_score(mock_project):

@@ -686,6 +686,88 @@ def loading_table(
     return columns, rows
 
 
+@ui.refreshable
+def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
+    tests = [t for t in cfa.invariance if t.instrument_id == instrument.id]
+    heading("Invariance across waves")
+    if cfa.invariance_status == CFA_UNSET:
+        note("Set the path to Rscript on the Settings page to test invariance across waves.")
+    elif cfa.invariance_status == CFA_RUNNING:
+        note("Testing invariance across waves in R.")
+    elif cfa.invariance_status == CFA_FAILED:
+        note(cfa.invariance_message)
+    elif not tests:
+        note("No model: no score here has three or more items in two or more waves.")
+    else:
+        note(
+            "lavaan and semTools: each wave's items load on their own factors, the same people "
+            "are linked by ID, and each item's residuals correlate across waves; WLSMV with the "
+            "items as ordered categories, people who answered every item at a wave. Each step "
+            "holds one more set of parameters equal across waves; Δχ² is the scaled difference "
+            "test against the step before. A drop in CFI of more than 0.01 is a common sign "
+            "that a step does not hold."
+        )
+        labels = {s.id: s.label for s in instrument.scores}
+        for test in tests:
+            names = ", ".join(labels[s] for s in test.factors)
+            kind = "Subscales" if test.kind == SUBSCALES else "One factor"
+            waves = ", ".join(
+                f"{views.wave_name(result, test.study, wave)} {n}" for wave, n in test.n.items()
+            )
+            ui.label(f"{kind}: {names}").classes("font-medium mt-2")
+            note(f"{test.reporter} in {test.study}; people per wave: {waves}.")
+            if test.problem:
+                note(test.problem)
+            else:
+                table(*invariance_table(test)).classes(remove="w-full")
+
+
+def invariance_table(test: InvarianceTest) -> tuple[list[dict], list[dict]]:
+    names = {
+        "configural": "Configural",
+        "thresholds": "Thresholds",
+        "metric": "Metric (+ loadings)",
+        "scalar": "Scalar (+ intercepts)",
+    }
+    columns = [
+        col("step", "Step"),
+        col("chisq", "χ² (df)", numeric=True),
+        col("cfi", "CFI", numeric=True),
+        col("rmsea", "RMSEA", numeric=True),
+        col("srmr", "SRMR", numeric=True),
+        col("diff", "Δχ² (Δdf)", numeric=True),
+        col("p", "p", numeric=True),
+        col("dcfi", "ΔCFI", numeric=True),
+        col("drmsea", "ΔRMSEA", numeric=True),
+        col("problem", "Note", sortable=False),
+    ]
+    rows = []
+    previous = None
+    for step in sorted(test.steps, key=lambda s: STEPS.index(s.step)):
+        values = step.fit
+        before = previous.fit if previous and not previous.problem else {}
+        rows.append(
+            {
+                "step": names[step.step],
+                "chisq": f"{fmt(values['chisq'])} ({values['df']:g})" if values else "",
+                **{key: fmt(values.get(key), 3) for key in ("cfi", "rmsea", "srmr")},
+                "diff": f"{fmt(step.chisq_diff)} ({step.df_diff:g})"
+                if step.chisq_diff is not None
+                else "",
+                "p": fmt(step.p_diff, 3),
+                **{
+                    f"d{key}": fmt(values[key] - before[key], 3)
+                    if values.get(key) is not None and before.get(key) is not None
+                    else ""
+                    for key in ("cfi", "rmsea")
+                },
+                "problem": step.problem or "",
+            }
+        )
+        previous = step
+    return columns, rows
+
+
 def score_table(
     result: CatalogResult, instrument: Instrument, fits: list[CfaFit]
 ) -> tuple[list[dict], list[dict]]:

@@ -77,9 +77,7 @@ def build_models(
                 if frame is not None and len(frame):
                     waves[wave] = frame
             if len(waves) >= 2:
-                models.append(
-                    InvarianceModel(study, reporter, instrument_id, kind, factors, waves)
-                )
+                models.append(InvarianceModel(study, reporter, instrument_id, kind, factors, waves))
     return models
 
 
@@ -144,8 +142,7 @@ def write_model(folder: Path, n: int, model: InvarianceModel) -> tuple[str, dict
         for j, score in enumerate(model.factors, start=1):
             original[f"f{j}_t{t}"] = f"{score} (wave {wave})"
     syntax = "; ".join(
-        f"f{j}_t{t} =~ "
-        + " + ".join(f"x{items.index(item) + 1}_t{t}" for item in members)
+        f"f{j}_t{t} =~ " + " + ".join(f"x{items.index(item) + 1}_t{t}" for item in members)
         for t in range(1, len(model.waves) + 1)
         for j, members in enumerate(model.factors.values(), start=1)
     )

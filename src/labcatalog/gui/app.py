@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from pathlib import Path
 
 import webview
@@ -29,7 +30,7 @@ from labcatalog.gui.instruments import (
     CfaView,
 )
 from labcatalog.gui.prepare import PrepareView
-from labcatalog.pipeline import CatalogResult, run_catalog, run_cfa
+from labcatalog.pipeline import CatalogResult, run_catalog, run_cfa, run_invariance
 from labcatalog.version import __version__
 
 WINDOW_SIZE = (1280, 820)
@@ -176,22 +177,23 @@ class Window:
         result, cfa = self.result, self.cfa
         rscript = preferences.load().get(preferences.RSCRIPT)
         cfa.fits, cfa.message = [], ""
+        cfa.invariance, cfa.invariance_message = [], ""
         if result is None or result.project is None or not rscript:
-            cfa.status = CFA_UNSET
+            cfa.status = cfa.invariance_status = CFA_UNSET
             instruments.cfa_changed()
             return
-        cfa.status = CFA_RUNNING
+        cfa.status = cfa.invariance_status = CFA_RUNNING
         instruments.cfa_changed()
-        try:
-            fits = await run.io_bound(run_cfa, result, rscript)
-        except LabCatalogError as err:
-            fits, message, status = [], str(err), CFA_FAILED
-        else:
-            message, status = "", CFA_DONE
+        found = await in_r(run_cfa, result, rscript)
         # A newer Refresh has started its own run.
         if self.result is not result:
             return
-        cfa.fits, cfa.message, cfa.status = fits, message, status
+        cfa.fits, cfa.message, cfa.status = found
+        instruments.cfa_changed()
+        found = await in_r(run_invariance, result, rscript)
+        if self.result is not result:
+            return
+        cfa.invariance, cfa.invariance_message, cfa.invariance_status = found
         instruments.cfa_changed()
 
     def set_palette(self, name: str) -> None:
@@ -290,6 +292,16 @@ class Window:
                 "lc-note"
             )
         return self.result is not None and self.result.project is not None
+
+
+async def in_r(
+    function: Callable[[CatalogResult, str], list], result: CatalogResult, rscript: str
+) -> tuple[list, str, str]:
+    try:
+        found = await run.io_bound(function, result, rscript)
+    except LabCatalogError as err:
+        return [], str(err), CFA_FAILED
+    return found, "", CFA_DONE
 
 
 def as_of_text(result: CatalogResult) -> str:
