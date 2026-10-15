@@ -6,6 +6,7 @@ from pathlib import Path
 from nicegui import app, ui
 
 from labcatalog.browse import BrowseIndex, counts, matches
+from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.gui import charts
 from labcatalog.gui.common import (
@@ -219,6 +220,15 @@ def detail(result: CatalogResult, instrument: Instrument, preferred: list[str]) 
     if instrument.kind == "demographics":
         heading("Sample by wave")
         table(*sample_table(result, instrument))
+    across = item_total_waves(result, instrument)
+    if across is not None:
+        heading("Item-total correlation across waves")
+        table(*across).classes(remove="w-full")
+    stable = stability_table(result, instrument)
+    if stable is not None:
+        heading("Stability across waves")
+        note("r between the same people's scores one wave apart (n people).")
+        table(*stable).classes(remove="w-full")
     dataset_tables(first)
     dataset_code(first)
 
@@ -400,6 +410,80 @@ def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) ->
                 ui.code(snippets["r"], language="r").classes("w-full")
             with ui.tab_panel("python").classes("p-0"):
                 ui.code(snippets["python"], language="python").classes("w-full")
+
+
+def item_total_waves(
+    result: CatalogResult, instrument: Instrument
+) -> tuple[list[dict], list[dict]] | None:
+    total = views.total_score(instrument)
+    if total is None:
+        return None
+    summaries = [
+        views.summary_of(result, s.key) for s in views.resolved(result, instrument.id, total.id)
+    ]
+    summaries = [s for s in summaries if s.item_total]
+    if not summaries:
+        return None
+    names = views.series_names(result, [s.dataset for s in summaries])
+    columns = [
+        col("n", "#", numeric=True),
+        col("item", "Item"),
+        *[
+            col(f"d{i}", f"{names[s.dataset]} (α {fmt(s.alpha)})", numeric=True)
+            for i, s in enumerate(summaries)
+        ],
+    ]
+    found = [
+        {item_ids(result, s.dataset).get(t.column): t.r for t in s.item_total} for s in summaries
+    ]
+    numbers = {item.id: n for n, item in enumerate(instrument.items, start=1)}
+    rows = [
+        {
+            "n": numbers[item],
+            "item": item,
+            **{f"d{i}": fmt(values.get(item)) for i, values in enumerate(found)},
+        }
+        for item in total.items
+    ]
+    return columns, rows
+
+
+def stability_table(
+    result: CatalogResult, instrument: Instrument
+) -> tuple[list[dict], list[dict]] | None:
+    rows_found = [s for s in result.summary.stability if s.instrument_id == instrument.id]
+    if not rows_found:
+        return None
+    pairs = list(dict.fromkeys((s.study, s.from_wave, s.to_wave) for s in rows_found))
+    reporters = unique(s.reporter for s in rows_found)
+    cells = {(s.score_id, s.reporter, s.study, s.from_wave, s.to_wave): s for s in rows_found}
+    columns = [
+        col("score", "Score"),
+        *[
+            col(
+                f"p{i}",
+                f"{views.wave_name(result, study, a)} → {views.wave_name(result, study, b)}",
+                numeric=True,
+            )
+            for i, (study, a, b) in enumerate(pairs)
+        ],
+    ]
+    rows = []
+    for score in instrument.scores:
+        for reporter in reporters:
+            found = [cells.get((score.id, reporter, *pair)) for pair in pairs]
+            if not any(found):
+                continue
+            rows.append(
+                {
+                    "score": score.label if len(reporters) == 1 else f"{score.label} ({reporter})",
+                    **{
+                        f"p{i}": f"{fmt(s.r)} (n {s.n})" if s and s.r is not None else ""
+                        for i, s in enumerate(found)
+                    },
+                }
+            )
+    return columns, rows
 
 
 def item_ids(result: CatalogResult, dataset: str) -> dict[str, str]:

@@ -334,65 +334,6 @@ def dot_rows(
     )
 
 
-def item_diagnostics(
-    items: list[str],
-    numbers: dict[str, int],
-    hovers: dict[str, str],
-    series: list[dict],
-    floor: float,
-    title: str,
-) -> go.Figure:
-    # Each item's item-total r against the α left without it; an item above its wave's α line weakens the scale.
-    fig = go.Figure()
-    for s in series:
-        shown = [i for i in items if i in s["points"]]
-        fig.add_trace(
-            go.Scatter(
-                x=[s["points"][i][0] for i in shown],
-                y=[s["points"][i][1] for i in shown],
-                mode="markers+text",
-                name=f"{s['name']} (α {s['alpha']:.2f})",
-                # The item's number from the item table sits inside its dot.
-                text=[str(numbers[i]) for i in shown],
-                textposition="middle center",
-                textfont=dict(size=9, color="white"),
-                marker=dict(size=17, color=s["color"], line=dict(width=0.8, color="white")),
-                customdata=[hovers[i] for i in shown],
-                hovertemplate=f"<b>{s['name']}</b><br>%{{customdata}}<br>item-total r = %{{x:.2f}}"
-                "<br>α if deleted = %{y:.3f}<extra></extra>",
-            )
-        )
-        fig.add_hline(y=s["alpha"], line=dict(color=s["color"], width=1, dash="dash"), opacity=0.6)
-    xs = [p[0] for s in series for p in s["points"].values()]
-    low, high = min(xs), max(xs)
-    span = (high - low) or 0.1
-    x_range = [low - 0.08 * span, high + 0.08 * span]
-    if x_range[0] <= floor:
-        fig.add_vline(x=floor, line=dict(color=MUTED_INK, width=1, dash="dot"))
-    fig.update_xaxes(
-        title_text="Corrected item-total r",
-        title_font=dict(size=10),
-        range=x_range,
-        gridcolor=GRID,
-        tickfont=dict(size=9),
-        zeroline=False,
-    )
-    fig.update_yaxes(
-        title_text="α if the item is deleted",
-        title_font=dict(size=10),
-        gridcolor=GRID,
-        tickfont=dict(size=9),
-        zeroline=False,
-    )
-    return base_layout(
-        fig,
-        400,
-        margin=dict(l=64, r=20, t=74, b=50),
-        title=dict(text=title, x=0.01, y=0.97, font=dict(size=13, color=TITLE_INK)),
-        legend=dict(orientation="h", x=0, y=1.02, yanchor="bottom", font=dict(size=10)),
-    )
-
-
 def profile_radar(
     axes: list[str], hovers: list[str], series: list[dict], value_range: tuple[float, float]
 ) -> go.Figure:

@@ -78,6 +78,26 @@ def test_dataset_page_lists_each_file_with_the_study_citation(mock_project):
     }
 
 
+def test_item_total_and_stability_tables_have_a_column_per_wave(mock_project):
+    result = run_catalog(mock_project)
+    mood = result.project.instruments["example_mood"]
+    columns, rows = instruments.item_total_waves(result, mood)
+    assert [c["label"] for c in columns[2:]] == [
+        "Wave 1 (α 0.86)",
+        "Wave 2 (α 0.88)",
+        "Wave 3 (α 0.85)",
+    ]
+    assert [r["item"] for r in rows] == [f"ems_{i}" for i in range(1, 7)]
+    assert all(r["d0"] and r["d2"] for r in rows)
+    columns, rows = instruments.stability_table(result, mood)
+    assert [c["label"] for c in columns[1:]] == ["Wave 1 → Wave 2", "Wave 2 → Wave 3"]
+    total = next(
+        s for s in result.summary.stability if (s.score_id, s.from_wave) == ("ems_total", "1")
+    )
+    assert rows[0] == {"score": "Total score", "p0": f"{total.r:.2f} (n {total.n})", **rows[0]}
+    assert [r["score"] for r in rows] == [s.label for s in mood.scores]
+
+
 def test_sample_table_reads_like_a_table_one(mock_project):
     result = run_catalog(mock_project)
     columns, rows = instruments.sample_table(

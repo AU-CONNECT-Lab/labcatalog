@@ -49,12 +49,8 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     for fig in views.item_responses(result, instrument_id):
         show(fig)
     side_by_side(
-        ("", views.item_total(result, instrument_id)),
-        ("", views.item_profile(result, instrument_id)),
-    )
-    side_by_side(
+        ("Item means", views.item_profile(result, instrument_id)),
         ("Scores across waves", views.score_means(result, instrument_id)),
-        ("Stability across waves", views.stability(result, instrument_id)),
     )
     profiles = views.wave_profiles(result, instrument_id)
     if profiles is not None:
@@ -64,9 +60,7 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     waves = views.item_waves(result, instrument_id)
     if waves:
         heading("Item correlations")
-        triangles(
-            waves, lambda lower, upper: show(views.item_grid(result, instrument_id, lower, upper))
-        )
+        one_wave(waves, lambda dataset: show(views.item_grid(result, instrument_id, dataset)))
     other_scores(result, instrument_id)
 
 
@@ -164,36 +158,19 @@ def overview_section(result: CatalogResult) -> None:
     score_relations(result)
 
 
-def first_two(choices: dict[str, str]) -> tuple[str, str]:
-    keys = list(choices)
-    return keys[0], keys[1] if len(keys) > 1 else keys[0]
+def wave_picker(choices: dict[str, str], value: str, changed) -> None:
+    ui.select(choices, value=value, label="Wave", on_change=lambda e: changed(e.value)).props(
+        "dense outlined"
+    ).classes("w-56")
 
 
-def wave_pickers(choices: dict[str, str], picked: dict, changed) -> None:
-    for key, label in (("lower", "Below the diagonal"), ("upper", "Above the diagonal")):
-        ui.select(
-            choices,
-            value=picked[key],
-            label=label,
-            on_change=lambda e, k=key: changed(k, e.value),
-        ).props("dense outlined").classes("w-56")
-
-
-def triangles(choices: dict[str, str], render) -> None:
-    lower, upper = first_two(choices)
-    picked = {"lower": lower, "upper": upper}
-
+def one_wave(choices: dict[str, str], render) -> None:
     @ui.refreshable
-    def grid() -> None:
-        render(picked["lower"], picked["upper"])
+    def grid(choice: str) -> None:
+        render(choice)
 
-    def changed(key: str, value: str) -> None:
-        picked[key] = value
-        grid.refresh()
-
-    with ui.row().classes("items-center gap-4"):
-        wave_pickers(choices, picked, changed)
-    grid()
+    wave_picker(choices, next(iter(choices)), grid.refresh)
+    grid(next(iter(choices)))
 
 
 def score_relations(result: CatalogResult) -> None:
@@ -202,10 +179,8 @@ def score_relations(result: CatalogResult) -> None:
         return
     instruments = views.correlated_instruments(result)
     choices = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
-    lower, upper = first_two(choices)
     picked = {
-        "lower": lower,
-        "upper": upper,
+        "wave": next(iter(choices)),
         "instruments": list(instruments),
         "color": "instrument",
     }
@@ -216,15 +191,14 @@ def score_relations(result: CatalogResult) -> None:
             views.score_grid(
                 result,
                 picked["instruments"],
-                tuple(picked["lower"].split("|")),
-                tuple(picked["upper"].split("|")),
+                tuple(picked["wave"].split("|")),
             ),
             "Pick instruments with at least two scores.",
         )
 
     @ui.refreshable
     def graph() -> None:
-        study, wave = picked["lower"].split("|")
+        study, wave = picked["wave"].split("|")
         show_network(
             views.score_network(result, study, wave, picked["instruments"], picked["color"])
         )
@@ -256,7 +230,7 @@ def score_relations(result: CatalogResult) -> None:
             .props(f'dense outlined clearable display-value="{shown()}"')
             .classes("w-72")
         )
-        wave_pickers(choices, picked, changed)
+        wave_picker(choices, picked["wave"], lambda value: changed("wave", value))
     grid()
     ui.select(
         views.network_colorings(result),

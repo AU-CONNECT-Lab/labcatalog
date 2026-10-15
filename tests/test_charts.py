@@ -13,16 +13,9 @@ def result(mock_project):
 def test_instrument_charts(result):
     assert len(views.score_boxes(result, "example_mood").data) == 6
     assert views.score_distribution(result, "example_mood") is not None
-    assert views.item_total(result, "example_mood") is not None
     assert views.item_profile(result, "example_mood") is not None
     assert len(views.item_responses(result, "example_screen_time")) == 2
     assert views.score_boxes(result, "example_screen_time") is None
-
-
-def test_item_diagnostics_put_each_item_against_alpha_without_it(result):
-    fig = views.item_total(result, "example_mood")
-    assert [t.name for t in fig.data] == ["Wave 1 (α 0.86)", "Wave 2 (α 0.88)", "Wave 3 (α 0.85)"]
-    assert all(list(t.text) == ["1", "2", "3", "4", "5", "6"] for t in fig.data)
 
 
 def test_subscale_radars_draw_each_subscale_with_three_items(result):
@@ -55,20 +48,10 @@ def test_small_multiples(result):
     assert sum(value is None for value in background) == len(result.datasets["child_w1"].frame)
 
 
-def test_means_and_stability_show_one_instrument(result):
+def test_means_show_one_instrument(result):
     means = views.score_means(result, "example_mood")
     labels = ["Total score", "Sadness", "Worry and fatigue", "Low positive affect"]
     assert [a.text for a in means.layout.annotations] == labels
-    stability = views.stability(result, "example_mood")
-    assert [a.text for a in stability.layout.annotations][: len(labels)] == labels
-    total = next(
-        r
-        for r in result.summary.stability
-        if (r.score_id, r.from_wave, r.to_wave) == ("ems_total", "1", "2")
-    )
-    first_pair = stability.data[1]
-    assert len(first_pair.x) == total.n
-    assert f"r = {total.r:.2f}" in stability.layout.annotations[len(labels)].text
 
 
 def test_overview_charts(result):
@@ -79,9 +62,8 @@ def test_overview_charts(result):
         ("mock_study", "2"),
         ("mock_study", "3"),
     ]
-    waves = ("mock_study", "1"), ("mock_study", "2")
-    assert views.score_grid(result, everything, *waves) is not None
-    assert views.score_grid(result, [], *waves) is None
+    assert views.score_grid(result, everything, ("mock_study", "1")) is not None
+    assert views.score_grid(result, [], ("mock_study", "1")) is None
 
 
 def test_score_levels_put_every_wave_on_one_row_per_score(result):
@@ -99,23 +81,23 @@ def test_score_levels_put_every_wave_on_one_row_per_score(result):
     assert all(0 <= share <= 1 for w in waves for share in w.x)
 
 
-def test_dot_grid_puts_one_wave_below_the_diagonal_and_another_above(result):
+def test_dot_grid_shows_one_wave_both_sides_of_the_diagonal(result):
     everything = list(views.correlated_instruments(result))
-    grid = views.score_grid(result, everything, ("mock_study", "1"), ("mock_study", "2"))
+    grid = views.score_grid(result, everything, ("mock_study", "2"))
     hover = next(trace for trace in grid.data if trace.customdata is not None)
-    below = {
-        wave for (wave, *_), x, y in zip(hover.customdata, hover.x, hover.y, strict=True) if y > x
+    assert {wave for wave, *_ in hover.customdata} == {"Wave 2"}
+    cells = {
+        (x, y): r for (_, _, _, r, _), x, y in zip(hover.customdata, hover.x, hover.y, strict=True)
     }
-    above = {
-        wave for (wave, *_), x, y in zip(hover.customdata, hover.x, hover.y, strict=True) if y < x
-    }
-    assert (below, above) == ({"Wave 1"}, {"Wave 2"})
-    assert all(x != y for x, y in zip(hover.x, hover.y, strict=True))
+    assert all(cells[(y, x)] == r for (x, y), r in cells.items())
+    assert all(x != y for x, y in cells)
+    title = next(a.text for a in grid.layout.annotations if a.xref == "x2 domain")
+    assert title.startswith("Wave 2: |Pearson r| ≥ 0.3")
 
 
 def test_item_grid_groups_items_by_subscale(result):
-    lower, upper = list(views.item_waves(result, "example_mood"))[:2]
-    grid = views.item_grid(result, "example_mood", lower, upper)
+    first = next(iter(views.item_waves(result, "example_mood")))
+    grid = views.item_grid(result, "example_mood", first)
     by_subscale = ["ems_2", "ems_6", "ems_3", "ems_5", "ems_1", "ems_4"]
     assert list(grid.layout.xaxis.ticktext) == by_subscale
     around = [a.text for a in grid.layout.annotations if a.xref == "x2"]

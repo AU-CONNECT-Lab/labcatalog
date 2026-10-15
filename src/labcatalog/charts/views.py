@@ -14,7 +14,7 @@ from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
 from labcatalog.schema import Instrument, Score
-from labcatalog.stats import Correlation, ScoreSummary, wave_order, waves_of_scores
+from labcatalog.stats import Correlation, ScoreSummary, wave_order
 
 RADAR_AXES = 3
 # Room beyond 0% and 100% so dots at either end stay whole.
@@ -223,45 +223,6 @@ def item_responses(result: CatalogResult, instrument_id: str) -> list[go.Figure]
     return figures
 
 
-def item_total(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    instrument = result.project.instruments[instrument_id]
-    total = total_score(instrument)
-    if total is None:
-        return None
-    items = {
-        v.column: v.item_id for v in result.catalog.variables if v.instrument_id == instrument_id
-    }
-    scores = [
-        s for s in resolved(result, instrument_id, total.id) if summary_of(result, s.key).item_total
-    ]
-    names = series_names(result, [s.dataset for s in scores])
-    series = []
-    for s in scores:
-        summary = summary_of(result, s.key)
-        points = {
-            items[t.column]: (t.r, t.alpha_if_deleted)
-            for t in summary.item_total
-            if t.r is not None and t.alpha_if_deleted is not None
-        }
-        if summary.alpha is not None and points:
-            series.append(
-                {
-                    "name": names[s.dataset],
-                    "color": series_color(result, s.dataset),
-                    "alpha": summary.alpha,
-                    "points": points,
-                }
-            )
-    if not series:
-        return None
-    hovers = {i: f"{i}: {item_text(instrument, i)}" for i in total.items}
-    title = f"{short_label(instrument, total)}: items"
-    numbers = {item.id: n for n, item in enumerate(instrument.items, start=1)}
-    return plots.item_diagnostics(
-        list(total.items), numbers, hovers, series, defaults.CHART_ITEM_TOTAL_FLOOR, title
-    )
-
-
 def item_profile(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     instrument = result.project.instruments[instrument_id]
     choices = [i for i in instrument.items if i.type == "choice"]
@@ -442,53 +403,6 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
                 }
             )
     return plots.score_means(panels, all_wave_names(result)) if panels else None
-
-
-def stability(result: CatalogResult, instrument_id: str) -> go.Figure | None:
-    # The same people's scores one wave apart, linked by ID as the stability r is.
-    rows = [
-        r for r in result.summary.stability if r.instrument_id == instrument_id and r.r is not None
-    ]
-    if not rows:
-        return None
-    instrument = result.project.instruments[instrument_id]
-    found = waves_of_scores(result.catalog, result.datasets, result.scores)
-    reporters = list(dict.fromkeys(r.reporter for r in rows))
-    panels = []
-    for score in instrument.scores:
-        for reporter in reporters:
-            pairs = []
-            for r in rows:
-                if (r.score_id, r.reporter) != (score.id, reporter):
-                    continue
-                waves = found[(r.study, reporter, instrument_id, score.id)]
-                both = pd.concat(
-                    [waves[r.from_wave], waves[r.to_wave]], axis=1, join="inner"
-                ).dropna()
-                pairs.append(
-                    {
-                        "name": f"{wave_name(result, r.study, r.from_wave)} → "
-                        f"{wave_name(result, r.study, r.to_wave)}",
-                        "color": wave_colors(result)[r.to_wave],
-                        "x": both.iloc[:, 0].tolist(),
-                        "y": both.iloc[:, 1].tolist(),
-                        "ids": [str(i) for i in both.index],
-                        "r": r.r,
-                        "n": r.n,
-                    }
-                )
-            if pairs:
-                first = resolved(result, instrument_id, score.id)[0]
-                panels.append(
-                    {
-                        "title": score.label
-                        if len(reporters) == 1
-                        else f"{score.label} ({reporter})",
-                        "range": summary_of(result, first.key).possible_range,
-                        "pairs": pairs,
-                    }
-                )
-    return scatter.retest(panels)
 
 
 def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -> go.Figure | None:
