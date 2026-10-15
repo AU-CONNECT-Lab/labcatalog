@@ -25,8 +25,8 @@ RING_LENGTH = 0.5
 # Degrees left open at the top for the scale, and between instruments.
 RING_TOP_GAP = 26.0
 RING_GROUP_GAP = 4.0
-RING_SPAN = 1.62
-RING_SCALE = "RdYlBu_r"
+RING_SPAN = 1.35
+RING_SCALE = "YlOrRd"
 RING_CENTRE = "#f3e3d0"
 
 
@@ -668,7 +668,7 @@ def score_ring(
                 showlegend=False,
             )
         )
-        radial_label(fig, np.deg2rad(angle), RING_HOLE + RING_LENGTH + 0.04, bar["label"])
+        radial_label(fig, np.deg2rad(angle), outer + 0.03, bar["label"])
     for g in groups:
         members = [a for a, b in zip(angles, bars, strict=True) if b["group"] == g]
         start, end = max(members) + half, min(members) - half
@@ -731,4 +731,4 @@ def score_ring(
             constrain="domain",
         ),
     )
-    return base_layout(fig, 760, margin=dict(l=10, r=10, t=10, b=10))
+    return base_layout(fig, 680, margin=dict(l=10, r=10, t=10, b=10))
