@@ -124,9 +124,21 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
         message = f"default_response_set: no response set '{instrument.default_response_set}'"
         issues.append(unknown(message, location))
     for n, item in enumerate(instrument.items, start=1):
+        where = f"items[{n}] ({item.id})"
         if item.response_set and item.response_set not in set_ids:
-            message = f"items[{n}] ({item.id}).response_set: no response set '{item.response_set}'"
+            message = f"{where}.response_set: no response set '{item.response_set}'"
             issues.append(unknown(message, location))
+        if item.type != "choice" and item.response_set:
+            message = f"{where}.response_set: {item.type} items have no response options"
+            issues.append(problem("invalid_value", message, location))
+        if item.type == "choice" and not (item.response_set or instrument.default_response_set):
+            message = f"{where}: needs a response_set, or type: number or text"
+            issues.append(problem("invalid_value", message, location))
+        if item.type != "number" and (item.min is not None or item.max is not None):
+            message = f"{where}: min and max apply to number items only"
+            issues.append(problem("invalid_value", message, location))
+        if item.min is not None and item.max is not None and item.min > item.max:
+            issues.append(problem("invalid_value", f"{where}: min is above max", location))
     items = {item.id: item for item in instrument.items}
     sets = {response_set.id: response_set for response_set in instrument.response_sets}
     for n, score in enumerate(instrument.scores, start=1):
@@ -137,6 +149,10 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
         unscorable = []
         for item_id in score.items:
             if item_id not in items:
+                continue
+            if items[item_id].type != "choice":
+                message = f"{where}.items: {item_id} is a {items[item_id].type} item and cannot be scored"
+                issues.append(problem("invalid_value", message, location))
                 continue
             response_set = sets.get(items[item_id].response_set or instrument.default_response_set)
             numeric = response_set is not None and all(

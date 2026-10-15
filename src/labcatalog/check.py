@@ -9,7 +9,7 @@ from labcatalog.ids import load_exclusions
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
-from labcatalog.resolve import Catalog
+from labcatalog.resolve import Catalog, ResolvedVariable, numbers_in_range
 from labcatalog.scoring import raw_items, scorable
 from labcatalog.sources import LoadedDataset
 
@@ -69,7 +69,7 @@ def check_values(
     issues = []
     for variable in catalog.variables:
         loaded = datasets[variable.dataset]
-        if not variable.response_options or variable.column not in loaded.frame:
+        if variable.type == "text" or variable.column not in loaded.frame:
             continue
         codes = list(missing_labels_for(project.config, loaded.config))
         allowed = [option.value for option in variable.response_options] + codes
@@ -78,10 +78,15 @@ def check_values(
         numeric_allowed = [float(v) for v in allowed if not isinstance(v, str)]
         numeric_allowed += [float(v) for v in codes if is_number(v)]
         ok = values.isin([str(v) for v in allowed]) | numbers.isin(numeric_allowed)
+        if variable.type == "number":
+            ok |= numbers_in_range(numbers, variable)
+            expected = f"numbers{range_text(variable)}"
+        else:
+            expected = "response options"
         if not ok.all():
             stray = values[~ok]
             message = (
-                f"{variable.column}: {len(stray)} value(s) are neither response options "
+                f"{variable.column}: {len(stray)} value(s) are neither {expected} "
                 f"nor missing codes: {examples(stray.unique())}"
             )
             issues.append(problem("unexpected_value", message, location(project, loaded)))
@@ -144,10 +149,20 @@ def check_exclusions(project: Project, datasets: dict[str, LoadedDataset]) -> li
 
 def check_identifier_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
     name_patterns = [re.compile(p, re.IGNORECASE) for p in defaults.IDENTIFIER_NAME_PATTERNS]
+    free_text = {
+        (instrument.id, item.id)
+        for instrument in project.instruments.values()
+        for item in instrument.items
+        if item.type == "text"
+    }
     issues = []
     for name, loaded in datasets.items():
-        # Item columns are already held to their response options by check_values.
-        items = {e.column for e in project.maps.get(name, []) if e.instrument is not None}
+        # Choice and number columns are already held to their allowed values by check_values.
+        items = {
+            e.column
+            for e in project.maps.get(name, [])
+            if e.instrument is not None and (e.instrument, e.item) not in free_text
+        }
         for column in loaded.frame:
             if column == loaded.id_column:
                 continue
@@ -244,6 +259,17 @@ def check_score_agreement(
             )
             issues.append(problem("score_coverage", message, where, "warning"))
     return issues
+
+
+def range_text(variable: ResolvedVariable) -> str:
+    low, high = variable.allowed_min, variable.allowed_max
+    if low is not None and high is not None:
+        return f" from {low:g} to {high:g}"
+    if low is not None:
+        return f" of at least {low:g}"
+    if high is not None:
+        return f" of at most {high:g}"
+    return ""
 
 
 def is_number(text: str) -> bool:

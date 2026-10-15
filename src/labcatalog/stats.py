@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, missing_labels_for
-from labcatalog.resolve import Catalog, ResolvedScore, ResolvedVariable
+from labcatalog.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
 from labcatalog.scoring import item_values, scorable, score_items
 from labcatalog.sources import LoadedDataset
 
@@ -23,6 +23,7 @@ class VariableSummary(BaseModel):
     sd: float | None = None
     minimum: float | None = None
     maximum: float | None = None
+    median: float | None = None
 
 
 class ItemTotal(BaseModel):
@@ -167,14 +168,21 @@ def summarize_variable(
     values = loaded.frame[variable.column]
     labels = missing_labels_for(config, loaded.config)
     missing = {label: int(values.isin([code]).sum()) for code, label in labels.items()}
-    options = [option.value for option in variable.response_options]
     numbers = loaded.numbers(variable.column)
-    counts = {
-        str(v): int((values == v).sum()) if isinstance(v, str) else int((numbers == v).sum())
-        for v in options
-    }
-    numeric = item_values(numbers, [float(v) for v in options if not isinstance(v, str)])
-    n_valid = sum(counts.values())
+    valid = valid_answers(loaded, variable, labels)
+    counts: dict[str, int] = {}
+    if variable.type == "choice":
+        options = [option.value for option in variable.response_options]
+        counts = {
+            str(v): int((values == v).sum()) if isinstance(v, str) else int((numbers == v).sum())
+            for v in options
+        }
+        numeric = item_values(numbers, [float(v) for v in options if not isinstance(v, str)])
+    elif variable.type == "number":
+        numeric = numbers[valid]
+    else:
+        numeric = pd.Series(dtype=float)
+    n_valid = int(valid.sum())
     unexpected = len(values) - n_valid - sum(missing.values())
     return VariableSummary(
         column=variable.column,
@@ -185,7 +193,22 @@ def summarize_variable(
         value_counts=counts,
         n_unexpected=unexpected,
         **describe(numeric),
+        median=float(numeric.median()) if variable.type == "number" and n_valid else None,
     )
+
+
+def valid_answers(
+    loaded: LoadedDataset, variable: ResolvedVariable, labels: dict[str, str]
+) -> pd.Series:
+    values = loaded.frame[variable.column]
+    numbers = loaded.numbers(variable.column)
+    if variable.type == "choice":
+        options = [str(option.value) for option in variable.response_options]
+        return values.isin(options) | numbers.isin([float(v) for v in options if is_number(v)])
+    answered = ~values.isin(list(labels))
+    if variable.type == "number":
+        return answered & numbers_in_range(numbers, variable)
+    return answered
 
 
 def summarize_score(loaded: LoadedDataset, score: ResolvedScore, values: pd.Series) -> ScoreSummary:
@@ -342,14 +365,12 @@ def completeness(
     loaded: LoadedDataset, catalog: Catalog, config: ProjectConfig
 ) -> list[InstrumentCompleteness]:
     frame = loaded.frame
+    labels = missing_labels_for(config, loaded.config)
     by_instrument: dict[str, list[pd.Series]] = {}
     for variable in catalog.variables_for(loaded.config.name):
         if variable.column not in frame:
             continue
-        options = [str(option.value) for option in variable.response_options]
-        values = frame[variable.column]
-        numeric = loaded.numbers(variable.column)
-        valid = values.isin(options) | numeric.isin([float(v) for v in options if is_number(v)])
+        valid = valid_answers(loaded, variable, labels)
         by_instrument.setdefault(variable.instrument_id, []).append(valid)
     rows = []
     for instrument_id, columns in by_instrument.items():

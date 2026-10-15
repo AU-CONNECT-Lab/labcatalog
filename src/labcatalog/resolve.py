@@ -1,9 +1,10 @@
+import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.config import DatasetConfig
 from labcatalog.project import Project
-from labcatalog.schema import Administration, Instrument, ResponseOption, Text
+from labcatalog.schema import Administration, Instrument, ItemType, ResponseOption, Text
 
 DEFAULT_TEXT_KEY = "default"
 
@@ -19,10 +20,22 @@ class ResolvedVariable(BaseModel):
     modality: str
     target: str | None = None
     text: dict[str, str]
+    type: ItemType = "choice"
     response_options: list[ResponseOption]
+    allowed_min: float | None = None
+    allowed_max: float | None = None
     reverse: bool
     reversed_in_data: bool
     subscales: list[str] = []
+
+
+def numbers_in_range(numbers: pd.Series, variable: ResolvedVariable) -> pd.Series:
+    ok = numbers.notna()
+    if variable.allowed_min is not None:
+        ok &= numbers >= variable.allowed_min
+    if variable.allowed_max is not None:
+        ok &= numbers <= variable.allowed_max
+    return ok
 
 
 class ResolvedScore(BaseModel):
@@ -100,7 +113,7 @@ def resolve_items(
         if dropped or column is None:
             continue
         set_id = set_id or instrument.default_response_set
-        options = response_sets[set_id].options if set_id else []
+        options = response_sets[set_id].options if set_id and item.type == "choice" else []
         resolved.append(
             ResolvedVariable(
                 column=column,
@@ -113,7 +126,10 @@ def resolve_items(
                 modality=dataset.modality,
                 target=administration.target,
                 text=as_text_dict(text),
+                type=item.type,
                 response_options=options,
+                allowed_min=item.min,
+                allowed_max=item.max,
                 reverse=item.reverse,
                 reversed_in_data=administration.reversed_in_data,
                 subscales=item.subscales,

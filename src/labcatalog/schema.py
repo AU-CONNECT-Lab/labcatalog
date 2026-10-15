@@ -24,10 +24,16 @@ class ResponseSet(StrictModel):
     options: list[ResponseOption]
 
 
+ItemType = Literal["choice", "number", "text"]
+
+
 class Item(StrictModel):
     id: str
     text: Text
+    type: ItemType = "choice"
     response_set: str | None = None
+    min: float | None = None
+    max: float | None = None
     reverse: bool = False
     subscales: list[str] = []
 
