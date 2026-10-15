@@ -12,9 +12,9 @@ def show(fig: go.Figure | None, empty: str = "") -> None:
             note(empty)
         return
     height = (fig.layout.height or 400) + 8
-    ui.plotly({**fig.to_plotly_json(), "config": {"displayModeBar": False}}).classes("w-full").style(
-        f"height:{height}px"
-    )
+    ui.plotly({**fig.to_plotly_json(), "config": {"displayModeBar": False}}).classes(
+        "w-full"
+    ).style(f"height:{height}px")
 
 
 def instrument_section(result: CatalogResult, instrument_id: str) -> None:
@@ -71,7 +71,9 @@ def dataset_section(result: CatalogResult, dataset: str) -> None:
     if pages > 1:
         with ui.row().classes("items-center gap-2 mt-6"):
             ui.label("Participants page").classes("text-grey-7")
-            ui.pagination(1, pages, direction_links=True, on_change=lambda e: people.refresh(e.value))
+            ui.pagination(
+                1, pages, direction_links=True, on_change=lambda e: people.refresh(e.value)
+            )
     people(1)
 
 
@@ -115,10 +117,10 @@ def correlations_page(result: CatalogResult) -> None:
         scatter.refresh()
 
     with ui.row().classes("gap-4"):
-        ui.select(choices, value=keys[0], label="X", on_change=lambda e: choose("x", e.value)).props(
-            "dense outlined"
-        ).classes("w-72")
-        ui.select(choices, value=keys[1], label="Y", on_change=lambda e: choose("y", e.value)).props(
-            "dense outlined"
-        ).classes("w-72")
+        ui.select(
+            choices, value=keys[0], label="X", on_change=lambda e: choose("x", e.value)
+        ).props("dense outlined").classes("w-72")
+        ui.select(
+            choices, value=keys[1], label="Y", on_change=lambda e: choose("y", e.value)
+        ).props("dense outlined").classes("w-72")
     scatter()
