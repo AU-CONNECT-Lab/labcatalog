@@ -14,6 +14,9 @@ from labcatalog.stats import DatasetSummary
 
 def render(result: CatalogResult, selected: str | None, on_select: Callable[[str], None]) -> None:
     summaries = {d.dataset: d for d in result.summary.datasets}
+    if not summaries:
+        note(f"No datasets yet; add them under datasets in {defaults.CONFIG_FILENAME}.")
+        return
     selected = selected if selected in summaries else next(iter(summaries))
     # Spelling out study, wave, reporter and modality lets typing in the box filter by them.
     ui.select(

@@ -21,10 +21,10 @@ def test_example_project_is_copied_with_its_schemas(tmp_path):
 
 
 def test_blank_project_is_valid_and_empty(tmp_path):
-    root = init_project(tmp_path / "Our Lab: pilot", example=False)
+    root = init_project(tmp_path / "#2 lab pilot", example=False)
     assert run_validate(root) == []
     result = run_catalog(root)
-    assert result.project.config.project.name == "Our Lab: pilot"
+    assert result.project.config.project.name == "#2 lab pilot"
     assert result.summary.datasets == []
     assert (root / "schemas" / "labcatalog.schema.json").is_file()
 
