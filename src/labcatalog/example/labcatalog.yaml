@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=schemas/labcatalog.schema.json
 # Settings for one labcatalog project. Instruments live in instruments/, studies in studies/, and each dataset's column map in maps/.
-# This example is fictional and contains a few deliberate data problems (values outside the options, an ID with a space, an ID used twice, people who gave the same answer to every item, a column the map does not describe) so that the Problems page has something to show.
+# This example is fictional and contains a few deliberate data problems (values outside the options, a child age outside its allowed range, an ID with a space, an ID used twice, people who gave the same answer to every item, a column the map does not describe) so that the Problems page has something to show.
 
 project:
   name: Mock Family Study Catalog

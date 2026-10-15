@@ -368,7 +368,8 @@ def completeness(
     labels = missing_labels_for(config, loaded.config)
     by_instrument: dict[str, list[pd.Series]] = {}
     for variable in catalog.variables_for(loaded.config.name):
-        if variable.column not in frame:
+        # Open text questions are usually optional, so leaving one blank still counts as complete.
+        if variable.column not in frame or variable.type == "text":
             continue
         valid = valid_answers(loaded, variable, labels)
         by_instrument.setdefault(variable.instrument_id, []).append(valid)

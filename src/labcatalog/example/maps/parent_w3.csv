@@ -10,3 +10,8 @@ ecs_1_w3,example_child_sleep,ecs_1
 ecs_2_w3,example_child_sleep,ecs_2
 ecs_3_w3,example_child_sleep,ecs_3
 ecs_4_w3,example_child_sleep,ecs_4
+dem_age_w3,example_demographics,dem_age
+dem_gender_w3,example_demographics,dem_gender
+dem_edu_w3,example_demographics,dem_edu
+dem_household_w3,example_demographics,dem_household
+dem_comment_w3,example_demographics,dem_comment
