@@ -369,15 +369,12 @@ def by_subscale(instrument: Instrument, items) -> list[str]:
 
 
 def item_grid(
-    result: CatalogResult, instrument_id: str, lower: str, upper: str
+    result: CatalogResult, instrument_id: str, dataset: str
 ) -> go.Figure | None:
-    # Items sit together by subscale; one wave below the diagonal and one above.
+    # Items sit together by subscale.
     instrument = result.project.instruments[instrument_id]
-    below, above = (
-        item_matrix(result, instrument_id, lower),
-        item_matrix(result, instrument_id, upper),
-    )
-    members = by_subscale(instrument, set(below[1]) | set(above[1]))
+    summary, where = item_matrix(result, instrument_id, dataset)
+    members = by_subscale(instrument, where)
     if len(members) < 2:
         return None
     subscales = subscales_of(instrument)
@@ -387,14 +384,12 @@ def item_grid(
     n: list[list[int | None]] = [[None] * size for _ in range(size)]
     for a, ma in enumerate(members):
         for b, mb in enumerate(members):
-            summary, where = below if a > b else above
-            if a != b and ma in where and mb in where:
+            if a != b:
                 value = summary.item_correlations[where[ma]][where[mb]]
                 if value is not None:
                     z[a, b] = value
                     n[a][b] = summary.n_complete
     names = {s.id: s.label for s in subscales} | {"": "In no subscale"}
-    names_of = item_waves(result, instrument_id)
     return matrices.dot_grid(
         z,
         n,
@@ -402,8 +397,7 @@ def item_grid(
         [group_of.get(m, "") for m in members] if subscales else None,
         group_order,
         names,
-        names_of[lower],
-        names_of[upper],
+        item_waves(result, instrument_id)[dataset],
         "Spearman ρ",
         set(),
         defaults.CHART_MIN_R,
@@ -885,15 +879,10 @@ Member = tuple[str, str, str]
 def score_grid(
     result: CatalogResult,
     instruments: list[str],
-    lower: tuple[str, str],
-    upper: tuple[str, str],
+    wave: tuple[str, str],
 ) -> go.Figure | None:
-    # One wave below the diagonal and one above; a score is the same across waves by instrument, score and reporter.
-    below, above = (
-        wave_members(result, *lower, instruments),
-        wave_members(result, *upper, instruments),
-    )
-    members = sorted(set(below[1]) | set(above[1]), key=lambda m: member_rank(result, m))
+    corr, where = wave_members(result, *wave, instruments)
+    members = sorted(where, key=lambda m: member_rank(result, m))
     if len(members) < 2:
         return None
     size = len(members)
@@ -901,23 +890,17 @@ def score_grid(
     n: list[list[int | None]] = [[None] * size for _ in range(size)]
     for a, ma in enumerate(members):
         for b, mb in enumerate(members):
-            corr, where = below if a > b else above
-            if a != b and ma in where and mb in where:
-                i, j = where[ma], where[mb]
-                if corr.r[i][j] is not None:
-                    z[a, b] = corr.r[i][j]
-                    n[a][b] = corr.n[i][j]
+            i, j = where[ma], where[mb]
+            if a != b and corr.r[i][j] is not None:
+                z[a, b] = corr.r[i][j]
+                n[a][b] = corr.n[i][j]
     by_key = {s.key: s for s in result.catalog.scores}
-    corr, where = below
-    lower_scores = {m: by_key[corr.keys[i]] for m, i in where.items()}
+    scores = [by_key[corr.keys[where[m]]] for m in members]
     skip = {
         (a, b)
-        for a, ma in enumerate(members)
-        for b, mb in enumerate(members)
-        if a < b
-        and ma in lower_scores
-        and mb in lower_scores
-        and nested(result, lower_scores[ma], lower_scores[mb])
+        for a in range(size)
+        for b in range(a + 1, size)
+        if nested(result, scores[a], scores[b])
     }
     return matrices.dot_grid(
         z,
@@ -926,8 +909,7 @@ def score_grid(
         [m[0] for m in members],
         instrument_order(result),
         instrument_names(result),
-        wave_name(result, *lower),
-        wave_name(result, *upper),
+        wave_name(result, *wave),
         "Pearson r",
         skip,
         defaults.CHART_MIN_R,

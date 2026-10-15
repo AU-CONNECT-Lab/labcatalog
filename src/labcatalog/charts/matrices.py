@@ -70,13 +70,12 @@ def dot_grid(
     groups: list[str] | None,
     group_order: list[str],
     group_names: dict[str, str],
-    lower_name: str,
-    upper_name: str,
+    wave_name: str,
     value_label: str,
     skip: set[tuple[int, int]],
     threshold: float,
 ) -> go.Figure:
-    # A corrplot (one wave below the diagonal, one above) with the lower wave's strong pairs as a circle beside it.
+    # A corrplot of one wave, with its strong pairs as a circle beside it.
     size = len(labels)
     fig = go.Figure()
     xs, ys = [], []
@@ -115,7 +114,7 @@ def dot_grid(
             )
             hx.append(j)
             hy.append(i)
-            data.append([lower_name if i > j else upper_name, labels[i], labels[j], value, n[i][j]])
+            data.append([wave_name, labels[i], labels[j], value, n[i][j]])
     fig.add_trace(
         go.Scatter(
             x=hx,
@@ -161,16 +160,13 @@ def dot_grid(
                     marker=dict(symbol="square", size=12, color=group_color(group_order.index(g))),
                 )
             )
-    key = (
-        lower_name if lower_name == upper_name else f"◥ {upper_name} above<br>◣ {lower_name} below"
-    )
     fig.add_annotation(
         x=low,
         y=low,
         xanchor="right",
         yanchor="bottom",
         align="right",
-        text=key,
+        text=wave_name,
         showarrow=False,
         font=dict(size=11, color=TITLE_INK),
     )
@@ -204,7 +200,7 @@ def dot_grid(
         skip,
         threshold,
         value_label,
-        lower_name,
+        wave_name,
     )
     fig.add_trace(colorbar(value_label, x=1, xanchor="right", y=-0.03, yanchor="top"))
     fig.update_layout(shapes=shapes)
