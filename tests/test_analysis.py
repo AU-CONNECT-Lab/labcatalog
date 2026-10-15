@@ -44,7 +44,7 @@ def test_the_correlation_table_reads_like_apa(result):
     assert (rows[0]["variable"], rows[0]["c0"], rows[0]["c1"]) == ("1. EMS", "—", "")
     assert rows[1]["c0"].startswith(".") and rows[1]["c0"].endswith("***")
     assert rows[1]["c1"] == "—"
-    assert pairs == [rows[1]["n"] if rows[1]["n"] <= rows[0]["n"] else pairs[0]]
+    assert pairs == [len(analysis.table(result, sample, keys).dropna())]
 
 
 def test_apa_numbers():

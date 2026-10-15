@@ -1,4 +1,5 @@
 import base64
+import json
 import urllib.parse
 from dataclasses import dataclass, field
 from functools import partial
@@ -232,7 +233,7 @@ def csv_button(columns: list[dict], rows: list[dict], filename: str) -> None:
     frame = pd.DataFrame(rows, columns=[c["name"] for c in columns])
     frame.columns = [c["label"] for c in columns]
     # The byte order mark lets Excel read the file as UTF-8.
-    content = ("﻿" + frame.to_csv(index=False)).encode("utf-8")
+    content = ("\ufeff" + frame.to_csv(index=False)).encode("utf-8")
     ui.button(
         "CSV", icon="download", on_click=lambda: ui.download.content(content, filename, "text/csv")
     ).props("flat dense no-caps")
@@ -243,16 +244,17 @@ def image_buttons(plot: ui.plotly | None, fig: go.Figure, name: str) -> None:
         return
 
     async def save(kind: str) -> None:
-        url = await plot.run_plot_method(
-            "toImage",
-            {
-                "format": kind,
-                "width": IMAGE_WIDTH,
-                "height": fig.layout.height,
-                "scale": 2 if kind == "png" else 1,
-                # The page draws charts on a clear background; a saved image gets a solid one.
-                "setBackground": "opaque",
-            },
+        options = {
+            "format": kind,
+            "width": IMAGE_WIDTH,
+            "height": fig.layout.height,
+            "scale": 2 if kind == "png" else 1,
+        }
+        # The page draws charts on a clear background, so the image comes from a copy with a white one.
+        url = await ui.run_javascript(
+            f"const plot = getElement({plot.id});"
+            "const figure = {data: plot.$el.data, layout: {...plot.$el.layout, paper_bgcolor: 'white'}};"
+            f"return await plot.Plotly.toImage(figure, {json.dumps(options)});",
             timeout=20,
         )
         header, data = url.split(",", 1)
