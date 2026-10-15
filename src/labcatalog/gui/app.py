@@ -4,8 +4,9 @@ import webview
 from nicegui import app, run, ui
 
 from labcatalog.browse import BrowseIndex, build_index
+from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import analysis, datasets, instruments, overview, problems, theme
+from labcatalog.gui import analysis, datasets, instruments, overview, preferences, problems, theme
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.instruments import BrowseView
 from labcatalog.pipeline import CatalogResult, run_catalog
@@ -23,6 +24,9 @@ PAGES = (
 
 def launch(project: Path | None = None) -> None:
     theme.install()
+    saved = preferences.load().get("palette")
+    # A palette saved by another version may no longer exist.
+    style.use_palette(saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
     # Saving a table or figure goes through the window's own save dialog.
     app.native.settings["ALLOW_DOWNLOADS"] = True
     ui.run(
@@ -66,6 +70,12 @@ class Window:
             ui.space()
             self.spinner = ui.spinner(size="sm")
             self.spinner.visible = False
+            ui.select(
+                {name: p.label for name, p in style.PALETTES.items()},
+                value=style.palette,
+                label="Chart colors",
+                on_change=lambda e: self.set_palette(e.value),
+            ).classes("w-44")
             self.refresh_button = (
                 ui.button("Refresh", icon="refresh", on_click=lambda: self.load(self.root))
                 .props("flat")
@@ -126,6 +136,12 @@ class Window:
             self.show_result()
         finally:
             self.set_busy(False)
+
+    def set_palette(self, name: str) -> None:
+        style.use_palette(name)
+        preferences.save({"palette": name})
+        if self.result is not None:
+            self.show_result()
 
     def set_busy(self, busy: bool) -> None:
         self.spinner.visible = busy

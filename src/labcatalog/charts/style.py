@@ -1,12 +1,46 @@
 import re
+from dataclasses import dataclass
 
 import numpy as np
 import plotly.graph_objects as go
 from plotly.colors import sample_colorscale
 
-WAVE_COLORS = ("#3498db", "#e67e22", "#34495e", "#9b59b6", "#2ecc71", "#e74c3c")
-SERIES_COLORS = ("#34495e", "#e67e22")
-GROUP_COLORS = ("#8e44ad", "#e67e22", "#16a085", "#f39c12", "#2c3e50", "#1abc9c", "#c0392b")
+
+@dataclass(frozen=True)
+class Palette:
+    label: str
+    waves: tuple[str, ...]
+    groups: tuple[str, ...]
+    pair: tuple[str, str]
+
+
+def single(label: str, colors: tuple[str, ...]) -> Palette:
+    return Palette(label, colors, colors, colors[:2])
+
+
+PALETTES = {
+    "default": Palette(
+        "Default",
+        waves=("#3498db", "#e67e22", "#34495e", "#9b59b6", "#2ecc71", "#e74c3c"),
+        groups=("#8e44ad", "#e67e22", "#16a085", "#f39c12", "#2c3e50", "#1abc9c", "#c0392b"),
+        pair=("#34495e", "#e67e22"),
+    ),
+    "okabe_ito": single(
+        "Okabe-Ito", ("#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#F0E442")
+    ),
+    "nature": single(
+        "Nature (NPG)",
+        ("#E64B35", "#3C5488", "#00A087", "#F39B7F", "#4DBBD5", "#7E6148", "#8491B4"),
+    ),
+    "lancet": single(
+        "Lancet", ("#00468B", "#ED0000", "#42B540", "#0099B4", "#925E9F", "#FDAF91", "#AD002A")
+    ),
+    "dataviz": single(
+        "Dataviz", ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6")
+    ),
+}
+DEFAULT_PALETTE = "default"
+palette = DEFAULT_PALETTE
 LOLLIPOP_COLORS = (
     "#A6CEE3",
     "#1F78B4",
@@ -43,12 +77,23 @@ CONNECTOR = "#c3cad1"
 GRID = "#f2f2f2"
 
 
+def use_palette(name: str) -> None:
+    global palette
+    palette = name
+
+
 def wave_color(index: int) -> str:
-    return WAVE_COLORS[index % len(WAVE_COLORS)]
+    waves = PALETTES[palette].waves
+    return waves[index % len(waves)]
 
 
 def group_color(index: int) -> str:
-    return GROUP_COLORS[index % len(GROUP_COLORS)]
+    groups = PALETTES[palette].groups
+    return groups[index % len(groups)]
+
+
+def pair_color(index: int) -> str:
+    return PALETTES[palette].pair[index]
 
 
 def base_layout(fig: go.Figure, height: int, **extra) -> go.Figure:

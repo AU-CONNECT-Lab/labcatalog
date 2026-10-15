@@ -10,7 +10,7 @@ from scipy.spatial.distance import squareform
 from labcatalog import analysis, defaults
 from labcatalog.browse import as_set, facet_label, facet_names, value_order
 from labcatalog.charts import matrices, network, plots, scatter
-from labcatalog.charts.style import SERIES_COLORS, group_color, natural_key, wave_color
+from labcatalog.charts.style import group_color, natural_key, pair_color, wave_color
 from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
@@ -389,8 +389,8 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
                     if len(by_reporter) == 1
                     else f"{score.label} ({reporter})",
                     "series": [
-                        {"name": "All participants", "color": SERIES_COLORS[0], "points": everyone},
-                        {"name": "In every wave", "color": SERIES_COLORS[1], "points": kept},
+                        {"name": "All participants", "color": pair_color(0), "points": everyone},
+                        {"name": "In every wave", "color": pair_color(1), "points": kept},
                     ],
                 }
             )
