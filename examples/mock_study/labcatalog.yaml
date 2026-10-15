@@ -43,4 +43,6 @@ custom_fields:
     applies_to: instrument
     type: choice
     choices: [emotion, family, health, media]
-    filter: true
+
+browse:
+  facets: [study, wave, reporter, domain]

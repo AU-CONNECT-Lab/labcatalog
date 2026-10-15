@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from nicegui import ui
 
+from labcatalog.browse import facet_names
 from labcatalog.config import WaveConfig
 from labcatalog.gui.common import (
     as_list,
@@ -157,7 +158,8 @@ def instrument_fields(result: CatalogResult) -> list:
 def instrument_filters(
     result: CatalogResult,
 ) -> tuple[dict[str, str], dict[str, dict[str, set[str]]]]:
-    fields = [f for f in instrument_fields(result) if f.filter]
+    facets = facet_names(result.project.config)
+    fields = [f for f in instrument_fields(result) if f.name in facets]
     labels = {
         "reporter": "Reporter",
         **{f"custom_{f.name}": f.label or f.name.capitalize() for f in fields},

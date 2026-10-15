@@ -14,6 +14,9 @@ MIN_CORRELATION_N = 3
 CORRELATE_BY = "id"
 SAME_ANSWER_MIN_ITEMS = 5
 DEFAULT_MODALITIES = ("questionnaire",)
+BUILTIN_FACETS = ("study", "wave", "reporter", "target", "modality")
+DEFAULT_FACETS = ("study", "wave", "reporter")
+FACET_FIELD_TYPES = ("choice", "tags")
 
 EXAMPLE_VALUES = 3
 HISTOGRAM_BINS = 20

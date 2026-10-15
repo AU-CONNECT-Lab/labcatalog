@@ -72,7 +72,10 @@ class CustomFieldDef(StrictModel):
     applies_to: Literal["instrument", "administration", "dataset"]
     type: Literal["text", "number", "date", "choice", "tags"]
     choices: list[str] | None = None
-    filter: bool = False
+
+
+class BrowseConfig(StrictModel):
+    facets: list[str] | None = None
 
 
 class ReferencesConfig(StrictModel):
@@ -93,6 +96,7 @@ class ProjectConfig(StrictModel):
     studies: dict[str, StudyConfig] = {}
     datasets: list[DatasetConfig] = []
     custom_fields: list[CustomFieldDef] = []
+    browse: BrowseConfig = Field(default_factory=BrowseConfig)
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)

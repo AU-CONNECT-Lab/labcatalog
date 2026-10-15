@@ -17,6 +17,7 @@ def validate_project(project: Project) -> list[Issue]:
         *check_vocab(project),
         *check_cross_references(project),
         *check_custom_fields(project),
+        *check_browse(project),
         *check_missing_code_collisions(project),
         *check_variable_maps(project),
         *check_data_settings(project),
@@ -186,6 +187,38 @@ def check_custom_fields(project: Project) -> list[Issue]:
             check("administration", administration.custom, where, project.study_files[name])
     for n, dataset in enumerate(config.datasets, start=1):
         check("dataset", dataset.custom, f"datasets[{n}] ({dataset.name}).", CONFIG)
+    return issues
+
+
+def check_browse(project: Project) -> list[Issue]:
+    config = project.config
+    fields = {field.name: field for field in config.custom_fields}
+    builtin = ", ".join(defaults.BUILTIN_FACETS)
+    issues = [
+        problem(
+            "invalid_value",
+            f"custom_fields ({name}): the name is taken by a built-in facet ({builtin})",
+            CONFIG,
+        )
+        for name in fields
+        if name in defaults.BUILTIN_FACETS
+    ]
+    facets = config.browse.facets or []
+    for name, count in Counter(facets).items():
+        if count > 1:
+            issues.append(
+                problem("duplicate_id", f"browse.facets: '{name}' is listed twice", CONFIG)
+            )
+    for name in dict.fromkeys(facets):
+        if name in defaults.BUILTIN_FACETS:
+            continue
+        field = fields.get(name)
+        if field is None:
+            message = f"browse.facets: '{name}' is neither a built-in facet ({builtin}) nor a custom field"
+            issues.append(unknown(message, CONFIG))
+        elif field.type not in defaults.FACET_FIELD_TYPES:
+            message = f"browse.facets: '{name}' is a {field.type} field; only choice and tags fields can be facets"
+            issues.append(problem("invalid_value", message, CONFIG))
     return issues
 
 
