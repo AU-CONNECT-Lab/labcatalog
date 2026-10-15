@@ -33,7 +33,7 @@ STATUS_NAMES = {
 }
 # Past this many rows the printed numbers no longer fit their cells; hover still shows them.
 CELL_TEXT_MAX = 25
-CORRELATION_SCALE = "RdBu_r"
+CORRELATION_SCALE = "RdYlBu_r"
 SHARE_SCALE = "YlGnBu"
 FONT = 'Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif'
 INK = "#1c2530"

@@ -209,6 +209,7 @@ def score_matrices(
             ticktext=panel["short"],
             showgrid=False,
             showticklabels=c == 1,
+            automargin=True,
         )
     fig.update_annotations(
         selector=dict(xref="paper"), font=dict(color=TITLE_INK, size=13), yshift=22
