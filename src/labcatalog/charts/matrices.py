@@ -17,7 +17,7 @@ from labcatalog.charts.style import (
 CIRCLE_GAP = 12.0
 CIRCLE_SPAN = 1.42
 # Data units left of and above the cells that hold the group strips.
-STRIP_ROOM = 1.1
+STRIP_ROOM = 0.95
 # A dot of r = 1 spans this share of its cell, so the largest dots never touch the lines.
 DOT_SPAN = 0.84
 COLORBAR_TICKS = [-1, -0.6, -0.2, 0.2, 0.6, 1]
@@ -124,8 +124,8 @@ def dot_grid(
         for i, g in enumerate(groups):
             color = group_color(group_order.index(g))
             for x0, x1, y0, y1 in (
-                (-1.0, -0.6, i - 0.46, i + 0.46),
-                (i - 0.46, i + 0.46, -1.0, -0.6),
+                (-0.85, -0.6, i - 0.46, i + 0.46),
+                (i - 0.46, i + 0.46, -0.85, -0.6),
             ):
                 shapes.append(
                     dict(

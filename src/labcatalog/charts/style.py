@@ -31,8 +31,7 @@ STATUS_NAMES = {
     "unexpected": "not an option",
     "blank": "blank",
 }
-# Positive blue and negative red, so mostly positive correlations read calm and a negative stands out.
-CORRELATION_SCALE = "RdBu"
+CORRELATION_SCALE = "RdBu_r"
 CELL_LINE = "#d9d9d9"
 SHARE_SCALE = "YlGnBu"
 FONT = 'Segoe UI, -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", Arial, sans-serif'
