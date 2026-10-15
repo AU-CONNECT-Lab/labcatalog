@@ -452,3 +452,72 @@ def collection_pace(
         margin=dict(l=48, r=40, t=40, b=96),
         legend=dict(orientation="h", x=0, y=-0.3, yanchor="top"),
     )
+
+
+def small_multiples(panels: list[dict], y_range: tuple[float, float], y_title: str) -> go.Figure:
+    # Every panel draws its background lines faint grey and its own line in colour on top.
+    cols = min(3, len(panels))
+    rows = -(-len(panels) // cols)
+    fig = make_subplots(
+        rows=rows,
+        cols=cols,
+        subplot_titles=[p["title"] for p in panels],
+        horizontal_spacing=0.06,
+        vertical_spacing=0.18 / rows,
+    )
+    for k, panel in enumerate(panels):
+        row, col = k // cols + 1, k % cols + 1
+        positions = list(range(len(panel["x"])))
+        xs, ys = [], []
+        for line in panel["background"]:
+            xs += [*positions, None]
+            ys += [*line, None]
+        fig.add_trace(
+            go.Scatter(
+                x=xs,
+                y=ys,
+                mode="lines",
+                line=dict(color="rgba(128,128,128,0.2)", width=1.2),
+                showlegend=False,
+                hoverinfo="skip",
+            ),
+            row=row,
+            col=col,
+        )
+        highlight = panel["highlight"]
+        fig.add_trace(
+            go.Scatter(
+                x=positions,
+                y=highlight["values"],
+                mode="lines+markers",
+                name=highlight["name"],
+                line=dict(color=highlight["color"], width=2),
+                marker=dict(size=6, color=highlight["color"]),
+                customdata=panel.get("hover", panel["x"]),
+                hovertemplate=f"<b>{highlight['name']}</b><br>%{{customdata}}<br>%{{y:.2f}}<extra></extra>",
+                showlegend=False,
+            ),
+            row=row,
+            col=col,
+        )
+        fig.update_xaxes(
+            tickvals=positions,
+            ticktext=panel["x"],
+            tickfont=dict(size=9),
+            showgrid=False,
+            range=[-0.3, len(positions) - 0.7],
+            row=row,
+            col=col,
+        )
+        fig.update_yaxes(
+            range=list(y_range),
+            gridcolor=GRID,
+            zeroline=False,
+            tickfont=dict(size=9),
+            title_text=y_title if col == 1 else None,
+            title_font=dict(size=10),
+            row=row,
+            col=col,
+        )
+    fig.update_annotations(font=dict(size=12, color=TITLE_INK))
+    return base_layout(fig, 60 + 250 * rows, margin=dict(l=60, r=20, t=50, b=50))

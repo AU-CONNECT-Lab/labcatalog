@@ -688,3 +688,100 @@ def standardized_scores(result: CatalogResult, dataset: str, page: int) -> go.Fi
                     }
                 )
     return scatter.standardized(points) if points else None
+
+
+# ---- small multiples ----
+
+
+def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None:
+    # One panel per wave: that wave's item means in colour, the other waves faint behind it.
+    instrument = result.project.instruments[instrument_id]
+    means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
+    names = series_names(result, instrument_datasets(result, instrument_id))
+    items = [i.id for i in instrument.items]
+    lines = {}
+    for name in names:
+        by_item = {
+            v.item_id: means.get((name, v.column))
+            for v in result.catalog.variables_for(name)
+            if v.instrument_id == instrument_id
+        }
+        lines[name] = [by_item.get(i) for i in items]
+    if len(lines) < 2:
+        return None
+    hovers = [f"{i}: {item_text(instrument, i)}" for i in items]
+    panels = [
+        {
+            "title": names[name],
+            "x": items,
+            "hover": hovers,
+            "background": [values for other, values in lines.items() if other != name],
+            "highlight": {
+                "name": names[name],
+                "color": series_color(result, name),
+                "values": values,
+            },
+        }
+        for name, values in lines.items()
+    ]
+    return plots.small_multiples(panels, option_range(instrument), "Mean answer")
+
+
+def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
+    # One panel per subscale: every person's answers faint, the mean of everyone in colour.
+    instrument = result.project.instruments[instrument_id]
+    columns = {
+        v.item_id: v
+        for v in result.catalog.variables_for(dataset)
+        if v.instrument_id == instrument_id and v.column in result.datasets[dataset].frame
+    }
+    if not columns:
+        return None
+    subscales = [s for s in instrument.scores if not is_total(instrument, s)]
+    groups = [(s.label, s.items) for s in subscales] or [
+        ("All items", [i.id for i in instrument.items])
+    ]
+    loaded = result.datasets[dataset]
+    rows = len(loaded.frame)
+    step = max(1, -(-rows // defaults.CHART_PEOPLE_PER_PAGE))
+    shown = list(range(0, rows, step))
+    color = series_color(result, dataset)
+    panels = []
+    for title, item_ids in groups:
+        item_ids = [i for i in item_ids if i in columns]
+        if not item_ids:
+            continue
+        answers = pd.DataFrame(
+            {
+                i: loaded.numbers(columns[i].column).where(
+                    loaded.numbers(columns[i].column).isin(
+                        [float(o.value) for o in columns[i].response_options]
+                    )
+                )
+                for i in item_ids
+            }
+        )
+        panels.append(
+            {
+                "title": title if step == 1 else f"{title} ({len(shown)} of {rows} people)",
+                "x": item_ids,
+                "hover": [f"{i}: {item_text(instrument, i)}" for i in item_ids],
+                "background": answers.iloc[shown].to_numpy(dtype=float).tolist(),
+                "highlight": {"name": "Mean", "color": color, "values": answers.mean().tolist()},
+            }
+        )
+    return plots.small_multiples(panels, option_range(instrument), "Answer") if panels else None
+
+
+def default_pair(result: CatalogResult) -> tuple[str, str]:
+    # Two totals from different instruments; a total against its own subscale says nothing.
+    choices = list(score_choices(result))
+    totals = []
+    for choice in choices:
+        instrument_id, score_id = choice.split("|")
+        instrument = result.project.instruments[instrument_id]
+        if is_total(instrument, next(s for s in instrument.scores if s.id == score_id)):
+            totals.append(choice)
+    if len(totals) >= 2:
+        return totals[0], totals[1]
+    return choices[0], choices[1]

@@ -33,6 +33,10 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
             show(views.item_total(result, instrument_id))
         with ui.column().classes("w-1/2"):
             show(views.item_profile(result, instrument_id))
+    profiles = views.wave_profiles(result, instrument_id)
+    if profiles is not None:
+        heading("Each wave against the others")
+        show(profiles)
     subscales = views.subscale_profile(result, instrument_id)
     if subscales is not None:
         heading("Subscales")
@@ -41,6 +45,13 @@ def instrument_section(result: CatalogResult, instrument_id: str) -> None:
     if correlations is not None:
         heading("Item correlations")
         show(correlations)
+
+
+def instrument_dataset_section(result: CatalogResult, instrument_id: str, dataset: str) -> None:
+    profiles = views.people_profiles(result, instrument_id, dataset)
+    if profiles is not None:
+        heading("Everyone's answers")
+        show(profiles)
 
 
 def overview_section(result: CatalogResult) -> None:
@@ -102,8 +113,8 @@ def correlations_page(result: CatalogResult) -> None:
     if len(choices) < 2:
         return
     heading("One score against another")
-    keys = list(choices)
-    picked = {"x": keys[0], "y": keys[1]}
+    first, second = views.default_pair(result)
+    picked = {"x": first, "y": second}
 
     @ui.refreshable
     def scatter() -> None:
@@ -117,10 +128,10 @@ def correlations_page(result: CatalogResult) -> None:
         scatter.refresh()
 
     with ui.row().classes("gap-4"):
-        ui.select(
-            choices, value=keys[0], label="X", on_change=lambda e: choose("x", e.value)
-        ).props("dense outlined").classes("w-72")
-        ui.select(
-            choices, value=keys[1], label="Y", on_change=lambda e: choose("y", e.value)
-        ).props("dense outlined").classes("w-72")
+        ui.select(choices, value=first, label="X", on_change=lambda e: choose("x", e.value)).props(
+            "dense outlined"
+        ).classes("w-72")
+        ui.select(choices, value=second, label="Y", on_change=lambda e: choose("y", e.value)).props(
+            "dense outlined"
+        ).classes("w-72")
     scatter()

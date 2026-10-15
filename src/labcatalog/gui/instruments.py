@@ -166,6 +166,7 @@ def dataset_statistics(result: CatalogResult, instrument: Instrument, dataset: s
         table(*score_table(result, summaries))
     heading("Items")
     table(*variable_table(result, instrument, dataset))
+    charts.instrument_dataset_section(result, instrument.id, dataset)
     items = item_ids(result, dataset)
     for summary in summaries:
         score = scores[summary.key]
