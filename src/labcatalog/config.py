@@ -42,12 +42,18 @@ class WaveConfig(StrictModel):
     end: date | None = None
 
 
+class Milestone(StrictModel):
+    name: str
+    date: date
+
+
 class StudyConfig(StrictModel):
     label: str | None = None
     description: str | None = None
     citation: str | None = None
     doi: str | None = None
     waves: dict[str, WaveConfig] = {}
+    milestones: list[Milestone] = []
 
 
 class DatasetConfig(StrictModel):

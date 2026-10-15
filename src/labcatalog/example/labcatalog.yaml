@@ -41,6 +41,9 @@ studies:
       1: {start: 2024-09-01, end: 2025-05-31}
       2: {start: 2025-09-01, end: 2026-05-31}
       3: {start: 2026-09-01}
+    milestones:
+      - {name: Interim report, date: 2026-12-15}
+      - {name: Wave 3 data freeze, date: 2027-06-30}
 
 # One entry per data file: which study, wave and reporter it holds, and where it is.
 datasets:

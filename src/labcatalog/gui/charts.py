@@ -119,6 +119,7 @@ def instrument_dataset_section(result: CatalogResult, instrument_id: str, datase
 
 
 def overview_section(result: CatalogResult) -> None:
+    timelines(result)
     pace = views.collection_pace(result)
     if pace is not None:
         with card("Collection pace", "People with data, by week since each wave started"):
@@ -219,3 +220,11 @@ def show_network(option: dict | None) -> None:
     ui.echart(theme.echart_for_page(option)).classes("w-full").style(
         f"height:{network.NETWORK_HEIGHT}px"
     )
+
+
+def timelines(result: CatalogResult) -> None:
+    for title, progress in (("Timeline", False), ("Timeline with collection progress", True)):
+        fig = views.timeline(result, progress)
+        if fig is not None:
+            with card(title, "Each wave's dates and the milestones in labcatalog.yaml"):
+                show(fig)

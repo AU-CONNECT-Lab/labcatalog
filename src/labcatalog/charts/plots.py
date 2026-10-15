@@ -1,3 +1,5 @@
+from datetime import date, timedelta
+
 import numpy as np
 import plotly.graph_objects as go
 from plotly.colors import sample_colorscale
@@ -26,6 +28,100 @@ ROW_LINE = "#ececec"
 DOT_TOP = 104
 DOT_BOTTOM = 16
 TITLE_ROOM = 28
+# Room on the calendar before the first date and after the last.
+TIMELINE_PAD = timedelta(days=30)
+
+
+def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date) -> go.Figure:
+    # One lane per wave and one per study's milestones on a shared calendar, today dashed across.
+    fig = go.Figure()
+    for bar in bars:
+        pieces = [(bar["start"], bar["end"], 0.45 if bar["ongoing"] else 1.0)]
+        if bar.get("projected"):
+            pieces = [(bar["start"], bar["projected"], 0.25), (bar["start"], bar["end"], 1.0)]
+        for start, end, alpha in pieces:
+            fig.add_trace(
+                go.Bar(
+                    y=[bar["lane"]],
+                    x=[(end - start).total_seconds() * 1000],
+                    base=[start.isoformat()],
+                    orientation="h",
+                    width=0.5,
+                    marker=dict(color=rgba(bar["color"], alpha), line=dict(width=0)),
+                    hovertext=[bar["hover"]],
+                    hoverinfo="text",
+                    showlegend=False,
+                )
+            )
+        if bar.get("text"):
+            # Above the bar from its start, where a long count cannot run off the calendar.
+            fig.add_annotation(
+                x=bar["start"].isoformat(),
+                y=bar["lane"],
+                yshift=13,
+                xanchor="left",
+                yanchor="bottom",
+                text=bar["text"],
+                showarrow=False,
+                font=dict(size=10, color=TITLE_INK),
+            )
+    if marks:
+        fig.add_trace(
+            go.Scatter(
+                x=[m["date"].isoformat() for m in marks],
+                y=[m["lane"] for m in marks],
+                mode="markers+text",
+                text=[m["name"] for m in marks],
+                textposition="top center",
+                textfont=dict(size=10, color=TITLE_INK),
+                marker=dict(symbol="diamond", size=12, color=TITLE_INK),
+                hovertext=[f"<b>{m['name']}</b><br>{m['date']:%Y-%m-%d}" for m in marks],
+                hoverinfo="text",
+                showlegend=False,
+            )
+        )
+    fig.add_shape(
+        type="line",
+        x0=today.isoformat(),
+        x1=today.isoformat(),
+        y0=0,
+        y1=1,
+        yref="paper",
+        line=dict(color=MUTED_INK, width=1.2, dash="dash"),
+    )
+    fig.add_annotation(
+        x=today.isoformat(),
+        y=1,
+        yref="paper",
+        yanchor="bottom",
+        text="Today",
+        showarrow=False,
+        font=dict(size=10, color=MUTED_INK),
+    )
+    dates = [d for b in bars for d in (b["start"], b.get("projected") or b["end"])]
+    dates += [m["date"] for m in marks] + [today]
+    fig.update_xaxes(
+        type="date",
+        range=[
+            (min(dates) - TIMELINE_PAD).isoformat(),
+            (max(dates) + 2 * TIMELINE_PAD).isoformat(),
+        ],
+        gridcolor=GRID,
+        tickfont=dict(size=10),
+    )
+    fig.update_yaxes(
+        categoryorder="array",
+        categoryarray=lanes,
+        autorange="reversed",
+        tickfont=dict(size=11),
+        showgrid=False,
+    )
+    return base_layout(
+        fig,
+        70 + 46 * len(lanes),
+        barmode="overlay",
+        margin=dict(l=10, r=20, t=30, b=30),
+    )
 
 
 def score_boxes(title: str, labels: list[str], series: list[dict]) -> go.Figure:
