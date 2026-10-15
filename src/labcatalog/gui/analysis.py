@@ -11,7 +11,7 @@ from nicegui import ui
 from labcatalog import analysis
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import charts
+from labcatalog.gui import analysis_tables, charts
 from labcatalog.gui.common import apa, col, heading, note, section, table
 from labcatalog.pipeline import CatalogResult
 
@@ -26,6 +26,9 @@ class AnalysisView:
     scores: list[str] = field(default_factory=list)
     xs: list[str] = field(default_factory=list)
     y: str | None = None
+    measures: list[str] = field(default_factory=list)
+    group: str | None = None
+    outcome: str | None = None
 
 
 def render(result: CatalogResult, view: AnalysisView) -> None:
@@ -40,11 +43,14 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         sample = analysis.build_sample(result, view.datasets, view.intersect)
         sample_note(result, sample, view.intersect)
         choices = views.variable_choices(result, view.datasets)
+        analysis_tables.table_one_section(result, sample, view)
         if len(choices) < 2:
-            note("Pick datasets with at least two scores between them.")
-            return
-        correlation_section(result, sample, view, choices)
-        pair_section(result, sample, view, choices)
+            note("Pick datasets with at least two scores between them for correlations.")
+        else:
+            correlation_section(result, sample, view, choices)
+            pair_section(result, sample, view, choices)
+        analysis_tables.group_section(result, sample, view, choices)
+        analysis_tables.script_section(result, sample, view, choices)
 
     def set_datasets(value: list[str] | None) -> None:
         view.datasets = value or []

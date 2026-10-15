@@ -152,7 +152,7 @@ regressions = pd.DataFrame(rows)
 print(regressions)
 """
 R_GROUPS = """\
-# Group comparison: {outcome_label} by {group_label}.{left_out}
+# Group comparison: {outcome_label} by {group_label}{left_out}
 group <- factor(d[[{group}]], levels = c({values}), labels = c({labels}))
 y <- d[[{outcome}]]
 keep <- !is.na(group) & !is.na(y)
@@ -179,7 +179,7 @@ eta_squared <- anova_table[["Sum Sq"]][1] / sum(anova_table[["Sum Sq"]])
 cat("eta squared:", eta_squared, "\\n")
 """
 PYTHON_GROUPS = """\
-# Group comparison: {outcome_label} by {group_label}.{left_out}
+# Group comparison: {outcome_label} by {group_label}{left_out}
 levels = [{labels}]
 group = d[{group}].map({{{mapping}}})
 y = d[{outcome}]
@@ -282,16 +282,18 @@ class AnalysisData:
         self.sample = sample
         self.columns: dict[str, pd.Series] = {}
 
-    def score(self, key: str) -> Variable:
+    def score(self, key: str, items: bool = False) -> Variable:
         score = next(s for s in self.result.catalog.scores if s.key == key)
         instrument = self.result.project.instruments[score.instrument_id]
         definition = next(s for s in instrument.scores if s.id == score.score_id)
         column = f"{score.score_id}_{score.dataset}"
         self.columns[column] = analysis.values(self.result, self.sample, key)
-        items = score_items(self.result.datasets[score.dataset], score)
-        names = [self.column_name(score.dataset, c) for c in items.columns]
-        for name, source in zip(names, items.columns, strict=True):
-            self.columns[name] = self.align(score.dataset, items[source].to_numpy(dtype=float))
+        names = []
+        if items:
+            found = score_items(self.result.datasets[score.dataset], score)
+            names = [self.column_name(score.dataset, c) for c in found.columns]
+            for name, source in zip(names, found.columns, strict=True):
+                self.columns[name] = self.align(score.dataset, found[source].to_numpy(dtype=float))
         return Variable(
             key=key,
             label=f"{abbreviation(instrument)} {definition.label}",
@@ -398,7 +400,7 @@ def default_measures(result: CatalogResult, datasets: list[str]) -> list[str]:
 
 
 def measure_variables(
-    data: AnalysisData, keys: list[str]
+    data: AnalysisData, keys: list[str], items: bool = False
 ) -> list[tuple[str, list[Variable]]]:
     rows = []
     for key in keys:
@@ -409,13 +411,15 @@ def measure_variables(
                 if any(item_key(v) == full for v in data.result.catalog.variables_for(name)):
                     found.append(data.item(full))
             elif any(s.key == f"{key}@{name}" for s in data.result.catalog.scores_for(name)):
-                found.append(data.score(f"{key}@{name}"))
+                found.append(data.score(f"{key}@{name}", items))
         if found:
             rows.append((found[0].label, found))
     return rows
 
 
-def group_choices(result: CatalogResult, datasets: list[str], labels: dict[str, str]) -> dict[str, str]:
+def group_choices(
+    result: CatalogResult, datasets: list[str], labels: dict[str, str]
+) -> dict[str, str]:
     instruments = result.project.instruments
     return {
         item_key(v): f"{abbreviation(instruments[v.instrument_id])}: "
@@ -448,8 +452,12 @@ def table_one_code(datasets: list[str], rows: list[tuple[str, list[Variable]]]) 
             args = f"{r_string(label)}, {r_string(v.dataset)}, d[[{r_string(v.column)}]]"
             py_args = f"{r_string(label)}, {r_string(v.dataset)}, d[{r_string(v.column)}]"
             if v.kind == CHOICE:
-                levels = ", ".join(f"{r_string(text)} = {number(value)}" for value, text in v.options)
-                py_levels = ", ".join(f"{r_string(text)}: {number(value)}" for value, text in v.options)
+                levels = ", ".join(
+                    f"{r_string(text)} = {number(value)}" for value, text in v.options
+                )
+                py_levels = ", ".join(
+                    f"{r_string(text)}: {number(value)}" for value, text in v.options
+                )
                 r_rows.append(f"  choice_rows({args}, c({levels}))")
                 py_rows.append(f"    *choice_rows({py_args}, {{{py_levels}}}),")
             elif v.items:
@@ -488,9 +496,13 @@ def regression_code(xs: list[Variable], y: Variable) -> Code:
     )
 
 
-def group_sizes(frame: pd.DataFrame, group: Variable, outcome: Variable) -> list[tuple[float, str, int]]:
+def group_sizes(
+    frame: pd.DataFrame, group: Variable, outcome: Variable
+) -> list[tuple[float, str, int]]:
     both = frame[[group.column, outcome.column]].dropna()
-    return [(value, text, int((both[group.column] == value).sum())) for value, text in group.options]
+    return [
+        (value, text, int((both[group.column] == value).sum())) for value, text in group.options
+    ]
 
 
 def comparison_plan(
@@ -528,6 +540,43 @@ def comparison_plan(
     return ComparisonPlan(kind, code, left)
 
 
+def page_script(
+    result: CatalogResult,
+    sample: analysis.Sample,
+    measures: list[str],
+    scores: list[str],
+    xs: list[str],
+    y: str | None,
+    group: str | None,
+    outcome: str | None,
+) -> tuple[str, str, pd.DataFrame] | None:
+    # Each part of the Analysis page that has enough chosen to run, in page order.
+    data = AnalysisData(result, sample)
+    codes = []
+    rows = measure_variables(data, measures, items=True)
+    if rows:
+        codes.append(table_one_code(sample.datasets, rows))
+    if len(scores) >= 2:
+        codes.append(correlation_code([data.score(k) for k in scores]))
+    if y is not None:
+        target = analysis.values(result, sample, y)
+        fitted = [
+            x
+            for x in xs
+            if x != y and analysis.regress(analysis.values(result, sample, x), target) is not None
+        ]
+        if fitted:
+            codes.append(regression_code([data.score(x) for x in fitted], data.score(y)))
+    if group is not None and outcome is not None:
+        plan = comparison_plan(data.frame(), data.item(group), data.score(outcome))
+        if plan is not None:
+            codes.append(plan.code)
+    if not codes:
+        return None
+    r_text, python_text = script(result, sample, codes)
+    return r_text, python_text, data.frame()
+
+
 def script(result: CatalogResult, sample: analysis.Sample, codes: list[Code]) -> tuple[str, str]:
     r_head, py_head = headers(result, sample, DATA_FILE)
     return (
@@ -554,9 +603,7 @@ def run_code(
                 for name in code.outputs
             ]
             path = folder / "analysis.R"
-            path.write_text(
-                "\n".join([r_head, code.r, code.r_footer, *writes]), encoding="utf-8"
-            )
+            path.write_text("\n".join([r_head, code.r, code.r_footer, *writes]), encoding="utf-8")
             run_r(rscript, [str(path)])
             return {n: pd.read_csv(folder / f"{n}.csv") for n in code.outputs}, R
         names: dict = {}
