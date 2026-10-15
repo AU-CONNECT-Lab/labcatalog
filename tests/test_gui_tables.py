@@ -47,3 +47,28 @@ def test_dataset_issues_cover_its_data_file_only(mock_project):
     result = run_catalog(mock_project)
     codes = [i.code for i in datasets.dataset_issues(result, "child_w1")]
     assert sorted(codes) == ["same_answer", "unexpected_value"]
+
+
+def test_dataset_page_lists_each_file_with_the_study_citation(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    config.write_text(
+        text.replace(
+            "    label: Mock Family Study\n",
+            "    label: Mock Family Study\n"
+            "    citation: Example, A. (2026). Mock Family Study.\n"
+            "    doi: 10.0000/mock\n",
+        ),
+        encoding="utf-8",
+    )
+    result = run_catalog(mock_project)
+    study = result.project.config.studies["mock_study"]
+    assert (study.citation, study.doi) == ("Example, A. (2026). Mock Family Study.", "10.0000/mock")
+    _, rows = datasets.dataset_table(result, result.summary.datasets[:3])
+    assert [(r["name"], r["wave"], r["reporter"]) for r in rows] == [
+        ("parent_w1", "1", "parent"),
+        ("parent_w2", "2", "parent"),
+        ("parent_w3", "3", "parent"),
+    ]
+    _, instruments = datasets.completeness_table(result, result.summary.datasets[0])
+    assert {r["id"] for r in instruments} == {"example_parent_stress", "example_child_sleep"}

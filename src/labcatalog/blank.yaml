@@ -15,6 +15,7 @@ vocab:
 missing_codes: []
 
 # Each study and its waves, for example:  my_study: {label: My Study, waves: {1: {start: 2026-01-01}}}
+# A study can also have a description, a citation (how to cite its data) and a doi; the Datasets page shows them.
 studies: {}
 
 # One entry per data file, for example:
