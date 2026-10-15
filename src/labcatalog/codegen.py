@@ -1,16 +1,44 @@
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from labcatalog.config import ProjectConfig, dataset_by_name, missing_codes_for
 from labcatalog.resolve import Catalog, ResolvedScore
 
 
-def score_code_r(score: ResolvedScore) -> str:
-    if score.unavailable_items:
-        return unavailable_note(score)
+def scoring_code_r(scores: list[ResolvedScore]) -> str:
+    return script(scores, "read.csv()", [], score_lines_r)
+
+
+def scoring_code_python(scores: list[ResolvedScore]) -> str:
+    return script(scores, "pandas.read_csv()", ["import pandas as pd"], score_lines_python)
+
+
+def script(
+    scores: list[ResolvedScore],
+    reader: str,
+    imports: list[str],
+    body: Callable[[ResolvedScore], list[str]],
+) -> str:
+    # One script for the scores of one instrument in one dataset.
+    first = scores[0]
+    lines = [
+        f"# {first.instrument_id} scores in dataset {first.dataset}; "
+        f"d is that dataset read with {reader}",
+        *imports,
+    ]
+    for score in scores:
+        lines.append("")
+        if score.unavailable_items:
+            lines.append(unavailable_note(score))
+        else:
+            lines += [f"# {score.label} ({score.score_id})", *body(score)]
+    return "\n".join(lines)
+
+
+def score_lines_r(score: ResolvedScore) -> list[str]:
     k, enough = len(score.columns), min_valid(score)
     lines = [
-        header(score, "read.csv()"),
         f"items <- c({quoted(score.columns)})",
         "x <- d[items]",
     ]
@@ -39,17 +67,12 @@ def score_code_r(score: ResolvedScore) -> str:
     }[(score.missing_rule, score.method)]
     test = f"n_valid == {k}" if score.missing_rule == "complete" else f"n_valid >= {enough}"
     lines.append(f"d${output_name(score)} <- ifelse({test}, {value}, NA)")
-    return "\n".join(lines)
+    return lines
 
 
-def score_code_python(score: ResolvedScore) -> str:
-    if score.unavailable_items:
-        return unavailable_note(score)
+def score_lines_python(score: ResolvedScore) -> list[str]:
     k, enough = len(score.columns), min_valid(score)
     lines = [
-        header(score, "pandas.read_csv()"),
-        "import pandas as pd",
-        "",
         f"items = [{quoted(score.columns)}]",
         'x = d[items].apply(pd.to_numeric, errors="coerce")',
     ]
@@ -72,13 +95,16 @@ def score_code_python(score: ResolvedScore) -> str:
     }[(score.missing_rule, score.method)]
     test = f"n_valid == {k}" if score.missing_rule == "complete" else f"n_valid >= {enough}"
     lines.append(f'd["{output_name(score)}"] = {value}.where({test})')
-    return "\n".join(lines)
+    return lines
 
 
-def scoring_snippets(catalog: Catalog) -> dict[str, dict[str, str]]:
+def scoring_snippets(catalog: Catalog) -> dict[tuple[str, str], dict[str, str]]:
+    groups: dict[tuple[str, str], list[ResolvedScore]] = {}
+    for score in catalog.scores:
+        groups.setdefault((score.instrument_id, score.dataset), []).append(score)
     return {
-        score.key: {"r": score_code_r(score), "python": score_code_python(score)}
-        for score in catalog.scores
+        key: {"r": scoring_code_r(scores), "python": scoring_code_python(scores)}
+        for key, scores in groups.items()
     }
 
 
@@ -218,13 +244,6 @@ def reverse_lines(score: ResolvedScore, language: str) -> list[str]:
         else:
             lines.append(f"x[{target}] = {number(low + high)} - x[{target}]")
     return lines
-
-
-def header(score: ResolvedScore, reader: str) -> str:
-    return (
-        f"# {score.label} ({score.instrument_id}.{score.score_id}), dataset {score.dataset}; "
-        f"d is that dataset read with {reader}"
-    )
 
 
 def unavailable_note(score: ResolvedScore) -> str:

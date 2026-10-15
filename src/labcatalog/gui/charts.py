@@ -4,7 +4,7 @@ from nicegui import ui
 
 from labcatalog.charts import network, views
 from labcatalog.gui import theme
-from labcatalog.gui.common import apa, card, col, heading, note, section, table
+from labcatalog.gui.common import apa, card, col, heading, note, table
 from labcatalog.pipeline import CatalogResult
 
 TABLE_MIN = 360
@@ -36,30 +36,32 @@ def side_by_side(*panels: tuple[str, go.Figure | None]) -> None:
                 show(fig)
 
 
-def instrument_section(result: CatalogResult, instrument_id: str) -> None:
-    if not views.instrument_datasets(result, instrument_id):
-        return
-    section("Across waves")
+def score_charts(result: CatalogResult, instrument_id: str) -> None:
     side_by_side(
         ("", views.score_boxes(result, instrument_id)),
         ("", views.score_distribution(result, instrument_id)),
     )
-    for fig in views.item_responses(result, instrument_id):
-        show(fig)
-    item_means(result, instrument_id)
     means = views.score_means(result, instrument_id)
     if means is not None:
         heading("Scores across waves")
         show(means)
+
+
+def item_charts(result: CatalogResult, instrument_id: str) -> None:
+    for fig in views.item_responses(result, instrument_id):
+        show(fig)
+    item_means(result, instrument_id)
     profiles = views.wave_profiles(result, instrument_id)
     if profiles is not None:
         heading("Each wave against the others")
         show(profiles)
+
+
+def item_correlation_section(result: CatalogResult, instrument_id: str) -> None:
     waves = views.item_waves(result, instrument_id)
     if waves:
         heading("Item correlations")
         one_wave(waves, lambda dataset: item_correlations(result, instrument_id, dataset))
-    other_scores(result, instrument_id)
 
 
 def figure_column(fig: go.Figure) -> ui.column:

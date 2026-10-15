@@ -13,7 +13,7 @@ def test_catalog_has_everything_the_gui_shows(mock_project):
         "child_w2",
         "child_w3",
     }
-    assert set(result.snippets) == {s.key for s in result.catalog.scores}
+    assert set(result.snippets) == {(s.instrument_id, s.dataset) for s in result.catalog.scores}
     assert len(result.manifest.files) == 6
 
 

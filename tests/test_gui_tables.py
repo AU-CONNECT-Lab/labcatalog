@@ -2,6 +2,7 @@ from pathlib import Path
 
 from labcatalog.browse import build_index, matches
 from labcatalog.cfa import ONE_FACTOR, SUBSCALES, CfaFit
+from labcatalog.charts import views
 from labcatalog.gui import datasets, instruments, overview
 from labcatalog.gui.common import location_path
 from labcatalog.pipeline import run_catalog
@@ -82,7 +83,7 @@ def test_dataset_page_lists_each_file_with_the_study_citation(mock_project):
 def test_item_total_and_stability_tables_have_a_column_per_wave(mock_project):
     result = run_catalog(mock_project)
     mood = result.project.instruments["example_mood"]
-    columns, rows = instruments.item_total_waves(result, mood)
+    columns, rows = instruments.item_total_waves(result, mood, "ems_total")
     assert [c["label"] for c in columns[2:]] == [
         "Wave 1 (α 0.90)",
         "Wave 2 (α 0.93)",
@@ -90,6 +91,11 @@ def test_item_total_and_stability_tables_have_a_column_per_wave(mock_project):
     ]
     assert [r["item"] for r in rows] == [f"ems_{i}" for i in range(1, 10)]
     assert all(r["d0"] and r["d2"] for r in rows)
+    first = next(t for t in views.summary_of(result, "example_mood.ems_total@child_w1").item_total)
+    assert rows[0]["d0"] == f"{first.r:.2f} ({first.alpha_if_deleted:.2f})"
+    sadness = next(s for s in mood.scores if s.id == "ems_sadness")
+    _, rows = instruments.item_total_waves(result, mood, "ems_sadness")
+    assert [r["item"] for r in rows] == sadness.items
     columns, rows = instruments.stability_table(result, mood)
     assert [c["label"] for c in columns[1:]] == ["Wave 1 → Wave 2", "Wave 2 → Wave 3"]
     total = next(
@@ -171,3 +177,24 @@ def test_factor_tables_show_fit_loadings_and_omega(mock_project):
     assert sadness["s_ems_sadness"] == "0.81"
     assert rows[-1]["column"] == "ω" and rows[-1]["s_ems_sadness"] == "0.87"
     assert instruments.omegas(fits) == {"ems_sadness": 0.87}
+
+
+def test_score_table_lists_every_wave_under_its_score(mock_project):
+    result = run_catalog(mock_project)
+    mood = result.project.instruments["example_mood"]
+    columns, rows = instruments.score_table(result, mood, [])
+    assert "ω" not in [c["label"] for c in columns]
+    assert not any(c["sortable"] for c in columns)
+    assert len(rows) == 3 * len(mood.scores)
+    assert [(r["score"], r["wave"]) for r in rows[:4]] == [
+        ("Total score", "Wave 1"),
+        ("", "Wave 2"),
+        ("", "Wave 3"),
+        (mood.scores[1].label, "Wave 1"),
+    ]
+    total = views.summary_of(result, "example_mood.ems_total@child_w2")
+    assert (rows[1]["n"], rows[1]["mean"]) == (total.n_valid, f"{total.mean:.2f}")
+    fit = CfaFit("example_mood", "child_w2", ONE_FACTOR, {}, 100, omega={"ems_total": 0.9})
+    columns, rows = instruments.score_table(result, mood, [fit])
+    assert "ω" in [c["label"] for c in columns]
+    assert [r["omega"] for r in rows[:3]] == ["", "0.90", ""]

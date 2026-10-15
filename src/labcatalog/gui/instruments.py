@@ -187,68 +187,103 @@ def detail(
     result: CatalogResult, instrument: Instrument, preferred: list[str], cfa: CfaView
 ) -> None:
     about(result, instrument)
+    definition(result, instrument)
+    datasets = administered_in(result, instrument.id)
+    if not datasets:
+        return
+    if any(s.instrument_id == instrument.id for s in result.catalog.scores):
+        scores_part(result, instrument, cfa)
+    items_part(result, instrument)
+    dataset_part(result, instrument, datasets, preferred, cfa)
 
-    heading("Items")
-    table(*item_table(result, instrument))
 
-    with ui.row().classes("w-full gap-8"):
-        for response_set in instrument.response_sets:
-            with ui.column().classes("gap-1"):
+def definition(result: CatalogResult, instrument: Instrument) -> None:
+    section("Items")
+    with ui.row().classes("w-full gap-6 items-start"):
+        with ui.column().classes("gap-1 min-w-0").style("flex: 1 1 480px"):
+            table(*item_table(result, instrument))
+        with ui.column().classes("gap-1"):
+            for response_set in instrument.response_sets:
                 heading(f"Options: {response_set.id}")
                 table(
                     [col("value", "Value", numeric=True), col("label", "Label")],
                     [o.model_dump() for o in response_set.options],
                 ).classes(remove="w-full")
-        with ui.column().classes("gap-1"):
             heading("Missing codes")
             table(*missing_code_table(result, instrument)).classes(remove="w-full")
 
-    charts.instrument_section(result, instrument.id)
 
-    datasets = administered_in(result, instrument.id)
-    if not datasets:
-        return
-    first = next((d for d in preferred if d in datasets), datasets[0])
-
-    # One switch drives the charts, tables and code of the chosen dataset further down.
-    @ui.refreshable
-    def dataset_charts(dataset: str) -> None:
-        charts.instrument_dataset_section(result, instrument.id, dataset)
-
-    @ui.refreshable
-    def dataset_tables(dataset: str) -> None:
-        dataset_statistics(result, instrument, dataset, cfa)
-
-    @ui.refreshable
-    def dataset_code(dataset: str) -> None:
-        scoring_code(result, instrument, dataset)
-
-    def pick(dataset: str) -> None:
-        dataset_charts.refresh(dataset)
-        dataset_tables.refresh(dataset)
-        dataset_code.refresh(dataset)
-
-    section("By dataset")
-    ui.toggle(datasets, value=first, on_change=lambda e: pick(e.value)).props(
-        "dense no-caps"
-    ).classes("mt-4")
-    dataset_charts(first)
-
-    section("Tables")
-    if instrument.kind == "demographics":
-        heading("Sample by wave")
-        table(*sample_table(result, instrument))
-    across = item_total_waves(result, instrument)
-    if across is not None:
-        heading("Item-total correlation across waves")
-        table(*across).classes(remove="w-full")
+def scores_part(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
+    section("Scores")
+    score_statistics(result, instrument, cfa)
+    charts.score_charts(result, instrument.id)
     stable = stability_table(result, instrument)
     if stable is not None:
         heading("Stability across waves")
         note("r between the same people's scores one wave apart (n people).")
         table(*stable).classes(remove="w-full")
-    dataset_tables(first)
-    dataset_code(first)
+    charts.other_scores(result, instrument.id)
+
+
+def items_part(result: CatalogResult, instrument: Instrument) -> None:
+    section("Item analysis")
+    if instrument.kind == "demographics":
+        heading("Sample by wave")
+        table(*sample_table(result, instrument))
+    charts.item_charts(result, instrument.id)
+    item_totals(result, instrument)
+    charts.item_correlation_section(result, instrument.id)
+
+
+def dataset_part(
+    result: CatalogResult,
+    instrument: Instrument,
+    datasets: list[str],
+    preferred: list[str],
+    cfa: CfaView,
+) -> None:
+    first = next((d for d in preferred if d in datasets), datasets[0])
+
+    @ui.refreshable
+    def one_dataset(dataset: str) -> None:
+        heading(f"Items in {dataset}")
+        table(*variable_table(result, instrument, dataset))
+        factor_structure(result, instrument, dataset, cfa)
+        charts.instrument_dataset_section(result, instrument.id, dataset)
+        scoring_code(result, instrument, dataset)
+
+    section("One dataset")
+    ui.toggle(datasets, value=first, on_change=lambda e: one_dataset.refresh(e.value)).props(
+        "dense no-caps"
+    ).classes("mt-4")
+    one_dataset(first)
+
+
+def item_totals(result: CatalogResult, instrument: Instrument) -> None:
+    choices = {
+        s.id: s.label
+        for s in instrument.scores
+        if any(
+            views.summary_of(result, r.key).item_total
+            for r in views.resolved(result, instrument.id, s.id)
+        )
+    }
+    if not choices:
+        return
+    total = views.total_score(instrument)
+    first = total.id if total is not None and total.id in choices else next(iter(choices))
+
+    @ui.refreshable
+    def body(score_id: str) -> None:
+        table(*item_total_waves(result, instrument, score_id)).classes(remove="w-full")
+
+    heading("Item-total correlations")
+    if len(choices) > 1:
+        ui.select(
+            choices, value=first, label="Score", on_change=lambda e: body.refresh(e.value)
+        ).props("dense outlined").classes("w-72")
+    body(first)
+    note("r of each item with the sum of the other items; α without the item in brackets.")
 
 
 def history(project: Project, instrument_id: str) -> None:
@@ -396,74 +431,40 @@ def score_summaries(result: CatalogResult, instrument: Instrument, dataset: str)
     ]
 
 
-# Module level, so a finished CFA can redraw these tables without redrawing the page.
+def cfa_changed() -> None:
+    score_statistics.refresh()
+    factor_structure.refresh()
+
+
+# Module level, so a finished CFA can redraw this table without redrawing the page.
 @ui.refreshable
-def dataset_statistics(
-    result: CatalogResult, instrument: Instrument, dataset: str, cfa: CfaView
-) -> None:
-    scores = {s.key: s for s in result.catalog.scores}
-    summaries = score_summaries(result, instrument, dataset)
-    fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
-    if summaries:
-        heading(f"Scores in {dataset}")
-        table(*score_table(result, summaries, omegas(fits)))
-        factor_structure(result, instrument, dataset, cfa, fits)
-    heading(f"Items in {dataset}")
-    table(*variable_table(result, instrument, dataset))
-    items = item_ids(result, dataset)
-    for summary in summaries:
-        score = scores[summary.key]
-        if summary.item_total:
-            heading(f"{score.label}: item-total correlations in {dataset} (α {fmt(summary.alpha)})")
-            table(
-                [
-                    col("column", "Variable"),
-                    col("item", "Item"),
-                    col("r", "Item-total r", numeric=True),
-                    col("alpha_if_deleted", "α if deleted", numeric=True),
-                ],
-                [
-                    {
-                        "column": t.column,
-                        "item": items.get(t.column, ""),
-                        "r": fmt(t.r),
-                        "alpha_if_deleted": fmt(t.alpha_if_deleted),
-                    }
-                    for t in summary.item_total
-                ],
-            ).classes(remove="w-full")
+def score_statistics(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
+    table(*score_table(result, instrument, cfa.fits))
 
 
 def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
-    scores = {s.key: s for s in result.catalog.scores}
-    summaries = score_summaries(result, instrument, dataset)
-    if summaries:
-        section("Scoring code")
-    for summary in summaries:
-        heading(f"{scores[summary.key].label}: scoring code for {dataset}")
-        snippets = result.snippets[summary.key]
-        with ui.tabs().props("dense no-caps align=left") as tabs:
-            ui.tab("r", label="R")
-            ui.tab("python", label="Python")
-        with ui.tab_panels(tabs, value="r").classes("w-full"):
-            with ui.tab_panel("r").classes("p-0"):
-                ui.code(snippets["r"], language="r").classes("w-full")
-            with ui.tab_panel("python").classes("p-0"):
-                ui.code(snippets["python"], language="python").classes("w-full")
+    snippets = result.snippets.get((instrument.id, dataset))
+    if snippets is None:
+        return
+    heading(f"Scoring code for {dataset}")
+    with ui.tabs().props("dense no-caps align=left") as tabs:
+        ui.tab("r", label="R")
+        ui.tab("python", label="Python")
+    with ui.tab_panels(tabs, value="r").classes("w-full"):
+        with ui.tab_panel("r").classes("p-0"):
+            ui.code(snippets["r"], language="r").classes("w-full")
+        with ui.tab_panel("python").classes("p-0"):
+            ui.code(snippets["python"], language="python").classes("w-full")
 
 
 def item_total_waves(
-    result: CatalogResult, instrument: Instrument
-) -> tuple[list[dict], list[dict]] | None:
-    total = views.total_score(instrument)
-    if total is None:
-        return None
+    result: CatalogResult, instrument: Instrument, score_id: str
+) -> tuple[list[dict], list[dict]]:
+    score = next(s for s in instrument.scores if s.id == score_id)
     summaries = [
-        views.summary_of(result, s.key) for s in views.resolved(result, instrument.id, total.id)
+        views.summary_of(result, s.key) for s in views.resolved(result, instrument.id, score_id)
     ]
     summaries = [s for s in summaries if s.item_total]
-    if not summaries:
-        return None
     names = views.series_names(result, [s.dataset for s in summaries])
     columns = [
         col("n", "#", numeric=True),
@@ -474,16 +475,21 @@ def item_total_waves(
         ],
     ]
     found = [
-        {item_ids(result, s.dataset).get(t.column): t.r for t in s.item_total} for s in summaries
+        {item_ids(result, s.dataset).get(t.column): t for t in s.item_total} for s in summaries
     ]
     numbers = {item.id: n for n, item in enumerate(instrument.items, start=1)}
     rows = [
         {
             "n": numbers[item],
             "item": item,
-            **{f"d{i}": fmt(values.get(item)) for i, values in enumerate(found)},
+            **{
+                f"d{i}": f"{fmt(t.r)} ({fmt(t.alpha_if_deleted)})"
+                if (t := values.get(item))
+                else ""
+                for i, values in enumerate(found)
+            },
         }
-        for item in total.items
+        for item in score.items
     ]
     return columns, rows
 
@@ -530,13 +536,13 @@ def item_ids(result: CatalogResult, dataset: str) -> dict[str, str]:
     return {v.column: v.item_id for v in result.catalog.variables if v.dataset == dataset}
 
 
+@ui.refreshable
 def factor_structure(
-    result: CatalogResult,
-    instrument: Instrument,
-    dataset: str,
-    cfa: CfaView,
-    fits: list[CfaFit],
+    result: CatalogResult, instrument: Instrument, dataset: str, cfa: CfaView
 ) -> None:
+    if not score_summaries(result, instrument, dataset):
+        return
+    fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
     heading(f"Factor structure in {dataset}")
     if cfa.status == CFA_UNSET:
         note("Set the path to Rscript on the Settings page to fit factor models (CFA) and get ω.")
@@ -625,26 +631,26 @@ def loading_table(
 
 
 def score_table(
-    result: CatalogResult, summaries: list, omega: dict[str, float] | None = None
+    result: CatalogResult, instrument: Instrument, fits: list[CfaFit]
 ) -> tuple[list[dict], list[dict]]:
-    scores = {s.key: s for s in result.catalog.scores}
-    custom = {
-        s.key: next(
-            d.custom
-            for d in result.project.instruments[scores[s.key].instrument_id].scores
-            if d.id == scores[s.key].score_id
-        )
-        for s in summaries
+    # One row per score and wave; what belongs to the score itself sits on its first row only.
+    omega = {
+        (f.dataset, score): value
+        for f in fits
+        if f.instrument_id == instrument.id
+        for score, value in f.omega.items()
     }
     fields = [
         f
         for f in result.project.config.custom_fields
-        if f.applies_to == "score" and any(f.name in values for values in custom.values())
+        if f.applies_to == "score" and any(f.name in s.custom for s in instrument.scores)
     ]
+    names = views.series_names(result, views.instrument_datasets(result, instrument.id))
     columns = [
         col("score", "Score"),
         *[col(f"custom_{f.name}", f.label or f.name.capitalize()) for f in fields],
         col("method", "Method"),
+        col("wave", "Wave"),
         col("n", "N", numeric=True),
         col("mean", "Mean", numeric=True),
         col("sd", "SD", numeric=True),
@@ -652,27 +658,38 @@ def score_table(
         col("observed", "Observed range"),
         col("possible", "Possible range"),
         col("alpha", "α", numeric=True),
-        col("omega", "ω", numeric=True),
+        *([col("omega", "ω", numeric=True)] if omega else []),
         col("n_complete", "Answered all", numeric=True),
     ]
-    rows = [
-        {
-            "score": scores[s.key].label,
-            **{f"custom_{f.name}": as_text(custom[s.key].get(f.name)) for f in fields},
-            "method": f"{scores[s.key].method}, {scores[s.key].missing_rule}",
-            "n": s.n_valid,
-            "mean": fmt(s.mean),
-            "sd": fmt(s.sd),
-            "median": fmt(s.median),
-            "observed": f"{fmt(s.minimum)} to {fmt(s.maximum)}" if s.n_valid else "",
-            "possible": f"{fmt(s.possible_range[0])} to {fmt(s.possible_range[1])}",
-            "alpha": fmt(s.alpha),
-            "omega": fmt((omega or {}).get(scores[s.key].score_id)),
-            "n_complete": s.n_complete,
-        }
-        for s in summaries
-    ]
-    return columns, rows
+    rows = []
+    for score in instrument.scores:
+        for k, s in enumerate(views.resolved(result, instrument.id, score.id)):
+            summary = views.summary_of(result, s.key)
+            own = {
+                "score": score.label,
+                **{f"custom_{f.name}": as_text(score.custom.get(f.name)) for f in fields},
+                "method": f"{s.method}, {s.missing_rule}",
+            }
+            rows.append(
+                {
+                    **(own if k == 0 else dict.fromkeys(own, "")),
+                    "wave": names[s.dataset],
+                    "n": summary.n_valid,
+                    "mean": fmt(summary.mean),
+                    "sd": fmt(summary.sd),
+                    "median": fmt(summary.median),
+                    "observed": f"{fmt(summary.minimum)} to {fmt(summary.maximum)}"
+                    if summary.n_valid
+                    else "",
+                    "possible": f"{fmt(summary.possible_range[0])} to "
+                    f"{fmt(summary.possible_range[1])}",
+                    "alpha": fmt(summary.alpha),
+                    "omega": fmt(omega.get((s.dataset, score.id))),
+                    "n_complete": summary.n_complete,
+                }
+            )
+    # Sorting would pull a score's rows apart.
+    return [{**c, "sortable": False} for c in columns], rows
 
 
 def variable_table(

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from labcatalog.codegen import output_name, score_code_python, score_code_r
+from labcatalog.codegen import output_name, scoring_code_python, scoring_code_r
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
 from labcatalog.resolve import ResolvedScore, resolve_catalog
@@ -65,7 +65,20 @@ def test_generated_python_matches_labcatalog(mock):
     root, catalog, datasets = mock
     for score in variants(catalog):
         d = pd.read_csv(root / "data" / f"{score.dataset}.csv")
-        exec(score_code_python(score), {"d": d})
+        exec(scoring_code_python([score]), {"d": d})
+        got = d[output_name(score)].to_numpy(dtype=float)
+        np.testing.assert_allclose(got, expected(datasets, score), err_msg=score.key)
+
+
+def test_one_script_scores_a_whole_instrument(mock_project):
+    result = run_catalog(mock_project)
+    scores = [s for s in result.catalog.scores_for("child_w1") if s.instrument_id == "example_mood"]
+    code = result.snippets[("example_mood", "child_w1")]["python"]
+    assert code.count("import pandas") == 1
+    d = pd.read_csv(mock_project / "data" / "child_w1.csv")
+    exec(code, {"d": d})
+    datasets = load_datasets(result.project)
+    for score in scores:
         got = d[output_name(score)].to_numpy(dtype=float)
         np.testing.assert_allclose(got, expected(datasets, score), err_msg=score.key)
 
@@ -79,7 +92,7 @@ def test_generated_r_matches_labcatalog(mock, tmp_path):
         data = (root / "data" / f"{score.dataset}.csv").as_posix()
         out = (tmp_path / f"out{n}.csv").as_posix()
         parts.append(
-            f'd <- read.csv("{data}")\n{score_code_r(score)}\n'
+            f'd <- read.csv("{data}")\n{scoring_code_r([score])}\n'
             f'write.csv(d["{output_name(score)}"], "{out}", row.names = FALSE)'
         )
     script = tmp_path / "check.R"
@@ -93,8 +106,8 @@ def test_generated_r_matches_labcatalog(mock, tmp_path):
 def test_unavailable_items_explain_why(mock):
     _, catalog, _ = mock
     score = catalog.scores[0].model_copy(update={"unavailable_items": ["x"]})
-    assert "cannot be computed" in score_code_r(score)
-    assert "cannot be computed" in score_code_python(score)
+    assert "cannot be computed" in scoring_code_r([score])
+    assert "cannot be computed" in scoring_code_python([score])
 
 
 def test_python_label_code_labels_items_and_blanks_missing_codes(mock_project):

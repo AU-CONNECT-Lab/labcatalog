@@ -26,7 +26,7 @@ class CatalogResult:
     project: Project | None = None
     catalog: Catalog | None = None
     summary: Summary | None = None
-    snippets: dict[str, dict[str, str]] = field(default_factory=dict)
+    snippets: dict[tuple[str, str], dict[str, str]] = field(default_factory=dict)
     label_snippets: dict[str, dict[str, str]] = field(default_factory=dict)
     manifest: Manifest | None = None
     # Row-level data stays for the charts that plot people rather than summaries.

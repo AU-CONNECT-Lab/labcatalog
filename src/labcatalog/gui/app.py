@@ -178,10 +178,10 @@ class Window:
         cfa.fits, cfa.message = [], ""
         if result is None or result.project is None or not rscript:
             cfa.status = CFA_UNSET
-            instruments.dataset_statistics.refresh()
+            instruments.cfa_changed()
             return
         cfa.status = CFA_RUNNING
-        instruments.dataset_statistics.refresh()
+        instruments.cfa_changed()
         try:
             fits = await run.io_bound(run_cfa, result, rscript)
         except LabCatalogError as err:
@@ -192,7 +192,7 @@ class Window:
         if self.result is not result:
             return
         cfa.fits, cfa.message, cfa.status = fits, message, status
-        instruments.dataset_statistics.refresh()
+        instruments.cfa_changed()
 
     def set_palette(self, name: str) -> None:
         style.use_palette(name)
