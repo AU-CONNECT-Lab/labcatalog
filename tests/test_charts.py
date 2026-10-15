@@ -142,3 +142,30 @@ def test_number_and_text_items_are_left_out_of_option_charts(result):
     assert views.item_profile(result, "example_demographics") is None
     waves = views.wave_profiles(result, "example_demographics")
     assert len(waves.data[-1].x) == 2
+
+
+def test_score_network_links_strong_pairs_and_colours_by_the_first_matching_tag(result):
+    everything = list(views.correlated_instruments(result))
+    assert list(views.network_colorings(result)) == [
+        "instrument",
+        "cluster",
+        "facet:reporter",
+        "facet:domain",
+        "facet:topics",
+    ]
+    option = views.score_network(result, "mock_study", "1", everything, "facet:topics")
+    series = option["series"][0]
+    names = [n["name"] for n in series["data"]]
+    categories = [c["name"] for c in series["categories"]]
+    assert categories == ["negative affect", "positive affect", "parenting", "sleep"]
+    strain = series["data"][names.index("EPS strain")]
+    assert categories[strain["category"]] == "negative affect"
+    linked = {
+        frozenset((names[int(e["source"])], names[int(e["target"])])) for e in series["links"]
+    }
+    assert frozenset(("EMS total score", "EMS sadness")) not in linked
+    assert all(e["value"] >= 0.3 for e in series["links"])
+    for color_by in views.network_colorings(result):
+        option = views.score_network(result, "mock_study", "1", everything, color_by)
+        used = {n["category"] for n in option["series"][0]["data"]}
+        assert used <= set(range(len(option["series"][0]["categories"])))

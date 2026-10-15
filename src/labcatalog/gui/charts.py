@@ -1,7 +1,7 @@
 import plotly.graph_objects as go
 from nicegui import ui
 
-from labcatalog.charts import views
+from labcatalog.charts import network, views
 from labcatalog.gui.common import heading, note
 from labcatalog.pipeline import CatalogResult
 
@@ -193,7 +193,12 @@ def score_relations(result: CatalogResult) -> None:
     instruments = views.correlated_instruments(result)
     choices = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
     lower, upper = first_two(choices)
-    picked = {"lower": lower, "upper": upper, "instruments": list(instruments)}
+    picked = {
+        "lower": lower,
+        "upper": upper,
+        "instruments": list(instruments),
+        "color": "instrument",
+    }
 
     @ui.refreshable
     def grid() -> None:
@@ -212,12 +217,24 @@ def score_relations(result: CatalogResult) -> None:
         study, wave = picked["lower"].split("|")
         show(views.score_circle(result, study, wave, picked["instruments"]))
 
+    @ui.refreshable
+    def graph() -> None:
+        study, wave = picked["lower"].split("|")
+        show_network(
+            views.score_network(result, study, wave, picked["instruments"], picked["color"])
+        )
+
     def changed(key: str, value) -> None:
         picked[key] = value or []
         if key == "instruments":
             chooser.props(f'display-value="{shown()}"')
         grid.refresh()
         circle.refresh()
+        graph.refresh()
+
+    def recolor(value: str) -> None:
+        picked["color"] = value
+        graph.refresh()
 
     def shown() -> str:
         return f"{len(picked['instruments'])} of {len(instruments)} instruments"
@@ -238,3 +255,16 @@ def score_relations(result: CatalogResult) -> None:
         wave_pickers(choices, picked, changed)
     grid()
     circle()
+    ui.select(
+        views.network_colorings(result),
+        value=picked["color"],
+        label="Color by",
+        on_change=lambda e: recolor(e.value),
+    ).props("dense outlined").classes("w-56 mt-4")
+    graph()
+
+
+def show_network(option: dict | None) -> None:
+    if option is None:
+        return
+    ui.echart(option).classes("w-full").style(f"height:{network.NETWORK_HEIGHT}px")

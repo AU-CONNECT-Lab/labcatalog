@@ -1,10 +1,15 @@
+from collections import Counter
+
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
+from scipy.cluster.hierarchy import fcluster, linkage
+from scipy.spatial.distance import squareform
 
 from labcatalog import defaults
-from labcatalog.charts import matrices, plots, scatter
-from labcatalog.charts.style import SERIES_COLORS, natural_key, wave_color
+from labcatalog.browse import as_set, facet_label, facet_names, value_order
+from labcatalog.charts import matrices, network, plots, scatter
+from labcatalog.charts.style import SERIES_COLORS, group_color, natural_key, wave_color
 from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
@@ -712,6 +717,8 @@ def score_panel(
     return {
         "title": wave_name(result, study, wave),
         "r": [[corr.r[i][j] for j in idx] for i in idx],
+        "n": [[corr.n[i][j] for j in idx] for i in idx],
+        "scores": resolved_scores,
         "labels": [
             short_label(result.project.instruments[s.instrument_id], d)
             for s, d in zip(resolved_scores, definitions, strict=True)
@@ -736,6 +743,135 @@ def score_circle(
         defaults.CHART_MIN_R,
         p["title"],
     )
+
+
+def network_colorings(result: CatalogResult) -> dict[str, str]:
+    config = result.project.config
+    facets = [n for n in facet_names(config) if n not in ("study", "wave")]
+    return {
+        "instrument": "Instrument",
+        "cluster": "Cluster",
+        **{f"facet:{n}": facet_label(config, n) for n in facets},
+    }
+
+
+def score_network(
+    result: CatalogResult, study: str, wave: str, instruments: list[str], color_by: str
+) -> dict | None:
+    p = score_panel(result, study, wave, instruments)
+    if p is None:
+        return None
+    z = matrices.as_matrix(p["r"])
+    labels = p["labels"]
+    pairs = [
+        (i, j)
+        for i in range(len(labels))
+        for j in range(i)
+        if (j, i) not in p["skip"] and np.isfinite(z[i, j]) and abs(z[i, j]) >= defaults.CHART_MIN_R
+    ]
+    degree = Counter(k for pair in pairs for k in pair)
+    which, categories, shown = network_groups(result, p, z, color_by)
+    names = instrument_names(result)
+    nodes = [
+        {
+            "label": label,
+            "category": which[i],
+            "tip": "<br>".join(
+                part
+                for part in (
+                    f"<b>{label}</b>",
+                    names[p["groups"][i]],
+                    shown[i],
+                    f"{degree[i]} links",
+                )
+                if part
+            ),
+        }
+        for i, label in enumerate(labels)
+    ]
+    links = [
+        {
+            "source": i,
+            "target": j,
+            "r": float(z[i, j]),
+            "tip": f"{labels[i]} and {labels[j]}<br>r = {z[i, j]:.2f}, n = {p['n'][i][j]}",
+        }
+        for i, j in pairs
+    ]
+    note = f"Links: |r| ≥ {defaults.CHART_MIN_R:g}. Drag to move, scroll to zoom."
+    return network.score_network(nodes, links, categories, p["title"], note)
+
+
+def network_groups(
+    result: CatalogResult, p: dict, z: np.ndarray, color_by: str
+) -> tuple[list[int], list[tuple[str, str]], list[str]]:
+    groups = p["groups"]
+    if color_by == "instrument":
+        order = instrument_order(result)
+        present = [i for i in order if i in groups]
+        names = instrument_names(result)
+        categories = [(names[i], group_color(order.index(i))) for i in present]
+        return [present.index(g) for g in groups], categories, [""] * len(groups)
+    if color_by == "cluster":
+        found = score_clusters(z, p["skip"])
+        sizes = Counter(found)
+        kept = [c for c in dict.fromkeys(found) if sizes[c] > 1]
+        categories = [(f"Cluster {k}", group_color(k - 1)) for k in range(1, len(kept) + 1)]
+        if len(kept) < len(sizes):
+            categories.append(("Unclustered", network.UNSET_COLOR))
+        which = [kept.index(c) if c in kept else len(kept) for c in found]
+        return which, categories, [categories[w][0] for w in which]
+    config = result.project.config
+    name = color_by.removeprefix("facet:")
+    values = [score_facet(result, s, name) for s in p["scores"]]
+    seen = set().union(*values)
+    declared = value_order(config, name)
+    order = [v for v in declared if v in seen] + sorted(seen - set(declared))
+    # As in Obsidian's groups, a node with several values takes the first one in the declared order.
+    which = [next((k for k, v in enumerate(order) if v in vs), len(order)) for vs in values]
+    categories = [(v, group_color(k)) for k, v in enumerate(order)]
+    if len(order) in which:
+        categories.append((network.UNSET, network.UNSET_COLOR))
+    label = facet_label(config, name)
+    shown = [f"{label}: {', '.join(v for v in order if v in vs) or network.UNSET}" for vs in values]
+    return which, categories, shown
+
+
+def score_clusters(z: np.ndarray, skip: set[tuple[int, int]]) -> list[int]:
+    # Average linkage on 1 - |r|, cut where the average |r| between clusters falls below the link threshold.
+    d = 1.0 - np.abs(z)
+    d[~np.isfinite(d)] = 1.0
+    for a, b in skip:
+        d[a, b] = d[b, a] = 1.0
+    np.fill_diagonal(d, 0.0)
+    tree = linkage(squareform(d, checks=False), method="average")
+    return [int(c) for c in fcluster(tree, t=1.0 - defaults.CHART_MIN_R, criterion="distance")]
+
+
+def score_facet(result: CatalogResult, score: ResolvedScore, name: str) -> set[str]:
+    config = result.project.config
+    dataset = dataset_by_name(config, score.dataset)
+    administration = next(
+        a
+        for content in result.project.studies.values()
+        if content.study == dataset.study
+        for a in content.administrations
+        if a.instrument == score.instrument_id and score.dataset in a.datasets
+    )
+    known = {
+        "reporter": dataset.reporter,
+        "target": administration.target,
+        "modality": dataset.modality,
+    }
+    if name in known:
+        return as_set(known[name])
+    custom = {
+        **dataset.custom,
+        **result.project.instruments[score.instrument_id].custom,
+        **administration.custom,
+        **definition(result, score).custom,
+    }
+    return as_set(custom.get(name))
 
 
 Member = tuple[str, str, str]

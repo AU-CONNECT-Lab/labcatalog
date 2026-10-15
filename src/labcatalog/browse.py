@@ -165,19 +165,24 @@ def facet(config: ProjectConfig, name: str, rows: list[Administered]) -> Facet:
             for s, study in config.studies.items()
             for wave in sorted(study.waves, key=wave_order)
         }
-    elif name in defaults.BUILTIN_FACETS:
-        vocab = config.vocab
-        order = {"reporter": vocab.reporters, "target": vocab.targets, "modality": vocab.modalities}
-        labels = {v: v for v in order[name]}
     else:
-        field = next(f for f in config.custom_fields if f.name == name)
-        labels = {v: v for v in field.choices or []}
+        labels = {v: v for v in value_order(config, name)}
     labels.update({v: v for v in sorted(present - set(labels))})
     return Facet(
         name=name,
         label=facet_label(config, name),
         values={value: label for value, label in labels.items() if value in present},
     )
+
+
+def value_order(config: ProjectConfig, name: str) -> list[str]:
+    if name in defaults.BUILTIN_FACETS:
+        vocab = config.vocab
+        return {"reporter": vocab.reporters, "target": vocab.targets, "modality": vocab.modalities}[
+            name
+        ]
+    field = next(f for f in config.custom_fields if f.name == name)
+    return field.choices or []
 
 
 def facet_label(config: ProjectConfig, name: str) -> str:
