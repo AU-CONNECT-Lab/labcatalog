@@ -15,7 +15,7 @@ LABEL_CHAR = 5.4
 MIN_CELL, MAX_CELL = 18, 40
 # Pixels the cells share before they reach their minimum size.
 CELL_ROOM = 360
-# The plot is never shorter than this, so the colour bar keeps room for its ticks.
+# Few variables get larger cells, so the plot and the colour bar beside it stay this tall.
 MIN_PLOT = 170
 COLORBAR_ROOM = 90
 
@@ -30,7 +30,7 @@ def heatmap(
     # The lower triangle, numbered like an APA table: rows from the second, columns to the second last.
     names = [f"{k}. {label}" for k, label in enumerate(labels, start=1)]
     rows, cols = range(1, len(labels)), range(len(labels) - 1)
-    cell = int(min(MAX_CELL, max(MIN_CELL, CELL_ROOM / len(cols))))
+    cell = max(MIN_PLOT / len(cols), min(MAX_CELL, max(MIN_CELL, CELL_ROOM / len(cols))))
     fig = go.Figure(
         go.Heatmap(
             z=[
@@ -50,10 +50,6 @@ def heatmap(
             colorbar=dict(
                 title=dict(text=value_label, font=dict(size=11)),
                 thickness=12,
-                lenmode="pixels",
-                len=MIN_PLOT,
-                y=1,
-                yanchor="top",
                 tickvals=COLORBAR_TICKS,
                 tickfont=dict(size=10),
                 outlinewidth=0,
@@ -77,10 +73,10 @@ def heatmap(
         **ticks,
     )
     left = int(LABEL_CHAR * max(len(names[i]) for i in rows)) + 16
-    side = cell * len(cols)
+    side = int(cell * len(cols))
     return base_layout(
         fig,
-        max(side, MIN_PLOT) + 60,
+        side + 60,
         width=left + side + COLORBAR_ROOM,
         margin=dict(l=left, r=COLORBAR_ROOM, t=20, b=40),
     )
