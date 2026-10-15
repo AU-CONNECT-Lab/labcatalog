@@ -4,11 +4,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.ai_scoring import write_scoring_scripts
 from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.exceptions import MetadataError
 from labcatalog.issues import Issue, has_errors
+from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.manifest import Manifest, build_manifest
 from labcatalog.prepare import Session, StepRun, run_steps
 from labcatalog.project import Project, load_project, write_schemas
@@ -81,6 +83,13 @@ def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
 def run_cfa(result: CatalogResult, rscript: str) -> list[CfaFit]:
     models = build_models(result.project, result.catalog, result.datasets)
     return fit_models(models, rscript)
+
+
+def run_scoring_script(
+    result: CatalogResult, instrument_id: str, dataset: str, provider: str, model: str, url: str
+) -> CallMetadata:
+    client = make_llm_client(provider, model, url)
+    return write_scoring_scripts(result.project, result.catalog, instrument_id, dataset, client)
 
 
 def run_prepare(root: Path, echo: Callable[[str], None]) -> list[StepRun]:

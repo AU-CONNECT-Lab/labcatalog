@@ -1,3 +1,4 @@
+import os
 from collections.abc import Awaitable, Callable
 
 from nicegui import run, ui
@@ -6,6 +7,7 @@ from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import note, section
+from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.rbridge import ALL_PACKAGES, install_command, r_status
 
 RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
@@ -52,6 +54,8 @@ def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable
 
     ui.button("Save and check", on_click=save).classes("mt-2")
 
+    models_section()
+
     section("Charts")
     ui.select(
         {name: p.label for name, p in style.PALETTES.items()},
@@ -59,3 +63,44 @@ def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable
         label="Chart colors",
         on_change=lambda e: on_palette(e.value),
     ).props("outlined dense").classes("w-56 mt-2")
+
+
+def models_section() -> None:
+    section("Language model")
+    note(
+        "On an instrument's page, a language model can write the scoring scripts from the "
+        "instrument's reference PDF. A cloud provider reads its key from an environment variable "
+        "that you set yourself, for example by running setx ANTHROPIC_API_KEY your-key in a "
+        "terminal and restarting labcatalog. A local model runs on an OpenAI-compatible server "
+        "such as Ollama or LM Studio; give its address, for example http://localhost:11434/v1."
+    )
+    saved = preferences.load()
+    with ui.row().classes("items-start gap-4 mt-2"):
+        provider = ui.select(
+            PROVIDERS,
+            value=saved.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
+            label="Provider",
+        ).classes("w-72")
+        model = ui.input("Model", value=saved.get(preferences.LLM_MODEL, "")).classes("w-72")
+        url = ui.input("Server address", value=saved.get(preferences.LLM_URL, "")).classes("w-80")
+    url.bind_visibility_from(provider, "value", value="local")
+    key = ui.label().classes("lc-note")
+    status = ui.label().classes("lc-note")
+
+    def show_key() -> None:
+        env = KEY_ENV.get(provider.value)
+        key.set_text(f"{env} is {'set' if os.environ.get(env) else 'not set'}." if env else "")
+
+    def save() -> None:
+        preferences.save(
+            {
+                preferences.LLM_PROVIDER: provider.value,
+                preferences.LLM_MODEL: (model.value or "").strip(),
+                preferences.LLM_URL: (url.value or "").strip(),
+            }
+        )
+        status.set_text("Saved.")
+
+    provider.on_value_change(lambda _: show_key())
+    show_key()
+    ui.button("Save", on_click=save).classes("mt-2")

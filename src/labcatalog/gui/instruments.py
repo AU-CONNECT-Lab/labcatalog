@@ -3,13 +3,15 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
-from nicegui import app, ui
+from nicegui import app, run, ui
 
+from labcatalog import ai_scoring
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
-from labcatalog.gui import charts
+from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui import charts, preferences
 from labcatalog.gui.common import (
     as_text,
     col,
@@ -22,7 +24,7 @@ from labcatalog.gui.common import (
     unique,
 )
 from labcatalog.history import file_history
-from labcatalog.pipeline import CatalogResult
+from labcatalog.pipeline import CatalogResult, run_scoring_script
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument, Reference, Text
@@ -444,17 +446,64 @@ def score_statistics(result: CatalogResult, instrument: Instrument, cfa: CfaView
 
 def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
     snippets = result.snippets.get((instrument.id, dataset))
-    if snippets is None:
-        return
-    heading(f"Scoring code for {dataset}")
+    if snippets is not None:
+        heading(f"Scoring code for {dataset}")
+        code_tabs(snippets)
+    written_scripts(result, instrument, dataset)
+
+
+def code_tabs(code: dict[str, str]) -> None:
     with ui.tabs().props("dense no-caps align=left") as tabs:
         ui.tab("r", label="R")
         ui.tab("python", label="Python")
     with ui.tab_panels(tabs, value="r").classes("w-full"):
         with ui.tab_panel("r").classes("p-0"):
-            ui.code(snippets["r"], language="r").classes("w-full")
+            ui.code(code["r"], language="r").classes("w-full")
         with ui.tab_panel("python").classes("p-0"):
-            ui.code(snippets["python"], language="python").classes("w-full")
+            ui.code(code["python"], language="python").classes("w-full")
+
+
+def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
+    if not ai_scoring.reference_pdfs(result.project, instrument):
+        return
+    paths = ai_scoring.script_paths(result.project, instrument.id, dataset)
+
+    @ui.refreshable
+    def saved() -> None:
+        if paths["r"].is_file():
+            note(f"Saved as {paths['r'].name} and {paths['python'].name} in {paths['r'].parent}.")
+            code_tabs({k: path.read_text(encoding="utf-8") for k, path in paths.items()})
+
+    async def write() -> None:
+        button.disable()
+        status.set_text("Reading the reference and writing the scripts.")
+        chosen = preferences.load()
+        try:
+            meta = await run.io_bound(
+                run_scoring_script,
+                result,
+                instrument.id,
+                dataset,
+                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
+                chosen.get(preferences.LLM_MODEL, ""),
+                chosen.get(preferences.LLM_URL, ""),
+            )
+        except LabCatalogError as err:
+            status.set_text(str(err))
+        else:
+            status.set_text(
+                f"Written by {meta.model} in {meta.latency_ms / 1000:.0f} s, "
+                f"{meta.input_tokens} tokens in and {meta.output_tokens} out."
+            )
+            saved.refresh()
+        finally:
+            button.enable()
+
+    heading(f"Scoring script from the reference PDF for {dataset}")
+    with ui.row().classes("items-center gap-3"):
+        button = ui.button("Write with the language model", on_click=write)
+        status = ui.label().classes("lc-note")
+    saved()
 
 
 def item_total_waves(

@@ -36,3 +36,7 @@ class CodebookError(LabCatalogError):
 
 class RError(LabCatalogError):
     pass
+
+
+class LLMError(LabCatalogError):
+    pass

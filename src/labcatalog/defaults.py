@@ -7,6 +7,7 @@ STUDIES_DIR = "studies"
 MAPS_DIR = "maps"
 SCHEMAS_DIR = "schemas"
 CODEBOOK_DIR = "codebook"
+SCORING_DIR = "scoring"
 SCORE_PREFIX = "score:"
 
 ID_COLUMN = "id"

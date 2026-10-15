@@ -6,6 +6,10 @@ from pathlib import Path
 FILENAME = "gui.json"
 PALETTE = "palette"
 RSCRIPT = "rscript"
+LLM_PROVIDER = "llm_provider"
+LLM_MODEL = "llm_model"
+LLM_URL = "llm_url"
+DEFAULT_LLM_PROVIDER = "anthropic"
 
 
 def folder() -> Path:
