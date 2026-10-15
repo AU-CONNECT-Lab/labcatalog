@@ -5,6 +5,7 @@ YAML_SUFFIXES = (".yaml", ".yml")
 INSTRUMENTS_DIR = "instruments"
 STUDIES_DIR = "studies"
 MAPS_DIR = "maps"
+SCHEMAS_DIR = "schemas"
 SCORE_PREFIX = "score:"
 
 ID_COLUMN = "id"

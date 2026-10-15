@@ -14,6 +14,10 @@ class ProjectNotFoundError(LabCatalogError):
     exit_code = 3
 
 
+class ProjectExistsError(LabCatalogError):
+    exit_code = 3
+
+
 class MetadataError(LabCatalogError):
     exit_code = EXIT_ISSUES
 

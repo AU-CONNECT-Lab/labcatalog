@@ -1,3 +1,5 @@
+import json
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
@@ -7,12 +9,20 @@ from pydantic import BaseModel, ValidationError
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig
-from labcatalog.exceptions import MetadataError, ProjectNotFoundError
+from labcatalog.exceptions import MetadataError, ProjectExistsError, ProjectNotFoundError
 from labcatalog.issues import Issue, issues_from_validation_error
-from labcatalog.schema import Instrument, StudyContent
+from labcatalog.schema import Instrument, LenientStrings, StudyContent
 from labcatalog.varmap import MapEntry, load_variable_map
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
+
+EXAMPLE_DIR = Path(__file__).parent / "example"
+BLANK_CONFIG = Path(__file__).parent / "blank.yaml"
+SCHEMA_MODELS: dict[str, type[BaseModel]] = {
+    "labcatalog": ProjectConfig,
+    "instrument": Instrument,
+    "study": StudyContent,
+}
 
 
 @dataclass

@@ -5,9 +5,11 @@ from typing import Annotated
 
 import typer
 
+from labcatalog import defaults
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.issues import Issue, has_errors, summarize_issues
-from labcatalog.pipeline import run_check, run_validate
+from labcatalog.pipeline import run_check, run_schema, run_validate
+from labcatalog.project import init_project
 
 app = typer.Typer(
     help="Build a browsable catalog of a lab's study data.",
@@ -58,12 +60,14 @@ def init(
     example: Annotated[
         bool,
         typer.Option(
-            "--example/--no-example", help="Include an example instrument, study, and data."
+            "--example/--no-example",
+            help="Start from the fictional example project instead of empty settings.",
         ),
     ] = True,
 ) -> None:
     """Create a new project folder."""
-    raise NotImplementedError
+    root = init_project(target, example)
+    typer.echo(f"Created {root}. Open it with: labcatalog gui -p {root}")
 
 
 @app.command()
@@ -86,7 +90,8 @@ def check(project: ProjectOption = Path(".")) -> None:
 def schema(
     out: Annotated[
         Path, typer.Option("--out", "-o", help="Folder to write the JSON Schema files to.")
-    ] = Path("schemas"),
+    ] = Path(defaults.SCHEMAS_DIR),
 ) -> None:
     """Write JSON Schema files so editors can autocomplete and check the YAML."""
-    raise NotImplementedError
+    for path in run_schema(out):
+        typer.echo(f"Wrote {path}")

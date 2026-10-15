@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=schemas/labcatalog.schema.json
+# Settings for one labcatalog project. Instruments go in instruments/, studies in studies/, each dataset's column map in maps/.
+# For a filled-in example, run: labcatalog init <new folder>
+
+project:
+  name: PROJECT_NAME
+
+# Allowed words for each dataset's modality and reporter, and for each administration's target.
+vocab:
+  modalities: [questionnaire]
+  reporters: []
+  targets: []
+
+# Codes in the data that mean "no answer"; they are counted, never scored. Blank cells always count as missing.
+missing_codes: []
+
+# Each study and its waves, for example:  my_study: {label: My Study, waves: {1: {start: 2026-01-01}}}
+studies: {}
+
+# One entry per data file, for example:
+#   - {name: parent_w1, modality: questionnaire, study: my_study, wave: 1, reporter: parent, source: csv, path: data/parent_w1.csv}
+datasets: []

@@ -2,6 +2,7 @@ from labcatalog.exceptions import (
     DataSourceError,
     LabCatalogError,
     MetadataError,
+    ProjectExistsError,
     ProjectNotFoundError,
 )
 from labcatalog.pipeline import run_catalog, run_check, run_schema, run_validate
@@ -13,6 +14,7 @@ __all__ = [
     "DataSourceError",
     "LabCatalogError",
     "MetadataError",
+    "ProjectExistsError",
     "Project",
     "ProjectNotFoundError",
     "init_project",

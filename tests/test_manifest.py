@@ -1,8 +1,6 @@
-
 from labcatalog.manifest import build_manifest, git_commit
 from labcatalog.project import EXAMPLE_DIR, load_project
 from labcatalog.sources import load_datasets
-
 
 
 def manifest_for(root):

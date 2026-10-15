@@ -8,7 +8,7 @@ from labcatalog.codegen import scoring_snippets
 from labcatalog.exceptions import MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.manifest import Manifest, build_manifest
-from labcatalog.project import Project, load_project
+from labcatalog.project import Project, load_project, write_schemas
 from labcatalog.resolve import Catalog, resolve_catalog
 from labcatalog.scoring import compute_scores
 from labcatalog.sources import LoadedDataset, load_datasets
@@ -74,4 +74,4 @@ def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
 
 
 def run_schema(out_dir: Path) -> list[Path]:
-    raise NotImplementedError
+    return write_schemas(out_dir)
