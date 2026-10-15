@@ -32,7 +32,7 @@ def test_scores_know_their_columns_and_reverse_bounds(mock_project):
     assert score.columns == [f"ems_{n}_w1" for n in range(1, 7)]
     assert score.reverse_bounds == {"ems_1_w1": (0.0, 3.0), "ems_4_w1": (0.0, 3.0)}
     assert (score.missing_rule, score.min_valid, score.unavailable_items) == ("prorate", 5, [])
-    assert len(catalog.scores) == 6
+    assert len(catalog.scores) == 12
 
 
 def test_overrides_change_one_wave_only(mock_project):

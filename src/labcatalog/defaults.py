@@ -29,3 +29,6 @@ IDENTIFIER_NAME_PATTERNS = (
     r"\bdob\b",
     r"\bssn\b",
 )
+
+CHART_MIN_R = 0.3
+CHART_PEOPLE_PER_PAGE = 200

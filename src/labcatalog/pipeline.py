@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import pandas as pd
+
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codegen import scoring_snippets
 from labcatalog.exceptions import MetadataError
@@ -9,7 +11,7 @@ from labcatalog.manifest import Manifest, build_manifest
 from labcatalog.project import Project, load_project
 from labcatalog.resolve import Catalog, resolve_catalog
 from labcatalog.scoring import compute_scores
-from labcatalog.sources import load_datasets
+from labcatalog.sources import LoadedDataset, load_datasets
 from labcatalog.stats import Summary, summarize
 from labcatalog.validate import validate_project
 
@@ -23,6 +25,9 @@ class CatalogResult:
     summary: Summary | None = None
     snippets: dict[str, dict[str, str]] = field(default_factory=dict)
     manifest: Manifest | None = None
+    # Row-level data stays for the charts that plot people rather than summaries.
+    datasets: dict[str, LoadedDataset] = field(default_factory=dict)
+    scores: dict[str, pd.DataFrame] = field(default_factory=dict)
 
 
 def run_validate(root: Path) -> list[Issue]:
@@ -54,6 +59,8 @@ def run_catalog(root: Path) -> CatalogResult:
         summary=summarize(catalog, datasets, scores, project.config),
         snippets=scoring_snippets(catalog),
         manifest=build_manifest(project, datasets),
+        datasets=datasets,
+        scores=scores,
     )
 
 
