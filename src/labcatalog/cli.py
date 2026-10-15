@@ -8,7 +8,15 @@ import typer
 from labcatalog import defaults
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.issues import Issue, has_errors, summarize_issues
-from labcatalog.pipeline import run_check, run_prepare, run_schema, run_validate
+from labcatalog.pipeline import (
+    run_check,
+    run_codebook_create,
+    run_codebook_import,
+    run_codebook_prompt,
+    run_prepare,
+    run_schema,
+    run_validate,
+)
 from labcatalog.project import init_project
 
 app = typer.Typer(
@@ -97,6 +105,51 @@ def prepare(project: ProjectOption = Path(".")) -> None:
         raise typer.Exit(EXIT_ISSUES)
     else:
         typer.echo(f"{len(runs)} step(s) succeeded.")
+
+
+codebook_app = typer.Typer(
+    help="Import the codebook of a data file that has no column map yet.", no_args_is_help=True
+)
+app.add_typer(codebook_app, name="codebook")
+DatasetArgument = Annotated[str, typer.Argument(help="Dataset name from labcatalog.yaml.")]
+
+
+@codebook_app.command("create")
+def codebook_create(
+    dataset: DatasetArgument,
+    redcap: Annotated[
+        Path | None,
+        typer.Option(
+            "--redcap", help="REDCap data dictionary to take wording, options and item types from."
+        ),
+    ] = None,
+    project: ProjectOption = Path("."),
+) -> None:
+    """Write three CSV files that list every column of the data file, to fill in."""
+    for path in run_codebook_create(project, dataset, redcap):
+        typer.echo(f"Wrote {path}")
+    typer.echo(f"Fill them in, then run: labcatalog codebook import {dataset}")
+
+
+@codebook_app.command("prompt")
+def codebook_prompt(dataset: DatasetArgument, project: ProjectOption = Path(".")) -> None:
+    """Print a prompt that asks an AI to fill in the three files from your codebook."""
+    typer.echo(run_codebook_prompt(project, dataset))
+
+
+@codebook_app.command("import")
+def codebook_import(dataset: DatasetArgument, project: ProjectOption = Path(".")) -> None:
+    """Check the three files, then write the instrument files and the column map."""
+    result = run_codebook_import(project, dataset)
+    print_issues(result.issues)
+    for path in result.written:
+        typer.echo(f"Wrote {path}")
+    if result.reused:
+        typer.echo(f"Already in the project, so only mapped: {', '.join(result.reused)}")
+    for instruction, lines in result.steps:
+        typer.echo(instruction)
+        typer.echo(lines)
+    raise typer.Exit(EXIT_ISSUES if has_errors(result.issues) else EXIT_OK)
 
 
 @app.command()

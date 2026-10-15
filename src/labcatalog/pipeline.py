@@ -4,12 +4,13 @@ from pathlib import Path
 
 import pandas as pd
 
-from labcatalog import invariance
+from labcatalog import codebook, invariance
 from labcatalog.ai_scoring import write_scoring_scripts
 from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
+from labcatalog.codebook import ImportResult
 from labcatalog.codegen import label_snippets, scoring_snippets
-from labcatalog.exceptions import MetadataError
+from labcatalog.exceptions import CodebookError, MetadataError
 from labcatalog.invariance import InvarianceTest
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
@@ -90,6 +91,28 @@ def run_cfa(result: CatalogResult, rscript: str) -> list[CfaFit]:
 def run_invariance(result: CatalogResult, rscript: str) -> list[InvarianceTest]:
     models = invariance.build_models(result.project, result.catalog, result.datasets)
     return invariance.fit_models(models, rscript)
+
+
+def run_codebook_create(root: Path, dataset: str, dictionary: Path | None) -> list[Path]:
+    project = load_project(root)
+    codebook.require_unmapped(project, dataset)
+    return codebook.write_templates(project, dataset, dictionary)
+
+
+def run_codebook_prompt(root: Path, dataset: str) -> str:
+    project = load_project(root)
+    codebook.require_unmapped(project, dataset)
+    if not codebook.codebook_paths(project, dataset)[codebook.ITEMS].is_file():
+        raise CodebookError(
+            f"Create the codebook files first: labcatalog codebook create {dataset}"
+        )
+    return codebook.ai_prompt(project, dataset)
+
+
+def run_codebook_import(root: Path, dataset: str) -> ImportResult:
+    project = load_project(root)
+    codebook.require_unmapped(project, dataset)
+    return codebook.import_codebook(project, dataset)
 
 
 def run_scoring_script(

@@ -129,6 +129,14 @@ def unmapped_datasets(project: Project) -> list[str]:
     return [d.name for d in project.config.datasets if d.name not in project.maps]
 
 
+def require_unmapped(project: Project, dataset: str) -> None:
+    if dataset in unmapped_datasets(project):
+        return
+    if dataset in project.maps:
+        raise CodebookError(f"{dataset} already has a column map in {defaults.MAPS_DIR}/")
+    raise CodebookError(f"No dataset named {dataset} in {defaults.CONFIG_FILENAME}")
+
+
 def write_templates(
     project: Project, dataset_name: str, dictionary: Path | None = None
 ) -> list[Path]:
