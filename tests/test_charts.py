@@ -21,11 +21,8 @@ def test_instrument_charts(result):
 
 def test_item_diagnostics_put_each_item_against_alpha_without_it(result):
     fig = views.item_total(result, "example_mood")
-    waves = [t for t in fig.data if t.mode == "markers"]
-    assert [t.name for t in waves] == ["Wave 1 (α 0.86)", "Wave 2 (α 0.88)", "Wave 3 (α 0.85)"]
-    assert all(len(t.x) == 6 for t in waves)
-    labels = next(t for t in fig.data if t.mode == "text")
-    assert [label.strip() for label in labels.text] == [f"ems_{i}" for i in range(1, 7)]
+    assert [t.name for t in fig.data] == ["Wave 1 (α 0.86)", "Wave 2 (α 0.88)", "Wave 3 (α 0.85)"]
+    assert all(list(t.text) == ["1", "2", "3", "4", "5", "6"] for t in fig.data)
 
 
 def test_subscale_radars_draw_each_subscale_with_three_items(result):

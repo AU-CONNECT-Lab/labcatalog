@@ -335,62 +335,38 @@ def dot_rows(
 
 
 def item_diagnostics(
-    items: list[str], hovers: dict[str, str], series: list[dict], floor: float, title: str
+    items: list[str],
+    numbers: dict[str, int],
+    hovers: dict[str, str],
+    series: list[dict],
+    floor: float,
+    title: str,
 ) -> go.Figure:
     # Each item's item-total r against the α left without it; an item above its wave's α line weakens the scale.
     fig = go.Figure()
-    seg_x, seg_y = [], []
-    for item in items:
-        path = [s["points"][item] for s in series if item in s["points"]]
-        if len(path) > 1:
-            seg_x += [p[0] for p in path] + [None]
-            seg_y += [p[1] for p in path] + [None]
-    fig.add_trace(
-        go.Scatter(
-            x=seg_x,
-            y=seg_y,
-            mode="lines",
-            line=dict(color=CONNECTOR, width=1.2),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
-    last: dict[str, tuple[float, float]] = {}
     for s in series:
         shown = [i for i in items if i in s["points"]]
         fig.add_trace(
             go.Scatter(
                 x=[s["points"][i][0] for i in shown],
                 y=[s["points"][i][1] for i in shown],
-                mode="markers",
+                mode="markers+text",
                 name=f"{s['name']} (α {s['alpha']:.2f})",
-                marker=dict(size=10, color=s["color"], line=dict(width=0.8, color="white")),
+                # The item's number from the item table sits inside its dot.
+                text=[str(numbers[i]) for i in shown],
+                textposition="middle center",
+                textfont=dict(size=9, color="white"),
+                marker=dict(size=17, color=s["color"], line=dict(width=0.8, color="white")),
                 customdata=[hovers[i] for i in shown],
                 hovertemplate=f"<b>{s['name']}</b><br>%{{customdata}}<br>item-total r = %{{x:.2f}}"
                 "<br>α if deleted = %{y:.3f}<extra></extra>",
             )
         )
-        fig.add_hline(
-            y=s["alpha"], line=dict(color=s["color"], width=1, dash="dash"), opacity=0.6
-        )
-        last.update({i: s["points"][i] for i in shown})
-    # The item name sits by the item's latest wave.
-    fig.add_trace(
-        go.Scatter(
-            x=[p[0] for p in last.values()],
-            y=[p[1] for p in last.values()],
-            mode="text",
-            text=[f"  {i}" for i in last],
-            textposition="middle right",
-            textfont=dict(size=10, color=TITLE_INK),
-            hoverinfo="skip",
-            showlegend=False,
-        )
-    )
+        fig.add_hline(y=s["alpha"], line=dict(color=s["color"], width=1, dash="dash"), opacity=0.6)
     xs = [p[0] for s in series for p in s["points"].values()]
     low, high = min(xs), max(xs)
     span = (high - low) or 0.1
-    x_range = [low - 0.08 * span, high + 0.25 * span]
+    x_range = [low - 0.08 * span, high + 0.08 * span]
     if x_range[0] <= floor:
         fig.add_vline(x=floor, line=dict(color=MUTED_INK, width=1, dash="dot"))
     fig.update_xaxes(

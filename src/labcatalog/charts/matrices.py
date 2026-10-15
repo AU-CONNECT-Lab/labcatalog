@@ -26,9 +26,9 @@ COLORBAR_LENGTH = 170
 PAGE_WIDTH = 960
 LABEL_CHAR = 5.8
 MIN_CELL, MAX_CELL = 18, 40
-# The matrix takes the left share of the width, the circle starts here.
+# The matrix takes the left share of the width; the circle leaves room on the right for its labels.
 GRID_SHARE = 0.5
-CIRCLE_START = 0.56
+CIRCLE_START, CIRCLE_END = 0.56, 0.95
 
 
 def as_matrix(rows: list[list[float | None]]) -> np.ndarray:
@@ -330,7 +330,7 @@ def add_circle(
     )
     hidden = dict(visible=False, range=[-CIRCLE_SPAN, CIRCLE_SPAN], constrain="domain")
     fig.update_layout(
-        xaxis2=dict(**hidden, domain=[CIRCLE_START, 1], anchor="y2"),
+        xaxis2=dict(**hidden, domain=[CIRCLE_START, CIRCLE_END], anchor="y2"),
         yaxis2=dict(**hidden, anchor="x2", scaleanchor="x2", scaleratio=1),
     )
 

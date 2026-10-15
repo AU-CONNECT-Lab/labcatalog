@@ -256,8 +256,9 @@ def item_total(result: CatalogResult, instrument_id: str) -> go.Figure | None:
         return None
     hovers = {i: f"{i}: {item_text(instrument, i)}" for i in total.items}
     title = f"{short_label(instrument, total)}: items"
+    numbers = {item.id: n for n, item in enumerate(instrument.items, start=1)}
     return plots.item_diagnostics(
-        list(total.items), hovers, series, defaults.CHART_ITEM_TOTAL_FLOOR, title
+        list(total.items), numbers, hovers, series, defaults.CHART_ITEM_TOTAL_FLOOR, title
     )
 
 

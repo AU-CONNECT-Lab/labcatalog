@@ -269,8 +269,10 @@ def retest(panels: list[dict]) -> go.Figure:
             row=row,
             col=col,
         )
-        # Scores take few values, so a little jitter keeps people from hiding behind each other.
-        spread = (high - low) * 0.015
+        # Scores take few values; jitter of a quarter step keeps people from hiding behind each other.
+        values = np.unique(np.concatenate([[*p["x"], *p["y"]] for p in panel["pairs"]]))
+        step = float(np.diff(values).min()) if len(values) > 1 else high - low
+        spread = min(0.25 * step, 0.03 * (high - low))
         for pair in panel["pairs"]:
             x, y = np.asarray(pair["x"], dtype=float), np.asarray(pair["y"], dtype=float)
             fig.add_trace(
