@@ -6,7 +6,7 @@ from typing import Any
 from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
 from labcatalog.issues import Issue, IssueLevel
-from labcatalog.project import Project, reference_pdf, references_root
+from labcatalog.project import Project, bib_path, reference_pdf, references_root
 from labcatalog.schema import Administration, Instrument
 
 CONFIG = defaults.CONFIG_FILENAME
@@ -411,19 +411,28 @@ def check_data_settings(project: Project) -> list[Issue]:
 
 def check_references(project: Project) -> list[Issue]:
     # A shared folder not yet synced on this computer should not block the catalog.
-    root = references_root(project)
+    root = references_root(project.config, project.root)
     if not root.is_dir():
         message = f"references.root: folder not found: {root}"
         return [problem("references_root_missing", message, CONFIG, "warning")]
     issues = []
+    has_bib = bib_path(project.config, project.root).is_file()
+    if not has_bib and any(i.references for i in project.instruments.values()):
+        message = f"references.root: no {defaults.BIB_FILENAME} in {root}"
+        issues.append(problem("bib_missing", message, CONFIG, "warning"))
     for instrument_id, instrument in project.instruments.items():
+        location = project.instrument_files[instrument_id]
         for n, reference in enumerate(instrument.references, start=1):
+            if has_bib and reference.key not in project.bibliography:
+                message = (
+                    f"references[{n}].key: '{reference.key}' is not in {defaults.BIB_FILENAME}"
+                )
+                issues.append(problem("reference_missing", message, location, "warning"))
             if not reference.pdf:
                 continue
             path = reference_pdf(project, reference.pdf)
             if not path.is_file():
                 message = f"references[{n}].pdf: file not found: {path}"
-                location = project.instrument_files[instrument_id]
                 issues.append(problem("pdf_missing", message, location, "warning"))
     return issues
 

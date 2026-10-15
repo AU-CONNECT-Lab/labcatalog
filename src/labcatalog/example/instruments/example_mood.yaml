@@ -28,8 +28,7 @@ scores:
   - {id: ems_worry, label: Worry and fatigue, method: sum, items: [ems_3, ems_5, ems_8], custom: {topics: [negative affect, sleep]}}
   - {id: ems_low_positive, label: Low positive affect, method: sum, items: [ems_1, ems_4, ems_9], custom: {topics: [positive affect]}}
 references:
-  - citation: "Example, A., & Sample, B. (2019). Development of the Example Mood Scale. Journal of Demonstration Measures, 4(2), 101-115. (Fictional reference for the mock project.)"
-    pdf: example_mood.pdf
+  - {key: example2019, pdf: example_mood.pdf}
 license: Free for research use (fictional)
 custom:
   domain: emotion

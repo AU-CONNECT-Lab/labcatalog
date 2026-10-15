@@ -25,7 +25,7 @@ scores:
   - {id: eps_strain, label: Strain, method: mean, items: [eps_1, eps_3, eps_5], custom: {topics: [parenting, negative affect]}}
   - {id: eps_child, label: Child-related, method: mean, items: [eps_2, eps_4, eps_6], custom: {topics: [parenting]}}
 references:
-  - citation: "Sample, B. (2017). The Example Parenting Stress Scale: A brief measure. Demonstration Quarterly, 12(1), 33-47. (Fictional reference for the mock project.)"
+  - {key: sample2017}
 license: Free for research use (fictional)
 custom:
   domain: family

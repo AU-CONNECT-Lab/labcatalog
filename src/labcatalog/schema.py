@@ -49,10 +49,8 @@ class Score(StrictModel):
 
 
 class Reference(StrictModel):
-    citation: str
-    doi: str | None = None
+    key: str
     pdf: str | None = None
-    url: str | None = None
 
 
 class Instrument(StrictModel):

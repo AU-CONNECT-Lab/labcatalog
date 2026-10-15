@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 from labcatalog import defaults
+from labcatalog.bibliography import citation
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.exceptions import LLMError
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
@@ -96,7 +97,8 @@ def scoring_request(project: Project, catalog: Catalog, instrument_id: str, data
     listed = ", ".join(f"{c.code} = {c.label}" for c in codes) or "none"
     lines += ["", f"Missing codes in this dataset: {listed}"]
     for reference, path in reference_pdfs(project, instrument):
-        lines += ["", f"Reference: {reference.citation}", "<reference>", pdf_text(path)]
+        cited = citation(project.bibliography, reference.key)
+        lines += ["", f"Reference: {cited}", "<reference>", pdf_text(path)]
         lines.append("</reference>")
     return "\n".join(lines)
 

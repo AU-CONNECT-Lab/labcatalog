@@ -23,7 +23,7 @@ scores:
   - {id: ecs_settling, label: Settling, method: sum, items: [ecs_1, ecs_2, ecs_5], custom: {topics: [sleep]}}
   - {id: ecs_waking, label: Waking, method: sum, items: [ecs_3, ecs_4, ecs_6], custom: {topics: [sleep]}}
 references:
-  - citation: "Demo, C. (2021). Measuring sleep habits in school-age children. Journal of Demonstration Measures, 6(3), 210-224. (Fictional reference for the mock project.)"
+  - {key: demo2021}
 license: Free for research use (fictional)
 custom:
   domain: health

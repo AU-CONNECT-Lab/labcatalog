@@ -71,7 +71,7 @@ custom_fields:
 browse:
   facets: [study, wave, reporter, domain, topics]
 
-# The folder holding the instruments' reference PDFs (often a shared Box or OneDrive folder; ~ and environment variables work). Each reference's pdf is a path inside it.
+# The folder holding references.bib and the instruments' reference PDFs (often a shared Box or OneDrive folder; ~ and environment variables work). An instrument names each reference by its key in references.bib, which a reference manager such as Zotero can export and keep up to date; a reference's pdf is a path inside this folder.
 references:
   root: references
 

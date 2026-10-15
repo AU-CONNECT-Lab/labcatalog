@@ -188,6 +188,20 @@ def test_missing_reference_pdf_is_a_warning(mock_project):
     assert "gone.pdf" in issue.message
 
 
+def test_reference_key_missing_from_the_bib_is_a_warning(mock_project):
+    edit(mock_project / "instruments" / "example_mood.yaml", "key: example2019", "key: nobody2020")
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level) == ("reference_missing", "warning")
+    assert issue.location == "instruments/example_mood.yaml"
+    assert "nobody2020" in issue.message
+
+
+def test_missing_bib_is_reported_once(mock_project):
+    (mock_project / "references" / "references.bib").unlink()
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level) == ("bib_missing", "warning")
+
+
 def test_missing_references_root_is_reported_once(mock_project):
     edit(mock_project / "labcatalog.yaml", "root: references", "root: ~/not-synced-yet")
     [issue] = run_validate(mock_project)

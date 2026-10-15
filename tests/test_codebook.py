@@ -47,9 +47,9 @@ age,background,age,How old are you?,number,,,18,99
 remarks,background,remarks,Anything else?,text,,,,
 """,
     INSTRUMENTS: """\
-instrument,name,abbreviation,kind,construct,citation,doi
-anx,Pilot Anxiety Scale,PAS,,Anxiety,"Doe, J. (2020). A short anxiety scale.",10.1000/xyz
-background,Background,,demographics,,,
+instrument,name,abbreviation,kind,construct
+anx,Pilot Anxiety Scale,PAS,,Anxiety
+background,Background,,demographics,
 """,
     SCORES: """\
 instrument,score,label,method,items,missing_rule,min_valid
@@ -94,7 +94,7 @@ def test_templates_guess_instruments_from_column_prefixes(pilot):
         "age,,,,,,,,",
         "remarks,,,,text,,,,",
     ]
-    assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == ["anx,,,,,,"]
+    assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == ["anx,,,,"]
     assert paths[SCORES].read_text(encoding="utf-8-sig").splitlines()[1:] == []
     with pytest.raises(CodebookError, match="already has codebook files"):
         write_templates(project, "pilot_w1")
@@ -128,8 +128,6 @@ def test_import_writes_instruments_and_map_that_score_like_the_data(pilot):
         "  - {id: anx_3, text: I worry about many things.}\n"
         "scores:\n"
         "  - {id: anx_total, label: Total, method: sum, items: [anx_1, anx_2, anx_3], missing_rule: prorate, min_valid: 2}\n"
-        "references:\n"
-        "  - {citation: 'Doe, J. (2020). A short anxiety scale.', doi: 10.1000/xyz}\n"
     )
     assert (pilot / "maps" / "pilot_w1.csv").read_text(encoding="utf-8").splitlines() == [
         "column,instrument,item",
@@ -282,8 +280,8 @@ def test_a_redcap_dictionary_fills_in_items_and_imports(pilot, tmp_path):
         "redcap_event_name,,,,text,,,,",
     ]
     assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == [
-        "mood_scale,Mood scale,,,,,",
-        "background,Background,,,,,",
+        "mood_scale,Mood scale,,,",
+        "background,Background,,,",
     ]
     result = import_codebook(project, "pilot_w1")
     assert result.issues == []

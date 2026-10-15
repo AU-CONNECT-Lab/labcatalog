@@ -8,6 +8,7 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from labcatalog import defaults
+from labcatalog.bibliography import Bibliography, load_bibliography
 from labcatalog.config import ProjectConfig
 from labcatalog.exceptions import MetadataError, ProjectExistsError, ProjectNotFoundError
 from labcatalog.issues import Issue, issues_from_validation_error
@@ -35,6 +36,7 @@ class Project:
     maps: dict[str, list[MapEntry]]
     instrument_files: dict[str, str]
     study_files: dict[str, str]
+    bibliography: Bibliography
 
 
 def load_project(root: Path) -> Project:
@@ -55,6 +57,7 @@ def load_project(root: Path) -> Project:
         path.stem: load_variable_map(path, root, issues)
         for path in sorted((root / defaults.MAPS_DIR).glob("*.csv"))
     }
+    bibliography = load_bibliography(bib_path(config, root), root, issues) if config else {}
     if issues:
         raise MetadataError(issues)
     return Project(
@@ -65,16 +68,21 @@ def load_project(root: Path) -> Project:
         maps=maps,
         instrument_files=instrument_files,
         study_files=study_files,
+        bibliography=bibliography,
     )
 
 
-def references_root(project: Project) -> Path:
-    root = project.config.references.root
-    return expand_path(root, project.root) if root else project.root
+def references_root(config: ProjectConfig, root: Path) -> Path:
+    folder = config.references.root
+    return expand_path(folder, root) if folder else root
+
+
+def bib_path(config: ProjectConfig, root: Path) -> Path:
+    return references_root(config, root) / defaults.BIB_FILENAME
 
 
 def reference_pdf(project: Project, pdf: str) -> Path:
-    return expand_path(pdf, references_root(project))
+    return expand_path(pdf, references_root(project.config, project.root))
 
 
 def load_yaml(path: Path) -> Any:

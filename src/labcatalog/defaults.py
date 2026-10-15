@@ -8,6 +8,7 @@ MAPS_DIR = "maps"
 SCHEMAS_DIR = "schemas"
 CODEBOOK_DIR = "codebook"
 SCORING_DIR = "scoring"
+BIB_FILENAME = "references.bib"
 SCORE_PREFIX = "score:"
 
 ID_COLUMN = "id"

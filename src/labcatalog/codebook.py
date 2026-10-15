@@ -42,8 +42,6 @@ COLUMNS: dict[str, dict[str, str]] = {
         "abbreviation": "its usual abbreviation",
         "kind": "questionnaire (the default) or demographics",
         "construct": "what it measures",
-        "citation": "the reference to cite for it",
-        "doi": "the reference's DOI",
     },
     SCORES: {
         "instrument": "the instrument ID used in items.csv",
@@ -488,8 +486,6 @@ class Importer:
                 continue
             if not row["name"]:
                 self.report(INSTRUMENTS, line, "name is empty")
-            if row["doi"] and not row["citation"]:
-                self.report(INSTRUMENTS, line, "a doi needs a citation")
             draft.fields = row
         for draft in self.drafts.values():
             if draft.id not in seen:
@@ -700,11 +696,6 @@ def instrument_yaml(draft: Draft) -> str:
     document["items"] = [item_fields(item, names, default) for item in draft.items.values()]
     if draft.scores:
         document["scores"] = draft.scores
-    if fields["citation"]:
-        reference = {"citation": fields["citation"]}
-        if fields["doi"]:
-            reference["doi"] = fields["doi"]
-        document["references"] = [reference]
     return yaml_text(document, "instrument")
 
 
