@@ -106,11 +106,18 @@ d = d.dropna(subset=used).copy()
 def mixed(formula, re_formula, vc_formula):
     model = smf.mixedlm(formula, d, groups=d[{top}], re_formula=re_formula,
                         vc_formula=vc_formula)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        # statsmodels' default (bfgs) can stop short of the optimum that lme4 finds.
-        result = model.fit(reml=True, method=["lbfgs", "nm"])
-    return result, list(dict.fromkeys(str(w.message) for w in caught))
+    # No one optimizer reaches lme4's optimum on every model, so keep the best of three.
+    best, notes = None, []
+    for method in ("lbfgs", "bfgs", "powell"):
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            try:
+                result = model.fit(reml=True, method=method)
+            except np.linalg.LinAlgError:
+                continue
+        if best is None or result.llf > best.llf:
+            best, notes = result, [str(w.message) for w in caught]
+    return best, list(dict.fromkeys(notes))
 
 
 def variances(result):

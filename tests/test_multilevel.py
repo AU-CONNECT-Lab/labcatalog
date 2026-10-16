@@ -191,6 +191,14 @@ def test_r_and_python_agree_on_growth(result):
 
 
 @needs_r
+def test_r_and_python_agree_where_one_optimizer_fails(result):
+    # On two waves of this feature, lbfgs alone stops at a zero person variance or fails.
+    model = ml.Model("item:eeg_resting.frontal_alpha_asymmetry", ["eeg_w1", "eeg_w3"], slope=False)
+    long = ml.long_frame(result, model)
+    close(ml.run(result, model, long, "FAA", rscript()), ml.run(result, model, long, "FAA", None))
+
+
+@needs_r
 def test_r_and_python_agree_on_groups_and_people():
     result, model, long = nested()
     close(ml.run(result, model, long, "Y", rscript()), ml.run(result, model, long, "Y", None))
