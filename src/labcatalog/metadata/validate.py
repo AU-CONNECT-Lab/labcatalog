@@ -408,6 +408,15 @@ def check_data_settings(project: Project) -> list[Issue]:
         where = f"datasets[{n}] ({dataset.name})"
         if dataset.source == "csv" and not dataset.path:
             issues.append(problem("invalid_value", f"{where}: a csv dataset needs a path", CONFIG))
+        if dataset.source == "folder" and not (dataset.path and dataset.files):
+            message = f"{where}: a folder dataset needs a path (the folder) and files"
+            issues.append(problem("invalid_value", message, CONFIG))
+        elif dataset.files is not None and dataset.files.count("{id}") != 1:
+            message = f"{where}.files: needs {{id}} once, where each file's path holds the ID"
+            issues.append(problem("invalid_value", message, CONFIG))
+        if dataset.source != "folder" and dataset.files is not None:
+            message = f"{where}.files: only folder datasets take files"
+            issues.append(problem("invalid_value", message, CONFIG))
         if dataset.group_column and group is None:
             message = f"{where}.group_column: declare ids.group (its name) first"
             issues.append(problem("invalid_value", message, CONFIG))

@@ -7,7 +7,7 @@ from nicegui import ui
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import analysis_tables, charts, multilevel
-from labcatalog.gui.common import apa, col, note, p_value, section
+from labcatalog.gui.common import apa, col, fmt, note, p_value, section
 from labcatalog.gui.paper import Chart, paper_table, save_button
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
@@ -374,7 +374,7 @@ def fit_table(
 
 
 def number(value: float | None) -> str:
-    return "" if value is None else f"{value:.2f}"
+    return fmt(value)
 
 
 def starred(found: analysis.Correlation) -> str:

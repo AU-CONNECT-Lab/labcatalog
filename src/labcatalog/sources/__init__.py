@@ -10,13 +10,14 @@ from labcatalog.exceptions import DataSourceError
 from labcatalog.paths import expand_path
 from labcatalog.project import Project
 from labcatalog.sources.csv_source import CsvSource
+from labcatalog.sources.folder_source import FolderSource
 
 
 class DataSource(Protocol):
-    def read(self, dataset: DatasetConfig, project_root: Path) -> pd.DataFrame: ...
+    def read(self, dataset: DatasetConfig, project_root: Path, id_column: str) -> pd.DataFrame: ...
 
 
-SOURCES: dict[str, DataSource] = {"csv": CsvSource()}
+SOURCES: dict[str, DataSource] = {"csv": CsvSource(), "folder": FolderSource()}
 
 
 @dataclass
@@ -41,8 +42,8 @@ def get_source(name: str) -> DataSource:
 
 def load_dataset(project: Project, dataset: DatasetConfig) -> LoadedDataset:
     config = project.config
-    frame = get_source(dataset.source).read(dataset, project.root)
     id_column = id_column_for(config, dataset)
+    frame = get_source(dataset.source).read(dataset, project.root, id_column)
     if id_column not in frame:
         raise DataSourceError(f"{dataset.name}: no ID column '{id_column}'")
     ids = frame[id_column]

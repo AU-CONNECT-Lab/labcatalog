@@ -6,7 +6,7 @@ from labcatalog.charts import views
 from labcatalog.gui import paper
 from labcatalog.gui.analysis import pick_menu
 from labcatalog.gui.analysis_tables import INDENT, code_view, compute, decimal, later, section_files
-from labcatalog.gui.common import col, note, p_value, section
+from labcatalog.gui.common import col, fmt, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.measures import series
 from labcatalog.reports.tables import PaperTable
@@ -102,8 +102,8 @@ def statistic(test: attrition.Test) -> str:
     if test.test == "t":
         # Welch's df is fractional, Student's whole.
         df = f"{test.df:g}" if test.df.is_integer() else f"{test.df:.1f}"
-        return f"t({df}) = {test.statistic:.2f}"
-    return f"χ²({test.df:g}) = {test.statistic:.2f}" + (SMALL if test.small else "")
+        return f"t({df}) = {fmt(test.statistic)}"
+    return f"χ²({test.df:g}) = {fmt(test.statistic)}" + (SMALL if test.small else "")
 
 
 def p_text(p: float) -> str:
@@ -159,7 +159,7 @@ def attrition_table(
 def mean_sd(mean: float | None, sd: float | None) -> str:
     if mean is None:
         return ""
-    return f"{mean:.2f}" + ("" if sd is None else f" ({sd:.2f})")
+    return fmt(mean) + ("" if sd is None else f" ({fmt(sd)})")
 
 
 def count(n: int, percent: float | None) -> str:
@@ -185,4 +185,4 @@ def sentence(found: attrition.Plan, compared: list[attrition.Compared]) -> str:
 
 def result_text(test: attrition.Test) -> str:
     shown = f"{statistic(test).rstrip(SMALL)}, {p_text(test.p)}"
-    return shown + (f", d = {test.effect:.2f}" if test.effect is not None else "")
+    return shown + (f", d = {fmt(test.effect)}" if test.effect is not None else "")

@@ -22,6 +22,7 @@ from labcatalog.exceptions import CodebookError, MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.metadata.validate import validate_project
+from labcatalog.paths import expand_path
 from labcatalog.project import Project, load_config, load_project, references_root, write_schemas
 from labcatalog.reports.codegen import label_snippets, scoring_snippets
 from labcatalog.sources import LoadedDataset, load_datasets
@@ -174,7 +175,11 @@ def run_get_missing(root: Path, datalad: str) -> None:
     config = load_config(root)
     # Reference PDFs come one at a time, when someone opens them.
     pdfs = references_root(config, root) if config.references.root else None
-    get_content(datalad, [p for p in used_paths(config, root) if p != pdfs])
+    # Folder datasets read only paths, so their files stay where they are.
+    folders = {
+        expand_path(d.path, root) for d in config.datasets if d.source == "folder" and d.path
+    }
+    get_content(datalad, [p for p in used_paths(config, root) if p != pdfs and p not in folders])
 
 
 def run_open_freeze(root: Path, name: str, datalad: str) -> Path:

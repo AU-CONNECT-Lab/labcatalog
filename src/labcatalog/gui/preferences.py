@@ -12,6 +12,8 @@ LLM_MODEL = "llm_model"
 LLM_URL = "llm_url"
 DEFAULT_LLM_PROVIDER = "anthropic"
 TABLE_FORMAT = "table_format"
+DECIMALS = "decimals"
+DEFAULT_DECIMALS = 2
 RICH = "rich"
 LATEX = "latex"
 

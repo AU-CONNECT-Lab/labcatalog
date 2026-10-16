@@ -69,8 +69,16 @@ def cited(bibliography: Bibliography, key: str) -> None:
         ui.link("Link", entry["url"], new_tab=True)
 
 
-def fmt(value: float | None, digits: int = 2) -> str:
-    return "" if value is None else f"{value:.{digits}f}"
+decimals = 2  # Decimal places of the numbers in tables; the Settings page sets it.
+
+
+def set_decimals(places: int) -> None:
+    global decimals
+    decimals = places
+
+
+def fmt(value: float | None, digits: int | None = None) -> str:
+    return "" if value is None else f"{value:.{decimals if digits is None else digits}f}"
 
 
 def p_value(p: float | None) -> str:
@@ -83,7 +91,7 @@ def apa(value: float | None) -> str:
     # Values bounded by 1 drop the leading zero.
     if value is None:
         return ""
-    return f"{value:.2f}".replace("0.", ".", 1)
+    return fmt(value).replace("0.", ".", 1)
 
 
 def as_text(value: object) -> str:

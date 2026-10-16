@@ -55,6 +55,14 @@ def file_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def folder_sha256(folder: Path) -> str:
+    # Which files are there and how big, without reading what may be gigabytes of images.
+    digest = hashlib.sha256()
+    for path in sorted(p for p in folder.rglob("*") if not p.is_dir()):
+        digest.update(f"{path.relative_to(folder).as_posix()}\t{path.lstat().st_size}\n".encode())
+    return digest.hexdigest()
+
+
 def git_commit(root: Path) -> str | None:
     # Metadata outside git, or a machine without git, simply has no commit to record.
     try:
@@ -99,7 +107,9 @@ def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Mani
             FileRecord(
                 dataset=name,
                 path=portable_path(loaded.source_path, project.root).as_posix(),
-                sha256=file_sha256(loaded.source_path),
+                sha256=folder_sha256(loaded.source_path)
+                if loaded.source_path.is_dir()
+                else file_sha256(loaded.source_path),
                 rows=len(loaded.frame),
                 snapshot_date=loaded.config.snapshot_date,
             )

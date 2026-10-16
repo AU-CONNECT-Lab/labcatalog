@@ -23,6 +23,10 @@ studies: {}
 
 # One entry per data file, for example:
 #   - {name: parent_w1, modality: questionnaire, study: my_study, wave: 1, reporter: parent, source: csv, path: data/parent_w1.csv}
+# A folder dataset counts each person's files instead of reading a table, for example a BIDS folder:
+#   - {name: fmri_w1, modality: fmri, study: my_study, wave: 1, reporter: child, source: folder, path: bids, files: "sub-{id}/ses-1/func/*_bold.nii.gz"}
+# Its data are the ID and a files column (how many files matched); map files to an item like any other column.
+# Datasets are matched on their ID column, so the part of the path at {id} must be written as the IDs in your other datasets.
 datasets: []
 
 # Optional: your own cleaning scripts, run in order from the Prepare page or with "labcatalog prepare", for example:

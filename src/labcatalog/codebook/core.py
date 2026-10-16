@@ -281,7 +281,8 @@ def is_text(values: pd.Series, missing: set[str]) -> bool:
 
 
 def read_data(project: Project, dataset: DatasetConfig) -> pd.DataFrame:
-    return get_source(dataset.source).read(dataset, project.root)
+    id_column = id_column_for(project.config, dataset)
+    return get_source(dataset.source).read(dataset, project.root, id_column)
 
 
 def write_table(path: Path, name: str, rows: list[dict[str, str]]) -> None:

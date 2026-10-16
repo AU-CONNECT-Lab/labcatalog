@@ -5,7 +5,7 @@ from nicegui import run, ui
 
 from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import datalad, preferences
+from labcatalog.gui import common, datalad, preferences
 from labcatalog.gui.common import note, section
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
@@ -18,12 +18,14 @@ def render(
     on_rscript: Callable[[], Awaitable[None]],
     on_model: Callable[[], None],
     on_datalad: Callable[[], Awaitable[None]],
+    on_decimals: Callable[[int], None],
 ) -> None:
     section("R")
     note(
         "Factor models (CFA) and ω run in R with lavaan and semTools, and the Analysis page "
         "uses R first, with psych and effectsize, and lme4, lmerTest and performance for the "
-        "multilevel model; without R it uses Python. Install R and "
+        "multilevel model; without R they use Python, except invariance across waves, which "
+        "needs R. Install R and "
         f"the packages yourself ({install_command(ALL_PACKAGES)}), then give the path to "
         f"Rscript, which is in R's bin folder, for example {RSCRIPT_EXAMPLE}."
     )
@@ -82,6 +84,12 @@ def render(
         value=preferences.load().get(preferences.TABLE_FORMAT, preferences.RICH),
         on_change=lambda e: preferences.save({preferences.TABLE_FORMAT: e.value}),
     ).props("no-caps").classes("mt-2")
+    ui.select(
+        {places: str(places) for places in range(1, 5)},
+        value=common.decimals,
+        label="Decimal places in tables (p values keep three)",
+        on_change=lambda e: on_decimals(e.value),
+    ).props("outlined dense").classes("w-72 mt-2")
 
 
 def models_section(on_model: Callable[[], None]) -> None:

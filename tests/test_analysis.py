@@ -2,6 +2,7 @@ import pytest
 
 from labcatalog.charts import views
 from labcatalog.gui import analysis as page
+from labcatalog.gui import common
 from labcatalog.gui.common import p_value
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import analysis, analysis_script
@@ -119,3 +120,14 @@ def test_apa_numbers():
     assert p_value(0.0234) == ".023"
     assert page.starred(analysis.Correlation(50, 0.3, 0.02)) == ".30*"
     assert page.starred(analysis.Correlation(2)) == ""
+
+
+def test_decimal_places_follow_the_setting():
+    common.set_decimals(3)
+    try:
+        assert page.apa(0.4512) == ".451"
+        assert page.number(1.23456) == "1.235"
+        assert p_value(0.0234) == ".023"
+    finally:
+        common.set_decimals(2)
+    assert page.apa(0.4512) == ".45"

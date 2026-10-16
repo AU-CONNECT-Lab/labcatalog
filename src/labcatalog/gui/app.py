@@ -12,6 +12,7 @@ from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import (
     analysis,
     codebook_import,
+    common,
     datasets,
     edit,
     instruments,
@@ -68,6 +69,7 @@ def launch(project: Path | None = None) -> None:
     saved = preferences.load().get(preferences.PALETTE)
     # A palette saved by another version may no longer exist.
     style.use_palette(saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
+    common.set_decimals(preferences.load().get(preferences.DECIMALS, preferences.DEFAULT_DECIMALS))
     if datalad := preferences.load().get(preferences.DATALAD):
         use_folder(datalad)
     # Saving a table or figure goes through the window's own save dialog.
@@ -176,7 +178,11 @@ class Window:
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-paper"):
                 settings.render(
-                    self.set_palette, self.start_cfa, self.instruments_panel.refresh, self.reload
+                    self.set_palette,
+                    self.start_cfa,
+                    self.instruments_panel.refresh,
+                    self.reload,
+                    self.set_decimals,
                 )
 
     async def choose_folder(self) -> None:
@@ -277,6 +283,12 @@ class Window:
     def set_palette(self, name: str) -> None:
         style.use_palette(name)
         preferences.save({preferences.PALETTE: name})
+        if self.result is not None:
+            self.show_result()
+
+    def set_decimals(self, places: int) -> None:
+        common.set_decimals(places)
+        preferences.save({preferences.DECIMALS: places})
         if self.result is not None:
             self.show_result()
 

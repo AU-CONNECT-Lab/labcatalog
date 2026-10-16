@@ -66,8 +66,10 @@ class DatasetConfig(StrictModel):
     study: str
     wave: str
     reporter: str
-    source: Literal["csv"]
+    source: Literal["csv", "folder"]
     path: str | None = None
+    # A folder dataset's files, with {id} where each file's path holds the ID.
+    files: str | None = None
     url: str | None = None
     table: str | None = None
     id_column: str | None = None

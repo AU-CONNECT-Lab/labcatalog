@@ -9,7 +9,7 @@ from labcatalog.paths import expand_path
 
 
 class CsvSource:
-    def read(self, dataset: DatasetConfig, project_root: Path) -> pd.DataFrame:
+    def read(self, dataset: DatasetConfig, project_root: Path, id_column: str) -> pd.DataFrame:
         path = expand_path(dataset.path, project_root)
         if is_placeholder(path):
             raise DataSourceError(f"{dataset.name}: {fetch_advice(path)}")

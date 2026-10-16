@@ -7,7 +7,7 @@ from labcatalog.charts import plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, paper, preferences
-from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
+from labcatalog.gui.common import apa, code_tabs, col, fmt, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
@@ -180,8 +180,8 @@ def cell_text(variable: str, cell: pd.Series, choice: bool) -> str:
         return f"{int(cell['n'])}{percent}"
     if pd.isna(cell["mean"]):
         return ""
-    sd = "" if pd.isna(cell["sd"]) else f" ({cell['sd']:.2f})"
-    return f"{cell['mean']:.2f}{sd}"
+    sd = "" if pd.isna(cell["sd"]) else f" ({fmt(cell['sd'])})"
+    return f"{fmt(cell['mean'])}{sd}"
 
 
 def group_section(
@@ -400,4 +400,4 @@ def script_section(
 
 
 def decimal(value: float | None) -> str:
-    return "" if value is None else f"{value:.2f}"
+    return fmt(value)
