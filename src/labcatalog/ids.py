@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.annex import fetch_advice, is_placeholder
 from labcatalog.exceptions import DataSourceError
 
 
@@ -11,6 +12,8 @@ def group_ids(ids: pd.Series, pattern: str) -> pd.Series:
 
 
 def load_exclusions(path: Path) -> set[str]:
+    if is_placeholder(path):
+        raise DataSourceError(f"Exclusion list: {fetch_advice(path)}")
     try:
         text = path.read_text(encoding="utf-8-sig")
     except FileNotFoundError:

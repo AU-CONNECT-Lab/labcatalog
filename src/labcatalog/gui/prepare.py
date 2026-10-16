@@ -149,7 +149,11 @@ def step_row(
 
 
 def file_label(f: FileState) -> None:
-    when = f.modified.strftime("%Y-%m-%d %H:%M") if f.modified else "missing"
+    when = (
+        f.modified.strftime("%Y-%m-%d %H:%M")
+        if f.modified
+        else "not downloaded" if f.placeholder else "missing"
+    )
     shown = ui.label(f"{f.path} ({when})")
     if f.modified:
         shown.classes("cursor-pointer").on("click", lambda: open_path(f.resolved))

@@ -9,6 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
+from labcatalog.annex import is_placeholder
 from labcatalog.config import PrepareStep
 from labcatalog.paths import expand_path
 from labcatalog.project import Project
@@ -24,6 +25,7 @@ class FileState:
     path: str
     resolved: Path
     modified: datetime | None
+    placeholder: bool = False
 
 
 @dataclass
@@ -72,6 +74,8 @@ def step_state(project: Project, step: PrepareStep) -> StepState:
 
 def file_state(root: Path, path: str) -> FileState:
     resolved = expand_path(path, root)
+    if is_placeholder(resolved):
+        return FileState(path, resolved, None, placeholder=True)
     modified = datetime.fromtimestamp(resolved.stat().st_mtime) if resolved.exists() else None
     return FileState(path, resolved, modified)
 

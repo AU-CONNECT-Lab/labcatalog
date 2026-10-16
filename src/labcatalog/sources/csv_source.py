@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.annex import fetch_advice, is_placeholder
 from labcatalog.config import DatasetConfig
 from labcatalog.exceptions import DataSourceError
 from labcatalog.paths import expand_path
@@ -10,6 +11,8 @@ from labcatalog.paths import expand_path
 class CsvSource:
     def read(self, dataset: DatasetConfig, project_root: Path) -> pd.DataFrame:
         path = expand_path(dataset.path, project_root)
+        if is_placeholder(path):
+            raise DataSourceError(f"{dataset.name}: {fetch_advice(path)}")
         if not path.is_file():
             raise DataSourceError(f"{dataset.name}: data file not found: {path}")
         try:

@@ -4,6 +4,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
+from labcatalog.annex import fetch_advice
 from labcatalog.config import missing_labels_for
 from labcatalog.ids import load_exclusions
 from labcatalog.issues import Issue, IssueLevel, has_errors
@@ -300,9 +301,18 @@ def check_prepare_outputs(project: Project) -> list[Issue]:
         where = f"prepare step {state.step.name}"
         for output in state.outputs:
             if output.modified is None:
-                message = f"{where}: {output.path} does not exist; run the step"
+                missing = (
+                    fetch_advice(output.resolved)
+                    if output.placeholder
+                    else f"{output.path} does not exist; run the step"
+                )
                 issues.append(
-                    problem("prepare_output_missing", message, defaults.CONFIG_FILENAME, "warning")
+                    problem(
+                        "prepare_output_missing",
+                        f"{where}: {missing}",
+                        defaults.CONFIG_FILENAME,
+                        "warning",
+                    )
                 )
         if state.status == "outdated":
             newest = max(state.inputs, key=lambda f: f.modified)
