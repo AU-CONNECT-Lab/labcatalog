@@ -35,6 +35,13 @@ def test_unknown_instrument_in_study(mock_project):
     assert "example_moood" in issues[0].message
 
 
+def test_methods_for_a_modality_outside_vocab(mock_project):
+    edit(mock_project / "studies" / "mock_study.yaml", "  questionnaire: |", "  survey: |")
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.location) == ("not_in_vocab", "studies/mock_study.yaml")
+    assert issue.message.startswith("methods.survey: 'survey' is not in vocab.modalities")
+
+
 def test_reporter_outside_vocab(mock_project):
     edit(mock_project / "labcatalog.yaml", "reporters: [parent, child]", "reporters: [parent]")
     issues = run_validate(mock_project)

@@ -49,9 +49,26 @@ def studies(
                 with ui.row().classes("items-baseline gap-2"):
                     ui.label("How to cite").classes("text-grey-7")
                     cited(result.project.bibliography, study_config.reference)
+            for modality, text in methods_of(result, study).items():
+                with ui.expansion(f"Methods: {modality}").props("dense").classes("w-full"):
+                    paragraphs(text)
             shown = table(*dataset_table(result, [summaries[n] for n in names])).classes("mt-2")
             shown.classes("cursor-pointer")
             shown.on("rowClick", lambda e: on_select(e.args[1]["name"]))
+
+
+def methods_of(result: CatalogResult, study: str) -> dict[str, str]:
+    return {
+        modality: text
+        for content in result.project.studies.values()
+        if content.study == study
+        for modality, text in content.methods.items()
+    }
+
+
+def paragraphs(text: str) -> None:
+    # Keeps the blank lines between paragraphs that YAML block text carries.
+    ui.label(text.strip()).style("white-space: pre-line").classes("max-w-4xl")
 
 
 def dataset_table(
@@ -93,6 +110,11 @@ def detail(
 ) -> None:
     ui.label(summary.dataset).classes("text-2xl font-medium mt-4")
     facts(result, summary)
+    dataset = dataset_by_name(result.project.config, summary.dataset)
+    methods = methods_of(result, dataset.study).get(dataset.modality)
+    if methods:
+        heading("Methods")
+        paragraphs(methods)
 
     heading("Instruments")
     shown = table(*completeness_table(result, summary)).classes(remove="w-full")

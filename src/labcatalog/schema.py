@@ -91,6 +91,8 @@ class Administration(StrictModel):
 
 class StudyContent(StrictModel):
     study: str
+    # Modality to how its data were collected and processed in this study.
+    methods: dict[str, str] = {}
     administrations: list[Administration] = []
 
 

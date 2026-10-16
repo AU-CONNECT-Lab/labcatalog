@@ -43,12 +43,18 @@ def check_vocab(project: Project) -> list[Issue]:
             message = f"{where}.wave: wave {dataset.wave} is not listed for study {dataset.study}"
             issues.append(unknown(message, CONFIG))
     for name, content in project.studies.items():
+        found = [
+            not_in_vocab(f"methods.{modality}", modality, "vocab.modalities")
+            for modality in content.methods
+            if modality not in vocab.modalities
+        ]
         for n, administration in enumerate(content.administrations, start=1):
             target = administration.target
             if target and target not in vocab.targets:
-                issue = not_in_vocab(f"administrations[{n}].target", target, "vocab.targets")
-                issue.location = project.study_files[name]
-                issues.append(issue)
+                found.append(not_in_vocab(f"administrations[{n}].target", target, "vocab.targets"))
+        for issue in found:
+            issue.location = project.study_files[name]
+        issues.extend(found)
     return issues
 
 

@@ -385,4 +385,8 @@ async def image(chart: Chart, kind: str) -> bytes:
         timeout=20,
     )
     header, data = url.split(",", 1)
-    return base64.b64decode(data) if header.endswith(";base64") else urllib.parse.unquote(data).encode()
+    return (
+        base64.b64decode(data)
+        if header.endswith(";base64")
+        else urllib.parse.unquote(data).encode()
+    )
