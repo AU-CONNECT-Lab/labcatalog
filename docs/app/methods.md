@@ -14,7 +14,7 @@ Choose the **Variables**; by default, the demographics items and each instrument
 
 ## Attrition
 
-Compares the people in the chosen wave who took part again in the next wave with those who did not, on the variables you choose: *t* tests with Cohen's *d* for numbers and scores, χ² tests for answer options. It writes a sentence and a table. Pick a wave other than the last to see it.
+Compares the people in the chosen wave who took part again in the next wave with those who did not, on the variables you choose: *t* tests with Cohen's *d* for numbers and scores, χ² tests for answer options. It writes a sentence and a table. A variable held in more than one file of the wave, such as the same scale answered by two reporters, gets a row for each file. Pick a wave other than the last to see it.
 
 ## Procedure
 

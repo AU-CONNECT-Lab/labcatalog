@@ -70,8 +70,7 @@ def test_a_variable_in_two_files_of_the_wave_gets_a_row_each(mock_project):
     first, second = found_plan.labels
     assert first.endswith(" (child_w1)") and second.endswith(" (child_w1b)")
     columns = found_plan.frame[["ems_total_child_w1", "ems_total_child_w1b"]].notna()
-    assert columns.all(axis=0).sum() == 0 and columns.any(axis=0).all()
-    assert not columns.all(axis=1).any()
+    assert columns.any(axis=0).all() and not columns.all(axis=1).any()
 
 
 def test_python_matches_scipy(result):
