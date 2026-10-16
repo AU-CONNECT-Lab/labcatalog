@@ -251,8 +251,9 @@ def unchosen_options(model: InvarianceModel) -> str | None:
                 gaps.append(f"{item} in {occasion_name(model.across, key)} ({options})")
     if not gaps:
         return None
+    word = "wave" if model.across == WAVES else "reporter" if model.across == REPORTERS else "group"
     return (
-        "Thresholds can only be held equal when every occasion uses the same options, and nobody "
+        f"Thresholds can only be held equal when every {word} uses the same options, and nobody "
         f"chose these options that were chosen elsewhere: {'; '.join(gaps)}. Merging rarely "
         "chosen options would make the test possible."
     )
