@@ -33,12 +33,14 @@ def test_instrument_list_shows_only_the_matched_datasets(mock_project):
     index = build_index(result.project)
     found = matches(index, {"reporter": {"child"}})
     columns, rows = instruments.list_table(result, found)
-    assert [c["label"] for c in columns[-3:]] == ["child_w1", "child_w2", "child_w3"]
+    assert [c["label"] for c in columns[-4:]] == ["child_w1", "child_w2", "child_w3", "Missing"]
     by_id = {r["id"]: r for r in rows}
     assert set(by_id) == {"example_mood", "example_screen_time"}
     screen = by_id["example_screen_time"]
     assert (screen["d0"], screen["d1"], screen["d2"]) == ("", 153, 148)
     assert by_id["example_mood"]["reporters"] == "child"
+    assert by_id["example_mood"]["missing"] == ""
+    assert by_id["example_screen_time"]["missing"].startswith("description, scores")
 
 
 def test_instrument_items_list_each_dataset_column(mock_project):

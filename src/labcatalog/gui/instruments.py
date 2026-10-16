@@ -9,6 +9,7 @@ from labcatalog import ai_scoring, measures
 from labcatalog.ai_search import Search
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.charts import views
+from labcatalog.completeness import gaps
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
@@ -364,6 +365,7 @@ def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list
         col("targets", "About"),
         col("items", "Items", numeric=True),
         *[col(f"d{i}", name, numeric=True) for i, name in enumerate(datasets)],
+        col("missing", "Missing"),
     ]
     rows = []
     for instrument_id, names in found.items():
@@ -382,9 +384,10 @@ def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list
                     f"d{i}": answered.get((instrument_id, name), "") if name in names else ""
                     for i, name in enumerate(datasets)
                 },
+                "missing": ", ".join(gaps(instrument)),
             }
         )
-    return columns, rows
+    return without_empty(columns, rows, "missing")
 
 
 def detail(
@@ -532,6 +535,8 @@ def about(result: CatalogResult, instrument: Instrument) -> None:
         reference_row(result.project, reference)
     if instrument.license:
         note(f"License: {instrument.license}")
+    if missing := gaps(instrument):
+        note(f"Missing from the catalog: {', '.join(missing)}.")
 
 
 def reference_row(project: Project, reference: Reference) -> None:
