@@ -52,10 +52,11 @@ PYTHON_HEADER = """\
 # d is the analysis data saved beside this script: one row per person, scores as labcatalog
 # computed them, each score's items reversed where the scale says so, and numbers blank
 # where they fall outside the item's range.
-# Needs pandas and pingouin (pip install pingouin).
+# Needs pandas, pingouin and scipy (pip install pingouin).
 import numpy as np
 import pandas as pd
 import pingouin as pg
+from scipy import stats
 
 d = pd.read_csv({path})
 """
@@ -153,16 +154,18 @@ regressions <- do.call(rbind, lapply(c({xs}), function(x) {{
 print(regressions)
 """
 PYTHON_REGRESSION = """\
-# Regression: {y_label} on each X by itself, with r and its 95% CI (pingouin).
+# Regression: {y_label} on each X by itself (pingouin), with r and its 95% CI (scipy, as
+# pingouin rounds the interval).
 y = {y}
 rows = []
 for x in [{xs}]:
     both = d[[x, y]].dropna()
     fit = pg.linear_regression(both[[x]], both[y])
-    r = pg.corr(both[x], both[y])
+    r = stats.pearsonr(both[x], both[y])
+    low, high = r.confidence_interval()
     rows.append(dict(x=x, n=len(both), slope=fit["coef"][1], slope_se=fit["se"][1],
-                     intercept=fit["coef"][0], intercept_se=fit["se"][0], r=r["r"].iloc[0],
-                     r_low=r["CI95"].iloc[0][0], r_high=r["CI95"].iloc[0][1],
+                     intercept=fit["coef"][0], intercept_se=fit["se"][0], r=r.statistic,
+                     r_low=low, r_high=high,
                      r_squared=fit["r2"][0], p=fit["pval"][1]))
 regressions = pd.DataFrame(rows)
 print(regressions)
@@ -227,6 +230,8 @@ PYTHON_WELCH = """\
 first, second = (data.loc[data["group"] == g, "y"] for g in levels)
 test = pg.ttest(first, second, correction=True)
 print(test)
+# The difference's 95% CI from scipy, as pingouin rounds it.
+low, high = stats.ttest_ind(first, second, equal_var=False).confidence_interval()
 cohens_d = (first.mean() - second.mean()) / np.sqrt((first.var() + second.var()) / 2)
 """
 PYTHON_STUDENT = """\
@@ -234,12 +239,14 @@ PYTHON_STUDENT = """\
 first, second = (data.loc[data["group"] == g, "y"] for g in levels)
 test = pg.ttest(first, second, correction=False)
 print(test)
+# The difference's 95% CI from scipy, as pingouin rounds it.
+low, high = stats.ttest_ind(first, second, equal_var=True).confidence_interval()
 cohens_d = pg.compute_effsize(first, second, eftype="cohen")
 """
 PYTHON_D_INTERVAL = """\
 # The 95% CI of d as JASP gives it: the noncentral t at d's own noncentrality, with the
 # test's df, solved with scipy as MBESS::conf.limits.nct does in JASP.
-from scipy import optimize, stats
+from scipy import optimize
 
 def limit(gap, step):
     # Step out from the observed noncentrality until the limit lies between two points.
@@ -274,7 +281,7 @@ R_TEST_OUT = {
 PYTHON_TEST_OUT = {
     TWO: "test_result = pd.DataFrame([dict(statistic=test['T'].iloc[0], "
     "df1=test['dof'].iloc[0], df2=np.nan, p=test['p_val'].iloc[0], "
-    "low=test['CI95'].iloc[0][0], high=test['CI95'].iloc[0][1], effect=cohens_d, "
+    "low=low, high=high, effect=cohens_d, "
     "effect_low=d_low, effect_high=d_high, omega=np.nan, omega_low=np.nan, "
     "omega_high=np.nan)])",
     "anova": "test_result = pd.DataFrame([dict(statistic=test['F'][0], df1=test['DF'][0], "

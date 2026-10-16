@@ -40,8 +40,8 @@ CODE_CELL = r"""
 <q-td :props="props" class="lc-faint font-mono">{{ props.value }}</q-td>
 """
 FIX_CELL = r"""
-<q-td :props="props" class="text-right">
-  <q-btn flat dense no-caps color="primary" icon="build" label="Fix"
+<q-td :props="props" class="text-right whitespace-nowrap">
+  <q-btn flat dense no-caps no-wrap color="primary" icon="build" label="Fix"
          @click="$parent.$emit('fix', props.row)" />
 </q-td>
 """
