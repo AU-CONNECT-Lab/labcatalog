@@ -33,13 +33,21 @@ def test_default_facets_add_choice_and_tags_fields(mock_project):
 def test_selections_must_hold_within_one_administration(mock_project):
     index = index_for(mock_project)
     assert list(matches(index, {"wave": {WAVE_1}})) == [
+        "eeg_resting",
         "example_child_sleep",
         "example_demographics",
         "example_mood",
         "example_parent_stress",
+        "eyetracking_faces",
+        "fmri_resting",
+        "saliva_cortisol",
     ]
     assert matches(index, {"wave": {WAVE_1}, "reporter": {"child"}}) == {
-        "example_mood": ["child_w1"]
+        "eeg_resting": ["eeg_w1"],
+        "example_mood": ["child_w1"],
+        "eyetracking_faces": ["eyetracking_w1"],
+        "fmri_resting": ["fmri_w1"],
+        "saliva_cortisol": ["saliva_w1"],
     }
     assert matches(index, {"domain": {"media", "emotion"}, "wave": set()}) == {
         "example_mood": ["child_w1", "child_w2", "child_w3"],
@@ -50,8 +58,8 @@ def test_selections_must_hold_within_one_administration(mock_project):
 def test_counts_keep_the_facets_own_values_open(mock_project):
     index = index_for(mock_project)
     found = counts(index, {"wave": {WAVE_1}})
-    assert found["wave"] == {WAVE_1: 4, WAVE_2: 5, WAVE_3: 5}
-    assert found["reporter"] == {"parent": 3, "child": 1}
+    assert found["wave"] == {WAVE_1: 8, WAVE_2: 9, WAVE_3: 9}
+    assert found["reporter"] == {"parent": 3, "child": 5}
     assert found["domain"] == {"emotion": 1, "family": 2, "health": 1, "media": 0}
 
 

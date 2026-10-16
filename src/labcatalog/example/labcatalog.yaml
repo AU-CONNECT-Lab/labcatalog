@@ -8,7 +8,7 @@ project:
 # Allowed words for each dataset's modality and reporter, and for each administration's target.
 vocab:
   modalities: [questionnaire, eeg, fmri, fnirs, eyetracking, video, ecg, saliva]
-  reporters: [parent, child, observer]
+  reporters: [parent, child]
   targets: [self, child]
 
 # Codes in the data that mean "no answer"; they are counted, never scored. Blank cells always count as missing.
@@ -62,7 +62,7 @@ datasets:
   - {name: fnirs_w2, modality: fnirs, study: mock_study, wave: 2, reporter: child, source: csv, path: data/fnirs_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: eyetracking_w1, modality: eyetracking, study: mock_study, wave: 1, reporter: child, source: csv, path: data/eyetracking_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: eyetracking_w2, modality: eyetracking, study: mock_study, wave: 2, reporter: child, source: csv, path: data/eyetracking_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
-  - {name: video_w2, modality: video, study: mock_study, wave: 2, reporter: observer, source: csv, path: data/video_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: video_w2, modality: video, study: mock_study, wave: 2, reporter: child, source: csv, path: data/video_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: ecg_w2, modality: ecg, study: mock_study, wave: 2, reporter: child, source: csv, path: data/ecg_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: ecg_w3, modality: ecg, study: mock_study, wave: 3, reporter: child, source: csv, path: data/ecg_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: saliva_w1, modality: saliva, study: mock_study, wave: 1, reporter: child, source: csv, path: data/saliva_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}

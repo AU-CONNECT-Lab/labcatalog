@@ -6,15 +6,10 @@ def test_catalog_has_everything_the_gui_shows(mock_project):
     assert result.project.config.project.name == "Mock Family Study Catalog"
     assert result.report.issues == run_check(mock_project).issues
     assert {d.dataset for d in result.summary.datasets} == {
-        "parent_w1",
-        "parent_w2",
-        "parent_w3",
-        "child_w1",
-        "child_w2",
-        "child_w3",
+        d.name for d in result.project.config.datasets
     }
     assert set(result.snippets) == {(s.instrument_id, s.dataset) for s in result.catalog.scores}
-    assert len(result.manifest.files) == 6
+    assert len(result.manifest.files) == 18
 
 
 def test_metadata_errors_return_only_the_report(mock_project):

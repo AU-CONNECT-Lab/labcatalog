@@ -11,7 +11,8 @@ def manifest_for(root):
 def test_records_every_data_file(mock_project):
     manifest = manifest_for(mock_project)
     records = {record.dataset: record for record in manifest.files}
-    assert set(records) == {
+    # Six questionnaire files and twelve from the other modalities.
+    assert set(records) >= {
         "parent_w1",
         "parent_w2",
         "parent_w3",
@@ -19,6 +20,7 @@ def test_records_every_data_file(mock_project):
         "child_w2",
         "child_w3",
     }
+    assert len(records) == 18
     assert records["parent_w1"].path == "data/parent_w1.csv"
     assert records["parent_w1"].rows == 191
     assert len(records["parent_w1"].sha256) == 64

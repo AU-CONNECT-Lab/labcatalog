@@ -382,19 +382,21 @@ def completeness(
 
 
 def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
-    groups: dict[tuple[str, str], list[LoadedDataset]] = {}
+    # Someone counts at a wave when any of that wave's files has them, whatever the modality.
+    groups: dict[tuple[str, str], dict[str, set]] = {}
     for loaded in datasets.values():
-        groups.setdefault((loaded.config.study, loaded.config.reporter), []).append(loaded)
+        waves = groups.setdefault((loaded.config.study, loaded.config.reporter), {})
+        waves.setdefault(loaded.config.wave, set()).update(loaded.frame[loaded.id_column])
     rows = []
-    for (study, reporter), members in groups.items():
+    for (study, reporter), waves in groups.items():
         previous: set[str] | None = None
-        for loaded in sorted(members, key=lambda d: wave_order(d.config.wave)):
-            ids = set(loaded.frame[loaded.id_column])
+        for wave in sorted(waves, key=wave_order):
+            ids = waves[wave]
             rows.append(
                 WaveRetention(
                     study=study,
                     reporter=reporter,
-                    wave=loaded.config.wave,
+                    wave=wave,
                     n=len(ids),
                     n_from_previous=None if previous is None else len(ids & previous),
                     n_new=None if previous is None else len(ids - previous),

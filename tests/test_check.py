@@ -64,8 +64,9 @@ def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):
         "exclusions: withdrawn.csv\n\ncustom_fields:",
     )
     messages = found(run_check(mock_project))["excluded_present"]
-    # 1032P is in all three parent waves; family 1003 has a parent and a child in all three.
-    assert len(messages) == 6
+    # 1032P is in all three parent waves; family 1003 has a parent and a child in all three,
+    # and the child also has files from seven other modalities.
+    assert len(messages) == 16
     assert any("1032P" in m and "1003P" in m for m in messages)
 
 
