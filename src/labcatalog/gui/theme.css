@@ -315,6 +315,9 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
 }
 .nicegui-code pre, .nicegui-code code { font-size: 0.8rem; line-height: 1.55; }
 .nicegui-code.lc-wrap pre, .nicegui-code.lc-wrap code { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* Grids as tall as their rows; AG Grid keeps 150px for the rows of an auto-height grid. */
+.lc-fit .ag-layout-auto-height .ag-center-cols-container,
+.lc-fit .ag-layout-auto-height .ag-center-cols-viewport { min-height: 42px; }
 /* Text boxes as tall as their text, even when drawn on a hidden tab. */
 .lc-grow textarea { field-sizing: content; min-height: 2lh; resize: none; }
 

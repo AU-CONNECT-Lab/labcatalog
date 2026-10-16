@@ -457,7 +457,7 @@ def grid(columns: list[dict], rows: list[dict], touched: Callable[[], None]) -> 
                 "defaultColDef": {"resizable": True},
             }
         )
-        .classes("w-full")
+        .classes("w-full lc-fit")
         .style("height: auto")
         .on("cellValueChanged", touched)
     )

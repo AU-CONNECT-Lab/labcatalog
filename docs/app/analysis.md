@@ -43,14 +43,15 @@ A linear mixed model of one outcome across waves. This section picks its own wav
 - **Outcome**: a score or number item. By default, the first total score measured in two or more waves.
 - **Waves**: the datasets that hold the outcome, one per wave, from one study. By default, all of them.
 - **Covariates**: a variable from one dataset, used at every wave, or a variable marked "(each wave)", which uses each wave's own value.
-- **Waves within people**: people as a level, with time as the waves since the first chosen wave (a wave you leave out still counts, so waves 1 and 3 give times 0 and 2). On by default.
+- **Time counts**: **Waves since the first** (the default) counts the waves since the first chosen wave; a wave you leave out still counts, so waves 1 and 3 give times 0 and 2. **Months, from the dates** and **Years, from the dates** count the time from the earliest visit date in the first chosen wave to each visit, from each dataset's `date_column`, so people seen early or late in a wave get their own times. Every chosen dataset needs a `date_column`; rows without a readable date are left out.
+- **Waves within people**: people as a level, with time as set above. On by default.
 - **People within each** group: groups as a level, when `labcatalog.yaml` names a group under `ids`. Off by default.
 - **Random slope of time for each person**: on by default.
 - **Split each-wave covariates into person mean and deviation**: separates the effect between people from the effect within a person. Shown when an each-wave covariate is chosen.
 
 The results are three tables: **Fixed Effects** (*b*, *SE*, *df*, *t*, *p* and 95% CI; with Satterthwaite's *df* in R), **Random Effects** (variances, SDs and the slope-intercept correlation) and **Model Summary** (the ICC of each level, the numbers of observations, people and groups, and fit statistics). A warning appears when the fit is singular, that is, when a random effect cannot be estimated from these data; a simpler model, such as one without the random slope, may then fit.
 
-Below the tables, a chart of the trajectories draws each person's values across the waves as thin lines, each wave's mean as a circle, and the fixed effects' prediction (intercept plus time) as a thick line. With covariates in the model, the line is the prediction for the mean of each number covariate and the reference option of each answer covariate.
+Below the tables, a chart of the trajectories draws each person's values across the waves as thin lines, each wave's mean as a circle, and the fixed effects' prediction (intercept plus time) as a thick line. With time from the dates, the axis counts months or years. With covariates in the model, the line is the prediction for the mean of each number covariate and the reference option of each answer covariate.
 
 **Save to outputs** writes the tables, the chart, the R and Python code, and `multilevel_data.csv`, with one row per person and wave.
 
