@@ -1,6 +1,8 @@
 # Tests invariance across waves for the models labcatalog writes to a folder; writes results.csv.
 args <- commandArgs(trailingOnly = TRUE)
 folder <- args[1]
+# wlsmv treats the items as ordered categories, ml as continuous.
+ordinal <- args[2] == "wlsmv"
 
 needed <- c("lavaan", "semTools")
 missing <- needed[!vapply(needed, requireNamespace, logical(1), quietly = TRUE)]
@@ -9,11 +11,16 @@ if (length(missing) > 0) {
   quit(status = 3)
 }
 
-measures <- c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled",
-              "rmsea.scaled", "srmr")
-steps <- list(configural = "", thresholds = "thresholds",
-              metric = c("thresholds", "loadings"),
-              scalar = c("thresholds", "loadings", "intercepts"))
+if (ordinal) {
+  measures <- c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled",
+                "rmsea.scaled", "srmr")
+  steps <- list(configural = "", thresholds = "thresholds",
+                metric = c("thresholds", "loadings"),
+                scalar = c("thresholds", "loadings", "intercepts"))
+} else {
+  measures <- c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "srmr")
+  steps <- list(configural = "", metric = "loadings", scalar = c("loadings", "intercepts"))
+}
 rows <- list()
 add <- function(model, step, what, item = "", value = NA, message = "") {
   rows[[length(rows) + 1]] <<- data.frame(model = model, step = step, what = what, item = item,
@@ -25,13 +32,24 @@ by_stem <- function(names) split(names, sub("_t[0-9]+$", "", names))
 
 fit_step <- function(syntax, data, equal) {
   # Small samples often leave empty response cells; lavaan warns but the fit stands.
+  long <- list(longFacNames = by_stem(lavaan::lavNames(syntax, "lv")),
+               longIndNames = by_stem(names(data)))
   withCallingHandlers(
-    semTools::measEq.syntax(
-      syntax, data = data, ordered = names(data), estimator = "WLSMV", missing = "pairwise",
-      parameterization = "theta", ID.fac = "std.lv", ID.cat = "Wu.Estabrook.2016",
-      longFacNames = by_stem(lavaan::lavNames(syntax, "lv")), longIndNames = by_stem(names(data)),
-      long.equal = equal, return.fit = TRUE
-    ),
+    if (ordinal) {
+      semTools::measEq.syntax(
+        syntax, data = data, ordered = names(data), estimator = "WLSMV", missing = "pairwise",
+        parameterization = "theta", ID.fac = "std.lv", ID.cat = "Wu.Estabrook.2016",
+        longFacNames = long$longFacNames, longIndNames = long$longIndNames,
+        long.equal = equal, return.fit = TRUE
+      )
+    } else {
+      # Full-information ML keeps the people missing a wave.
+      semTools::measEq.syntax(
+        syntax, data = data, estimator = "ML", missing = "ml", ID.fac = "std.lv",
+        longFacNames = long$longFacNames, longIndNames = long$longIndNames,
+        long.equal = equal, return.fit = TRUE
+      )
+    },
     warning = function(w) invokeRestart("muffleWarning")
   )
 }

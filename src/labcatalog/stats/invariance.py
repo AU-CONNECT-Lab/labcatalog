@@ -10,7 +10,7 @@ from labcatalog.data.scoring import scorable, score_items
 from labcatalog.project import Project
 from labcatalog.schema import Instrument, Score
 from labcatalog.sources import LoadedDataset
-from labcatalog.stats.cfa import FIT, MIN_ITEMS, ONE_FACTOR, SUBSCALES, is_total
+from labcatalog.stats.cfa import FIT, MIN_ITEMS, ONE_FACTOR, SUBSCALES, WLSMV, is_total
 from labcatalog.stats.rbridge import run_r
 from labcatalog.stats.summary import wave_order
 
@@ -117,10 +117,13 @@ def wave_items(
     return frame[~frame.index.duplicated(keep=False) & frame.index.notna()].dropna()
 
 
-def fit_models(models: list[InvarianceModel], rscript: str) -> list[InvarianceTest]:
-    gaps = [unchosen_options(model) for model in models]
+def fit_models(
+    models: list[InvarianceModel], rscript: str, estimator: str = WLSMV
+) -> list[InvarianceTest]:
+    # Only ordered items have thresholds that every wave must share.
+    gaps = [unchosen_options(model) if estimator == WLSMV else None for model in models]
     ready = [model for model, gap in zip(models, gaps, strict=True) if gap is None]
-    tested = iter(fit_in_r(ready, rscript))
+    tested = iter(fit_in_r(ready, rscript, estimator))
     return [
         next(tested) if gap is None else new_test(model, problem=gap)
         for model, gap in zip(models, gaps, strict=True)
@@ -146,13 +149,13 @@ def unchosen_options(model: InvarianceModel) -> str | None:
     )
 
 
-def fit_in_r(models: list[InvarianceModel], rscript: str) -> list[InvarianceTest]:
+def fit_in_r(models: list[InvarianceModel], rscript: str, estimator: str) -> list[InvarianceTest]:
     if not models:
         return []
     with tempfile.TemporaryDirectory() as temp:
         folder = Path(temp)
         names = [write_model(folder, n, model) for n, model in enumerate(models, start=1)]
-        run_r(rscript, [str(R_SCRIPT), str(folder)])
+        run_r(rscript, [str(R_SCRIPT), str(folder), estimator])
         results = pd.read_csv(
             folder / "results.csv", keep_default_na=False, na_values={"value": ["NA"]}
         )
@@ -203,7 +206,8 @@ def read_test(
             step.fit[FIT[row.item]] = value
         elif row.what == "compare":
             setattr(step, row.item, value)
-    test.steps = list(steps.values())
+    # Continuous items have no thresholds step.
+    test.steps = [s for s in steps.values() if s.fit or s.problem]
     return test
 
 

@@ -20,6 +20,9 @@ ONE_FACTOR = "one factor"
 R = "R"
 PYTHON = "Python"
 IMPROPER = "improper solution (a negative variance or a correlation above 1)"
+WLSMV = "wlsmv"
+ML = "ml"
+# lavaan's names for the scaled (WLSMV) and plain (ML) fit measures.
 FIT = {
     "chisq.scaled": "chisq",
     "df.scaled": "df",
@@ -27,6 +30,12 @@ FIT = {
     "cfi.scaled": "cfi",
     "tli.scaled": "tli",
     "rmsea.scaled": "rmsea",
+    "chisq": "chisq",
+    "df": "df",
+    "pvalue": "p",
+    "cfi": "cfi",
+    "tli": "tli",
+    "rmsea": "rmsea",
     "srmr": "srmr",
 }
 
@@ -53,6 +62,7 @@ class CfaFit:
     omega: dict[str, float] = field(default_factory=dict)
     problem: str | None = None
     engine: str = R
+    estimator: str = WLSMV
 
 
 def is_total(instrument: Instrument, score_id: str) -> bool:
@@ -88,8 +98,8 @@ def build_models(
     return models
 
 
-def fit_models(models: list[CfaModel], rscript: str | None) -> list[CfaFit]:
-    # lavaan in R when there is an Rscript, otherwise semopy here.
+def fit_models(models: list[CfaModel], rscript: str | None, estimator: str = WLSMV) -> list[CfaFit]:
+    # lavaan in R when there is an Rscript, otherwise semopy here, which has ML only.
     if not rscript:
         return [fit_python(model) for model in models]
     if not models:
@@ -97,11 +107,13 @@ def fit_models(models: list[CfaModel], rscript: str | None) -> list[CfaFit]:
     with tempfile.TemporaryDirectory() as temp:
         folder = Path(temp)
         names = [write_model(folder, n, model) for n, model in enumerate(models, start=1)]
-        run_r(rscript, [str(R_SCRIPT), str(folder)])
+        run_r(rscript, [str(R_SCRIPT), str(folder), estimator])
         results = pd.read_csv(
             folder / "results.csv", keep_default_na=False, na_values={"value": ["NA"]}
         )
-    return [read_fit(model, name, results) for model, name in zip(models, names, strict=True)]
+    return [
+        read_fit(model, name, results, estimator) for model, name in zip(models, names, strict=True)
+    ]
 
 
 def write_model(folder: Path, n: int, model: CfaModel) -> tuple[str, dict[str, str]]:
@@ -123,10 +135,19 @@ def write_model(folder: Path, n: int, model: CfaModel) -> tuple[str, dict[str, s
     return name, {**{v: k for k, v in items.items()}, **{v: k for k, v in factors.items()}}
 
 
-def read_fit(model: CfaModel, named: tuple[str, dict[str, str]], results: pd.DataFrame) -> CfaFit:
+def read_fit(
+    model: CfaModel, named: tuple[str, dict[str, str]], results: pd.DataFrame, estimator: str
+) -> CfaFit:
     name, original = named
     rows = results[results["model"] == name]
-    fit = CfaFit(model.instrument_id, model.dataset, model.kind, model.factors, len(model.data))
+    fit = CfaFit(
+        model.instrument_id,
+        model.dataset,
+        model.kind,
+        model.factors,
+        len(model.data),
+        estimator=estimator,
+    )
     problems = rows[rows["what"] == "problem"]
     if len(problems):
         fit.problem = problems["message"].iloc[0]
@@ -159,7 +180,13 @@ def fit_python(model: CfaModel) -> CfaFit:
     )
     data = model.data.set_axis(list(items.values()), axis=1)
     fit = CfaFit(
-        model.instrument_id, model.dataset, model.kind, model.factors, len(data), engine=PYTHON
+        model.instrument_id,
+        model.dataset,
+        model.kind,
+        model.factors,
+        len(data),
+        engine=PYTHON,
+        estimator=ML,
     )
     sem = semopy.Model(syntax)
     # As cfa.R does, a model that fails is reported, and the other models still run.

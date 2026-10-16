@@ -53,7 +53,7 @@ from labcatalog.reports.export import (
 )
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument, Reference, Text
-from labcatalog.stats.cfa import SUBSCALES, CfaFit, R
+from labcatalog.stats.cfa import SUBSCALES, WLSMV, CfaFit, R
 from labcatalog.stats.invariance import STEPS, InvarianceTest
 from labcatalog.stats.summary import VariableSummary
 
@@ -820,16 +820,18 @@ def factor_structure(
     elif not fits:
         note("No factor model: no score here has three or more items.")
     else:
-        in_r = fits[0].engine == R
-        method = (
-            "lavaan, WLSMV with the items as ordered categories, people who answered every item."
-            if in_r
-            else "semopy, maximum likelihood with the items as continuous, people who answered "
-            "every item."
+        engine, estimator = fits[0].engine, fits[0].estimator
+        ordinal = estimator == WLSMV
+        package = "lavaan" if engine == R else "semopy"
+        how = (
+            "WLSMV with the items as ordered categories"
+            if ordinal
+            else "maximum likelihood with the items as continuous"
         )
+        method = f"{package}, {how}, people who answered every item."
         omega = (
             "ω is semTools' categorical omega."
-            if in_r
+            if ordinal
             else "ω is the factor's share of the observed variance of the summed items, as "
             "semTools gives it for continuous items."
         )
@@ -850,11 +852,12 @@ def factor_structure(
         save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
         if cfa.message:
             note(cfa.message)
-        elif not in_r:
+        elif result.project.config.stats.cfa_estimator != estimator:
+            # The project asks for ordered items, which only lavaan in R can fit.
             settings_hint(
                 cfa,
-                "Set Rscript on the Settings page to fit with WLSMV in lavaan, as JASP does "
-                "for ordinal items.",
+                "This project's stats: cfa_estimator is wlsmv; set Rscript on the Settings "
+                "page to fit the items as ordered categories in lavaan.",
             )
 
 
@@ -1022,12 +1025,19 @@ def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaVi
     elif not tests:
         note("No model: no score here has three or more items in two or more waves.")
     else:
+        how = (
+            "WLSMV with the items as ordered categories, people who answered every item at a "
+            "wave. Each step holds one more set of parameters equal across waves; Δχ² is the "
+            "scaled difference test"
+            if result.project.config.stats.cfa_estimator == WLSMV
+            else "maximum likelihood with the items as continuous, full information for people "
+            "missing a wave. Each step holds one more set of parameters equal across waves; "
+            "Δχ² is the likelihood ratio test"
+        )
         method = (
             "lavaan and semTools: each wave's items load on their own factors, the same people "
-            "are linked by ID, and each item's residuals correlate across waves; WLSMV with the "
-            "items as ordered categories, people who answered every item at a wave. Each step "
-            "holds one more set of parameters equal across waves; Δχ² is the scaled difference "
-            "test against the step before."
+            f"are linked by ID, and each item's residuals correlate across waves; {how} against "
+            "the step before."
         )
         note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
         labels = {s.id: s.label for s in instrument.scores}

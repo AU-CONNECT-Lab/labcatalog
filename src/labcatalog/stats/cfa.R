@@ -1,6 +1,8 @@
 # Fits the factor models labcatalog writes to a folder and writes results.csv beside them.
 args <- commandArgs(trailingOnly = TRUE)
 folder <- args[1]
+# wlsmv treats the items as ordered categories, ml as continuous.
+ordinal <- args[2] == "wlsmv"
 
 needed <- c("lavaan", "semTools")
 missing <- needed[!vapply(needed, requireNamespace, logical(1), quietly = TRUE)]
@@ -9,8 +11,12 @@ if (length(missing) > 0) {
   quit(status = 3)
 }
 
-measures <- c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled",
-              "rmsea.scaled", "srmr")
+measures <- if (ordinal) {
+  c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled",
+    "srmr")
+} else {
+  c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "srmr")
+}
 rows <- list()
 add <- function(model, what, factor = "", item = "", value = NA, message = "") {
   rows[[length(rows) + 1]] <<- data.frame(model = model, what = what, factor = factor,
@@ -20,7 +26,11 @@ add <- function(model, what, factor = "", item = "", value = NA, message = "") {
 fit_one <- function(model, syntax, data) {
   # Small samples often leave empty response cells; lavaan warns but the fit stands.
   fit <- withCallingHandlers(
-    lavaan::cfa(syntax, data = data, ordered = names(data), estimator = "WLSMV", std.lv = TRUE),
+    if (ordinal) {
+      lavaan::cfa(syntax, data = data, ordered = names(data), estimator = "WLSMV", std.lv = TRUE)
+    } else {
+      lavaan::cfa(syntax, data = data, estimator = "ML", std.lv = TRUE)
+    },
     warning = function(w) invokeRestart("muffleWarning")
   )
   if (!lavaan::lavInspect(fit, "converged")) {

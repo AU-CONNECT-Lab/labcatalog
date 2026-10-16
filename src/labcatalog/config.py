@@ -96,6 +96,8 @@ class ReferencesConfig(StrictModel):
 
 class StatsConfig(StrictModel):
     correlate_by: str = defaults.CORRELATE_BY
+    # Factor models: items as ordered categories (WLSMV) or as continuous (ML).
+    cfa_estimator: Literal["wlsmv", "ml"] = "wlsmv"
 
 
 class PrepareStep(StrictModel):
