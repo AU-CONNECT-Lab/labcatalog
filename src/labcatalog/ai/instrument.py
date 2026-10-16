@@ -126,7 +126,9 @@ def instrument_request(instrument_id: str, pdf: Path) -> str:
     return "\n".join([f"Instrument ID: {instrument_id}", "", "<document>", text, "</document>"])
 
 
-def draft_instrument(root: Path, instrument_id: str, pdf: Path, client: LLMClient) -> InstrumentDraft:
+def draft_instrument(
+    root: Path, instrument_id: str, pdf: Path, client: LLMClient
+) -> InstrumentDraft:
     free_instrument_path(root, instrument_id)
     output, meta = client.complete_structured(
         system=SYSTEM, user_message=instrument_request(instrument_id, pdf), tool_schema=SCHEMA
@@ -154,7 +156,9 @@ def draft_instrument(root: Path, instrument_id: str, pdf: Path, client: LLMClien
 def instrument_document(instrument_id: str, output: dict[str, Any]) -> dict[str, Any]:
     default = output["default_response_set"].strip()
     document: dict[str, Any] = {"id": instrument_id, "name": output["name"].strip()}
-    document |= given({key: output[key] for key in ("abbreviation", "construct_name", "instructions")})
+    document |= given(
+        {key: output[key] for key in ("abbreviation", "construct_name", "instructions")}
+    )
     if output["response_sets"]:
         document["response_sets"] = [
             {

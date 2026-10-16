@@ -51,3 +51,18 @@ def test_new_instrument_is_a_valid_file(mock_project):
         editing.new_instrument(mock_project, "new_scale")
     with pytest.raises(EditError, match="lower-case"):
         editing.new_instrument(mock_project, "New Scale")
+
+
+def test_a_draft_is_listed_checked_and_moved_into_instruments(mock_project):
+    drafts = mock_project / "drafts"
+    drafts.mkdir()
+    text = (mock_project / MOOD).read_text(encoding="utf-8").replace("example_mood", "mood_two")
+    (drafts / "mood_two.yaml").write_text(text, encoding="utf-8")
+    assert editing.editable_files(mock_project)["Drafts"] == ["drafts/mood_two.yaml"]
+    assert editing.check_text("drafts/mood_two.yaml", text + "colour: blue\n")
+    assert "mood_two" not in load_project(mock_project).instruments
+    assert editing.move_draft(mock_project, "drafts/mood_two.yaml") == "instruments/mood_two.yaml"
+    assert "mood_two" in load_project(mock_project).instruments
+    (drafts / "mood_two.yaml").write_text(text, encoding="utf-8")
+    with pytest.raises(EditError, match="already exists"):
+        editing.move_draft(mock_project, "drafts/mood_two.yaml")

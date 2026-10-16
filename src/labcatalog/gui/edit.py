@@ -6,6 +6,7 @@ from pathlib import Path
 import webview
 from nicegui import app, run, ui
 
+from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import LINE_SUFFIX, heading, note
@@ -100,16 +101,25 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         shown.edited = False
         return True
 
-    async def save(text: str) -> None:
-        if write(text):
+    async def edited_text() -> str | None:
+        if shown.editor is not None:
+            return shown.editor.value
+        rows = await shown.grid.get_client_data()
+        try:
+            return records.write_rows(shown.opened.text, view.mode, table(), rows)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative")
+            return None
+
+    async def save() -> None:
+        text = await edited_text()
+        if text is not None and write(text):
             ui.notify(f"Saved {view.path}")
             await on_saved()
 
-    async def save_text() -> None:
-        await save(shown.editor.value)
-
     async def move() -> None:
-        if not write(shown.editor.value):
+        text = await edited_text()
+        if text is None or not write(text):
             return
         try:
             path = editing.move_draft(root, view.path)
@@ -119,15 +129,6 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         ui.notify(f"Moved to {path}")
         go(path, TEXT)
         await on_saved()
-
-    async def save_table() -> None:
-        rows = await shown.grid.get_client_data()
-        try:
-            text = records.write_rows(shown.opened.text, view.mode, table(), rows)
-        except LabCatalogError as err:
-            ui.notify(str(err), type="negative")
-            return
-        await save(text)
 
     async def add_row() -> None:
         rows = await shown.grid.get_client_data()
@@ -190,6 +191,77 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 ui.button("Cancel", on_click=dialog.close).props("flat")
         dialog.open()
 
+    def draft() -> None:
+        with ui.dialog() as dialog, ui.card().classes("w-[32rem]"):
+            ui.label("New instrument from a PDF")
+            if not preferences.model_set():
+                note("Set a language model on the Settings page to draft an instrument from a PDF.")
+                ui.button("Close", on_click=dialog.close).props("flat")
+                dialog.open()
+                return
+            name = ui.input("ID", placeholder="for example parent_stress").classes("w-72")
+            chosen: list[Path] = []
+
+            async def pick() -> None:
+                selection = await app.native.main_window.create_file_dialog(
+                    webview.FileDialog.OPEN, file_types=("PDF files (*.pdf)",)
+                )
+                if selection:
+                    chosen[:] = [Path(selection[0])]
+                    picked.set_text(chosen[0].name)
+
+            async def make() -> None:
+                if not chosen:
+                    ui.notify("Choose the PDF first")
+                    return
+                button.disable()
+                status.set_text("Reading the PDF and drafting the instrument.")
+                settings = preferences.load()
+                try:
+                    drafted = await run.io_bound(
+                        run_instrument_draft,
+                        root,
+                        (name.value or "").strip(),
+                        chosen[0],
+                        settings.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
+                        settings.get(preferences.LLM_MODEL, ""),
+                        settings.get(preferences.LLM_URL, ""),
+                    )
+                except LabCatalogError as err:
+                    status.set_text(str(err))
+                    button.enable()
+                    return
+                dialog.close()
+                meta = drafted.meta
+                ui.notify(
+                    f"Drafted by {meta.model} in {meta.latency_ms / 1000:.0f} s, "
+                    f"{meta.input_tokens} tokens in and {meta.output_tokens} out"
+                )
+                leave(partial(go, drafted.path.relative_to(root).as_posix(), TEXT))
+
+            with ui.row().classes("items-center gap-3"):
+                ui.button("Choose the PDF", icon="picture_as_pdf", on_click=pick).props(
+                    "flat no-caps"
+                )
+                picked = ui.label()
+            note(
+                f"The draft goes into {defaults.DRAFTS_DIR}/, replacing a draft with the "
+                "same ID, and stays out of the catalog until you move it to instruments/. The "
+                "PDF's text, including the item wording, is sent to the model's provider."
+            )
+            with ui.row():
+                button = ui.button("Draft", on_click=make)
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+            status = ui.label().classes("lc-note")
+        dialog.open()
+
+    def save_buttons() -> None:
+        ui.button("Save", icon="save", on_click=save)
+        if editing.is_draft(view.path):
+            ui.button("Move to instruments", icon="drive_file_move", on_click=move).props(
+                "flat no-caps"
+            )
+
     def text_mode(opened: editing.Opened) -> None:
         shown.editor = (
             ui.codemirror(
@@ -204,7 +276,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         mark(view.line)
         view.line = None
         with ui.row().classes("items-center gap-3"):
-            ui.button("Save", icon="save", on_click=save_text)
+            save_buttons()
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
 
     def table_mode(opened: editing.Opened) -> None:
@@ -216,7 +288,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             .on("cellValueChanged", lambda: setattr(shown, "edited", True))
         )
         with ui.row().classes("items-center gap-3"):
-            ui.button("Save", icon="save", on_click=save_table)
+            save_buttons()
             ui.button("Add row", icon="add", on_click=add_row).props("flat no-caps")
             ui.button("Delete ticked rows", icon="delete", on_click=delete_rows).props(
                 "flat no-caps"
@@ -254,6 +326,9 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 ui.button("New instrument", icon="add", on_click=create).props(
                     "flat dense no-caps"
                 ).classes("mt-2")
+                ui.button("New instrument from a PDF", icon="picture_as_pdf", on_click=draft).props(
+                    "flat dense no-caps"
+                )
             with ui.column().classes("grow min-w-0 gap-2"):
                 with ui.row().classes("items-center gap-4"):
                     ui.label(opened.path).classes("font-medium")
@@ -267,6 +342,11 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     "Saving checks the file the way loading the project does and keeps it as it "
                     "was if something is wrong; then the catalog reloads."
                 )
+                if editing.is_draft(view.path):
+                    note(
+                        "A draft from a PDF, kept out of the catalog. Check it against the PDF "
+                        "and add its reference, then move it to instruments/."
+                    )
                 if view.mode == TEXT:
                     text_mode(opened)
                 else:
