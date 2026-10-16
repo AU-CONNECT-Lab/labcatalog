@@ -1,8 +1,10 @@
 import tempfile
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
+import semopy
 
 from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.data.scoring import scorable, score_items
@@ -15,6 +17,9 @@ R_SCRIPT = Path(__file__).parent / "cfa.R"
 MIN_ITEMS = 3
 SUBSCALES = "subscales"
 ONE_FACTOR = "one factor"
+R = "R"
+PYTHON = "Python"
+IMPROPER = "improper solution (a negative variance or a correlation above 1)"
 FIT = {
     "chisq.scaled": "chisq",
     "df.scaled": "df",
@@ -47,6 +52,7 @@ class CfaFit:
     loadings: dict[tuple[str, str], float] = field(default_factory=dict)
     omega: dict[str, float] = field(default_factory=dict)
     problem: str | None = None
+    engine: str = R
 
 
 def is_total(instrument: Instrument, score_id: str) -> bool:
@@ -82,7 +88,10 @@ def build_models(
     return models
 
 
-def fit_models(models: list[CfaModel], rscript: str) -> list[CfaFit]:
+def fit_models(models: list[CfaModel], rscript: str | None) -> list[CfaFit]:
+    # lavaan in R when there is an Rscript, otherwise semopy here.
+    if not rscript:
+        return [fit_python(model) for model in models]
     if not models:
         return []
     with tempfile.TemporaryDirectory() as temp:
@@ -129,7 +138,70 @@ def read_fit(model: CfaModel, named: tuple[str, dict[str, str]], results: pd.Dat
             fit.loadings[(original[row.factor], original[row.item])] = float(row.value)
         elif row.what == "omega":
             fit.omega[original[row.factor]] = float(row.value)
+    return exact(fit)
+
+
+def exact(fit: CfaFit) -> CfaFit:
     # A just-identified model reproduces the data exactly, so its fit indices say nothing.
     if fit.fit.get("df") == 0:
         fit.fit = {"chisq": None, "df": 0.0}
     return fit
+
+
+def fit_python(model: CfaModel) -> CfaFit:
+    # Items as continuous, maximum likelihood; lavaan's ML gives the same numbers.
+    items = {c: f"x{i}" for i, c in enumerate(model.data.columns, start=1)}
+    factors = {score: f"f{i}" for i, score in enumerate(model.factors, start=1)}
+    original = {v: k for k, v in {**items, **factors}.items()}
+    syntax = "\n".join(
+        f"{factors[score]} =~ {' + '.join(items[c] for c in columns)}"
+        for score, columns in model.factors.items()
+    )
+    data = model.data.set_axis(list(items.values()), axis=1)
+    fit = CfaFit(
+        model.instrument_id, model.dataset, model.kind, model.factors, len(data), engine=PYTHON
+    )
+    sem = semopy.Model(syntax)
+    # As cfa.R does, a model that fails is reported, and the other models still run.
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            solved = sem.fit(data)
+            found = sem.inspect(std_est=True)
+            stats = semopy.calc_stats(sem).T["Value"]
+    except Exception as err:  # noqa: BLE001
+        fit.problem = str(err)
+        return fit
+    if not solved.success:
+        fit.problem = "the model did not converge"
+        return fit
+    estimate = found["Estimate"].astype(float)
+    standard = found["Est. Std"].astype(float)
+    variances = (found["op"] == "~~") & (found["lval"] == found["rval"])
+    if (estimate[variances] < 0).any() or (standard[~variances].abs() > 1).any():
+        fit.problem = IMPROPER
+        return fit
+    fit.fit = {
+        "chisq": float(stats["chi2"]),
+        "df": float(stats["DoF"]),
+        "p": float(stats["chi2 p-value"]),
+        # lavaan caps CFI at 1.
+        "cfi": min(float(stats["CFI"]), 1.0),
+        "tli": float(stats["TLI"]),
+        "rmsea": float(stats["RMSEA"]),
+        "srmr": None,
+    }
+    loadings = found[found["op"] == "~"]
+    for item, factor, value in zip(
+        loadings["lval"], loadings["rval"], standard[loadings.index], strict=True
+    ):
+        fit.loadings[(original[factor], original[item])] = float(value)
+    # semTools' omega: the factor's share of the observed variance of the summed items.
+    observed = data.cov(ddof=0)
+    for factor in factors.values():
+        rows = loadings[loadings["rval"] == factor]
+        variance = estimate[(found["lval"] == factor) & (found["rval"] == factor) & variances]
+        columns = list(rows["lval"])
+        common = estimate[rows.index].sum() ** 2 * float(variance.iloc[0])
+        fit.omega[original[factor]] = common / observed.loc[columns, columns].to_numpy().sum()
+    return exact(fit)

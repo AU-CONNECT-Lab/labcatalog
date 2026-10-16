@@ -50,6 +50,8 @@ def score_charts(result: CatalogResult, instrument_id: str) -> None:
 def item_charts(result: CatalogResult, instrument_id: str) -> None:
     for fig in views.item_responses(result, instrument_id):
         show(fig)
+    for fig in views.number_distributions(result, instrument_id):
+        show(fig)
     item_means(result, instrument_id)
     profiles = views.wave_profiles(result, instrument_id)
     if profiles is not None:

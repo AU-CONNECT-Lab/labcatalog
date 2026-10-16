@@ -167,6 +167,44 @@ def score_boxes(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     )
 
 
+def number_distributions(result: CatalogResult, instrument_id: str) -> list[go.Figure]:
+    instrument = result.project.instruments[instrument_id]
+    found = {(v.dataset, v.column): v for v in result.summary.variables}
+    figures = []
+    for item in instrument.items:
+        if item.type != "number":
+            continue
+        answered = [
+            (v.dataset, found[(v.dataset, v.column)])
+            for v in result.catalog.variables
+            if v.instrument_id == instrument_id
+            and v.item_id == item.id
+            and (v.dataset, v.column) in found
+            and found[(v.dataset, v.column)].histogram
+        ]
+        if not answered:
+            continue
+        names = series_names(result, [dataset for dataset, _ in answered])
+        bounds = (
+            min(s.histogram[0][0] for _, s in answered),
+            max(s.histogram[-1][1] for _, s in answered),
+        )
+        rows = [
+            {
+                "label": names[dataset],
+                "color": series_color(result, dataset),
+                "n": s.n_valid,
+                "mean": s.mean,
+                "histogram": s.histogram,
+                "possible_range": bounds,
+            }
+            for dataset, s in answered
+        ]
+        integer = all(b - a == 1 for _, s in answered for a, b, _ in s.histogram)
+        figures.append(plots.score_ridges(item_text(instrument, item.id), rows, integer))
+    return figures
+
+
 def score_distribution(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     instrument = result.project.instruments[instrument_id]
     total = total_score(instrument)
@@ -969,6 +1007,9 @@ def standardized_scores(
 def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     # One panel per wave: that wave's item means in colour, the other waves faint behind it.
     instrument = result.project.instruments[instrument_id]
+    if instrument.kind == "demographics":
+        # Codes such as 1 = Girl, 2 = Boy have no mean worth drawing.
+        return None
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
     names = series_names(result, instrument_datasets(result, instrument_id))
     items = [i.id for i in instrument.items if i.type == "choice"]
@@ -1003,6 +1044,8 @@ def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None
 def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
     # One panel per subscale: every person's answers faint, the mean of everyone in colour.
     instrument = result.project.instruments[instrument_id]
+    if instrument.kind == "demographics":
+        return None
     columns = {
         v.item_id: v
         for v in result.catalog.variables_for(dataset)

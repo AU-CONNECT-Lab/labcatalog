@@ -184,8 +184,17 @@ def test_number_and_text_items_are_left_out_of_option_charts(result):
     grid = views.answer_grid(result, "parent_w2", 1, "example_demographics")
     assert all(tick.startswith(("dem_gender", "dem_edu")) for tick in grid.layout.yaxis.ticktext)
     assert views.subscale_radars(result, "example_demographics") is None
-    waves = views.wave_profiles(result, "example_demographics")
-    assert len(waves.data[-1].x) == 2
+    assert views.wave_profiles(result, "example_demographics") is None
+    assert views.people_profiles(result, "example_demographics", "parent_w1") is None
+
+
+def test_number_items_get_one_distribution_per_wave(result):
+    age, household = views.number_distributions(result, "example_demographics")
+    assert age.layout.xaxis.title.text == "How old is your child (in years)?"
+    ticks = age.layout.yaxis.ticktext
+    assert len(ticks) == 3 and all("n " in tick for tick in ticks)
+    assert household.layout.xaxis.range[0] < 2 < 7 < household.layout.xaxis.range[1]
+    assert views.number_distributions(result, "example_mood") == []
 
 
 def test_score_network_links_strong_pairs_and_colours_by_the_first_matching_tag(result):

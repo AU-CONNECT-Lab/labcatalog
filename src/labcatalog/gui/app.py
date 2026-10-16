@@ -247,18 +247,24 @@ class Window:
         rscript = preferences.load().get(preferences.RSCRIPT)
         cfa.fits, cfa.message = [], ""
         cfa.invariance, cfa.invariance_message = [], ""
-        if result is None or result.project is None or not rscript:
+        if result is None or result.project is None:
             cfa.status = cfa.invariance_status = CFA_UNSET
             cfa_changed()
             return
-        cfa.status = cfa.invariance_status = CFA_RUNNING
+        cfa.status = CFA_RUNNING
+        cfa.invariance_status = CFA_RUNNING if rscript else CFA_UNSET
         cfa_changed()
-        found = await in_r(run_cfa, result, rscript)
+        fits, message, status = await in_r(run_cfa, result, rscript)
+        if status == CFA_FAILED:
+            fits = await run.io_bound(run_cfa, result, None)
+            message, status = f"R failed, so the factor models were fitted in Python: {message}", CFA_DONE
         # A newer Refresh has started its own run.
         if self.result is not result:
             return
-        cfa.fits, cfa.message, cfa.status = found
+        cfa.fits, cfa.message, cfa.status = fits, message, status
         cfa_changed()
+        if not rscript:
+            return
         found = await in_r(run_invariance, result, rscript)
         if self.result is not result:
             return
@@ -403,7 +409,9 @@ def cfa_changed() -> None:
 
 
 async def in_r(
-    function: Callable[[CatalogResult, str], list], result: CatalogResult, rscript: str
+    function: Callable[[CatalogResult, str | None], list],
+    result: CatalogResult,
+    rscript: str | None,
 ) -> tuple[list, str, str]:
     try:
         found = await run.io_bound(function, result, rscript)

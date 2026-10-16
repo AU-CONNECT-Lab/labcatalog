@@ -25,6 +25,8 @@ class VariableSummary(BaseModel):
     minimum: float | None = None
     maximum: float | None = None
     median: float | None = None
+    # Number items only.
+    histogram: list[tuple[float, float, int]] = []
 
 
 class ItemTotal(BaseModel):
@@ -205,7 +207,14 @@ def summarize_variable(
         n_unexpected=unexpected,
         **describe(numeric),
         median=float(numeric.median()) if variable.type == "number" and n_valid else None,
+        histogram=number_histogram(numeric) if variable.type == "number" and n_valid else [],
     )
+
+
+def number_histogram(values: pd.Series) -> list[tuple[float, float, int]]:
+    low, high = float(values.min()), float(values.max())
+    # A single value still needs a bin of some width.
+    return histogram(values, low, high, integer=bool((values % 1 == 0).all()) or low == high)
 
 
 def valid_answers(

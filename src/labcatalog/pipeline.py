@@ -90,7 +90,7 @@ def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
     return (None if has_errors(issues) else project), issues
 
 
-def run_cfa(result: CatalogResult, rscript: str) -> list[CfaFit]:
+def run_cfa(result: CatalogResult, rscript: str | None) -> list[CfaFit]:
     models = build_models(result.project, result.catalog, result.datasets)
     return fit_models(models, rscript)
 
