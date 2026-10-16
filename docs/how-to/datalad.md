@@ -66,7 +66,7 @@ The project folder and every input and output must be inside a dataset (subdatas
 
 A freeze (the Freeze button on the Datasets page, or `labcatalog freeze <name>`) writes a record of every data file labcatalog reads to `freezes/`: checksums, rows and participants. When the data are in DataLad, it also saves the files labcatalog uses and tags each dataset with the freeze's name.
 
-The tag and the frozen data stay on your computer until you push them. `datalad push` sends neither tags nor the content of versions that are no longer the current one, so push right after freezing, for each dataset:
+The tag and the frozen data stay on your computer until you push them. `datalad push` sends neither tags nor the content of versions that are no longer the current one, so they have to be pushed right after freezing. When a dataset has one sibling, or several of which one is `origin`, the Freeze dialog offers **Then push the tag and the data to ...**, ticked by default, and `labcatalog freeze <name> --push` does the same. If the push fails, the freeze stays as it is. Push by hand with these two commands for each dataset, which is also what to do for a dataset whose sibling is not clear:
 
 ```bash
 datalad push --to <sibling> --data anything

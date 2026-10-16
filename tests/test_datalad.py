@@ -21,10 +21,10 @@ from labcatalog.metadata.history import file_history
 from labcatalog.pipeline import (
     run_catalog,
     run_freeze,
-    run_push_freeze,
     run_get,
     run_get_missing,
     run_open_freeze,
+    run_push_freeze,
 )
 from labcatalog.project import init_project, load_project
 from labcatalog.sources import load_datasets

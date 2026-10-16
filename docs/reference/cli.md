@@ -45,10 +45,10 @@ Run the prepare steps in `labcatalog.yaml` in order, stopping at the first failu
 ## freeze
 
 ```bash
-labcatalog freeze NAME [-p PROJECT]
+labcatalog freeze NAME [--push] [-p PROJECT]
 ```
 
-Record the data as they are now under `NAME`, for example `2026-06-submission`. Datasets in DataLad are also saved and tagged. See [Using labcatalog with DataLad](../how-to/datalad.md).
+Record the data as they are now under `NAME`, for example `2026-06-submission`. Datasets in DataLad are also saved and tagged; with `--push`, the tag and the data then go to each dataset's sibling (its only one, or `origin`). See [Using labcatalog with DataLad](../how-to/datalad.md).
 
 ## export
 
