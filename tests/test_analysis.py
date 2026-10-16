@@ -5,6 +5,7 @@ from labcatalog.gui import analysis as page
 from labcatalog.gui.common import p_value
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import analysis, analysis_script
+from labcatalog.stats import multilevel as ml
 
 EMS = "example_mood.ems_total@child_w1"
 EPS = "example_parent_stress.eps_mean@parent_w1"
@@ -95,6 +96,20 @@ def test_choices_come_in_modality_blocks_with_a_shortcut_each(result):
     ]
     assert {k.rsplit("@", 1)[1] for k in menu["All EEG"]} == {"eeg_w1", "eeg_w3"}
     assert views.menu_groups(result, ["child_w1"], views.variable_choices) == {}
+
+
+def test_measures_filter_every_list_of_the_page(result):
+    measures = list(views.analysis_instruments(result))
+    assert measures.index("example_demographics") < measures.index("eeg_resting")
+    assert measures.index("eeg_resting") < measures.index("fmri_resting")
+    groups = views.instrument_groups(result)
+    assert groups["All EEG"] == ["eeg_resting"] and "example_mood" in groups["All questionnaires"]
+    view = page.AnalysisView(datasets=["child_w1", "eeg_w1"], instruments=["eeg_resting"])
+    choices = page.variables(view)(result, view.datasets)
+    assert choices and all(k.startswith("item:eeg_resting.") for k in choices)
+    assert page.default_totals(result, view, choices) == []
+    outcomes = analysis.of_instruments(ml.outcome_choices(result), ["eeg_resting"])
+    assert ml.default_model(result, list(outcomes)).outcome.startswith("item:eeg_resting.")
 
 
 def test_apa_numbers():

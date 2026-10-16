@@ -16,7 +16,7 @@ from labcatalog.data.resolve import ResolvedScore, as_text_dict
 from labcatalog.metadata.browse import as_set, facet_label, facet_names, value_order
 from labcatalog.pipeline import CatalogResult
 from labcatalog.schema import Instrument, Score
-from labcatalog.stats import analysis
+from labcatalog.stats import analysis, analysis_script
 from labcatalog.stats.summary import wave_order
 
 RADAR_AXES = 3
@@ -1097,6 +1097,48 @@ def modality_order(result: CatalogResult, datasets: list[str]) -> list[str]:
         return modalities.index(modality) if modality in modalities else len(modalities)
 
     return sorted(dataset_order(result, datasets), key=rank)
+
+
+def instrument_modalities(result: CatalogResult) -> dict[str, str]:
+    # Each instrument the Analysis page can use, with the modality of the first file that has it.
+    names = list(result.datasets)
+    holders: dict[str, str] = {}
+    for s in result.catalog.scores:
+        holders.setdefault(s.instrument_id, s.dataset)
+    for v in analysis.number_items(result, names) + analysis_script.demographic_items(
+        result, names
+    ):
+        holders.setdefault(v.instrument_id, v.dataset)
+    config = result.project.config
+    return {i: dataset_by_name(config, name).modality for i, name in holders.items()}
+
+
+def analysis_instruments(result: CatalogResult) -> dict[str, str]:
+    found = instrument_modalities(result)
+    modalities = result.project.config.vocab.modalities
+    order = list(result.project.instruments)
+
+    def rank(instrument_id: str) -> tuple[int, int]:
+        m = found[instrument_id]
+        return (
+            modalities.index(m) if m in modalities else len(modalities),
+            order.index(instrument_id),
+        )
+
+    names = instrument_names(result)
+    return {i: names[i] for i in sorted(found, key=rank)}
+
+
+def instrument_groups(result: CatalogResult) -> dict[str, list[str]]:
+    # "All EEG" and the like, where the instruments come from more than one modality.
+    vocab = result.project.config.vocab
+    by_modality: dict[str, list[str]] = {}
+    found = instrument_modalities(result)
+    for instrument_id in analysis_instruments(result):
+        by_modality.setdefault(found[instrument_id], []).append(instrument_id)
+    if len(by_modality) < 2:
+        return {}
+    return {f"All {vocab.modality_label(m)}": ids for m, ids in by_modality.items()}
 
 
 def menu_groups(

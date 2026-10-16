@@ -288,8 +288,9 @@ def occasions(result: CatalogResult, outcome: str) -> list[str]:
     return sorted(names, key=lambda n: (configs[n].study, wave_order(configs[n].wave), n))
 
 
-def default_model(result: CatalogResult) -> Model | None:
-    choices = list(outcome_choices(result))
+def default_model(result: CatalogResult, choices: list[str] | None = None) -> Model | None:
+    # The first total measured at two or more waves, among the outcomes offered.
+    choices = list(outcome_choices(result)) if choices is None else choices
     if not choices:
         return None
     instruments = result.project.instruments

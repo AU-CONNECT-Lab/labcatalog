@@ -199,7 +199,7 @@ def group_section(
     if view.group not in groups:
         view.group = next(iter(groups))
     if view.outcome not in scores:
-        view.outcome = next(iter(views.total_choices(result, sample.datasets) or scores))
+        view.outcome = next(iter(page.default_totals(result, view, scores) or scores))
 
     @ui.refreshable
     def body() -> None:

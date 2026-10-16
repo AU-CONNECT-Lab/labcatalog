@@ -10,6 +10,7 @@ from labcatalog.gui.analysis_tables import decimal, later, rscript
 from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
+from labcatalog.stats import analysis
 from labcatalog.stats import multilevel as ml
 
 ONE_EACH = (
@@ -27,15 +28,15 @@ SINGULAR = (
 
 def render(result: CatalogResult, view) -> None:
     section("Multilevel model")
-    outcomes = ml.outcome_choices(result)
+    outcomes = analysis.of_instruments(ml.outcome_choices(result), view.instruments)
     if not outcomes:
-        note("Needs a score or number in at least one dataset.")
+        note("Needs a score or number of the chosen measures in at least one dataset.")
         return
     if view.multilevel is None or view.multilevel.outcome not in outcomes:
-        view.multilevel = ml.default_model(result)
+        view.multilevel = ml.default_model(result, list(outcomes))
     model: ml.Model = view.multilevel
     labels = {name: views.dataset_label(result, name) for name in result.datasets}
-    covariates = ml.covariate_choices(result, labels)
+    covariates = analysis.of_instruments(ml.covariate_choices(result, labels), view.instruments)
     group = ml.group_name(result)
     note(
         "Waves within people, people within groups, or both, fitted the way JASP's linear "

@@ -29,6 +29,18 @@ class AnalysisView:
     group: str | None = None
     outcome: str | None = None
     multilevel: ml.Model | None = None
+    # The instruments whose variables the page offers; None until first shown, then all.
+    instruments: list[str] | None = None
+
+
+def variables(view: AnalysisView) -> Callable[[CatalogResult, list[str]], dict[str, str]]:
+    return lambda result, names: analysis.of_instruments(
+        views.variable_choices(result, names), view.instruments
+    )
+
+
+def default_totals(result: CatalogResult, view: AnalysisView, choices: dict[str, str]) -> list[str]:
+    return [k for k in views.total_choices(result, view.datasets) if k in choices]
 
 
 def render(result: CatalogResult, view: AnalysisView) -> None:
@@ -37,15 +49,22 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         note("No datasets yet.")
         return
     view.datasets = [n for n in view.datasets if n in names] or first_wave(result, names)
+    measures = views.analysis_instruments(result)
+    if view.instruments is None:
+        view.instruments = list(measures)
+    view.instruments = [i for i in view.instruments if i in measures]
 
     @ui.refreshable
     def tools() -> None:
         sample = analysis.build_sample(result, view.datasets, view.intersect)
         where = "in every selected dataset" if view.intersect else "in any selected dataset"
         sample_note(result, sample, where)
-        choices = views.variable_choices(result, view.datasets)
+        choices = variables(view)(result, view.datasets)
         if len(choices) < 2:
-            note("Pick datasets with at least two scores or numbers between them for correlations.")
+            note(
+                "Pick datasets and measures with at least two scores or numbers between them "
+                "for correlations."
+            )
         else:
             correlation_section(result, sample, view, choices)
             pair_section(result, sample, view, choices)
@@ -59,6 +78,16 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
     def set_intersect(value: bool) -> None:
         view.intersect = value
         tools.refresh()
+
+    def set_instruments(value: list[str] | None) -> None:
+        view.instruments = value or []
+        tools.refresh()
+        models.refresh()
+
+    # Its own waves and people, so changing the sample does not refit it.
+    @ui.refreshable
+    def models() -> None:
+        multilevel.render(result, view)
 
     section("Sample")
     with ui.row().classes("w-full items-center gap-4"):
@@ -74,9 +103,22 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
             value=view.intersect,
             on_change=lambda e: set_intersect(e.value),
         )
+    with ui.row().classes("w-full items-center gap-2 no-wrap"):
+        chosen = (
+            ui.select(
+                measures,
+                multiple=True,
+                value=view.instruments,
+                label="Measures (every list on this page, the multilevel model too)",
+                with_input=True,
+                on_change=lambda e: set_instruments(e.value),
+            )
+            .props("dense outlined use-chips")
+            .classes("grow")
+        )
+        pick_menu(chosen, views.instrument_groups(result))
     tools()
-    # Its own waves and people, so changing the sample does not refit it.
-    multilevel.render(result, view)
+    models()
 
 
 def first_wave(result: CatalogResult, names: list[str]) -> list[str]:
@@ -101,9 +143,7 @@ def sample_note(result: CatalogResult, sample: analysis.Sample, where: str) -> N
 def correlation_section(
     result: CatalogResult, sample: analysis.Sample, view: AnalysisView, choices: dict[str, str]
 ) -> None:
-    view.scores = [k for k in view.scores if k in choices] or views.total_choices(
-        result, view.datasets
-    )
+    view.scores = [k for k in view.scores if k in choices] or default_totals(result, view, choices)
 
     @ui.refreshable
     def body() -> None:
@@ -184,7 +224,7 @@ def correlation_section(
             .props("dense outlined use-chips")
             .classes("grow")
         )
-        pick_menu(scores, views.menu_groups(result, view.datasets, views.variable_choices))
+        pick_menu(scores, views.menu_groups(result, view.datasets, variables(view)))
     body()
 
 
@@ -226,7 +266,7 @@ def pair_section(
     result: CatalogResult, sample: analysis.Sample, view: AnalysisView, choices: dict[str, str]
 ) -> None:
     keys = list(choices)
-    totals = views.total_choices(result, view.datasets) or keys
+    totals = default_totals(result, view, choices) or keys
     view.xs = [x for x in view.xs if x in choices] or totals[:1]
     if view.y not in choices or view.y in view.xs:
         view.y = next((k for k in totals + keys if k not in view.xs), keys[0])
@@ -294,7 +334,7 @@ def pair_section(
             .props("dense outlined use-chips")
             .classes("min-w-96 grow")
         )
-        pick_menu(xs, views.menu_groups(result, view.datasets, views.variable_choices))
+        pick_menu(xs, views.menu_groups(result, view.datasets, variables(view)))
         ui.select(
             choices, value=view.y, label="Y", with_input=True, on_change=lambda e: choose_y(e.value)
         ).props("dense outlined").classes("w-96")

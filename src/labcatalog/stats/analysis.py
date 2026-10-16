@@ -100,6 +100,10 @@ def instrument_of(key: str) -> str:
     return key.removeprefix(ITEM_PREFIX).split(".", 1)[0]
 
 
+def of_instruments(found: dict[str, str], instruments: list[str]) -> dict[str, str]:
+    return {k: v for k, v in found.items() if instrument_of(k) in instruments}
+
+
 def row_values(result: CatalogResult, key: str) -> np.ndarray:
     # A score or an item, one value per row of its dataset.
     if key.startswith(ITEM_PREFIX):
