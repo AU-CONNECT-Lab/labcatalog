@@ -7,7 +7,7 @@ labcatalog is a Python package with a desktop window and a command line. It need
 - Windows, macOS or Linux.
 - Python 3.11 or newer.
 - Optional: R, for factor models and to run the analyses in R instead of Python. See [Set Up R and Language Models](../how-to/r-and-models.md).
-- Optional: DataLad, if your data are in DataLad datasets. See [Freeze Versions with DataLad](../how-to/datalad.md).
+- Optional: DataLad, if your data are in DataLad datasets. See [Using labcatalog with DataLad](../how-to/datalad.md).
 
 ## Install with uv
 

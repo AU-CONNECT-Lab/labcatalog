@@ -37,7 +37,7 @@ The **Datasets** page shows the study and each of its eighteen data files. Click
 
 ## Run an analysis
 
-The **Analysis** page works on the datasets you pick under **Sample**. Pick `child_w1` and `parent_w1`: the correlation table shows how the children's mood scores relate to their parents' stress, linked through the family each ID belongs to. Below it are regression, group comparisons and a multilevel model. Every table has a **Copy** button for pasting into a manuscript and a **Code** section with the R and Python code that reproduces it.
+The **Analysis** page works on the datasets you pick under **Sample**. Pick `child_w1` and `parent_w1`: the correlation table shows how the children's mood scores relate to their parents' stress, linked through the family each ID belongs to. Below it are regression, group comparisons and a multilevel model. Each result has a **Copy** button for pasting into a manuscript and a **Code** section with the R and Python code that reproduces it.
 
 ## Read the Methods page
 
@@ -47,4 +47,4 @@ The **Methods** page drafts the parts of a methods section that the catalog alre
 
 The **Problems** page lists what `labcatalog check` found: values outside an item's options, an age outside its allowed range, an ID with a stray space, an ID used twice, people who gave the same answer to every item, and a column the column map does not describe. Each one links to where it can be fixed. [Fix Reported Problems](../how-to/fix-problems.md) explains them.
 
-The **Prepare** page may also show some steps as outdated, because copying the example can leave scripts newer than their outputs. Press **Run all** to rebuild the data from the raw files.
+The **Prepare** page may also show some steps as outdated, because some of the example's scripts are newer than the files they made. Press **Run all** to rebuild the data from the raw files.
