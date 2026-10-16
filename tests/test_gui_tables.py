@@ -31,7 +31,10 @@ def test_wave_table(mock_project):
 def test_instrument_list_shows_only_the_matched_datasets(mock_project):
     result = run_catalog(mock_project)
     index = build_index(result.project)
-    found = matches(index, {"reporter": {"child"}})
+    # The children's questionnaires, leaving out their other modalities.
+    found = {
+        k: v for k, v in matches(index, {"reporter": {"child"}}).items() if k.startswith("example_")
+    }
     columns, rows = instruments.list_table(result, found)
     assert [c["label"] for c in columns[-3:]] == ["child_w1", "child_w2", "child_w3"]
     by_id = {r["id"]: r for r in rows}
