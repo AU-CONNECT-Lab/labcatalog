@@ -59,6 +59,10 @@ class Instrument(StrictModel):
     abbreviation: str | None = None
     kind: str = "questionnaire"
     construct_name: str | None = None
+    # A sentence or two for the Measures paragraph, written or checked by a person.
+    description: str | None = None
+    # This instrument's own Measures template, in place of the project's.
+    measures: str | None = None
     instructions: Text | None = None
     response_sets: list[ResponseSet] = []
     default_response_set: str | None = None

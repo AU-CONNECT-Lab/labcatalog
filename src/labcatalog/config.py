@@ -115,6 +115,8 @@ class ProjectConfig(StrictModel):
     exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)
     prepare: list[PrepareStep] = []
+    # Template of each instrument's Measures paragraph, in place of the built-in one.
+    measures: str | None = None
 
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:

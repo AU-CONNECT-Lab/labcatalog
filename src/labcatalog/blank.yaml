@@ -27,3 +27,8 @@ datasets: []
 #   prepare:
 #     - {name: clean_parent_w1, run: Rscript scripts/clean_parent.R, inputs: [raw/parent_w1_export.csv, scripts/clean_parent.R], outputs: [data/parent_w1.csv]}
 # A step is outdated when one of its inputs is newer than its outputs, so list the script among the inputs.
+
+# Optional: the template of each instrument's Measures paragraph on its page, in place of the built-in one:
+#   measures: "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}"
+# Placeholders: name, abbreviation, cite, named, construct, reporter, n_items, scale, description, items, reverse, scoring, alpha, omega.
+# An instrument can have its own template (measures:) and a sentence or two about what it measures (description:).

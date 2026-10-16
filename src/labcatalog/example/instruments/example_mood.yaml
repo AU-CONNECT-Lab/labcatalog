@@ -3,6 +3,7 @@ id: example_mood
 name: Example Mood Scale
 abbreviation: EMS
 construct_name: Mood and negative affect
+description: It asks how often in the past two weeks the child felt sad, worried or tired, and how often they enjoyed things.
 instructions: Think about the past two weeks. How often did you feel this way?
 response_sets:
   - id: frequency

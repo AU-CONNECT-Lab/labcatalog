@@ -6,6 +6,7 @@ from typing import Any
 from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
 from labcatalog.issues import Issue, IssueLevel
+from labcatalog.measures import placeholder_problem
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
 from labcatalog.schema import Administration, Instrument
 
@@ -23,6 +24,7 @@ def validate_project(project: Project) -> list[Issue]:
         *check_data_settings(project),
         *check_references(project),
         *check_prepare_steps(project),
+        *check_measures(project),
     ]
 
 
@@ -467,6 +469,18 @@ def check_prepare_steps(project: Project) -> list[Issue]:
             message = f"{where}.outputs: list at least one file the step writes"
             issues.append(problem("invalid_value", message, CONFIG))
     return issues
+
+
+def check_measures(project: Project) -> list[Issue]:
+    templates = [("measures", project.config.measures, CONFIG)] + [
+        ("measures", instrument.measures, project.instrument_files[instrument_id])
+        for instrument_id, instrument in project.instruments.items()
+    ]
+    return [
+        problem("invalid_value", f"{where}: {found}", location)
+        for where, template, location in templates
+        if template and (found := placeholder_problem(template))
+    ]
 
 
 def problem(code: str, message: str, location: str, level: IssueLevel = "error") -> Issue:

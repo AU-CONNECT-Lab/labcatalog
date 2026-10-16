@@ -88,6 +88,14 @@ def citation(bibliography: Bibliography, key: str) -> str:
     return " ".join(sentence(unbrace(p)) for p in (head, entry.get("title", ""), venue) if p)
 
 
+def in_text(bibliography: Bibliography, key: str) -> str:
+    entry = bibliography.get(key)
+    if entry is None:
+        return key
+    year = entry.get("year") or entry.get("date", "")[:4]
+    return ", ".join(p for p in (short_authors(entry.get("author", "")), year) if p)
+
+
 def short_authors(field: str) -> str:
     names = [last_name(name) for name in split_multiple_persons_names(field)] if field else []
     return f"{names[0]} et al." if len(names) > 2 else " & ".join(names)
