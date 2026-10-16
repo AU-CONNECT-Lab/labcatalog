@@ -142,7 +142,7 @@ class Window:
             with ui.tab_panel("problems").classes("lc-paper"):
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-paper"):
-                settings.render(self.set_palette, self.start_cfa)
+                settings.render(self.set_palette, self.start_cfa, self.instruments_panel.refresh)
 
     async def choose_folder(self) -> None:
         selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)

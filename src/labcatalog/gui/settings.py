@@ -13,7 +13,11 @@ from labcatalog.rbridge import ALL_PACKAGES, install_command, r_status
 RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
 
 
-def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable[None]]) -> None:
+def render(
+    on_palette: Callable[[str], None],
+    on_rscript: Callable[[], Awaitable[None]],
+    on_model: Callable[[], None],
+) -> None:
     section("R")
     note(
         "Factor models (CFA) and ω run in R with lavaan and semTools, and the Analysis page "
@@ -54,7 +58,7 @@ def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable
 
     ui.button("Save and check", on_click=save).classes("mt-2")
 
-    models_section()
+    models_section(on_model)
 
     section("Charts")
     ui.select(
@@ -77,11 +81,11 @@ def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable
     ).props("no-caps").classes("mt-2")
 
 
-def models_section() -> None:
+def models_section(on_model: Callable[[], None]) -> None:
     section("Language model")
     note(
-        "On an instrument's page, a language model can write the scoring scripts from the "
-        "instrument's reference PDF. A cloud provider reads its key from an environment variable "
+        "On an instrument's page, a language model can write the scoring scripts and draft the "
+        "description for the Measures paragraph from the instrument's reference PDF. A cloud provider reads its key from an environment variable "
         "that you set yourself, for example by running setx ANTHROPIC_API_KEY your-key in a "
         "terminal and restarting labcatalog. A local model runs on an OpenAI-compatible server "
         "such as Ollama or LM Studio; give its address, for example http://localhost:11434/v1."
@@ -112,6 +116,7 @@ def models_section() -> None:
             }
         )
         status.set_text("Saved.")
+        on_model()
 
     provider.on_value_change(lambda _: show_key())
     show_key()

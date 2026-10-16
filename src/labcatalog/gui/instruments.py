@@ -571,9 +571,12 @@ def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str)
             button.enable()
 
     heading(f"Scoring script from the reference PDF for {dataset}")
-    with ui.row().classes("items-center gap-3"):
-        button = ui.button("Write with the language model", on_click=write)
-        status = ui.label().classes("lc-note")
+    if model_set():
+        with ui.row().classes("items-center gap-3"):
+            button = ui.button("Write with the language model", on_click=write)
+            status = ui.label().classes("lc-note")
+    else:
+        note("Set a language model on the Settings page to write the scripts from the PDF.")
     saved()
 
 
@@ -714,6 +717,9 @@ def measures_section(
 def description_draft(result: CatalogResult, instrument: Instrument) -> None:
     if not ai_scoring.reference_pdfs(result.project, instrument):
         return
+    if not model_set():
+        note("Set a language model on the Settings page to draft the description from the PDF.")
+        return
     path = result.project.instrument_files[instrument.id]
 
     async def write() -> None:
@@ -751,6 +757,10 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
         button = ui.button("Draft the description from the reference PDF", on_click=write)
         status = ui.label().classes("lc-note")
     shown = ui.column().classes("gap-1")
+
+
+def model_set() -> bool:
+    return bool(preferences.load().get(preferences.LLM_MODEL))
 
 
 def without_empty(
