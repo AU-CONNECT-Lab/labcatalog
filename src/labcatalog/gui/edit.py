@@ -283,7 +283,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     def table_mode(opened: editing.Opened) -> None:
         rows = records.read_rows(opened.text, view.mode, table())
         shown.grid = (
-            ui.aggrid(grid_options(table().columns, rows))
+            ui.aggrid(grid_options(table(), rows))
             .classes("w-full")
             .style("height: 7rem" if table().single else "height: 65vh")
             .on("cellValueChanged", lambda: setattr(shown, "edited", True))
@@ -366,15 +366,20 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         page()
 
 
-def grid_options(columns: tuple[records.Column, ...], rows: list[dict]) -> dict:
+def grid_options(table: records.Table, rows: list[dict]) -> dict:
+    columns = table.columns
     definitions = []
     for column in columns:
+        # Tags and notes in custom fields run long, like the built-in text columns.
+        wide = column.key in WIDE or (
+            column.key.startswith(records.CUSTOM + records.NESTED) and column.kind != "choice"
+        )
         definition = {
             "field": column.key,
             "headerName": column.label,
             "editable": True,
-            "flex": 3 if column.key in WIDE else 1,
-            "minWidth": 280 if column.key in WIDE else 90,
+            "flex": 3 if wide else 1,
+            "minWidth": 280 if wide else 90,
             "cellDataType": {"bool": "boolean", "number": "number"}.get(column.kind, "text"),
         }
         if column.kind == "choice":
@@ -386,10 +391,9 @@ def grid_options(columns: tuple[records.Column, ...], rows: list[dict]) -> dict:
         "rowData": [
             {c.key: cell(row[c.key], c) for c in columns} | row_origin(row) for row in rows
         ],
-        "rowSelection": {"mode": "multiRow"},
         "stopEditingWhenCellsLoseFocus": True,
         "defaultColDef": {"resizable": True},
-    }
+    } | ({} if table.single else {"rowSelection": {"mode": "multiRow"}})
 
 
 def cell(value, column: records.Column):
