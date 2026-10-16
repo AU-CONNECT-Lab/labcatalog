@@ -12,7 +12,7 @@ from labcatalog import defaults
 from labcatalog.bibliography import Bibliography, citation
 from labcatalog.stats import wave_order
 
-LINE_SUFFIX = re.compile(r":\d+$")
+LINE_SUFFIX = re.compile(r":(\d+)$")
 ROW_KEY = "_row"
 
 
@@ -102,8 +102,9 @@ def sorted_waves(waves: Iterable[str]) -> list[str]:
     return sorted(set(waves), key=wave_order)
 
 
-def location_path(root: Path, location: str) -> Path:
-    return root / without_line(location)
+def split_location(location: str) -> tuple[str, int | None]:
+    found = LINE_SUFFIX.search(location)
+    return (location[: found.start()], int(found.group(1))) if found else (location, None)
 
 
 def without_line(location: str) -> str:

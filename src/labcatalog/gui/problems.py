@@ -1,8 +1,10 @@
+from collections.abc import Callable
 from pathlib import Path
 
 from nicegui import ui
 
-from labcatalog.gui.common import col, keyed, location_path, open_path, table
+from labcatalog import editing
+from labcatalog.gui.common import col, keyed, note, open_path, split_location, table
 from labcatalog.issues import Issue, summarize_issues
 
 COLUMNS = [
@@ -21,7 +23,7 @@ LEVEL_CELL = r"""
   {{ props.value }}
 </q-td>
 """
-# The click is emitted back to Python, which opens the file with the system's default app.
+# The click is emitted back to Python, which opens the file on the Edit page or in its own app.
 LOCATION_CELL = r"""
 <q-td :props="props">
   <a v-if="props.value" class="text-primary cursor-pointer"
@@ -33,13 +35,14 @@ CODE_CELL = r"""
 """
 
 
-def render(issues: list[Issue], root: Path) -> None:
+def render(issues: list[Issue], root: Path, edit: Callable[[str, int | None], None]) -> None:
     with ui.row().classes("w-full items-center gap-4"):
         ui.label(summarize_issues(issues)).classes("text-lg")
         ui.space()
         level = ui.toggle(LEVEL_FILTERS, value="all").props("dense no-caps")
         search = ui.input(placeholder="Search").props("dense clearable").classes("w-64")
-    shown = issue_table(issues, root)
+    note("Project files open on the Edit page at the line named; data files open in their own app.")
+    shown = issue_table(issues, root, edit)
     search.bind_value_to(shown, "filter")
     level.on_value_change(
         lambda e: shown.update_rows(
@@ -48,12 +51,23 @@ def render(issues: list[Issue], root: Path) -> None:
     )
 
 
-def issue_table(issues: list[Issue], root: Path) -> ui.table:
+def issue_table(
+    issues: list[Issue], root: Path, edit: Callable[[str, int | None], None]
+) -> ui.table:
+    editable = {path for group in editing.editable_files(root).values() for path in group}
+
+    def follow(location: str) -> None:
+        path, line = split_location(location)
+        if path in editable:
+            edit(path, line)
+        else:
+            open_path(root / path)
+
     shown = table(COLUMNS, issue_rows(issues, None))
     shown.add_slot("body-cell-level", LEVEL_CELL)
     shown.add_slot("body-cell-location", LOCATION_CELL)
     shown.add_slot("body-cell-code", CODE_CELL)
-    shown.on("open_location", lambda e: open_path(location_path(root, e.args["location"])))
+    shown.on("open_location", lambda e: follow(e.args["location"]))
     return shown
 
 

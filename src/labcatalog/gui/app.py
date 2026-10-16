@@ -262,6 +262,10 @@ class Window:
         self.instruments_panel.refresh()
         self.tabs.set_value("instruments")
 
+    def edit_location(self, path: str, line: int | None) -> None:
+        self.tabs.set_value("edit")
+        self.editing.open(path, line)
+
     def show_dataset(self, dataset: str | None) -> None:
         self.dataset = dataset
         self.datasets_panel.refresh()
@@ -319,7 +323,7 @@ class Window:
         if self.result is None:
             ui.label(self.error or "Open a project folder to check it.").classes("lc-note")
         else:
-            problems.render(self.result.report.issues, self.root)
+            problems.render(self.result.report.issues, self.root, self.edit_location)
 
     def has_catalog(self) -> bool:
         if self.result is None:

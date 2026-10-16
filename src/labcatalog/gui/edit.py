@@ -1,4 +1,3 @@
-import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from functools import partial
@@ -8,10 +7,9 @@ from nicegui import ui
 
 from labcatalog import editing, records
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui.common import heading, note
+from labcatalog.gui.common import LINE_SUFFIX, heading, note
 from labcatalog.issues import Issue
 
-LINE = re.compile(r":(\d+)$")
 TEXT = "text"
 WIDE = {"text", "label", "path"}
 
@@ -20,6 +18,10 @@ WIDE = {"text", "label", "path"}
 class EditView:
     path: str | None = None
     mode: str = TEXT
+    # The line to show once the file opens, as when coming from the Problems page.
+    line: int | None = None
+    # Set by the page, so other pages can open a file in it.
+    open: Callable[[str, int | None], None] | None = None
 
 
 @dataclass
@@ -48,7 +50,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         if not changed():
             then()
             return
-        with ui.dialog() as dialog, ui.card():
+        # Inside this page even when another page asks, so the question shows here.
+        with frame, ui.dialog() as dialog, ui.card():
             ui.label(f"Discard your changes to {view.path}?")
             with ui.row():
                 ui.button("Discard", on_click=lambda: (dialog.close(), then()))
@@ -63,9 +66,22 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         if mode != view.mode:
             leave(partial(go, view.path, mode))
 
-    def go(path: str, mode: str) -> None:
-        view.path, view.mode = path, mode
+    def go(path: str, mode: str, line: int | None = None) -> None:
+        view.path, view.mode, view.line = path, mode, line
         page.refresh()
+
+    def jump(path: str, line: int | None) -> None:
+        if path == view.path and shown.editor is not None:
+            mark(line)
+        else:
+            leave(partial(go, path, TEXT, line))
+
+    def mark(line: int | None) -> None:
+        if line is None:
+            return
+        shown.editor.decorations = [{"kind": "line", "line": line, "class": "bg-yellow-2"}]
+        # The editor mounts after the Edit tab shows.
+        ui.timer(0.3, partial(shown.editor.reveal_line, line), once=True)
 
     async def write(text: str) -> None:
         issues = editing.check_text(view.path, text)
@@ -127,12 +143,12 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             shown.editor.line_tooltips = {
                 int(found.group(1)): issue.message
                 for issue in issues
-                if issue.location and (found := LINE.search(issue.location))
+                if issue.location and (found := LINE_SUFFIX.search(issue.location))
             }
         shown.problems.clear()
         with shown.problems:
             for issue in issues:
-                where = LINE.search(issue.location or "")
+                where = LINE_SUFFIX.search(issue.location or "")
                 line = f"Line {where.group(1)}: " if where else ""
                 ui.label(f"{line}{issue.message}").classes("text-negative")
 
@@ -166,6 +182,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             .classes("w-full")
             .style("height: 65vh")
         )
+        mark(view.line)
+        view.line = None
         with ui.row().classes("items-center gap-3"):
             ui.button("Save", icon="save", on_click=save_text)
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
@@ -239,7 +257,9 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         note(str(err))
                 shown.problems = ui.column().classes("gap-1")
 
-    page()
+    view.open = jump
+    with ui.element("div").classes("w-full") as frame:
+        page()
 
 
 def grid_options(columns: tuple[records.Column, ...], rows: list[dict]) -> dict:
