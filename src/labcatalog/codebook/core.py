@@ -13,6 +13,7 @@ import yaml
 from labcatalog import defaults
 from labcatalog.codebook import qualtrics, redcap, spss
 from labcatalog.config import DatasetConfig, dataset_by_name, id_column_for, missing_codes_for
+from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.exceptions import CodebookError
 from labcatalog.issues import Issue, IssueLevel, has_errors
@@ -85,6 +86,8 @@ ITEM_TYPES = get_args(ItemType)
 METHODS = get_args(Score.model_fields["method"].annotation)
 MISSING_RULES = get_args(Score.model_fields["missing_rule"].annotation)
 FENCE = re.compile(r"```[^\n]*\n(.*?)```", re.DOTALL)
+ITEM_NUMBER = re.compile(r"^\(?\d+[.)]\s*")
+NONWORD = re.compile(r"[\W_]+")
 MODELINE = "# yaml-language-server: $schema=../schemas/{}.schema.json"
 
 Value = int | float | str
@@ -195,12 +198,16 @@ def template_items(
     prefixes = Counter(prefix(column) for column in frame.columns if column not in skipped)
     missing = {str(code.code) for code in missing_codes_for(config, dataset)} | {""}
     field_names = sorted(fields or {}, key=len, reverse=True)
+    wordings = catalog_wordings(project)
     rows = []
     for column in frame.columns:
         row = {"column": column, "instrument": "", "item": ""}
         if column not in skipped:
             known = known_item(column, mapped, item_ids)
             name = None if known else next((f for f in field_names if holds(column, f)), None)
+            if name and len(found := wordings.get(wording(fields[name].text), set())) == 1:
+                [known] = found
+                name = None
             if known:
                 row.update(instrument=known[0], item=known[1])
             elif name:
@@ -232,6 +239,22 @@ def known_item(
         ((instrument_id, item_id) for item_id, instrument_id in item_ids if holds(column, item_id)),
         None,
     )
+
+
+def catalog_wordings(project: Project) -> dict[str, set[tuple[str, str]]]:
+    found: dict[str, set[tuple[str, str]]] = {}
+    for instrument in project.instruments.values():
+        for item in instrument.items:
+            for text in as_text_dict(item.text).values():
+                found.setdefault(wording(text), set()).add((instrument.id, item.id))
+    found.pop("", None)
+    return found
+
+
+def wording(text: str) -> str:
+    # Case, punctuation, spacing and a leading item number do not tell two items apart.
+    words = NONWORD.sub(" ", ITEM_NUMBER.sub("", text.casefold().strip())).strip()
+    return " ".join(words.split())
 
 
 def holds(column: str, item_id: str) -> bool:

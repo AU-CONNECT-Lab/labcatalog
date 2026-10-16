@@ -415,3 +415,40 @@ def test_existing_instruments_are_reused_and_the_map_matches(mock_project):
         "  - {instrument: example_child_sleep, datasets: [parent_w1, parent_w2, parent_w3], target: child}",
         "  - {instrument: example_demographics, datasets: [parent_w1, parent_w2, parent_w3]}",
     ]
+
+
+FEELINGS = """\
+id: feelings
+name: Feelings
+response_sets:
+  - id: often
+    options:
+      - {value: 0, label: Never}
+      - {value: 1, label: Always}
+default_response_set: often
+items:
+  - {id: feel_sad, text: "1. I feel SAD."}
+"""
+
+
+def test_a_dictionary_item_worded_like_a_catalog_item_reuses_it(pilot, tmp_path):
+    (pilot / "data" / "pilot_w1.csv").write_text(REDCAP_DATA, encoding="utf-8")
+    dictionary = write_dictionary(tmp_path / "dictionary.csv", REDCAP_HEADER)
+    (pilot / "instruments" / "feelings.yaml").write_text(FEELINGS, encoding="utf-8")
+    write_templates(load_project(pilot), "pilot_w1", dictionary)
+    rows = codebook_paths(load_project(pilot), "pilot_w1")[ITEMS].read_text(encoding="utf-8-sig")
+    lines = rows.splitlines()
+    assert "mood_1_w1,feelings,feel_sad,,,,,," in lines
+    assert any(line.startswith("mood_10_w1,mood_scale,mood_10,") for line in lines)
+
+
+def test_wording_shared_by_two_catalog_items_is_not_guessed(pilot, tmp_path):
+    (pilot / "data" / "pilot_w1.csv").write_text(REDCAP_DATA, encoding="utf-8")
+    dictionary = write_dictionary(tmp_path / "dictionary.csv", REDCAP_HEADER)
+    (pilot / "instruments" / "feelings.yaml").write_text(FEELINGS, encoding="utf-8")
+    (pilot / "instruments" / "moods.yaml").write_text(
+        FEELINGS.replace("feelings", "moods").replace("Feelings", "Moods"), encoding="utf-8"
+    )
+    write_templates(load_project(pilot), "pilot_w1", dictionary)
+    rows = codebook_paths(load_project(pilot), "pilot_w1")[ITEMS].read_text(encoding="utf-8-sig")
+    assert any(line.startswith("mood_1_w1,mood_scale,mood_1,") for line in rows.splitlines())
