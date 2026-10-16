@@ -117,3 +117,14 @@ def open_path(path: Path) -> None:
         subprocess.run(["open", str(path)], check=True)
     else:
         subprocess.run(["xdg-open", str(path)], check=True)
+
+
+def code_tabs(code: dict[str, str]) -> None:
+    with ui.tabs().props("dense no-caps align=left") as tabs:
+        ui.tab("r", label="R")
+        ui.tab("python", label="Python")
+    with ui.tab_panels(tabs, value="r").classes("w-full"):
+        with ui.tab_panel("r").classes("p-0"):
+            ui.code(code["r"], language="r").classes("w-full")
+        with ui.tab_panel("python").classes("p-0"):
+            ui.code(code["python"], language="python").classes("w-full")

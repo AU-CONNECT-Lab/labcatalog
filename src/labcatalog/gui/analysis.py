@@ -114,7 +114,9 @@ def correlation_section(
             data = analysis_script.AnalysisData(result, sample)
             variables = [data.score(k) for k in keys]
             code = analysis_script.correlation_code(variables)
-            found, engine = await analysis_tables.compute(result, sample, data.frame(), code)
+            frame = data.frame()
+            found, engine = await analysis_tables.compute(result, sample, frame, code)
+            texts = analysis_tables.section_files(result, sample, frame, code)
             described, matrix = analysis_script.read_correlations(
                 found, [v.column for v in variables]
             )
@@ -155,7 +157,8 @@ def correlation_section(
                     with charts.rest_column():
                         paper_table(shown)
                         note(engine)
-                        save_button(result, "correlations", {"correlations": shown}, drawn)
+                        analysis_tables.code_view(texts)
+                        save_button(result, "correlations", {"correlations": shown}, drawn, texts)
 
             return content
 
@@ -245,6 +248,7 @@ def pair_section(
                 return lambda: note("Too few people have an X score and the Y score.")
             code = analysis_script.regression_code(list(usable.values()), y)
             found, engine = await analysis_tables.compute(result, sample, frame, code)
+            texts = analysis_tables.section_files(result, sample, frame, code)
             fits = analysis_script.read_regressions(found, {v.column: x for x, v in usable.items()})
             fig = views.pair_scatter(result, sample, list(fits), y_key)
             columns, rows = fit_table(fits, choices)
@@ -260,7 +264,8 @@ def pair_section(
                 drawn = Chart(charts.show(fig), fig)
                 paper_table(shown)
                 note(engine)
-                save_button(result, "regression", {"regression": shown}, drawn)
+                analysis_tables.code_view(texts)
+                save_button(result, "regression", {"regression": shown}, drawn, texts)
 
             return content
 

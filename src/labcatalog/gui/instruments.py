@@ -17,6 +17,7 @@ from labcatalog.gui import charts, preferences
 from labcatalog.gui.common import (
     as_text,
     cited,
+    code_tabs,
     col,
     fmt,
     heading,
@@ -521,17 +522,6 @@ def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) ->
         heading(f"Scoring code for {dataset}")
         code_tabs(snippets)
     written_scripts(result, instrument, dataset)
-
-
-def code_tabs(code: dict[str, str]) -> None:
-    with ui.tabs().props("dense no-caps align=left") as tabs:
-        ui.tab("r", label="R")
-        ui.tab("python", label="Python")
-    with ui.tab_panels(tabs, value="r").classes("w-full"):
-        with ui.tab_panel("r").classes("p-0"):
-            ui.code(code["r"], language="r").classes("w-full")
-        with ui.tab_panel("python").classes("p-0"):
-            ui.code(code["python"], language="python").classes("w-full")
 
 
 def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str) -> None:

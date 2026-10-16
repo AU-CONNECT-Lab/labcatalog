@@ -10,7 +10,7 @@ from labcatalog.charts import plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, paper, preferences
-from labcatalog.gui.common import apa, col, note, p_value, section
+from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.tables import PaperTable
 
@@ -39,6 +39,24 @@ async def compute(
     if engine == script.R:
         return found, "Computed in R."
     return found, "Computed in Python; set Rscript on the Settings page to compute in R."
+
+
+def section_files(
+    result: CatalogResult, sample: analysis.Sample, frame: pd.DataFrame, code: Code
+) -> dict[str, str]:
+    # The code for one section, runnable on its own beside the data it reads.
+    r_text, python_text = script.script(result, sample, [code])
+    return {
+        script.DATA_FILE: frame.to_csv(index=False),
+        "analysis.R": r_text,
+        "analysis.py": python_text,
+    }
+
+
+def code_view(texts: dict[str, str]) -> None:
+    with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
+        note(f"Runs in a folder that holds {script.DATA_FILE}; Save to outputs writes both.")
+        code_tabs({"r": texts["analysis.R"], "python": texts["analysis.py"]})
 
 
 def later(fill: Callable) -> ui.column:
@@ -78,7 +96,9 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
             data = AnalysisData(result, sample)
             rows = script.measure_variables(data, view.measures, items=True)
             code = script.table_one_code(sample.datasets, rows)
-            found, engine = await compute(result, sample, data.frame(), code)
+            frame = data.frame()
+            found, engine = await compute(result, sample, frame, code)
+            texts = section_files(result, sample, frame, code)
             columns, rows = table_one_table(found["table1"], sample.datasets, labels)
             shown = PaperTable(
                 "Descriptive Statistics",
@@ -91,7 +111,8 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
             def content() -> None:
                 paper.paper_table(shown)
                 note(engine)
-                paper.save_button(result, "table1", {"table1": shown})
+                code_view(texts)
+                paper.save_button(result, "table1", {"table1": shown}, texts=texts)
 
             return content
 
@@ -188,6 +209,7 @@ def group_section(
             if plan is None:
                 return lambda: note("Fewer than two groups have two or more people with a score.")
             found, engine = await compute(result, sample, frame, plan.code)
+            texts = section_files(result, sample, frame, plan.code)
             comparison = script.read_comparison(found, plan)
             fig = group_figure(frame, group, outcome, comparison, script.link_name(result))
             left = ", ".join(f"{text} ({n})" for text, n in comparison.left_out)
@@ -212,7 +234,8 @@ def group_section(
                         for shown in papers.values():
                             paper.paper_table(shown)
                         note(engine)
-                        paper.save_button(result, "groups", papers, drawn)
+                        code_view(texts)
+                        paper.save_button(result, "groups", papers, drawn, texts)
 
             return content
 
@@ -346,14 +369,7 @@ def script_section(
                 "analysis.py": python_text,
             }
             paper.save_button(result, "script", texts=texts)
-            with ui.tabs().props("dense no-caps align=left") as tabs:
-                ui.tab("r", label="R")
-                ui.tab("python", label="Python")
-            with ui.tab_panels(tabs, value="r").classes("w-full"):
-                with ui.tab_panel("r").classes("p-0"):
-                    ui.code(r_text, language="r").classes("w-full")
-                with ui.tab_panel("python").classes("p-0"):
-                    ui.code(python_text, language="python").classes("w-full")
+            code_tabs({"r": r_text, "python": python_text})
 
     ui.button("Write script", icon="code", on_click=write).classes("w-fit")
     holder = ui.column().classes("w-full gap-2")
