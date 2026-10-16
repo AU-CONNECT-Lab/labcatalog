@@ -114,6 +114,33 @@ def test_student_uses_equal_variances_and_the_pooled_sd(result, sample):
     assert found.effect == pytest.approx((girls.mean() - boys.mean()) / pooled)
 
 
+JASP_TTESTS = "C:/Program Files (x86)/JASP/Modules/module_libs/jaspTTests/jaspTTests/R/jaspTTests"
+JASP_LIMITS = """\
+env <- new.env()
+lazyLoad("{lib}", envir = env)
+limits <- get(".confidenceLimitsEffectSizes", envir = env)(
+  ncp = {ncp}, df = {df}, alpha.lower = 0.025, alpha.upper = 0.025)
+cat(limits$Lower.Limit, limits$Upper.Limit)
+"""
+
+
+@pytest.mark.skipif(
+    not r_ready() or not glob(f"{JASP_TTESTS}.rdb"), reason="needs R with the packages and JASP"
+)
+@pytest.mark.parametrize("t_test", [script.WELCH, script.STUDENT])
+def test_the_interval_of_d_is_jasps(result, sample, tmp_path, t_test):
+    found, _ = comparison(result, sample, True, t_test=t_test)
+    n = [g.n for g in found.groups]
+    scale = np.sqrt(n[0] * n[1] / sum(n))
+    (tmp_path / "jasp.R").write_text(
+        JASP_LIMITS.format(lib=JASP_TTESTS, ncp=repr(found.effect * scale), df=repr(found.df1)),
+        encoding="utf-8",
+    )
+    done = subprocess.run([rscript(), str(tmp_path / "jasp.R")], capture_output=True, text=True)
+    low, high = (float(v) / scale for v in done.stdout.split())
+    assert (found.effect_low, found.effect_high) == pytest.approx((low, high), abs=1e-6)
+
+
 @needs_r
 def test_student_agrees_in_r_and_python(result, sample):
     in_python, _ = comparison(result, sample, True, t_test=script.STUDENT)
@@ -155,9 +182,9 @@ def test_r_and_python_give_the_same_numbers(result, sample):
             assert (in_r.low, in_r.high) == pytest.approx(
                 (in_python.low, in_python.high), abs=0.006
             )
-            # effectsize uses the noncentral t, pingouin an approximation.
+            # Both solve JASP's noncentral t interval, MBESS in R and scipy here.
             assert (in_r.effect_low, in_r.effect_high) == pytest.approx(
-                (in_python.effect_low, in_python.effect_high), abs=0.01
+                (in_python.effect_low, in_python.effect_high), abs=1e-6
             )
         else:
             assert in_python.effect_low is None and in_python.omega is None

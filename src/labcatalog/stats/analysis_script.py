@@ -180,18 +180,27 @@ print(groups)
 """
 R_WELCH = """\
 # Welch's t test (unequal variances); Cohen's d with the mean of the two group variances
-# and its 95% CI (effectsize).
+# (effectsize).
 test <- t.test(y ~ group)
 print(test)
 effect <- effectsize::cohens_d(y ~ group, pooled_sd = FALSE)
-print(effect)
 """
 R_STUDENT = """\
-# Student's t test (equal variances); Cohen's d with the pooled SD and its 95% CI (effectsize).
+# Student's t test (equal variances); Cohen's d with the pooled SD (effectsize).
 test <- t.test(y ~ group, var.equal = TRUE)
 print(test)
 effect <- effectsize::cohens_d(y ~ group, pooled_sd = TRUE)
-print(effect)
+"""
+R_D_INTERVAL = """\
+# The 95% CI of d as JASP gives it: the noncentral t at d's own noncentrality, with the
+# test's df (MBESS::conf.limits.nct, which JASP uses).
+n <- as.vector(table(group))
+scale <- sqrt(prod(n) / sum(n))
+limits <- MBESS::conf.limits.nct(ncp = effect$Cohens_d * scale, df = unname(test$parameter),
+                                 conf.level = 0.95)
+d_low <- limits$Lower.Limit / scale
+d_high <- limits$Upper.Limit / scale
+print(c(d = effect$Cohens_d, low = d_low, high = d_high))
 """
 R_ANOVA = """\
 # One-way analysis of variance; eta squared and omega squared with their 95% CIs (effectsize).
@@ -212,23 +221,37 @@ groups = groups.reset_index().set_axis(["group", "n", "mean", "sd"], axis=1)
 print(groups)
 """
 PYTHON_WELCH = """\
-# Welch's t test (unequal variances) and Cohen's d with the mean of the two group variances,
-# with its 95% CI (pingouin). pingouin's own d uses the pooled SD, so d is written out here.
+# Welch's t test (unequal variances) and Cohen's d with the mean of the two group variances
+# (pingouin). pingouin's own d uses the pooled SD, so d is written out here.
 first, second = (data.loc[data["group"] == g, "y"] for g in levels)
 test = pg.ttest(first, second, correction=True)
 print(test)
 cohens_d = (first.mean() - second.mean()) / np.sqrt((first.var() + second.var()) / 2)
-d_low, d_high = pg.compute_esci(cohens_d, len(first), len(second), eftype="cohen", decimals=4)
-print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
 """
 PYTHON_STUDENT = """\
-# Student's t test (equal variances) and Cohen's d with the pooled SD, with its 95% CI
-# (pingouin).
+# Student's t test (equal variances) and Cohen's d with the pooled SD (pingouin).
 first, second = (data.loc[data["group"] == g, "y"] for g in levels)
 test = pg.ttest(first, second, correction=False)
 print(test)
 cohens_d = pg.compute_effsize(first, second, eftype="cohen")
-d_low, d_high = pg.compute_esci(cohens_d, len(first), len(second), eftype="cohen", decimals=4)
+"""
+PYTHON_D_INTERVAL = """\
+# The 95% CI of d as JASP gives it: the noncentral t at d's own noncentrality, with the
+# test's df, solved with scipy as MBESS::conf.limits.nct does in JASP.
+from scipy import optimize, stats
+
+def limit(gap, step):
+    # Step out from the observed noncentrality until the limit lies between two points.
+    end = ncp + step
+    while gap(end) > 0:
+        end += step
+    return optimize.brentq(gap, min(ncp, end), max(ncp, end), xtol=1e-12)
+
+
+scale = np.sqrt(len(first) * len(second) / (len(first) + len(second)))
+ncp, df = cohens_d * scale, test["dof"].iloc[0]
+d_low = limit(lambda x: stats.nct.sf(ncp, df, x) - 0.025, -1) / scale
+d_high = limit(lambda x: stats.nct.cdf(ncp, df, x) - 0.025, 1) / scale
 print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
 """
 PYTHON_ANOVA = """\
@@ -239,8 +262,8 @@ print(test)
 R_TEST_OUT = {
     TWO: "test_result <- data.frame(statistic = unname(test$statistic), "
     "df1 = unname(test$parameter), df2 = NA, p = test$p.value, low = test$conf.int[1], "
-    "high = test$conf.int[2], effect = effect$Cohens_d, effect_low = effect$CI_low, "
-    "effect_high = effect$CI_high, omega = NA, omega_low = NA, omega_high = NA)",
+    "high = test$conf.int[2], effect = effect$Cohens_d, effect_low = d_low, "
+    "effect_high = d_high, omega = NA, omega_low = NA, omega_high = NA)",
     "anova": 'test_result <- data.frame(statistic = anova_table[["F value"]][1], '
     'df1 = anova_table[["Df"]][1], df2 = anova_table[["Df"]][2], '
     'p = anova_table[["Pr(>F)"]][1], low = NA, high = NA, effect = effect$Eta2, '
@@ -597,8 +620,8 @@ def comparison_plan(
         mapping=", ".join(f"{number(v)}: {r_string(t)}" for v, t in kept), **fields
     )
     tests = {
-        WELCH: (R_WELCH, PYTHON_WELCH),
-        STUDENT: (R_STUDENT, PYTHON_STUDENT),
+        WELCH: (R_WELCH + R_D_INTERVAL, PYTHON_WELCH + PYTHON_D_INTERVAL),
+        STUDENT: (R_STUDENT + R_D_INTERVAL, PYTHON_STUDENT + PYTHON_D_INTERVAL),
         ANOVA: (R_ANOVA, PYTHON_ANOVA),
     }
     out = ANOVA if kind == ANOVA else TWO
@@ -609,7 +632,7 @@ def comparison_plan(
         outputs=("groups", "test_result"),
         r_footer=R_TEST_OUT[out],
         python_footer=PYTHON_TEST_OUT[out],
-        packages=("effectsize",),
+        packages=("effectsize",) if kind == ANOVA else ("effectsize", "MBESS"),
     )
     return ComparisonPlan(kind, code, left)
 

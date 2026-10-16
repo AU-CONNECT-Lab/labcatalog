@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from labcatalog.exceptions import RError
 
 CFA_PACKAGES = ("lavaan", "semTools")
-ANALYSIS_PACKAGES = ("psych", "effectsize")
+ANALYSIS_PACKAGES = ("psych", "effectsize", "MBESS")
 MULTILEVEL_PACKAGES = ("lme4", "lmerTest", "performance")
 ALL_PACKAGES = CFA_PACKAGES + ANALYSIS_PACKAGES + MULTILEVEL_PACKAGES
 MISSING_PACKAGES = 3

@@ -306,9 +306,8 @@ def test_note(comparison: Comparison) -> str:
             else "d is Cohen's d with the pooled SD, as JASP gives it with Student's test"
         )
         return (
-            f"{d}; its confidence interval is computed differently from JASP's, so it can "
-            f"differ a little. The difference is {first.label} minus {second.label}, with its "
-            "95% confidence interval."
+            f"{d}, with JASP's 95% confidence interval (noncentral t). The difference is "
+            f"{first.label} minus {second.label}, with its 95% confidence interval."
         )
     omega = "" if comparison.omega is not None else " ω² is computed only in R."
     return f"η² and ω² (JASP's default) with their 95% confidence intervals.{omega}"
