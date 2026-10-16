@@ -8,7 +8,7 @@ import pytest
 from labcatalog.data.scoring import score_items
 from labcatalog.exceptions import RError
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats.cfa import ONE_FACTOR, PYTHON, SUBSCALES, build_models, fit_models
+from labcatalog.stats.cfa import ML, ONE_FACTOR, PYTHON, SUBSCALES, build_models, fit_models
 from labcatalog.stats.rbridge import CFA_PACKAGES, r_status
 
 
@@ -125,6 +125,22 @@ write.csv(data.frame(name = c(names(measures), paste(std$lhs, std$rhs), names(om
                      value = c(unname(measures), std$est.std, unname(omega))),
           args[3], row.names = FALSE)
 """
+
+
+@needs_r
+def test_with_ml_r_and_python_give_the_same_fit(result):
+    models = [m for m in models_of(result) if m.dataset == "child_w1"]
+    in_r = fit_models(models, rscript(), ML)
+    in_python = fit_models(models, None, ML)
+    for a, b in zip(in_r, in_python, strict=True):
+        assert (a.engine, a.estimator, b.engine, b.estimator) == ("R", ML, PYTHON, ML)
+        assert a.problem is None and b.problem is None
+        for key in ("chisq", "df", "cfi", "tli", "rmsea"):
+            if a.fit.get(key) is not None:
+                assert a.fit[key] == pytest.approx(b.fit[key], abs=1e-3)
+        assert a.loadings == pytest.approx(b.loadings, abs=1e-3)
+        assert a.omega == pytest.approx(b.omega, abs=1e-3)
+        assert a.fit.get("srmr") is not None or a.fit.get("df") == 0
 
 
 @needs_r

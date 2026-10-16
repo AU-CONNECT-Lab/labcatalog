@@ -11,6 +11,8 @@ from labcatalog.reports.export import (
     BY_GROUP,
     BY_ID,
     COLUMNS,
+    ITEM_STATISTICS,
+    SCORE_STATISTICS,
     VARIABLES,
     data_frame,
     export_plan,
@@ -90,7 +92,9 @@ def test_export_writes_a_new_folder_in_outputs(result):
     assert sorted(p.name for p in folder.iterdir()) == [
         "child_w1.csv",
         "child_w2.csv",
+        ITEM_STATISTICS,
         "manifest.json",
+        SCORE_STATISTICS,
         VARIABLES,
     ]
     assert done.left_out == {}
@@ -141,7 +145,13 @@ def test_cli_exports_named_instruments(mock_project, monkeypatch, capsys):
     assert code == 0
     folder = next((mock_project / "outputs").iterdir())
     assert out.strip() == f"Wrote {folder.resolve()}"
-    assert sorted(f.name for f in folder.iterdir()) == ["child_w3.csv", "manifest.json", VARIABLES]
+    assert sorted(f.name for f in folder.iterdir()) == [
+        "child_w3.csv",
+        ITEM_STATISTICS,
+        "manifest.json",
+        SCORE_STATISTICS,
+        VARIABLES,
+    ]
     code, out, _ = run_cli(monkeypatch, capsys, "example_parent_stress", "--by", "id", *p)
     assert code == 0 and "Left out 2 rows of parent_w3: their id repeats in that file" in out
     code, _, err = run_cli(monkeypatch, capsys, "example_mood", "--by", "row", *p)
@@ -153,3 +163,21 @@ def test_cli_exports_named_instruments(mock_project, monkeypatch, capsys):
     assert (code, err.strip()) == (1, "Error: Not an instrument or dataset in this project: nope")
     code, _, err = run_cli(monkeypatch, capsys, "example_mood", "-d", "parent_w1", *p)
     assert (code, err.strip()) == (1, "Error: None of these instruments is in these datasets")
+
+
+def test_statistics_match_the_summary_and_leave_out_open_answers(result):
+    plan = {"child_w1": ["example_mood"], "parent_w1": ["example_demographics"]}
+    done = write_export(result, plan, BY_DATASET)
+    scores = pd.read_csv(done.folder / SCORE_STATISTICS, encoding="utf-8-sig")
+    total = scores.set_index("score").loc["ems_total"]
+    key = next(s.key for s in result.catalog.scores_for("child_w1") if s.score_id == "ems_total")
+    summary = next(s for s in result.summary.scores if s.key == key)
+    assert (total["n"], total["alpha"]) == (summary.n_valid, pytest.approx(summary.alpha))
+    assert (total["possible_min"], total["possible_max"]) == (0, 27)
+    items = pd.read_csv(done.folder / ITEM_STATISTICS, encoding="utf-8-sig", keep_default_na=False)
+    assert "dem_comment_w1" not in set(items["column"])
+    gender = items.set_index("column").loc["dem_gender_w1"]
+    assert gender["counts"] == "1=90; 2=96; 3=2" and gender["missing"] == "blank=2; refused=1"
+    wide = write_export(result, {"child_w1": ["example_mood"]}, BY_ID)
+    columns = pd.read_csv(wide.folder / SCORE_STATISTICS, encoding="utf-8-sig")["column"]
+    assert all(c.startswith("child_w1_") for c in columns)

@@ -14,6 +14,8 @@ from labcatalog.reports.outputs import write_output
 from labcatalog.stats.analysis import linkable
 
 VARIABLES = "variables.csv"
+SCORE_STATISTICS = "score_statistics.csv"
+ITEM_STATISTICS = "item_statistics.csv"
 # One file per dataset, or one wide table with a row per person or per group.
 BY_DATASET = "dataset"
 BY_ID = "id"
@@ -120,6 +122,72 @@ def variable_rows(result: CatalogResult, plan: dict[str, list[str]]) -> list[dic
     return [{column: row.get(column, "") for column in COLUMNS} for row in rows]
 
 
+def score_statistics(result: CatalogResult, plan: dict[str, list[str]]) -> list[dict]:
+    found = {s.key: s for s in result.summary.scores}
+    rows = []
+    for dataset, instrument_ids in plan.items():
+        info = result.datasets[dataset].config
+        for score in exported_scores(result, dataset, instrument_ids):
+            stats = found[score.key]
+            low, high = stats.possible_range
+            rows.append(
+                {
+                    "dataset": dataset,
+                    "study": info.study,
+                    "wave": info.wave,
+                    "reporter": info.reporter,
+                    "column": output_name(score),
+                    "instrument": score.instrument_id,
+                    "score": score.score_id,
+                    "label": score.label,
+                    "n": stats.n_valid,
+                    "n_complete": stats.n_complete,
+                    "mean": stats.mean,
+                    "sd": stats.sd,
+                    "median": stats.median,
+                    "min": stats.minimum,
+                    "max": stats.maximum,
+                    "possible_min": low,
+                    "possible_max": high,
+                    "alpha": stats.alpha,
+                }
+            )
+    return rows
+
+
+def item_statistics(result: CatalogResult, plan: dict[str, list[str]]) -> list[dict]:
+    found = {(v.dataset, v.column): v for v in result.summary.variables}
+    rows = []
+    for dataset, instrument_ids in plan.items():
+        for variable in result.catalog.variables_for(dataset):
+            stats = found.get((dataset, variable.column))
+            # Open answers stay out, as in the data files.
+            if variable.instrument_id not in instrument_ids or variable.type == "text" or not stats:
+                continue
+            rows.append(
+                {
+                    "dataset": dataset,
+                    "study": variable.study,
+                    "wave": variable.wave,
+                    "reporter": variable.reporter,
+                    "column": variable.column,
+                    "instrument": variable.instrument_id,
+                    "item": variable.item_id,
+                    "type": variable.type,
+                    "n": stats.n_valid,
+                    "missing": "; ".join(f"{k}={n}" for k, n in stats.missing.items() if n),
+                    "not_an_option": stats.n_unexpected,
+                    "mean": stats.mean,
+                    "sd": stats.sd,
+                    "median": stats.median,
+                    "min": stats.minimum,
+                    "max": stats.maximum,
+                    "counts": "; ".join(f"{k}={n}" for k, n in stats.value_counts.items()),
+                }
+            )
+    return rows
+
+
 def number_text(value: float | None) -> str:
     return "" if value is None else f"{value:g}"
 
@@ -184,15 +252,22 @@ def write_export(result: CatalogResult, plan: dict[str, list[str]], layout: str)
     if layout not in allowed:
         raise ExportError(f"Cannot export by {layout}; these datasets allow {', '.join(allowed)}")
     variables = pd.DataFrame(variable_rows(result, plan), columns=COLUMNS)
+    statistics = {
+        SCORE_STATISTICS: pd.DataFrame(score_statistics(result, plan)),
+        ITEM_STATISTICS: pd.DataFrame(item_statistics(result, plan)),
+    }
     if layout == BY_DATASET:
         frames = {f"{d}.csv": data_frame(result, d, ids) for d, ids in plan.items()}
         left_out = {}
     else:
         wide, left_out = wide_frame(result, plan, layout)
         frames = {f"data_by_{key_name(result, layout)}.csv": wide}
-        variables["column"] = variables["dataset"] + "_" + variables["column"]
-    # The byte-order mark makes Excel open the list as UTF-8; data files stay plain for R.
+        for table in [variables, *statistics.values()]:
+            if not table.empty:
+                table["column"] = table["dataset"] + "_" + table["column"]
+    # The byte-order mark makes Excel open the lists as UTF-8; data files stay plain for R.
     files = {VARIABLES: variables.to_csv(index=False).encode("utf-8-sig")}
+    files |= {name: t.to_csv(index=False).encode("utf-8-sig") for name, t in statistics.items()}
     files |= {name: frame.to_csv(index=False).encode("utf-8") for name, frame in frames.items()}
     folder = write_output(result.project.root, "export", files, result.manifest)
     return Export(folder, left_out)

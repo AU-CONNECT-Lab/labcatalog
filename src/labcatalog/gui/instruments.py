@@ -46,6 +46,8 @@ from labcatalog.reports.export import (
     BY_DATASET,
     BY_GROUP,
     BY_ID,
+    ITEM_STATISTICS,
+    SCORE_STATISTICS,
     VARIABLES,
     export_plan,
     layouts,
@@ -300,8 +302,10 @@ def export_dialog(result: CatalogResult, found: dict[str, list[str]], view: Brow
             ui.label(
                 f"Writes a new folder in outputs/ with {VARIABLES}, which describes every "
                 "variable, and the data: the ID and date columns, the chosen items as they are "
-                "in the data and the scores labcatalog computes. Open answers are listed but not "
-                "exported. In one table, each column starts with its dataset's name."
+                "in the data and the scores labcatalog computes; and the statistics: "
+                f"{SCORE_STATISTICS} and {ITEM_STATISTICS} with each score's and item's n, mean, "
+                "SD and range in each dataset. Open answers are listed but not exported. In one "
+                "table, each column starts with its dataset's name."
             )
             with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0"):
                 for dataset, ids in plan.items():

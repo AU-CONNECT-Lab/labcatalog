@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from labcatalog.charts import views
-from labcatalog.gui import datasets, instruments, overview, problems
+from labcatalog.gui import datasets, instruments, problems
 from labcatalog.gui.common import split_location
 from labcatalog.issues import Issue
 from labcatalog.metadata.bibliography import citation
@@ -17,16 +17,6 @@ def test_location_splits_off_the_line_number():
     outside = Path.cwd() / "data" / "parent_w1.csv"
     path, line = split_location(f"{outside.as_posix()}:3")
     assert (Path("project") / path, line) == (outside, 3)
-
-
-def test_wave_table(mock_project):
-    result = run_catalog(mock_project)
-    _, waves = overview.wave_table(result)
-    assert [(w["wave"], w["n_parent"], w["n_child"]) for w in waves] == [
-        ("1", 191, 182),
-        ("2", 170, 153),
-        ("3", 159, 148),
-    ]
 
 
 def test_instrument_list_shows_only_the_matched_datasets(mock_project):

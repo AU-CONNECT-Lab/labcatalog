@@ -199,7 +199,7 @@ def export(
     ] = BY_DATASET,
     project: ProjectOption = Path("."),
 ) -> None:
-    """Write a variable list and the data for the chosen instruments into outputs/."""
+    """Write a variable list, the data and their statistics for the chosen instruments into outputs/."""
     done = run_export(project, instruments, dataset or [], by)
     typer.echo(f"Wrote {done.folder}")
     for name, n in done.left_out.items():

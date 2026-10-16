@@ -88,6 +88,18 @@ def test_steps_add_constraints_and_compare_with_the_step_before(result):
     assert all(s.df_diff > 0 and 0 <= s.p_diff <= 1 for s in test.steps[1:])
 
 
+@needs_r
+def test_continuous_items_have_no_thresholds_step_or_option_check(result):
+    stress = models_of(result)["example_parent_stress"]
+    # An option nobody chose in one wave only matters for ordered items.
+    stress.waves["3"]["eps_1"] = stress.waves["3"]["eps_1"].replace(5.0, 4.0)
+    [test] = invariance.fit_models([stress], rscript(), "ml")
+    assert test.problem is None
+    assert [s.step for s in test.steps] == ["configural", "metric", "scalar"]
+    assert all(s.problem is None and s.fit["srmr"] is not None for s in test.steps)
+    assert all(s.df_diff > 0 for s in test.steps[1:])
+
+
 def test_an_option_nobody_chose_in_one_wave_stops_the_model_before_r(result):
     stress = models_of(result)["example_parent_stress"]
     stress.waves["3"]["eps_1"] = stress.waves["3"]["eps_1"].replace(5.0, 4.0)
