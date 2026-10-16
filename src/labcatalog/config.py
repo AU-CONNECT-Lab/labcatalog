@@ -117,6 +117,8 @@ class ProjectConfig(StrictModel):
     prepare: list[PrepareStep] = []
     # Template of each instrument's Measures paragraph, in place of the built-in one.
     measures: str | None = None
+    # Template of each study's Participants paragraph, in place of the built-in one.
+    participants: str | None = None
 
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:

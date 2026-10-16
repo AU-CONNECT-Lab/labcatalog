@@ -54,5 +54,5 @@ def test_unknown_placeholders_and_stray_braces_are_errors(mock_project):
     issues = validate_project(load_project(mock_project))
     found = [i for i in issues if i.message.startswith("measures:")]
     assert len(found) == 1 and "unknown placeholder {nmae}" in found[0].message
-    assert measures.placeholder_problem("{name") is not None
-    assert measures.placeholder_problem("a {{literal}} {name}") is None
+    assert measures.placeholder_problem("{name", measures.PLACEHOLDERS) is not None
+    assert measures.placeholder_problem("a {{literal}} {name}", measures.PLACEHOLDERS) is None

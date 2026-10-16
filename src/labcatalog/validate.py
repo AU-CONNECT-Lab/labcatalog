@@ -6,7 +6,7 @@ from typing import Any
 from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
 from labcatalog.issues import Issue, IssueLevel
-from labcatalog.measures import placeholder_problem
+from labcatalog import measures, participants
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
 from labcatalog.schema import Administration, Instrument
 
@@ -24,7 +24,7 @@ def validate_project(project: Project) -> list[Issue]:
         *check_data_settings(project),
         *check_references(project),
         *check_prepare_steps(project),
-        *check_measures(project),
+        *check_templates(project),
     ]
 
 
@@ -471,15 +471,24 @@ def check_prepare_steps(project: Project) -> list[Issue]:
     return issues
 
 
-def check_measures(project: Project) -> list[Issue]:
-    templates = [("measures", project.config.measures, CONFIG)] + [
-        ("measures", instrument.measures, project.instrument_files[instrument_id])
-        for instrument_id, instrument in project.instruments.items()
+def check_templates(project: Project) -> list[Issue]:
+    config = project.config
+    templates = [
+        ("measures", config.measures, CONFIG, measures.PLACEHOLDERS),
+        ("participants", config.participants, CONFIG, participants.PLACEHOLDERS),
+        *[
+            ("measures", instrument.measures, project.instrument_files[name], measures.PLACEHOLDERS)
+            for name, instrument in project.instruments.items()
+        ],
+        *[
+            ("participants", content.participants, project.study_files[name], participants.PLACEHOLDERS)
+            for name, content in project.studies.items()
+        ],
     ]
     return [
         problem("invalid_value", f"{where}: {found}", location)
-        for where, template, location in templates
-        if template and (found := placeholder_problem(template))
+        for where, template, location, allowed in templates
+        if template and (found := measures.placeholder_problem(template, allowed))
     ]
 
 

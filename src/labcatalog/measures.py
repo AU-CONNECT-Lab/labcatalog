@@ -32,14 +32,14 @@ def template_for(project: Project, instrument: Instrument) -> str:
     return instrument.measures or project.config.measures or DEFAULT_TEMPLATE
 
 
-def placeholder_problem(template: str) -> str | None:
+def placeholder_problem(template: str, allowed: tuple[str, ...]) -> str | None:
     try:
         fields = [f for _, f, _, _ in string.Formatter().parse(template) if f is not None]
     except ValueError as e:
         return f"{e}; write a literal brace as {{{{ or }}}}"
-    wrong = [f for f in fields if f not in PLACEHOLDERS]
+    wrong = [f for f in fields if f not in allowed]
     if wrong:
-        return f"unknown placeholder {{{wrong[0]}}}; use one of {', '.join(PLACEHOLDERS)}"
+        return f"unknown placeholder {{{wrong[0]}}}; use one of {', '.join(allowed)}"
     return None
 
 

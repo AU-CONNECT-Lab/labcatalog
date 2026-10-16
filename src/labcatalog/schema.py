@@ -97,6 +97,8 @@ class StudyContent(StrictModel):
     study: str
     # Modality to how its data were collected and processed in this study.
     methods: dict[str, str] = {}
+    # This study's own Participants template, in place of the project's.
+    participants: str | None = None
     administrations: list[Administration] = []
 
 

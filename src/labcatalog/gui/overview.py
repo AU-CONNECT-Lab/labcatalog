@@ -2,9 +2,9 @@ from collections.abc import Callable
 
 from nicegui import ui
 
-from labcatalog.config import WaveConfig
 from labcatalog.gui import charts
 from labcatalog.gui.common import card, col, sorted_waves, table, unique
+from labcatalog.participants import wave_dates
 from labcatalog.pipeline import CatalogResult
 
 
@@ -80,12 +80,3 @@ def wave_table(result: CatalogResult, only: str | None = None) -> tuple[list[dic
             )
     return columns, rows
 
-
-def wave_dates(wave: WaveConfig) -> str:
-    if wave.start and wave.end:
-        return f"{wave.start} to {wave.end}"
-    if wave.start:
-        return f"since {wave.start}"
-    if wave.end:
-        return f"until {wave.end}"
-    return ""
