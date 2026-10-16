@@ -66,8 +66,22 @@ def git_commit(root: Path) -> str | None:
 
 def commit_of(root: Path, branch: str, paths: list[str]) -> str:
     head = run_git(root, "rev-parse", "--short", branch)
-    changed = run_git(root, "status", "--porcelain", "--", *paths)
+    changed = run_git(root, "status", "--porcelain", "--", *paths) or unsynced(root, branch)
     return f"{head}-modified" if changed else head
+
+
+def unsynced(root: Path, branch: str) -> bool:
+    # A synced adjusted branch is one git-annex commit on top of the original branch.
+    return branch != "HEAD" and run_git(root, "rev-parse", "HEAD^") != run_git(
+        root, "rev-parse", branch
+    )
+
+
+def tags_at(root: Path, branch: str) -> list[str]:
+    # datalad save --version-tag tags the adjusted commit, a plain git tag the original one.
+    found = {*run_git(root, "tag", "--points-at", "HEAD").split()}
+    found.update(run_git(root, "tag", "--points-at", branch).split())
+    return sorted(found)
 
 
 def original_branch(root: Path) -> str:
@@ -96,7 +110,7 @@ def datalad_record(project_root: Path, folder: Path, paths: list[str]) -> Datala
             id=run_git(folder, "config", "--file", DATALAD_CONFIG.as_posix(), "datalad.dataset.id"),
             # Only the files labcatalog used decide whether the dataset counts as modified.
             commit=commit_of(folder, branch, paths),
-            tags=run_git(folder, "tag", "--points-at", branch).split(),
+            tags=tags_at(folder, branch),
         )
     except (OSError, subprocess.CalledProcessError):
         return None
