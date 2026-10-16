@@ -786,7 +786,8 @@ def network_groups(
         order = instrument_order(result)
         present = [i for i in order if i in groups]
         names = instrument_names(result)
-        categories = [(names[i], group_color(order.index(i))) for i in present]
+        # Colours by place among the instruments shown, so neighbours in the palette stay apart.
+        categories = [(names[i], group_color(k)) for k, i in enumerate(present)]
         return [present.index(g) for g in groups], categories, [""] * len(groups)
     if color_by == "cluster":
         found = score_clusters(z, p["skip"])

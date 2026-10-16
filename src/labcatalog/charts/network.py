@@ -13,6 +13,8 @@ NODE_SPAN = 11
 NETWORK_HEIGHT = 640
 UNSET = "Not set"
 UNSET_COLOR = "#9aa5b1"
+# Links shown at |r| from the chart's threshold up use the stronger part of the colour scale.
+LINK_FLOOR = 0.35
 
 
 def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[str, str]]) -> dict:
@@ -38,7 +40,12 @@ def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[s
             "target": str(link["target"]),
             "value": abs(link["r"]),
             "lineStyle": {
-                "color": scale_color(link["r"], CORRELATION_SCALE, -1, 1),
+                "color": scale_color(
+                    np.sign(link["r"]) * (LINK_FLOOR + (1 - LINK_FLOOR) * abs(link["r"])),
+                    CORRELATION_SCALE,
+                    -1,
+                    1,
+                ),
                 "width": round(2 * (0.25 + 0.75 * (abs(link["r"]) / top) ** 1.5), 2),
             },
             "tooltip": {"formatter": link["tip"]},
@@ -64,20 +71,25 @@ def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[s
                 "roam": True,
                 "draggable": True,
                 "top": 16,
-                "bottom": 64,
+                "bottom": 40,
                 "data": data,
                 "links": edges,
                 "categories": [{"name": n, "itemStyle": {"color": c}} for n, c in categories],
                 "itemStyle": {"opacity": 0.9, "borderColor": "#fff", "borderWidth": 0.5},
-                "lineStyle": {"opacity": 0.6},
-                "label": {"show": True, "position": "right", "fontSize": 10, "color": LABEL_INK},
-                "labelLayout": {"hideOverlap": True},
+                "lineStyle": {"opacity": 0.85},
+                "label": {
+                    "show": True,
+                    "position": "right",
+                    "fontSize": 10,
+                    "color": LABEL_INK,
+                    "backgroundColor": "rgba(255,255,255,0.75)",
+                },
                 "emphasis": {"focus": "adjacency", "lineStyle": {"width": 3}},
                 "force": {
                     "initLayout": "circular",
-                    "repulsion": 420,
-                    "gravity": 0.07,
-                    "edgeLength": [50, 200],
+                    "repulsion": 900,
+                    "gravity": 0.03,
+                    "edgeLength": [90, 280],
                 },
             }
         ],

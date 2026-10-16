@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from labcatalog.charts import views
+from labcatalog.charts import style, views
 from labcatalog.charts.style import STATUS_COLORS
 from labcatalog.gui import charts as gui_charts
 from labcatalog.pipeline import run_catalog
@@ -222,3 +222,15 @@ def test_score_network_links_strong_pairs_and_colours_by_the_first_matching_tag(
         option = views.score_network(result, "mock_study", "1", everything, color_by)
         used = {n["category"] for n in option["series"][0]["data"]}
         assert used <= set(range(len(option["series"][0]["categories"])))
+
+
+def test_network_colours_the_instruments_shown_in_palette_order(result):
+    everything = list(views.correlated_instruments(result))
+    option = views.score_network(result, "mock_study", "1", everything, "instrument")
+    colors = [c["itemStyle"]["color"] for c in option["series"][0]["categories"]]
+    assert colors == [style.group_color(k) for k in range(len(colors))]
+    # A weak link is drawn from the stronger part of the scale, not near white.
+    weakest = min(option["series"][0]["links"], key=lambda e: e["value"])
+    assert weakest["lineStyle"]["color"] != style.scale_color(
+        weakest["value"], style.CORRELATION_SCALE, -1, 1
+    )
