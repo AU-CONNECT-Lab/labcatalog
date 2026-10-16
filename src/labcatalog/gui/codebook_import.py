@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -21,7 +22,9 @@ class ImportView:
     issues: list[Issue] = field(default_factory=list)
 
 
-def render(result: CatalogResult, view: ImportView) -> None:
+def render(
+    result: CatalogResult, view: ImportView, on_edit: Callable[[str, int | None], None]
+) -> None:
     project = result.project
     names = codebook.unmapped_datasets(project)
     if not names:
@@ -149,7 +152,7 @@ def render(result: CatalogResult, view: ImportView) -> None:
         )
         ui.button("Check and import", icon="upload", on_click=import_files).classes("mt-2")
         if view.issues:
-            problems.issue_table(view.issues, project.root).classes("mt-2")
+            problems.issue_table(view.issues, project.root, on_edit).classes("mt-2")
 
     note(
         "Describe a new data file's columns in three CSV files; labcatalog checks them and "

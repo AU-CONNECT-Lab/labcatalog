@@ -19,6 +19,7 @@ def render(
     on_instrument: Callable[[str], None],
     on_frozen: Callable[[], Awaitable[None]],
     on_open_freeze: Callable[[str], Awaitable[None]] | None,
+    on_edit: Callable[[str, int | None], None],
 ) -> None:
     summaries = {d.dataset: d for d in result.summary.datasets}
     if not summaries:
@@ -32,7 +33,7 @@ def render(
     ui.button("All datasets", icon="arrow_back", on_click=lambda: on_select(None)).props(
         "flat dense no-caps"
     )
-    detail(result, summaries[selected], on_instrument)
+    detail(result, summaries[selected], on_instrument, on_edit)
 
 
 def studies(
@@ -107,7 +108,10 @@ def dataset_table(
 
 
 def detail(
-    result: CatalogResult, summary: DatasetSummary, on_instrument: Callable[[str], None]
+    result: CatalogResult,
+    summary: DatasetSummary,
+    on_instrument: Callable[[str], None],
+    on_edit: Callable[[str, int | None], None],
 ) -> None:
     ui.label(summary.dataset).classes("text-2xl font-medium mt-4")
     facts(result, summary)
@@ -137,7 +141,7 @@ def detail(
     heading("Problems")
     issues = dataset_issues(result, summary.dataset)
     if issues:
-        problems.issue_table(issues, result.project.root)
+        problems.issue_table(issues, result.project.root, on_edit)
     else:
         note("No problems found.")
 

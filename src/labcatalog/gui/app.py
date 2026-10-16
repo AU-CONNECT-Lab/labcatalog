@@ -340,6 +340,7 @@ class Window:
                 self.open_instrument,
                 self.reload,
                 None if self.home else self.open_freeze,
+                self.edit_location,
             )
 
     @ui.refreshable_method
@@ -369,7 +370,7 @@ class Window:
     @ui.refreshable_method
     def import_panel(self) -> None:
         if self.has_catalog():
-            codebook_import.render(self.result, self.importing)
+            codebook_import.render(self.result, self.importing, self.edit_location)
 
     @ui.refreshable_method
     def problems_panel(self) -> None:

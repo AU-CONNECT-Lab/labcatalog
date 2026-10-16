@@ -27,7 +27,11 @@ LEVEL_CELL = r"""
 LOCATION_CELL = r"""
 <q-td :props="props">
   <a v-if="props.value" class="text-primary cursor-pointer"
-     @click="$parent.$emit('open_location', props.row)">{{ props.value }}</a>
+     :title="props.row.in_editor ? 'Open on the Edit page' : 'Open in its own app'"
+     @click="$parent.$emit('open_location', props.row)">
+    <q-icon :name="props.row.in_editor ? 'edit_note' : 'open_in_new'" size="xs" class="q-mr-xs" />
+    {{ props.value }}
+  </a>
 </q-td>
 """
 CODE_CELL = r"""
@@ -46,7 +50,7 @@ def render(issues: list[Issue], root: Path, edit: Callable[[str, int | None], No
     search.bind_value_to(shown, "filter")
     level.on_value_change(
         lambda e: shown.update_rows(
-            keyed(issue_rows(issues, None if e.value == "all" else e.value))
+            keyed(issue_rows(issues, None if e.value == "all" else e.value, editable_paths(root)))
         )
     )
 
@@ -54,7 +58,7 @@ def render(issues: list[Issue], root: Path, edit: Callable[[str, int | None], No
 def issue_table(
     issues: list[Issue], root: Path, edit: Callable[[str, int | None], None]
 ) -> ui.table:
-    editable = {path for group in editing.editable_files(root).values() for path in group}
+    editable = editable_paths(root)
 
     def follow(location: str) -> None:
         path, line = split_location(location)
@@ -63,7 +67,7 @@ def issue_table(
         else:
             open_path(root / path)
 
-    shown = table(COLUMNS, issue_rows(issues, None))
+    shown = table(COLUMNS, issue_rows(issues, None, editable))
     shown.add_slot("body-cell-level", LEVEL_CELL)
     shown.add_slot("body-cell-location", LOCATION_CELL)
     shown.add_slot("body-cell-code", CODE_CELL)
@@ -71,5 +75,13 @@ def issue_table(
     return shown
 
 
-def issue_rows(issues: list[Issue], level: str | None) -> list[dict]:
-    return [issue.model_dump() for issue in issues if level is None or issue.level == level]
+def editable_paths(root: Path) -> set[str]:
+    return {path for group in editing.editable_files(root).values() for path in group}
+
+
+def issue_rows(issues: list[Issue], level: str | None, editable: set[str]) -> list[dict]:
+    return [
+        issue.model_dump() | {"in_editor": split_location(issue.location or "")[0] in editable}
+        for issue in issues
+        if level is None or issue.level == level
+    ]

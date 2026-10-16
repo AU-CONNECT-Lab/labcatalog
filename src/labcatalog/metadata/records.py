@@ -47,6 +47,8 @@ class Table:
     inner: str | None = None
     # One row for the whole file rather than one per entry of a list.
     single: bool = False
+    # Set when rows come from a list inside each entry of this list, which rows only point to.
+    parent: str | None = None
 
 
 ITEMS = Table(
@@ -88,6 +90,19 @@ ADMINISTRATIONS = Table(
         Column("reversed_in_data", "Reversed in data", "bool", default=False),
     ),
 )
+OVERRIDES = Table(
+    "Overrides",
+    (
+        Column("administration", "Administration", "choice"),
+        Column("item", "Item"),
+        Column("dataset", "Dataset"),
+        Column("text", "Text"),
+        Column("response_set", "Response set"),
+        Column("dropped", "Dropped", "bool", default=False),
+    ),
+    inner="overrides",
+    parent="administrations",
+)
 DATASETS = Table(
     "Datasets",
     (
@@ -108,7 +123,7 @@ INSTRUMENT_TABLES = {"items": ITEMS, "scores": SCORES, "response_sets": OPTIONS}
 TABLES = {
     defaults.INSTRUMENTS_DIR: INSTRUMENT_TABLES,
     defaults.DRAFTS_DIR: INSTRUMENT_TABLES,
-    defaults.STUDIES_DIR: {"administrations": ADMINISTRATIONS},
+    defaults.STUDIES_DIR: {"administrations": ADMINISTRATIONS, "overrides": OVERRIDES},
     "": {"datasets": DATASETS},
 }
 
@@ -148,6 +163,27 @@ def custom_column(field: CustomFieldDef) -> Column:
     )
 
 
+def with_entries(table: Table, text: str) -> Table:
+    # The entries rows can point to are the file's own, so they are read from it.
+    if table.parent is None:
+        return table
+    entries = load(text).get(table.parent) or []
+    first, *rest = table.columns
+    choices = tuple(entry_label(n, entry) for n, entry in enumerate(entries))
+    return replace(table, columns=(replace(first, choices=choices), *rest))
+
+
+def entry_label(n: int, entry: CommentedMap) -> str:
+    return f"{n + 1}: {entry.get('instrument')}"
+
+
+def load(text: str) -> CommentedMap:
+    try:
+        return round_trip().load(text) or CommentedMap()
+    except YAMLError as err:
+        raise EditError(f"The file is not valid YAML; fix it as text first. {err}") from None
+
+
 def round_trip() -> YAML:
     # The layout labcatalog writes, so untouched lines come back as they were.
     loader = YAML()
@@ -158,10 +194,14 @@ def round_trip() -> YAML:
 
 
 def read_rows(text: str, key: str, table: Table) -> list[dict[str, Any]]:
-    try:
-        data = round_trip().load(text) or {}
-    except YAMLError as err:
-        raise EditError(f"The file is not valid YAML; fix it as text first. {err}") from None
+    data = load(text)
+    if table.parent:
+        first, *columns = table.columns
+        return [
+            {ORIGIN: [n, m], first.key: entry_label(n, entry)} | cells(part, columns, key)
+            for n, entry in enumerate(data.get(table.parent) or [])
+            for m, part in enumerate(entry.get(table.inner) or [])
+        ]
     if table.single:
         return [{ORIGIN: 0} | cells(data, table.columns, key)]
     entries = data.get(key) or []
@@ -193,6 +233,8 @@ def write_rows(text: str, key: str, table: Table, rows: list[dict]) -> str:
     data = loader.load(text) or CommentedMap()
     if table.single:
         fill(data, table.columns, rows[0])
+    elif table.parent:
+        write_nested(data, table, rows)
     elif table.inner is None:
         origins = [row.get(ORIGIN) for row in rows]
         for row, entry in zip(rows, place(data, key, origins), strict=True):
@@ -230,6 +272,25 @@ def write_groups(data: CommentedMap, key: str, table: Table, rows: list[dict]) -
             fill(part, columns, row)
 
 
+def write_nested(data: CommentedMap, table: Table, rows: list[dict]) -> None:
+    entries = data.get(table.parent) or []
+    first, *columns = table.columns
+    labels = {entry_label(n, entry): n for n, entry in enumerate(entries)}
+    members: dict[int, list[dict]] = {n: [] for n in range(len(entries))}
+    for row in rows:
+        if row.get(first.key) not in labels:
+            raise EditError(f"{first.label}: choose one for every row")
+        members[labels[row[first.key]]].append(row)
+    for n, entry in enumerate(entries):
+        found = members[n]
+        if not found:
+            entry.pop(table.inner, None)
+            continue
+        origins = [r[ORIGIN][1] if r.get(ORIGIN) and r[ORIGIN][0] == n else None for r in found]
+        for row, part in zip(found, place(entry, table.inner, origins), strict=True):
+            fill(part, columns, row)
+
+
 def sources(rows: list[dict]) -> list[int]:
     return [row[ORIGIN][0] for row in rows if row.get(ORIGIN)]
 
@@ -251,6 +312,10 @@ def place(parent: CommentedMap, key: str, origins: list[int | None], flow: bool 
                 # One line per entry, as labcatalog and its example write them.
                 entries[n].fa.set_flow_style()
             old.insert(n, entries[n])
+    # Rows dragged into another order move their entries; otherwise the list is left as it was.
+    if [id(e) for e in old] != [id(e) for e in entries]:
+        old.clear()
+        old.extend(entries)
     return entries
 
 

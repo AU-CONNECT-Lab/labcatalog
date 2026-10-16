@@ -105,7 +105,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     async def edited_text() -> str | None:
         if shown.editor is not None:
             return shown.editor.value
-        rows = await shown.grid.get_client_data()
+        rows = await shown.grid.get_client_data(method="filtered_sorted")
         try:
             return records.write_rows(shown.opened.text, view.mode, table(), rows)
         except LabCatalogError as err:
@@ -132,7 +132,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         await on_saved()
 
     async def add_row() -> None:
-        rows = await shown.grid.get_client_data()
+        rows = await shown.grid.get_client_data(method="filtered_sorted")
         new = {c.key: cell(records.shown(None, c), c) for c in table().columns}
         if table().inner and rows:
             # A new option most often joins the set above it.
@@ -145,7 +145,13 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         if not selected:
             ui.notify("Tick the rows to delete first")
             return
-        set_rows([r for r in await shown.grid.get_client_data() if r not in selected])
+        set_rows(
+            [
+                r
+                for r in await shown.grid.get_client_data(method="filtered_sorted")
+                if r not in selected
+            ]
+        )
 
     def set_rows(rows: list[dict]) -> None:
         shown.grid.options["rowData"] = rows
@@ -157,7 +163,9 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         page.refresh()
 
     def table() -> records.Table:
-        return records.tables_for(view.path, fields)[view.mode]
+        return records.with_entries(
+            records.tables_for(view.path, fields)[view.mode], shown.opened.text
+        )
 
     def show(issues: list[Issue]) -> None:
         if shown.editor is not None:
@@ -287,6 +295,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             .classes("w-full")
             .style("height: 7rem" if table().single else "height: 65vh")
             .on("cellValueChanged", lambda: setattr(shown, "edited", True))
+            .on("rowDragEnd", lambda: setattr(shown, "edited", True))
         )
         with ui.row().classes("items-center gap-3"):
             save_buttons()
@@ -297,10 +306,16 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 )
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
         note(
-            "Lists are written with commas, for example ems_1, ems_2. Saving changes only the "
-            "cells you changed, so comments and the rest of the file stay as they were."
+            "Lists are written with commas, for example ems_1, ems_2. Drag a row by its handle "
+            "to move it. Saving changes only the cells you changed, so comments and the rest of "
+            "the file stay as they were."
         )
-        if table().inner:
+        if table().parent:
+            note(
+                "Each row changes one item in the administration chosen first; leave Dataset "
+                "empty for every dataset of that administration."
+            )
+        elif table().inner:
             note(
                 f"Rows with the same {table().columns[0].label} make one entry. Renaming it here "
                 "does not rename it where other parts of the file use it."
@@ -382,6 +397,9 @@ def grid_options(table: records.Table, rows: list[dict]) -> dict:
             "minWidth": 280 if wide else 90,
             "cellDataType": {"bool": "boolean", "number": "number"}.get(column.kind, "text"),
         }
+        if column is columns[0] and not table.single:
+            # A handle to drag the row up or down.
+            definition["rowDrag"] = True
         if column.kind == "choice":
             definition["cellEditor"] = "agSelectCellEditor"
             definition["cellEditorParams"] = {"values": list(column.choices)}
@@ -393,7 +411,7 @@ def grid_options(table: records.Table, rows: list[dict]) -> dict:
         ],
         "stopEditingWhenCellsLoseFocus": True,
         "defaultColDef": {"resizable": True},
-    } | ({} if table.single else {"rowSelection": {"mode": "multiRow"}})
+    } | ({} if table.single else {"rowSelection": {"mode": "multiRow"}, "rowDragManaged": True})
 
 
 def cell(value, column: records.Column):
