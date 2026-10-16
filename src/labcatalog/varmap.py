@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from labcatalog import defaults
+from labcatalog.annex import fetch_advice, is_placeholder
 from labcatalog.issues import Issue
 
 MAP_COLUMNS = ("column", "instrument", "item")
@@ -24,6 +25,9 @@ class MapEntry:
 
 def load_variable_map(path: Path, root: Path, issues: list[Issue]) -> list[MapEntry]:
     location = path.relative_to(root).as_posix()
+    if is_placeholder(path):
+        issues.append(map_issue("not_downloaded", fetch_advice(path), location))
+        return []
     try:
         # utf-8-sig accepts the byte-order mark that Excel writes for "CSV UTF-8".
         text = path.read_text(encoding="utf-8-sig")

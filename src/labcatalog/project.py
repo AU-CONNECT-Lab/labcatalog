@@ -8,6 +8,7 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from labcatalog import defaults
+from labcatalog.annex import fetch_advice, is_placeholder
 from labcatalog.bibliography import Bibliography, load_bibliography
 from labcatalog.config import ProjectConfig
 from labcatalog.exceptions import MetadataError, ProjectExistsError, ProjectNotFoundError
@@ -92,6 +93,11 @@ def load_yaml(path: Path) -> Any:
 
 def load_model(path: Path, model: type[ModelT], root: Path, issues: list[Issue]) -> ModelT | None:
     location = path.relative_to(root).as_posix()
+    if is_placeholder(path):
+        issues.append(
+            Issue(level="error", code="not_downloaded", message=fetch_advice(path), location=location)
+        )
+        return None
     try:
         data = load_yaml(path)
     except yaml.YAMLError as err:

@@ -241,7 +241,7 @@ def grid_options(columns: tuple[records.Column, ...], rows: list[dict]) -> dict:
             "headerName": column.label,
             "editable": True,
             "flex": 3 if column.key in WIDE else 1,
-            "minWidth": 90,
+            "minWidth": 280 if column.key in WIDE else 90,
             "cellDataType": {"bool": "boolean", "number": "number"}.get(column.kind, "text"),
         }
         if column.kind == "choice":

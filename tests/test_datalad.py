@@ -1,12 +1,13 @@
 import os
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
 from labcatalog.annex import is_placeholder
 from labcatalog.check import check_prepare_outputs
-from labcatalog.exceptions import DataSourceError
+from labcatalog.exceptions import DataSourceError, MetadataError
 from labcatalog.ids import load_exclusions
 from labcatalog.manifest import build_manifest, git_commit
 from labcatalog.prepare import step_states
@@ -116,13 +117,98 @@ def test_the_manifest_records_the_nearest_dataset_of_each_file(mock_project):
 @needs_git
 def test_on_an_adjusted_branch_the_original_branch_commit_is_recorded(mock_project):
     make_dataset(mock_project)
-    git(mock_project, "tag", "freeze-2026-06")
+    git(mock_project, "tag", "plain-tag")
     main = git(mock_project, "rev-parse", "--short", "main")
     git(mock_project, "checkout", "-b", "adjusted/main(unlocked)")
     git(mock_project, "commit", "--allow-empty", "-m", "git-annex adjusted branch")
+    git(mock_project, "tag", "version-tag")
     assert git(mock_project, "rev-parse", "--short", "HEAD") != main
 
     assert git_commit(mock_project) == main
     [record] = manifest_for(mock_project).datalad
     assert record.commit == main
-    assert record.tags == ["freeze-2026-06"]
+    assert record.tags == ["plain-tag", "version-tag"]
+
+    git(mock_project, "commit", "--allow-empty", "-m", "Plain git commit, not synced")
+    assert git_commit(mock_project) == f"{main}-modified"
+    assert manifest_for(mock_project).datalad[0].commit == f"{main}-modified"
+
+
+def test_metadata_without_its_content_says_how_to_get_it(mock_project):
+    (mock_project / "instruments" / "example_mood.yaml").write_text(POINTER, encoding="utf-8")
+    with pytest.raises(MetadataError) as caught:
+        load_project(mock_project)
+    [issue] = [i for i in caught.value.issues if i.code == "not_downloaded"]
+    assert issue.location == "instruments/example_mood.yaml"
+    assert "datalad get" in issue.message
+
+
+def datalad_exe() -> str | None:
+    home_bin = Path.home() / ".local" / "bin"
+    return shutil.which("datalad") or shutil.which("datalad", path=str(home_bin))
+
+
+needs_datalad = pytest.mark.skipif(datalad_exe() is None, reason="DataLad is not installed")
+
+
+@pytest.fixture
+def datalad(monkeypatch):
+    exe = datalad_exe()
+    # Inside a dataset git itself calls git-annex, so labcatalog's git calls need it on PATH too.
+    monkeypatch.setenv("PATH", str(Path(exe).parent) + os.pathsep + os.environ["PATH"])
+
+    def run(root, *args: str) -> str:
+        done = subprocess.run([exe, *args], cwd=root, check=True, capture_output=True, text=True)
+        return done.stdout
+
+    return run
+
+
+def shared_commit(root) -> str:
+    # The adjusted commit stays on this computer; the one under it is what other clones have.
+    adjusted = git(root, "rev-parse", "--abbrev-ref", "HEAD").startswith("adjusted/")
+    return git(root, "rev-parse", "--short", "HEAD^" if adjusted else "HEAD")
+
+
+@needs_datalad
+def test_a_real_dataset_and_its_clone_record_the_same_commit(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    # Metadata stays in git, row-level data goes to the annex.
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    datalad(mock_project, "save", "-m", "Freeze", "--version-tag", "freeze-test")
+    commit = shared_commit(mock_project)
+
+    [record] = manifest_for(mock_project).datalad
+    assert record.commit == commit
+    assert record.tags == ["freeze-test"]
+
+    clone = mock_project.parent / "clone"
+    datalad(mock_project.parent, "clone", str(mock_project), str(clone))
+    with pytest.raises(DataSourceError, match=r"parent_w1: the content of .* datalad get"):
+        load_datasets(load_project(clone))
+    states = {s.step.name: s for s in step_states(load_project(clone))}
+    assert states["clean_parent_w1"].outputs[0].placeholder
+
+    datalad(clone, "get", "data")
+    [cloned] = manifest_for(clone).datalad
+    assert cloned.id == record.id
+    assert cloned.commit == commit
+
+
+@needs_datalad
+def test_a_plain_git_commit_in_a_real_dataset(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    commit = shared_commit(mock_project)
+    adjusted = git(mock_project, "rev-parse", "--abbrev-ref", "HEAD").startswith("adjusted/")
+    (mock_project / "notes.txt").write_text("checked\n", encoding="utf-8")
+    git(mock_project, "add", "notes.txt")
+    git(mock_project, "commit", "-m", "Plain git commit")
+
+    [record] = manifest_for(mock_project).datalad
+    if adjusted:
+        assert record.commit == f"{commit}-modified"
+    else:
+        assert record.commit == git(mock_project, "rev-parse", "--short", "HEAD")
