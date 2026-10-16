@@ -6,9 +6,9 @@ kind: video
 construct_name: Parent-child interaction
 description: Ten minutes of free play, filmed and coded by trained observers; the coding software leaves a behaviours-by-count-and-seconds table for each family.
 items:
-  - {id: child_positive_rate, text: "Child positive affect, events per minute", type: number, min: 0, max: 30}
-  - {id: child_negative_rate, text: "Child negative affect, events per minute", type: number, min: 0, max: 30}
-  - {id: parent_warmth_rate, text: "Parent warmth, events per minute", type: number, min: 0, max: 30}
-  - {id: joint_attention, text: "Share of the session in joint attention", type: number, min: 0, max: 1}
-  - {id: minutes, text: "Length of the coded recording (minutes)", type: number, min: 0, max: 60}
+  - {id: child_positive_rate, label: "Child positive affect", text: "Child positive affect, events per minute", type: number, min: 0, max: 30}
+  - {id: child_negative_rate, label: "Child negative affect", text: "Child negative affect, events per minute", type: number, min: 0, max: 30}
+  - {id: parent_warmth_rate, label: "Parent warmth", text: "Parent warmth, events per minute", type: number, min: 0, max: 30}
+  - {id: joint_attention, label: "Joint attention", text: "Share of the session in joint attention", type: number, min: 0, max: 1}
+  - {id: minutes, label: "Coded minutes", text: "Length of the coded recording (minutes)", type: number, min: 0, max: 60}
 license: Fictional example measures

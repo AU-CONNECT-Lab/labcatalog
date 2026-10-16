@@ -18,10 +18,10 @@ response_sets:
       - {value: 3, label: "Bachelor's degree"}
       - {value: 4, label: Graduate degree}
 items:
-  - {id: dem_age, text: "How old is your child (in years)?", type: number, min: 3, max: 18}
-  - {id: dem_gender, text: "What is your child's gender?", response_set: gender}
-  - {id: dem_edu, text: "What is the highest level of education you have completed?", response_set: education}
-  - {id: dem_household, text: "How many people live in your household, including you?", type: number, min: 1, max: 15}
-  - {id: dem_comment, text: "Is there anything else about your family's situation you would like us to know?", type: text}
+  - {id: dem_age, label: "Child age", text: "How old is your child (in years)?", type: number, min: 3, max: 18}
+  - {id: dem_gender, label: "Child gender", text: "What is your child's gender?", response_set: gender}
+  - {id: dem_edu, label: "Parent education", text: "What is the highest level of education you have completed?", response_set: education}
+  - {id: dem_household, label: "Household size", text: "How many people live in your household, including you?", type: number, min: 1, max: 15}
+  - {id: dem_comment, label: "Other family information", text: "Is there anything else about your family's situation you would like us to know?", type: text}
 custom:
   domain: family

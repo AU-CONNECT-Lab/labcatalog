@@ -68,10 +68,10 @@ def test_table_one_matches_a_direct_calculation(result, sample):
     table = found["table1"]
     assert engine == script.PYTHON
     assert table[table["variable"] == "N"]["n"].tolist() == [len(sample.people)] * 2
-    age = table[table["variable"] == "EFB: How old is your child (in years)?"].iloc[0]
+    age = table[table["variable"] == "Child age"].iloc[0]
     assert age["mean"] == pytest.approx(frame["dem_age_w1"].mean())
     assert age["sd"] == pytest.approx(frame["dem_age_w1"].std())
-    gender = table[table["variable"] == "EFB: What is your child's gender?"]
+    gender = table[table["variable"] == "Child gender"]
     assert gender["level"].tolist() == ["Girl", "Boy", "Another gender"]
     assert gender["n"].sum() == frame["dem_gender_w1"].notna().sum()
     assert gender["percent"].sum() == pytest.approx(100)
@@ -243,7 +243,7 @@ def test_table_one_reads_like_a_paper_table(result, sample):
     assert [c["label"] for c in columns] == ["Variable", "Parent", "α", "Child", "α"]
     n = str(len(sample.people))
     assert (rows[0]["variable"], rows[0]["d0"], rows[0]["d1"], rows[0]["a0"]) == ("N", n, n, "")
-    gender = [r["variable"] for r in rows].index("EFB: What is your child's gender?")
+    gender = [r["variable"] for r in rows].index("Child gender")
     assert rows[gender + 1]["variable"] == analysis_tables.INDENT + "Girl"
     assert rows[gender + 1]["d0"].endswith("%)")
     ems = next(r for r in rows if r["variable"] == "EMS Total score")
@@ -345,6 +345,15 @@ def test_correlations_and_regression_agree_in_r_and_python(result, sample):
         (py_fit.slope, py_fit.slope_se, py_fit.correlation.p)
     )
     assert r_fit.correlation.high == pytest.approx(py_fit.correlation.high, abs=0.006)
+
+
+def test_an_item_reads_by_its_label_or_else_by_its_text(result):
+    age = script.item_variable(result, "item:example_demographics.dem_age@parent_w1")
+    assert script.item_label(result, age) == "Child age"
+    unnamed = age.model_copy(update={"label": None})
+    assert script.item_label(result, unnamed) == "EFB: How old is your child (in years)?"
+    choices = views.variable_choices(result, ["eeg_w1"])
+    assert choices[FAA] == "EEG: Frontal alpha asymmetry (Wave 1)"
 
 
 def test_number_items_analyse_beside_scores(result, tmp_path, monkeypatch):

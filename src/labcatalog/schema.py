@@ -29,6 +29,8 @@ ItemType = Literal["choice", "number", "text"]
 
 class Item(StrictModel):
     id: str
+    # A short name for tables and text, such as "Child age"; the item's text when left out.
+    label: str | None = None
     text: Text
     type: ItemType = "choice"
     response_set: str | None = None

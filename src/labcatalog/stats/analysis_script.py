@@ -377,10 +377,9 @@ class AnalysisData:
         options = [(float(o.value), o.label) for o in variable.response_options]
         column = self.column_name(variable.dataset, variable.column)
         self.columns[column] = analysis.values(self.result, self.sample, key)
-        instrument = self.result.project.instruments[variable.instrument_id]
         return Variable(
             key=key,
-            label=f"{abbreviation(instrument)}: {next(iter(variable.text.values()))}",
+            label=item_label(self.result, variable),
             dataset=variable.dataset,
             kind=variable.type,
             column=column,
@@ -440,6 +439,8 @@ def other_numbers(result: CatalogResult, datasets: list[str]) -> list[ResolvedVa
 
 
 def item_label(result: CatalogResult, variable: ResolvedVariable) -> str:
+    if variable.label:
+        return variable.label
     instrument = result.project.instruments[variable.instrument_id]
     return f"{abbreviation(instrument)}: {next(iter(variable.text.values()))}"
 
@@ -491,10 +492,8 @@ def measure_variables(
 def group_choices(
     result: CatalogResult, datasets: list[str], labels: dict[str, str]
 ) -> dict[str, str]:
-    instruments = result.project.instruments
     return {
-        item_key(v): f"{abbreviation(instruments[v.instrument_id])}: "
-        f"{next(iter(v.text.values()))} ({labels[v.dataset]})"
+        item_key(v): f"{item_label(result, v)} ({labels[v.dataset]})"
         for v in demographic_items(result, datasets)
         if v.type == CHOICE
     }

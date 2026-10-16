@@ -6,9 +6,9 @@ kind: fmri
 construct_name: Functional connectivity
 description: Connectivity between seven large-scale networks from an eight-minute resting scan; the pipeline leaves a networks-by-networks matrix of Fisher z for each child, and scripts/extract_fmri.py takes four of its cells.
 items:
-  - {id: dmn_within, text: "Default network, within-network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
-  - {id: fpn_within, text: "Control network, within-network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
-  - {id: dmn_fpn, text: "Default with control network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
-  - {id: salience_dmn, text: "Salience with default network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
-  - {id: mean_fd, text: "Mean framewise displacement during the scan (mm)", type: number, min: 0, max: 5}
+  - {id: dmn_within, label: "Default network connectivity", text: "Default network, within-network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
+  - {id: fpn_within, label: "Control network connectivity", text: "Control network, within-network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
+  - {id: dmn_fpn, label: "Default with control network connectivity", text: "Default with control network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
+  - {id: salience_dmn, label: "Salience with default network connectivity", text: "Salience with default network connectivity (Fisher z)", type: number, min: -1.5, max: 2.5}
+  - {id: mean_fd, label: "Mean head motion", text: "Mean framewise displacement during the scan (mm)", type: number, min: 0, max: 5}
 license: Fictional example measures

@@ -86,7 +86,7 @@ def test_a_covariate_can_take_each_waves_own_value(result):
             rows, expected.reindex(rows.index), check_names=False, check_index_type=False
         )
     assert ml.problem(result, eeg_model(["item:eyetracking_faces.valid_trials"])) == (
-        "ET: Trials with at least one second of looking, out of 12 is not measured in wave 3."
+        "Valid eye-tracking trials is not measured in wave 3."
     )
 
 
@@ -142,8 +142,8 @@ def test_python_fit_reads_back_in_formula_order(result):
     assert [t.label for t in fitted.fixed] == [
         "Intercept",
         "Time (waves since the first)",
-        "EFB: What is your child's gender?: Boy",
-        "EFB: What is your child's gender?: Another gender",
+        "Child gender: Boy",
+        "Child gender: Another gender",
     ]
     assert [(v.level, v.term) for v in fitted.random] == [
         ("Person", "Intercept"),
@@ -154,7 +154,7 @@ def test_python_fit_reads_back_in_formula_order(result):
     assert [level for level, _ in fitted.icc] == ["Person"] and 0 < fitted.icc[0][1] < 1
     assert fitted.observations + fitted.dropped == len(long.frame)
     assert all(t.df is None for t in fitted.fixed)
-    assert ml.references(long) == [("EFB: What is your child's gender?", "Girl")]
+    assert ml.references(long) == [("Child gender", "Girl")]
 
 
 def test_saved_python_script_runs_on_its_data(result, tmp_path):
@@ -228,9 +228,7 @@ def test_r_and_python_agree_with_a_covariate_each_wave(result):
     model = eeg_model([EPOCHS])
     long = ml.long_frame(result, model)
     in_r = ml.run(result, model, long, "FAA", rscript())
-    assert [t.label for t in in_r.fixed][-1] == (
-        "EEG: Clean two-second epochs kept, out of 60 (each wave)"
-    )
+    assert [t.label for t in in_r.fixed][-1] == ("EEG epochs kept (each wave)")
     close(in_r, ml.run(result, model, long, "FAA", None))
 
 
@@ -257,8 +255,8 @@ def test_r_and_python_agree_on_a_split_covariate(result):
     long = ml.long_frame(result, model)
     in_r = ml.run(result, model, long, "FAA", rscript())
     assert [t.label for t in in_r.fixed][-2:] == [
-        f"EEG: Clean two-second epochs kept, out of 60 (each wave){ml.PERSON_MEAN}",
-        f"EEG: Clean two-second epochs kept, out of 60 (each wave){ml.DEVIATION}",
+        f"EEG epochs kept (each wave){ml.PERSON_MEAN}",
+        f"EEG epochs kept (each wave){ml.DEVIATION}",
     ]
     close(in_r, ml.run(result, model, long, "FAA", None))
 

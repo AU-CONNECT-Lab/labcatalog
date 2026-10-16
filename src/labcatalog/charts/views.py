@@ -1109,7 +1109,7 @@ def variable_choices(result: CatalogResult, datasets: list[str]) -> dict[str, st
             )
         for v in analysis.number_items(result, [name]):
             instrument = instruments[v.instrument_id]
-            text = next(iter(v.text.values()))
+            text = v.label or next(iter(v.text.values()))
             found[analysis.item_key(v)] = (
                 f"{instrument.abbreviation or instrument.id}: {text} ({names[name]})"
             )

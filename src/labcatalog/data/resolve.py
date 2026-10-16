@@ -19,6 +19,7 @@ class ResolvedVariable(BaseModel):
     reporter: str
     modality: str
     target: str | None = None
+    label: str | None = None
     text: dict[str, str]
     type: ItemType = "choice"
     response_options: list[ResponseOption]
@@ -125,6 +126,7 @@ def resolve_items(
                 reporter=dataset.reporter,
                 modality=dataset.modality,
                 target=administration.target,
+                label=item.label,
                 text=as_text_dict(text),
                 type=item.type,
                 response_options=options,

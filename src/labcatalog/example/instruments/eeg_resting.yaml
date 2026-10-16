@@ -6,9 +6,9 @@ kind: eeg
 construct_name: Resting brain activity
 description: Band power from five minutes of eyes-closed rest, recorded with a 32-channel cap; the pipeline leaves a channels-by-bands table of log10 power for each child, and scripts/extract_eeg.py turns it into these measures.
 items:
-  - {id: frontal_alpha_asymmetry, text: "Frontal alpha asymmetry: log alpha power at F4 minus F3", type: number, min: -3, max: 3}
-  - {id: frontal_theta, text: "Frontal theta: mean log10 theta power at F3, F4 and Fz (µV²)", type: number, min: -2, max: 4}
-  - {id: posterior_alpha, text: "Posterior alpha: mean log10 alpha power at Pz, O1 and O2 (µV²)", type: number, min: -2, max: 4}
-  - {id: theta_beta_ratio, text: "Theta/beta power ratio at Fz", type: number, min: 0, max: 50}
-  - {id: epochs_kept, text: "Clean two-second epochs kept, out of 60", type: number, min: 0, max: 60}
+  - {id: frontal_alpha_asymmetry, label: "Frontal alpha asymmetry", text: "Frontal alpha asymmetry: log alpha power at F4 minus F3", type: number, min: -3, max: 3}
+  - {id: frontal_theta, label: "Frontal theta power", text: "Frontal theta: mean log10 theta power at F3, F4 and Fz (µV²)", type: number, min: -2, max: 4}
+  - {id: posterior_alpha, label: "Posterior alpha power", text: "Posterior alpha: mean log10 alpha power at Pz, O1 and O2 (µV²)", type: number, min: -2, max: 4}
+  - {id: theta_beta_ratio, label: "Theta/beta ratio", text: "Theta/beta power ratio at Fz", type: number, min: 0, max: 50}
+  - {id: epochs_kept, label: "EEG epochs kept", text: "Clean two-second epochs kept, out of 60", type: number, min: 0, max: 60}
 license: Fictional example measures

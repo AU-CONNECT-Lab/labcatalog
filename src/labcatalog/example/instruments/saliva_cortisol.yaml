@@ -6,8 +6,8 @@ kind: saliva
 construct_name: Diurnal cortisol
 description: Saliva at waking, 30 minutes later and at bedtime on one school day, assayed in duplicate; the lab returns one report for the whole wave.
 items:
-  - {id: cortisol_wake, text: "Cortisol at waking (nmol/L)", type: number, min: 0, max: 100}
-  - {id: cortisol_awakening, text: "Cortisol awakening response: 30 minutes after waking minus waking (nmol/L)", type: number, min: -100, max: 100}
-  - {id: cortisol_slope, text: "Diurnal slope from waking to bedtime (nmol/L per hour)", type: number, min: -10, max: 10}
-  - {id: usable_samples, text: "Samples with a usable result, out of 3", type: number, min: 0, max: 3}
+  - {id: cortisol_wake, label: "Waking cortisol", text: "Cortisol at waking (nmol/L)", type: number, min: 0, max: 100}
+  - {id: cortisol_awakening, label: "Cortisol awakening response", text: "Cortisol awakening response: 30 minutes after waking minus waking (nmol/L)", type: number, min: -100, max: 100}
+  - {id: cortisol_slope, label: "Diurnal cortisol slope", text: "Diurnal slope from waking to bedtime (nmol/L per hour)", type: number, min: -10, max: 10}
+  - {id: usable_samples, label: "Usable cortisol samples", text: "Samples with a usable result, out of 3", type: number, min: 0, max: 3}
 license: Fictional example measures

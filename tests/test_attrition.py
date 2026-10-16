@@ -61,12 +61,12 @@ def test_python_matches_scipy(result):
     stay = frame.loc[frame[attrition.RETURNED] == 1, ems].dropna()
     left = frame.loc[frame[attrition.RETURNED] == 0, ems].dropna()
     welch = stats.ttest_ind(stay, left, equal_var=False)
-    mood = compared[1] if compared[0].label.startswith("EFB") else compared[0]
+    mood = compared[1] if compared[0].label == "Child gender" else compared[0]
     assert (mood.test.statistic, mood.test.p) == pytest.approx((welch.statistic, welch.pvalue))
     d = (stay.mean() - left.mean()) / np.sqrt((stay.var() + left.var()) / 2)
     assert mood.test.effect == pytest.approx(d)
     assert (mood.rows[0].returned_n, mood.rows[0].left_n) == (len(stay), len(left))
-    gender = next(c for c in compared if c.label.startswith("EFB"))
+    gender = next(c for c in compared if c.label == "Child gender")
     column = next(c for c in frame.columns if c.startswith("dem_gender"))
     table = pd.crosstab(frame[column], frame[attrition.RETURNED])
     chi2, p, dof, _ = stats.chi2_contingency(table, correction=False)
