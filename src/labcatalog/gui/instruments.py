@@ -3,7 +3,6 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
-import webview
 from nicegui import app, run, ui
 
 from labcatalog import ai_scoring, measures
@@ -12,7 +11,15 @@ from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.export import VARIABLES, export_plan, write_export
+from labcatalog.export import (
+    BY_DATASET,
+    BY_GROUP,
+    BY_ID,
+    VARIABLES,
+    export_plan,
+    layouts,
+    write_export,
+)
 from labcatalog.gui import charts, preferences
 from labcatalog.gui.common import (
     as_text,
@@ -31,6 +38,7 @@ from labcatalog.gui.common import (
 from labcatalog.gui.datalad import get_button
 from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.history import file_history
+from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     CatalogResult,
     run_description_draft,
@@ -165,35 +173,52 @@ def export_dialog(result: CatalogResult, found: dict[str, list[str]], view: Brow
     names = {i: s.abbreviation or s.name for i, s in result.project.instruments.items()}
     left_out = [names[i] for i in view.chosen if not any(i in ids for ids in plan.values())]
 
+    root = result.project.root
+    group = result.project.config.ids.group
+    labels = {
+        BY_DATASET: "One file per dataset",
+        BY_ID: "One table, a row per person (ID)",
+        BY_GROUP: f"One table, a row per {group.name if group else 'group'}",
+    }
+
     async def go() -> None:
-        selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)
-        if not selection:
-            return
-        folder = await run.io_bound(write_export, result, plan, Path(selection[0]))
-        dialog.close()
-        ui.notify(f"Exported to {folder}")
-        open_path(folder)
+        done = await run.io_bound(write_export, result, plan, layout.value)
+        saved.clear()
+        with saved:
+            note(f"Saved to {portable_path(done.folder, root).as_posix()}")
+            for name, n in done.left_out.items():
+                note(f"Left out {n} rows of {name}: their key repeats in that file.")
+        export.set_visibility(False)
+        opener.set_visibility(True)
+        opener.on_click(lambda: open_path(done.folder))
 
     with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
         ui.label("Export").classes("text-xl font-medium")
         if plan:
             ui.label(
-                f"Writes a new folder with {VARIABLES}, which describes every variable, and one "
-                "data file per dataset: the ID and date columns, the chosen items as they are in "
-                "the data and the scores labcatalog computes. Open answers are listed but not "
-                "exported."
+                f"Writes a new folder in outputs/ with {VARIABLES}, which describes every "
+                "variable, and the data: the ID and date columns, the chosen items as they are "
+                "in the data and the scores labcatalog computes. Open answers are listed but not "
+                "exported. In one table, each column starts with its dataset's name."
             )
             with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0"):
                 for dataset, ids in plan.items():
                     ui.label(dataset).classes("font-medium")
                     ui.label(", ".join(names[i] for i in ids))
+            layout = ui.radio(
+                {key: labels[key] for key in layouts(result, plan)}, value=BY_DATASET
+            ).props("dense")
         else:
             ui.label("None of the chosen instruments is in a dataset the filters show.")
         if left_out:
             note(f"Chosen but not in the filtered datasets: {', '.join(left_out)}")
+        saved = ui.column().classes("gap-0")
         with ui.row().classes("w-full justify-end"):
-            ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
-            ui.button("Choose a folder and export", on_click=go).set_enabled(bool(plan))
+            ui.button("Close", on_click=dialog.close).props("flat no-caps")
+            opener = ui.button("Open folder", icon="folder_open").props("no-caps")
+            opener.set_visibility(False)
+            export = ui.button("Export", on_click=go).props("no-caps")
+            export.set_enabled(bool(plan))
     dialog.open()
 
 

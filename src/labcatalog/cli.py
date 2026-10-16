@@ -9,7 +9,7 @@ import typer
 from labcatalog import defaults
 from labcatalog.datalad.freeze import RECORD_ONLY
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
-from labcatalog.export import run_export
+from labcatalog.export import BY_DATASET, run_export
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import (
     run_check,
@@ -185,13 +185,21 @@ def export(
             "--dataset", "-d", help="Only this dataset; repeat for more. Default: every dataset."
         ),
     ] = None,
-    out: Annotated[
-        Path, typer.Option("--out", "-o", help="Folder to create the export folder in.")
-    ] = Path("."),
+    by: Annotated[
+        str,
+        typer.Option(
+            "--by",
+            help="dataset: one file per dataset; id or group: one wide table, a row per person "
+            "or per group.",
+        ),
+    ] = BY_DATASET,
     project: ProjectOption = Path("."),
 ) -> None:
-    """Write a variable list and each dataset's data for the chosen instruments."""
-    typer.echo(f"Wrote {run_export(project, instruments, dataset or [], out)}")
+    """Write a variable list and the data for the chosen instruments into outputs/."""
+    done = run_export(project, instruments, dataset or [], by)
+    typer.echo(f"Wrote {done.folder}")
+    for name, n in done.left_out.items():
+        typer.echo(f"Left out {n} rows of {name}: their {by} repeats in that file")
 
 
 @app.command()

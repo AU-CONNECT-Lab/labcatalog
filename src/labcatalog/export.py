@@ -1,4 +1,4 @@
-from datetime import datetime
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
@@ -7,11 +7,17 @@ from labcatalog.browse import build_index, matches
 from labcatalog.codegen import output_name
 from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.exceptions import ExportError, MetadataError
+from labcatalog.outputs import write_output
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.resolve import ResolvedScore
 from labcatalog.scoring import scorable
+from labcatalog.stats.analysis import linkable
 
 VARIABLES = "variables.csv"
+# One file per dataset, or one wide table with a row per person or per group.
+BY_DATASET = "dataset"
+BY_ID = "id"
+BY_GROUP = "group"
 COLUMNS = [
     "dataset",
     "study",
@@ -34,6 +40,13 @@ COLUMNS = [
     "missing_rule",
     "in_data",
 ]
+
+
+@dataclass
+class Export:
+    folder: Path
+    # Rows per dataset left out of a wide table because their key repeats in that file.
+    left_out: dict[str, int]
 
 
 def export_plan(
@@ -138,11 +151,11 @@ def data_frame(result: CatalogResult, dataset: str, instrument_ids: list[str]) -
     return frame
 
 
-def run_export(root: Path, instrument_ids: list[str], datasets: list[str], parent: Path) -> Path:
+def run_export(root: Path, instrument_ids: list[str], datasets: list[str], layout: str) -> Export:
     result = run_catalog(root)
     if result.project is None:
         raise MetadataError(result.report.issues)
-    return write_export(result, named_plan(result, instrument_ids, datasets), parent)
+    return write_export(result, named_plan(result, instrument_ids, datasets), layout)
 
 
 def named_plan(
@@ -161,13 +174,52 @@ def named_plan(
     return plan
 
 
-def write_export(result: CatalogResult, plan: dict[str, list[str]], parent: Path) -> Path:
-    folder = parent / f"labcatalog_export_{datetime.now():%Y-%m-%d_%H%M%S}"
-    folder.mkdir()
+def layouts(result: CatalogResult, plan: dict[str, list[str]]) -> list[str]:
+    grouped = all(result.datasets[d].group is not None for d in plan)
+    return [BY_DATASET, BY_ID, *([BY_GROUP] if grouped else [])]
+
+
+def write_export(result: CatalogResult, plan: dict[str, list[str]], layout: str) -> Export:
+    allowed = layouts(result, plan)
+    if layout not in allowed:
+        raise ExportError(f"Cannot export by {layout}; these datasets allow {', '.join(allowed)}")
+    variables = pd.DataFrame(variable_rows(result, plan), columns=COLUMNS)
+    if layout == BY_DATASET:
+        frames = {f"{d}.csv": data_frame(result, d, ids) for d, ids in plan.items()}
+        left_out = {}
+    else:
+        wide, left_out = wide_frame(result, plan, layout)
+        frames = {f"data_by_{key_name(result, layout)}.csv": wide}
+        variables["column"] = variables["dataset"] + "_" + variables["column"]
     # The byte-order mark makes Excel open the list as UTF-8; data files stay plain for R.
-    pd.DataFrame(variable_rows(result, plan), columns=COLUMNS).to_csv(
-        folder / VARIABLES, index=False, encoding="utf-8-sig"
-    )
+    files = {VARIABLES: variables.to_csv(index=False).encode("utf-8-sig")}
+    files |= {name: frame.to_csv(index=False).encode("utf-8") for name, frame in frames.items()}
+    folder = write_output(result.project.root, "export", files, result.manifest)
+    return Export(folder, left_out)
+
+
+def key_name(result: CatalogResult, layout: str) -> str:
+    return result.project.config.ids.group.name if layout == BY_GROUP else "id"
+
+
+def wide_frame(
+    result: CatalogResult, plan: dict[str, list[str]], layout: str
+) -> tuple[pd.DataFrame, dict[str, int]]:
+    # One row per person or group; a row whose key repeats within a file cannot be placed.
+    parts = []
+    left_out = {}
     for dataset, instrument_ids in plan.items():
-        data_frame(result, dataset, instrument_ids).to_csv(folder / f"{dataset}.csv", index=False)
-    return folder
+        loaded = result.datasets[dataset]
+        keys = (loaded.group if layout == BY_GROUP else loaded.frame[loaded.id_column]).astype(
+            "string"
+        )
+        keep = linkable(keys)
+        if (~keep).sum():
+            left_out[dataset] = int((~keep).sum())
+        frame = data_frame(result, dataset, instrument_ids)
+        if layout == BY_ID:
+            frame = frame.drop(columns=loaded.id_column)
+        frame = frame.add_prefix(f"{dataset}_")[keep]
+        parts.append(frame.set_axis(keys[keep].to_numpy()))
+    wide = pd.concat(parts, axis=1).sort_index()
+    return wide.rename_axis(key_name(result, layout)).reset_index(), left_out
