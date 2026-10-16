@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from nicegui import ui
 
 from labcatalog.charts import views
-from labcatalog.gui import analysis_tables
+from labcatalog.gui import analysis_tables, attrition
 from labcatalog.gui.analysis import sample_note
 from labcatalog.gui.common import col, heading, note, section, sorted_waves, unique
 from labcatalog.gui.datasets import methods_of, paragraphs
@@ -21,6 +21,7 @@ class MethodsView:
     study: str | None = None
     wave: str | None = None
     measures: list[str] = field(default_factory=list)
+    attrition: list[str] = field(default_factory=list)
 
 
 def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
@@ -107,6 +108,7 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
     sample = analysis.build_sample(result, datasets, intersect=False)
     sample_note(result, sample, "with data in this wave")
     analysis_tables.table_one_section(result, sample, view)
+    attrition.render(result, view, study, view.wave)
 
 
 def modality_table(result: CatalogResult, study: str) -> tuple[list[dict], list[dict]]:
