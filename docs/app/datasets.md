@@ -4,7 +4,7 @@ The Datasets page shows each study and its data files: who is in each file, how 
 
 ## Studies
 
-Each study has a card with its label, its description and, when the study has a `reference`, a "How to cite" line taken from `references.bib`. Below it, a table lists the study's datasets:
+The datasets are grouped by study, under the study's label; its description and citation are on the [Studies](studies.md) page. Each study's table lists its datasets:
 
 | Column | Meaning |
 |---|---|
@@ -18,14 +18,14 @@ Click a row to open the dataset.
 
 ## Add a dataset
 
-**Add a dataset**, above the study cards, adds a file that repeats one the project already has, usually the same questionnaire in the next wave. It takes four steps:
+**Add a dataset**, above the tables, adds a file that repeats one the project already has, usually the same questionnaire in the next wave. It takes four steps:
 
 1. **Start from**: pick the dataset it repeats under **Same as**. The new one takes that dataset's modality, study, reporter, ID, group and date columns. The window suggests the next wave and a name with the wave number changed (`parent_w1` becomes `parent_w2`); change them if needed, and set **Data as of**.
 2. **Data file**: **Choose the file** as it came from the survey platform or the lab's pipeline. labcatalog copies it into the project and leaves the original where it is. If the dataset it repeats is made by a prepare step, the copy goes where that step would read it, a new step with the new name is added, and it runs right away. If the step stops with an error, the window shows its log.
 3. **Columns**: each column of the new file next to the instrument and item it belongs to, filled in where a column has the same name as in an existing column map or starts with an item's ID (`eps_10_w2`). The labels above the table say how many items of each instrument were found. Fill in **Instrument** and **Item** for any column the window missed, and leave the ID, dates and other columns empty. Columns of an instrument the catalog does not have yet come in later through the [Import](import.md) page.
 4. **Check and add**: the lines that will be added to `labcatalog.yaml` (the dataset, the new wave and the new prepare step if any), the new column map in `maps/`, and the study file, where the dataset is added to each instrument's administration. **Add the dataset** writes them all and opens the new dataset.
 
-**Cancel**, or closing the window, removes the copied file. A wave the study does not have yet is added to it without dates; fill in its `start` and `end` on the [Edit](edit.md) page afterwards. Before it writes anything, the window checks the project with the changes in place and stops if they would cause a new error. The button appears only when some dataset can be repeated this way: one CSV file, made by no prepare step or by one that reads a single file named after the dataset. For anything else, see [Add a Wave or Dataset](../how-to/add-dataset.md).
+**Cancel**, or closing the window, removes the copied file. A wave the study does not have yet is added to it without dates; fill in its start and end dates on the [Studies](studies.md) page afterwards. Before it writes anything, the window checks the project with the changes in place and stops if they would cause a new error. The button appears only when some dataset can be repeated this way: one CSV file, made by no prepare step or by one that reads a single file named after the dataset. For anything else, see [Add a Wave or Dataset](../how-to/add-dataset.md).
 
 ## A dataset
 

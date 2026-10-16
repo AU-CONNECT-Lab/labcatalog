@@ -27,6 +27,7 @@ project:
         - file: app/index.md
         - file: app/overview.md
         - file: app/instruments.md
+        - file: app/studies.md
         - file: app/datasets.md
         - file: app/analysis.md
         - file: app/methods.md

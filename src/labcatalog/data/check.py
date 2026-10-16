@@ -106,7 +106,19 @@ def check_values(
                 f"{variable.column}: {len(stray)} value(s) are neither {expected} "
                 f"nor missing codes: {examples(stray.unique())}"
             )
-            issues.append(problem("unexpected_value", message, location(project, loaded)))
+            issues.append(
+                problem(
+                    "unexpected_value",
+                    message,
+                    location(project, loaded),
+                    dataset=variable.dataset,
+                    column=variable.column,
+                    instrument=variable.instrument_id,
+                    item=variable.item_id,
+                    values=[str(v) for v in stray.unique()],
+                    rows=rows_of(~ok),
+                )
+            )
     return issues
 
 
@@ -120,28 +132,51 @@ def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issu
         spaced = ~blank & (ids != ids.str.strip())
         # Rows already reported for spaces are not reported again below.
         clean = ~blank & ~spaced
+        dataset_name = loaded.config.name
         if blank.any():
-            issues.append(problem("id_missing", f"{blank.sum()} row(s) have no ID", where))
+            message = f"{blank.sum()} row(s) have no ID"
+            issues.append(
+                problem("id_missing", message, where, dataset=dataset_name, rows=rows_of(blank))
+            )
         if spaced.any():
             shown = examples([repr(value) for value in ids[spaced]])
             message = f"{spaced.sum()} ID(s) have leading or trailing spaces: {shown}"
-            issues.append(problem("id_whitespace", message, where))
+            issues.append(
+                problem("id_whitespace", message, where, dataset=dataset_name, rows=rows_of(spaced))
+            )
         if pattern:
             mismatched = clean & ~ids.str.fullmatch(pattern)
             if mismatched.any():
                 message = f"{mismatched.sum()} ID(s) do not match ids.pattern: {examples(ids[mismatched])}"
-                issues.append(problem("id_pattern", message, where))
+                issues.append(
+                    problem(
+                        "id_pattern", message, where, dataset=dataset_name, rows=rows_of(mismatched)
+                    )
+                )
         duplicated = clean & ids.duplicated(keep=False)
         if duplicated.any():
             repeated = ids[duplicated].unique()
             message = f"{len(repeated)} ID(s) appear more than once: {examples(repeated)}"
-            issues.append(problem("id_duplicate", message, where))
+            issues.append(
+                problem(
+                    "id_duplicate", message, where, dataset=dataset_name, rows=rows_of(duplicated)
+                )
+            )
         if loaded.group is not None:
             no_group = clean & loaded.group.isna()
             if no_group.any():
                 name = project.config.ids.group.name if project.config.ids.group else "group"
                 message = f"{no_group.sum()} ID(s) give no {name} ID: {examples(ids[no_group])}"
-                issues.append(problem("group_missing", message, where, "warning"))
+                issues.append(
+                    problem(
+                        "group_missing",
+                        message,
+                        where,
+                        "warning",
+                        dataset=dataset_name,
+                        rows=rows_of(no_group),
+                    )
+                )
     return issues
 
 
@@ -160,7 +195,15 @@ def check_exclusions(project: Project, datasets: dict[str, LoadedDataset]) -> li
                 f"{hits.sum()} row(s) belong to people or groups on the exclusion list: "
                 f"{examples(ids[hits])}"
             )
-            issues.append(problem("excluded_present", message, location(project, loaded)))
+            issues.append(
+                problem(
+                    "excluded_present",
+                    message,
+                    location(project, loaded),
+                    dataset=loaded.config.name,
+                    rows=rows_of(hits),
+                )
+            )
     return issues
 
 
@@ -196,7 +239,14 @@ def check_identifier_columns(project: Project, datasets: dict[str, LoadedDataset
             if reasons:
                 message = f"{column} may hold identifying information ({' and '.join(reasons)})"
                 issues.append(
-                    problem("possible_identifier", message, location(project, loaded), "warning")
+                    problem(
+                        "possible_identifier",
+                        message,
+                        location(project, loaded),
+                        "warning",
+                        dataset=name,
+                        column=column,
+                    )
                 )
     return issues
 
@@ -216,7 +266,15 @@ def check_dates(project: Project, datasets: dict[str, LoadedDataset]) -> list[Is
                 f"{examples(values[bad])}"
             )
             issues.append(
-                problem("date_unparseable", message, location(project, loaded), "warning")
+                problem(
+                    "date_unparseable",
+                    message,
+                    location(project, loaded),
+                    "warning",
+                    dataset=loaded.config.name,
+                    column=column,
+                    rows=rows_of(bad),
+                )
             )
     return issues
 
@@ -237,7 +295,16 @@ def check_same_answers(
                 f"{score.key}: {same.sum()} participant(s) gave the same answer to every item: "
                 f"{examples(loaded.frame.loc[same, loaded.id_column])}"
             )
-            issues.append(problem("same_answer", message, location(project, loaded), "warning"))
+            issues.append(
+                problem(
+                    "same_answer",
+                    message,
+                    location(project, loaded),
+                    "warning",
+                    dataset=score.dataset,
+                    rows=rows_of(same),
+                )
+            )
     return issues
 
 
@@ -343,6 +410,11 @@ def check_prepare_outputs(project: Project) -> list[Issue]:
                 )
             )
     return issues
+
+
+def rows_of(mask: pd.Series) -> list[int]:
+    # Positions in the data file, counting from 0 below the header.
+    return [int(n) for n in mask[mask].index]
 
 
 def problem(

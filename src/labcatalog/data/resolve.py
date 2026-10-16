@@ -23,6 +23,8 @@ class ResolvedVariable(BaseModel):
     text: dict[str, str]
     type: ItemType = "choice"
     response_options: list[ResponseOption]
+    # The response set the options come from, after overrides; None for numbers and text.
+    response_set: str | None = None
     allowed_min: float | None = None
     allowed_max: float | None = None
     reverse: bool
@@ -130,6 +132,7 @@ def resolve_items(
                 text=as_text_dict(text),
                 type=item.type,
                 response_options=options,
+                response_set=set_id if options else None,
                 allowed_min=item.min,
                 allowed_max=item.max,
                 reverse=item.reverse,
