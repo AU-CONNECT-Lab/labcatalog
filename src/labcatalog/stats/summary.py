@@ -2,7 +2,6 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
-import pingouin as pg
 from pydantic import BaseModel
 
 from labcatalog import defaults
@@ -296,8 +295,11 @@ def cronbach_alpha(items: pd.DataFrame) -> float | None:
     answered = items.dropna(how="all")
     if items.shape[1] < 2 or len(answered) < defaults.MIN_CORRELATION_N:
         return None
+    # From the pairwise covariances, as JASP computes it.
+    cov = answered.cov().to_numpy()
+    k = len(cov)
     with np.errstate(divide="ignore", invalid="ignore"):
-        found = pg.cronbach_alpha(answered, nan_policy="pairwise")[0]
+        found = k / (k - 1) * (1 - np.trace(cov) / cov.sum())
     return float(found) if np.isfinite(found) else None
 
 

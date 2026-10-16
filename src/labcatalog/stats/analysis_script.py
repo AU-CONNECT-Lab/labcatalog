@@ -52,10 +52,11 @@ PYTHON_HEADER = """\
 # d is the analysis data saved beside this script: one row per person, scores as labcatalog
 # computed them, each score's items reversed where the scale says so, and numbers blank
 # where they fall outside the item's range.
-# Needs pandas, pingouin and scipy (pip install pingouin).
+# Needs pandas, scipy and statsmodels (pip install statsmodels).
 import numpy as np
 import pandas as pd
-import pingouin as pg
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
 from scipy import stats
 
 d = pd.read_csv({path})
@@ -88,13 +89,20 @@ print(table1)
 """
 PYTHON_TABLE_ONE = """\
 # Table 1: N in each dataset; n, M and SD for numbers and scores, with Cronbach's alpha
-# (pingouin) on pairwise complete cases; n (%) for answer options.
+# on pairwise complete cases; n (%) for answer options.
+def cronbach_alpha(items):
+    # From the pairwise covariances, as JASP computes it.
+    cov = items.cov().to_numpy()
+    k = len(cov)
+    return k / (k - 1) * (1 - np.trace(cov) / cov.sum())
+
+
 def n_row(dataset, present):
     return [dict(variable="N", dataset=dataset, level="", n=present.sum())]
 
 
 def number_row(variable, dataset, x, items=None):
-    alpha = np.nan if items is None else pg.cronbach_alpha(items, nan_policy="pairwise")[0]
+    alpha = np.nan if items is None else cronbach_alpha(items)
     return [dict(variable=variable, dataset=dataset, level="", n=x.count(), mean=x.mean(),
                  sd=x.std(), alpha=alpha)]
 
@@ -127,15 +135,20 @@ print(correlations)
 """
 PYTHON_CORRELATIONS = """\
 # Correlations: n, M and SD of each variable, then {coefficient} for each pair on everyone
-# with both values (pingouin, p values not adjusted).
+# with both values (scipy, p values not adjusted).
 variables = [{columns}]
 descriptives = pd.DataFrame(dict(variable=variables, n=d[variables].count().to_numpy(),
                                  mean=d[variables].mean().to_numpy(),
                                  sd=d[variables].std().to_numpy()))
 print(descriptives)
-correlations = pg.pairwise_corr(d, columns=variables, method="{method}", padjust="none")
-correlations = correlations[["X", "Y", "n", "r", "p_unc"]]
-correlations.columns = ["x", "y", "n", "r", "p"]
+rows = []
+for i, x in enumerate(variables):
+    for y in variables[i + 1:]:
+        both = d[[x, y]].dropna()
+        test = stats.{function}(both[x], both[y]) if len(both) > 2 else None
+        rows.append(dict(x=x, y=y, n=len(both), r=np.nan if test is None else test.statistic,
+                         p=np.nan if test is None else test.pvalue))
+correlations = pd.DataFrame(rows, columns=["x", "y", "n", "r", "p"])
 print(correlations)
 """
 R_REGRESSION = """\
@@ -154,19 +167,18 @@ regressions <- do.call(rbind, lapply(c({xs}), function(x) {{
 print(regressions)
 """
 PYTHON_REGRESSION = """\
-# Regression: {y_label} on each X by itself (pingouin), with r and its 95% CI (scipy, as
-# pingouin rounds the interval).
+# Regression: {y_label} on each X by itself (statsmodels), with r and its 95% CI (scipy).
 y = {y}
 rows = []
 for x in [{xs}]:
     both = d[[x, y]].dropna()
-    fit = pg.linear_regression(both[[x]], both[y])
+    fit = sm.OLS(both[y], sm.add_constant(both[[x]])).fit()
     r = stats.pearsonr(both[x], both[y])
     low, high = r.confidence_interval()
-    rows.append(dict(x=x, n=len(both), slope=fit["coef"][1], slope_se=fit["se"][1],
-                     intercept=fit["coef"][0], intercept_se=fit["se"][0], r=r.statistic,
-                     r_low=low, r_high=high,
-                     r_squared=fit["r2"][0], p=fit["pval"][1]))
+    rows.append(dict(x=x, n=len(both), slope=fit.params[x], slope_se=fit.bse[x],
+                     intercept=fit.params["const"], intercept_se=fit.bse["const"],
+                     r=r.statistic, r_low=low, r_high=high, r_squared=fit.rsquared,
+                     p=fit.pvalues[x]))
 regressions = pd.DataFrame(rows)
 print(regressions)
 """
@@ -225,23 +237,23 @@ groups = groups.reset_index().set_axis(["group", "n", "mean", "sd"], axis=1)
 print(groups)
 """
 PYTHON_WELCH = """\
-# Welch's t test (unequal variances) and Cohen's d with the mean of the two group variances
-# (pingouin). pingouin's own d uses the pooled SD, so d is written out here.
+# Welch's t test (unequal variances, scipy) and Cohen's d with the mean of the two group
+# variances, as JASP gives it with Welch's test.
 first, second = (data.loc[data["group"] == g, "y"] for g in levels)
-test = pg.ttest(first, second, correction=True)
+test = stats.ttest_ind(first, second, equal_var=False)
 print(test)
-# The difference's 95% CI from scipy, as pingouin rounds it.
-low, high = stats.ttest_ind(first, second, equal_var=False).confidence_interval()
+low, high = test.confidence_interval()
 cohens_d = (first.mean() - second.mean()) / np.sqrt((first.var() + second.var()) / 2)
 """
 PYTHON_STUDENT = """\
-# Student's t test (equal variances) and Cohen's d with the pooled SD (pingouin).
+# Student's t test (equal variances, scipy) and Cohen's d with the pooled SD.
 first, second = (data.loc[data["group"] == g, "y"] for g in levels)
-test = pg.ttest(first, second, correction=False)
+test = stats.ttest_ind(first, second, equal_var=True)
 print(test)
-# The difference's 95% CI from scipy, as pingouin rounds it.
-low, high = stats.ttest_ind(first, second, equal_var=True).confidence_interval()
-cohens_d = pg.compute_effsize(first, second, eftype="cohen")
+low, high = test.confidence_interval()
+pooled = np.sqrt(((len(first) - 1) * first.var() + (len(second) - 1) * second.var())
+                 / (len(first) + len(second) - 2))
+cohens_d = (first.mean() - second.mean()) / pooled
 """
 PYTHON_D_INTERVAL = """\
 # The 95% CI of d as JASP gives it: the noncentral t at d's own noncentrality, with the
@@ -257,15 +269,17 @@ def limit(gap, step):
 
 
 scale = np.sqrt(len(first) * len(second) / (len(first) + len(second)))
-ncp, df = cohens_d * scale, test["dof"].iloc[0]
+ncp, df = cohens_d * scale, test.df
 d_low = limit(lambda x: stats.nct.sf(ncp, df, x) - 0.025, -1) / scale
 d_high = limit(lambda x: stats.nct.cdf(ncp, df, x) - 0.025, 1) / scale
 print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
 """
 PYTHON_ANOVA = """\
-# One-way analysis of variance and eta squared (pingouin, which has no omega squared).
-test = pg.anova(data=data, dv="y", between="group", detailed=True, effsize="n2")
+# One-way analysis of variance (statsmodels) and eta squared, the groups' share of the sums
+# of squares; omega squared is computed only in R.
+test = sm.stats.anova_lm(smf.ols("y ~ C(group)", data=data).fit(), typ=2)
 print(test)
+eta_squared = test["sum_sq"].iloc[0] / test["sum_sq"].sum()
 """
 R_TEST_OUT = {
     TWO: "test_result <- data.frame(statistic = unname(test$statistic), "
@@ -279,13 +293,14 @@ R_TEST_OUT = {
     "omega_low = omega$CI_low, omega_high = omega$CI_high)",
 }
 PYTHON_TEST_OUT = {
-    TWO: "test_result = pd.DataFrame([dict(statistic=test['T'].iloc[0], "
-    "df1=test['dof'].iloc[0], df2=np.nan, p=test['p_val'].iloc[0], "
+    TWO: "test_result = pd.DataFrame([dict(statistic=test.statistic, "
+    "df1=test.df, df2=np.nan, p=test.pvalue, "
     "low=low, high=high, effect=cohens_d, "
     "effect_low=d_low, effect_high=d_high, omega=np.nan, omega_low=np.nan, "
     "omega_high=np.nan)])",
-    "anova": "test_result = pd.DataFrame([dict(statistic=test['F'][0], df1=test['DF'][0], "
-    "df2=test['DF'][1], p=test['p_unc'][0], low=np.nan, high=np.nan, effect=test['n2'][0], "
+    "anova": "test_result = pd.DataFrame([dict(statistic=test['F'].iloc[0], "
+    "df1=test['df'].iloc[0], df2=test['df'].iloc[1], p=test['PR(>F)'].iloc[0], "
+    "low=np.nan, high=np.nan, effect=eta_squared, "
     "effect_low=np.nan, effect_high=np.nan, omega=np.nan, omega_low=np.nan, "
     "omega_high=np.nan)])",
 }
@@ -566,7 +581,8 @@ def table_one_code(datasets: list[str], rows: list[tuple[str, list[Variable]]]) 
 def correlation_code(variables: list[Variable], method: str = "pearson") -> Code:
     columns = ", ".join(r_string(v.column) for v in variables)
     coefficient = "Spearman's rho" if method == "spearman" else "Pearson r"
-    fields = dict(columns=columns, method=method, coefficient=coefficient)
+    function = "spearmanr" if method == "spearman" else "pearsonr"
+    fields = dict(columns=columns, method=method, coefficient=coefficient, function=function)
     return Code(
         title="Correlations",
         r=R_CORRELATIONS.format(**fields),

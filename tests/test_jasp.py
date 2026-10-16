@@ -186,7 +186,7 @@ out <- list(f = table["g", "F value"], df1 = table["g", "Df"],
         (jasp["f"], jasp["df1"], jasp["df2"], jasp["p"]), rel=1e-6
     )
     assert found.effect == pytest.approx(jasp["eta"], rel=1e-6)
-    # pingouin has no omega squared, so only R gives it.
+    # Only R gives omega squared.
     if engine is not None:
         assert (found.omega, found.omega_low, found.omega_high) == pytest.approx(
             (jasp["omega"], jasp["omega_low"], jasp["omega_high"]), rel=1e-5, abs=1e-8

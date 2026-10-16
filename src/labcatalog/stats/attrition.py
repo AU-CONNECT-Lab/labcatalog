@@ -45,15 +45,21 @@ T_TESTS = {
     "welch": "Welch's t test and Cohen's d with the mean of the two group variances",
     "student": "Student's t test and Cohen's d with the pooled SD",
 }
-# R's t.test and effectsize, then pingouin's ttest and d, for each test.
+# R's t.test and effectsize, then scipy's equal_var and the matching d, for each test.
 T_CODE = {
     "welch": (
         "FALSE",
         "FALSE",
-        "True",
+        "False",
         "(stay.mean() - left.mean()) / np.sqrt((stay.var() + left.var()) / 2)",
     ),
-    "student": ("TRUE", "TRUE", "False", 'pg.compute_effsize(stay, left, eftype="cohen")'),
+    "student": (
+        "TRUE",
+        "TRUE",
+        "True",
+        "(stay.mean() - left.mean()) / np.sqrt(((len(stay) - 1) * stay.var() "
+        "+ (len(left) - 1) * left.var()) / (len(stay) + len(left) - 2))",
+    ),
 }
 R_ATTRITION = """\
 returned <- factor(d[[{returned}]], levels = c(1, 0), labels = c({stayed}, {left}))
@@ -112,11 +118,10 @@ def number_rows(variable, x, test):
                        returned_mean=stay.mean(), returned_sd=stay.std(), left_n=len(left),
                        left_mean=left.mean(), left_sd=left.std()))
     if test:
-        t_test = pg.ttest(stay, left, correction={correction})
+        t_test = stats.ttest_ind(stay, left, equal_var={equal_var})
         effect = {effect}
-        tests.append(dict(variable=variable, test="t", statistic=t_test["T"].iloc[0],
-                          df=t_test["dof"].iloc[0], p=t_test["p_val"].iloc[0], effect=effect,
-                          small=False))
+        tests.append(dict(variable=variable, test="t", statistic=t_test.statistic,
+                          df=t_test.df, p=t_test.pvalue, effect=effect, small=False))
 
 
 def choice_rows(variable, x, levels, test):
@@ -132,11 +137,11 @@ def choice_rows(variable, x, levels, test):
                            returned_percent=shares.loc[level, {stayed}],
                            left_percent=shares.loc[level, {left}]))
     if test:
-        expected, _, found = pg.chi2_independence(data, x="answer", y="g", correction=False)
-        pearson = found[found["test"] == "pearson"].iloc[0]
-        tests.append(dict(variable=variable, test="chi2", statistic=pearson["chi2"],
-                          df=pearson["dof"], p=pearson["pval"], effect=np.nan,
-                          small=bool((expected < 5).to_numpy().any())))
+        answered = counts[counts.sum(axis=1) > 0]
+        found = stats.chi2_contingency(answered, correction=False)
+        tests.append(dict(variable=variable, test="chi2", statistic=found.statistic,
+                          df=found.dof, p=found.pvalue, effect=np.nan,
+                          small=bool((found.expected_freq < 5).any())))
 
 
 {rows}
@@ -236,7 +241,7 @@ def plan(result: CatalogResult, study: str, wave: str, keys: list[str]) -> Plan 
     lines = [call(frame, label, v) for label, v in variables]
     fields = dict(returned=r_string(RETURNED), stayed=r_string(STAYED), left=r_string(LEFT))
     t_test = result.project.config.stats.t_test
-    var_equal, pooled, correction, effect = T_CODE[t_test]
+    var_equal, pooled, equal_var, effect = T_CODE[t_test]
     about = ABOUT.format(unit=unit(result), first=wave, second=second, t_test=T_TESTS[t_test])
     r_rows = "\n".join(r for r, _ in lines)
     python_rows = "\n".join(p for _, p in lines)
@@ -248,7 +253,7 @@ def plan(result: CatalogResult, study: str, wave: str, keys: list[str]) -> Plan 
             rows=python_rows,
             group_columns=GROUP_COLUMNS,
             test_columns=TEST_COLUMNS,
-            correction=correction,
+            equal_var=equal_var,
             effect=effect,
             **fields,
         ),

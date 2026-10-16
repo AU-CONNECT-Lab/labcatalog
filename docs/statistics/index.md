@@ -8,7 +8,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 
 | | R | Python |
 |---|---|---|
-| Reliability, correlations, regression, group comparisons | psych, effectsize, MBESS | pingouin, scipy, statsmodels |
+| Reliability, correlations, regression, group comparisons | psych, effectsize, MBESS | scipy, statsmodels |
 | Confirmatory factor analysis, ω | lavaan, semTools | semopy |
 | Measurement invariance across waves, reporters and groups, score tests | lavaan, semTools | not available |
 | Multilevel models | lme4, lmerTest, performance | statsmodels |

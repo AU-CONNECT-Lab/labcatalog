@@ -179,10 +179,7 @@ def test_r_and_python_give_the_same_numbers(result, sample):
         for field in ("statistic", "df1", "p", "effect"):
             assert getattr(in_r, field) == pytest.approx(getattr(in_python, field), rel=1e-9)
         if two_groups:
-            # pingouin rounds this interval to two decimals.
-            assert (in_r.low, in_r.high) == pytest.approx(
-                (in_python.low, in_python.high), abs=0.006
-            )
+            assert (in_r.low, in_r.high) == pytest.approx((in_python.low, in_python.high))
             # Both solve JASP's noncentral t interval, MBESS in R and scipy here.
             assert (in_r.effect_low, in_r.effect_high) == pytest.approx(
                 (in_python.effect_low, in_python.effect_high), abs=1e-6
@@ -330,8 +327,9 @@ def test_correlations_and_regression_match_the_summary_numbers(result, sample):
     assert (fit.slope, fit.slope_se, fit.intercept) == pytest.approx(
         (expected.slope, expected.slope_se, expected.intercept)
     )
-    # pingouin rounds the interval of r to two decimals.
-    assert fit.correlation.low == pytest.approx(expected.correlation.low, abs=0.006)
+    assert (fit.correlation.low, fit.correlation.high) == pytest.approx(
+        (expected.correlation.low, expected.correlation.high)
+    )
 
 
 @needs_r
