@@ -160,9 +160,11 @@ def write_templates(
 
 
 def read_fields(path: Path) -> dict[str, redcap.Field]:
-    # A Qualtrics survey file or a REDCap data dictionary, told apart by extension.
+    # A Qualtrics survey file, an SPSS data file or a REDCap data dictionary, told apart by extension.
     if path.suffix.lower() == ".qsf":
         return qualtrics.read_survey(path)
+    if path.suffix.lower() == ".sav":
+        return spss.read_sav(path)
     return redcap.read_dictionary(path)
 
 
