@@ -581,7 +581,9 @@ def page_script(
         if fitted:
             codes.append(regression_code(fitted, target))
     if group is not None and outcome is not None:
-        plan = comparison_plan(data.frame(), data.item(group), data.score(outcome))
+        # The frame holds only the variables asked for so far, so ask first.
+        grouping, measured = data.item(group), data.score(outcome)
+        plan = comparison_plan(data.frame(), grouping, measured)
         if plan is not None:
             codes.append(plan.code)
     if not codes:
