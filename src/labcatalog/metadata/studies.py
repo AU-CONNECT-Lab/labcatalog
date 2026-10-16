@@ -3,7 +3,9 @@ from datetime import date
 from pathlib import PurePosixPath
 
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.error import CommentMark
 from ruamel.yaml.scalarstring import LiteralScalarString
+from ruamel.yaml.tokens import CommentToken
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
@@ -192,6 +194,39 @@ def rename_study(project: Project, old: str, new: str) -> list[Change]:
         Change(target, records.dumped(study)),
         Change(relative, "", content, removed=True),
     ]
+
+
+def delete_study(project: Project, study: str) -> list[Change]:
+    # Takes the study's datasets and their column maps with it; the data files stay.
+    opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    studies = data["studies"]
+    tail = records.take_tail(studies)
+    studies.pop(study)
+    studies.ca.items.pop(study, None)
+    if studies:
+        records.put_tail(studies, tail)
+    else:
+        # An empty mapping keeps no comments, so they follow the key's own line.
+        data["studies"] = CommentedMap()
+        data["studies"].fa.set_flow_style()
+        if tail:
+            slot = data.ca.items.setdefault("studies", [None, None, None, None])
+            slot[2] = CommentToken("\n" + tail, CommentMark(0), None)
+    datasets = data.get("datasets") or []
+    names = [str(d.get("name")) for d in datasets if str(d.get("study")) == study]
+    for n in reversed(range(len(datasets))):
+        if str(datasets[n].get("study")) == study:
+            del datasets[n]
+    found = [Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)]
+    files = [f"{defaults.MAPS_DIR}/{name}.csv" for name in names]
+    if study in project.study_files:
+        files.append(project.study_files[study])
+    for relative in files:
+        if (project.root / relative).exists():
+            opened_file = editing.open_file(project.root, relative)
+            found.append(Change(relative, "", opened_file, removed=True))
+    return found
 
 
 def check_new_id(project: Project, study: str) -> None:

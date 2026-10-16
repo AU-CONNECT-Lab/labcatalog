@@ -140,6 +140,36 @@ def test_renaming_a_study_follows_it_into_every_file(mock_project):
         studies.rename_study(after, "family_study", "family_study")
 
 
+def test_deleting_a_new_study_leaves_the_file_as_it_was(mock_project):
+    before = (mock_project / "labcatalog.yaml").read_text(encoding="utf-8")
+    changes.write(
+        load_project(mock_project), studies.new_study(load_project(mock_project), "pilot", "Pilot")
+    )
+    project = load_project(mock_project)
+    found = studies.delete_study(project, "pilot")
+    assert [(c.path, c.removed) for c in found] == [
+        ("labcatalog.yaml", False),
+        ("studies/pilot.yaml", True),
+    ]
+    assert found[0].text == before
+    assert changes.check(project, found) == []
+
+
+def test_deleting_a_study_takes_its_datasets_and_maps(mock_project):
+    project = load_project(mock_project)
+    found = studies.delete_study(project, "mock_study")
+    removed = [c.path for c in found if c.removed]
+    assert "maps/parent_w1.csv" in removed and removed[-1] == "studies/mock_study.yaml"
+    assert len(removed) == len(project.config.datasets) + 1
+    assert "\nstudies: {}\n\n# One entry per data file" in found[0].text
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    after = load_project(mock_project)
+    assert after.config.studies == {} and after.config.datasets == []
+    # The data stay where they were.
+    assert (mock_project / "data/parent_w1.csv").exists()
+
+
 def test_wave_status():
     today = date(2026, 10, 16)
     assert studies.wave_status(WaveConfig(), today) == ""

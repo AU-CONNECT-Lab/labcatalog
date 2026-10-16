@@ -1,3 +1,4 @@
+import asyncio
 import os
 import re
 import subprocess
@@ -6,7 +7,7 @@ from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from nicegui import ui
+from nicegui import run, ui
 
 from labcatalog import defaults
 from labcatalog.metadata.bibliography import Bibliography, citation
@@ -31,6 +32,14 @@ def table(columns: list[dict], rows: list[dict], pagination: int | None = None) 
 
 def keyed(rows: list[dict]) -> list[dict]:
     return [{ROW_KEY: i, **row} for i, row in enumerate(rows)]
+
+
+async def computed(callback, *args):
+    # NiceGUI gives None in place of the result while the window closes.
+    found = await run.io_bound(callback, *args)
+    if found is None:
+        raise asyncio.CancelledError
+    return found
 
 
 @contextmanager

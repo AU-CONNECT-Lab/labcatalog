@@ -1,13 +1,13 @@
 from collections.abc import Callable
 from dataclasses import replace
 
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
-from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
+from labcatalog.gui.common import apa, code_tabs, col, computed, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
@@ -184,11 +184,11 @@ async def fit(
 ) -> tuple[ml.Fitted, str]:
     path = rscript()
     try:
-        fitted = await run.io_bound(ml.run, result, model, long, label, path)
+        fitted = await computed(ml.run, result, model, long, label, path)
     except LabCatalogError as err:
         if not path:
             raise
-        fitted = await run.io_bound(ml.run, result, model, long, label, None)
+        fitted = await computed(ml.run, result, model, long, label, None)
         return fitted, f"R failed, so this was computed in Python: {err}"
     if fitted.engine == ml.R:
         return fitted, "Computed in R (lme4 and lmerTest)."

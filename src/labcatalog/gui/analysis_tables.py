@@ -1,13 +1,13 @@
 from collections.abc import Callable
 
 import pandas as pd
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog.charts import plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, paper, preferences
-from labcatalog.gui.common import apa, code_tabs, col, fmt, note, p_value, section
+from labcatalog.gui.common import apa, code_tabs, col, computed, fmt, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
@@ -30,11 +30,11 @@ async def compute(
 ) -> tuple[dict[str, pd.DataFrame], str]:
     path = rscript()
     try:
-        found, engine = await run.io_bound(script.run_code, result, sample, frame, code, path)
+        found, engine = await computed(script.run_code, result, sample, frame, code, path)
     except LabCatalogError as err:
         if not path:
             raise
-        found, _ = await run.io_bound(script.run_code, result, sample, frame, code, None)
+        found, _ = await computed(script.run_code, result, sample, frame, code, None)
         return found, f"R failed, so this was computed in Python: {err}"
     if engine == script.R:
         return found, "Computed in R."

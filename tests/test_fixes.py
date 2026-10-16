@@ -163,3 +163,78 @@ def test_a_mistyped_id_is_swapped_for_the_one_meant(mock_project):
         changes.write(project, [change])
     assert {"example_mod", "chld_w2", "agreement"} <= seen
     assert run_validate(mock_project) == []
+
+
+def test_a_renamed_column_is_put_back_or_its_row_taken_out(mock_project):
+    map_file = mock_project / "maps" / "child_w1.csv"
+    edit(map_file, "pid,,\n", "pid,,\n\n")
+    edit(map_file, "ems_2_w1,example_mood,ems_2", "ems_2_wl,example_mood,ems_2")
+    [issue] = [i for i in run_check(mock_project).issues if i.code == "column_missing"]
+    line = map_file.read_text(encoding="utf-8").split("\n").index("ems_2_wl,example_mood,ems_2")
+    assert issue.details == {"dataset": "child_w1", "column": "ems_2_wl", "line": line + 1}
+    assert issue.location == f"maps/child_w1.csv:{line + 1}"
+    project = load_project(mock_project)
+    free = fixes.free_columns(project, "child_w1", ["pid", "ems_2_w1", "visit_date"])
+    assert fixes.closest("ems_2_wl", free) == "ems_2_w1"
+    before = map_file.read_text(encoding="utf-8")
+    apply(mock_project, fixes.map_line(project, "child_w1", issue.details["line"], "ems_2_w1"))
+    assert map_file.read_text(encoding="utf-8") == before.replace("ems_2_wl", "ems_2_w1")
+    found = codes(run_check(mock_project).issues)
+    assert "column_missing" not in found and "column_unmapped" not in found
+    map_file.write_text(before, encoding="utf-8")
+    taken = fixes.map_line(load_project(mock_project), "child_w1", issue.details["line"], None)
+    assert "ems_2_wl" not in taken.text and taken.text.count("\n") == before.count("\n") - 1
+
+
+def test_a_row_listed_twice_in_the_map_is_taken_out(mock_project):
+    map_file = mock_project / "maps" / "child_w1.csv"
+    before = map_file.read_text(encoding="utf-8")
+    map_file.write_text(before + "ems_1_w1,example_mood,ems_1\n", encoding="utf-8")
+    last = before.count("\n") + 1
+    [issue] = [i for i in run_validate(mock_project) if i.code == "duplicate_id"]
+    assert issue.details == {"dataset": "child_w1", "lines": [4, last]}
+    project = load_project(mock_project)
+    assert fixes.map_lines(project, "child_w1")[3] == "ems_1_w1,example_mood,ems_1"
+    apply(mock_project, fixes.map_line(project, "child_w1", last, None))
+    assert map_file.read_text(encoding="utf-8") == before
+    map_file.write_text(before + "ems_1_again,example_mood,ems_1\n", encoding="utf-8")
+    [issue] = [i for i in run_validate(mock_project) if i.code == "duplicate_id"]
+    assert "already mapped to ems_1_w1" in issue.message
+    assert issue.details["lines"] == [4, last]
+
+
+def test_a_missing_code_that_is_an_answer_is_taken_out(mock_project):
+    edit(
+        mock_project / "instruments" / "example_mood.yaml",
+        "{value: 0, label: Never}",
+        "{value: -99, label: Never}",
+    )
+    found = [i for i in run_validate(mock_project) if i.code == "missing_code_collision"]
+    assert len(found) > 1 and all(i.details["value"] == "-99" for i in found)
+    first, second = found[0].details["dataset"], found[1].details["dataset"]
+    apply(mock_project, fixes.drop_missing_code(load_project(mock_project), first, "-99", False))
+    project = load_project(mock_project)
+    own = next(d for d in project.config.datasets if d.name == first).missing_codes
+    assert [str(m.code) for m in own] == ["-98", "-97", ""]
+    left = {
+        i.details["dataset"]
+        for i in run_validate(mock_project)
+        if i.code == "missing_code_collision"
+    }
+    assert first not in left and second in left
+    apply(mock_project, fixes.drop_missing_code(project, second, "-99", True))
+    assert "missing_code_collision" not in codes(run_validate(mock_project))
+
+
+def test_a_mistyped_reference_key_is_swapped_for_one_in_the_bib(mock_project):
+    edit(mock_project / "instruments" / "example_mood.yaml", "key: example2019", "key: exampel2019")
+    [issue] = [i for i in run_validate(mock_project) if i.code == "reference_missing"]
+    details = issue.details
+    assert details["path"] == ["references", 0, "key"] and details["value"] == "exampel2019"
+    assert fixes.closest("exampel2019", details["choices"]) == "example2019"
+    project = load_project(mock_project)
+    apply(
+        mock_project,
+        fixes.replace_at(project, issue.location, details["path"], "example2019"),
+    )
+    assert "reference_missing" not in codes(run_validate(mock_project))

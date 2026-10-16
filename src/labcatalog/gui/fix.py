@@ -497,7 +497,7 @@ def repeated_row(project: Project, result: CatalogResult, issue: Issue, save) ->
 
 def clashing_code(project: Project, result: CatalogResult, issue: Issue, save) -> None:
     details = issue.details
-    dataset, code = details["dataset"], details["code"]
+    dataset, code = details["dataset"], details["value"]
     caption("Stop counting it as missing")
     note(
         f"If {code} is a real answer in {dataset}, take it out of the missing codes. If it "

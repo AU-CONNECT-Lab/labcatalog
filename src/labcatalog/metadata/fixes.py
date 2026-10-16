@@ -37,8 +37,7 @@ def map_line(project: Project, dataset: str, line: int, column: str | None) -> C
     # One row of the column map given another data column, or taken out when column is None.
     relative = f"{defaults.MAPS_DIR}/{dataset}.csv"
     opened = editing.open_file(project.root, relative)
-    lines = opened.text.split("
-")
+    lines = opened.text.split("\n")
     if column is None:
         del lines[line - 1]
     else:
@@ -47,13 +46,11 @@ def map_line(project: Project, dataset: str, line: int, column: str | None) -> C
         out = io.StringIO()
         csv.writer(out, lineterminator="").writerow(row)
         lines[line - 1] = out.getvalue()
-    return Change(relative, "
-".join(lines), opened)
+    return Change(relative, "\n".join(lines), opened)
 
 
 def map_lines(project: Project, dataset: str) -> list[str]:
-    return editing.open_file(project.root, f"{defaults.MAPS_DIR}/{dataset}.csv").text.split("
-")
+    return editing.open_file(project.root, f"{defaults.MAPS_DIR}/{dataset}.csv").text.split("\n")
 
 
 def add_to_vocab(project: Project, kind: str, value: str) -> Change:

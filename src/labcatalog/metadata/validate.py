@@ -373,7 +373,7 @@ def check_missing_code_collisions(project: Project) -> list[Issue]:
                             where = (project.instrument_files[instrument.id], dataset_name, option)
                             messages.setdefault(message, where)
     return [
-        problem("missing_code_collision", m, loc, dataset=name, code=str(option.value))
+        problem("missing_code_collision", m, loc, dataset=name, value=str(option.value))
         for m, (loc, name, option) in messages.items()
     ]
 
@@ -412,7 +412,9 @@ def check_variable_maps(project: Project) -> list[Issue]:
                     f"column {entry.column} is already listed on line {seen_columns[entry.column]}"
                 )
                 lines = [seen_columns[entry.column], entry.line]
-                issues.append(problem("duplicate_id", message, where, dataset=dataset.name, lines=lines))
+                issues.append(
+                    problem("duplicate_id", message, where, dataset=dataset.name, lines=lines)
+                )
                 continue
             seen_columns[entry.column] = entry.line
             if entry.instrument is None:
@@ -435,7 +437,9 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 first = seen_items[key]
                 message = f"{entry.instrument} {entry.item} is already mapped to {first.column}"
                 lines = [first.line, entry.line]
-                issues.append(problem("duplicate_id", message, where, dataset=dataset.name, lines=lines))
+                issues.append(
+                    problem("duplicate_id", message, where, dataset=dataset.name, lines=lines)
+                )
             seen_items[key] = entry
         # One issue per instrument, so a single typo upstream does not flood the list.
         for name, lines in stray_rows.items():
