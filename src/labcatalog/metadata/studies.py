@@ -1,7 +1,9 @@
 from dataclasses import dataclass
 from datetime import date
+from pathlib import PurePosixPath
 
 from ruamel.yaml.comments import CommentedMap
+from ruamel.yaml.scalarstring import LiteralScalarString
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
@@ -110,13 +112,99 @@ def write_milestones(entry: CommentedMap, rows: list[dict]) -> None:
         records.fill(milestone, MILESTONES, row)
 
 
-def new_study(project: Project, study: str, label: str) -> list[Change]:
+def text_change(
+    project: Project, study: str, methods: dict[str, str], participants: str
+) -> Change | None:
+    relative = study_file(project, study)
+    opened = None
+    text = f"{MODELINE.format('study')}\nstudy: {study}\n"
+    if (project.root / relative).exists():
+        opened = editing.open_file(project.root, relative)
+        text = opened.text
+    data = records.load(text)
+    written = data.get("methods") or CommentedMap()
+    for modality, paragraphs in methods.items():
+        set_block(written, modality, paragraphs)
+    if written:
+        place_key(data, "methods", written, after="study")
+    else:
+        data.pop("methods", None)
+    set_block(data, "participants", participants, after="methods" if written else "study")
+    new = records.dumped(data)
+    return None if new == text else Change(relative, new, opened)
+
+
+def study_file(project: Project, study: str) -> str:
+    return project.study_files.get(study, f"{defaults.STUDIES_DIR}/{study}.yaml")
+
+
+def set_block(parent: CommentedMap, key: str, text: str, after: str | None = None) -> None:
+    # One line per paragraph and a blank line between them, written as a | block.
+    lines = [line.rstrip() for line in text.replace("\r\n", "\n").strip().split("\n")]
+    clean = "\n".join(lines)
+    if clean == str(parent.get(key) or "").strip():
+        return
+    if not clean:
+        parent.pop(key, None)
+    elif after is None:
+        parent[key] = LiteralScalarString(clean + "\n")
+    else:
+        place_key(parent, key, LiteralScalarString(clean + "\n"), after)
+
+
+def place_key(data: CommentedMap, key: str, value, after: str) -> None:
+    # A new key goes after the one it belongs with, not at the end of the file.
+    if key in data:
+        data[key] = value
+        return
+    keys = list(data)
+    data.insert(keys.index(after) + 1 if after in keys else len(keys), key, value)
+
+
+def rename_study(project: Project, old: str, new: str) -> list[Change]:
+    check_new_id(project, new)
+    opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    studies = data["studies"]
+    at = list(studies).index(old)
+    comment = studies.ca.items.pop(old, None)
+    studies.insert(at, new, studies.pop(old))
+    if comment:
+        studies.ca.items[new] = comment
+    for entry in data.get("datasets") or []:
+        if str(entry.get("study")) == old:
+            entry["study"] = records.as_text(new)
+    found = [Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)]
+    relative = project.study_files.get(old)
+    if relative is None:
+        return found
+    content = editing.open_file(project.root, relative)
+    study = records.load(content.text)
+    study["study"] = records.as_text(new)
+    # A file named after the study takes the new name; any other name stays.
+    target = (
+        f"{defaults.STUDIES_DIR}/{new}.yaml" if PurePosixPath(relative).stem == old else relative
+    )
+    if target == relative:
+        return [*found, Change(relative, records.dumped(study), content)]
+    return [
+        *found,
+        Change(target, records.dumped(study)),
+        Change(relative, "", content, removed=True),
+    ]
+
+
+def check_new_id(project: Project, study: str) -> None:
     if not editing.NEW_ID.fullmatch(study):
         raise EditError(
             "ID: use lower-case letters, digits and underscores, starting with a letter"
         )
     if study in project.config.studies:
         raise EditError(f"A study called {study} already exists")
+
+
+def new_study(project: Project, study: str, label: str) -> list[Change]:
+    check_new_id(project, study)
     opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
     data = records.load(opened.text)
     if not data.get("studies"):

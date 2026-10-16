@@ -101,6 +101,45 @@ def test_a_new_study_gets_its_entry_and_study_file(mock_project):
         studies.new_study(after, "Pilot 2", "")
 
 
+def test_methods_and_participants_are_written_as_blocks(mock_project):
+    project = load_project(mock_project)
+    methods = dict(project.studies["mock_study"].methods)
+    assert studies.text_change(project, "mock_study", methods, "") is None
+    methods["eeg"] = "Recorded at 500 Hz.  \r\n\r\nCleaned by hand.\n\n"
+    methods["saliva"] = ""
+    template = "{waves} {counts}"
+    change = studies.text_change(project, "mock_study", methods, template)
+    assert "  eeg: |\n    Recorded at 500 Hz.\n\n    Cleaned by hand.\n  fmri: |" in change.text
+    assert "  saliva:" not in change.text
+    assert "\nparticipants: |\n  {waves} {counts}\nadministrations:" in change.text
+    # Only the changed modalities and the new template differ from the file as it was.
+    assert len(changed_lines(change.opened.text, change.text)) == 9
+    assert changes.check(project, [change]) == []
+    changes.write(project, [change])
+    after = load_project(mock_project).studies["mock_study"]
+    assert after.methods["eeg"] == "Recorded at 500 Hz.\n\nCleaned by hand.\n"
+    assert after.participants == "{waves} {counts}\n"
+
+
+def test_renaming_a_study_follows_it_into_every_file(mock_project):
+    project = load_project(mock_project)
+    found = studies.rename_study(project, "mock_study", "family_study")
+    assert [(c.path, c.removed) for c in found] == [
+        ("labcatalog.yaml", False),
+        ("studies/family_study.yaml", False),
+        ("studies/mock_study.yaml", True),
+    ]
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    assert not (mock_project / "studies/mock_study.yaml").exists()
+    after = load_project(mock_project)
+    assert list(after.config.studies) == ["family_study"]
+    assert {d.study for d in after.config.datasets} == {"family_study"}
+    assert after.studies["family_study"].methods
+    with pytest.raises(EditError, match="already exists"):
+        studies.rename_study(after, "family_study", "family_study")
+
+
 def test_wave_status():
     today = date(2026, 10, 16)
     assert studies.wave_status(WaveConfig(), today) == ""

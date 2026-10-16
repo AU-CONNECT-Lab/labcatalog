@@ -17,10 +17,17 @@ class Change:
     path: str
     text: str
     opened: editing.Opened | None = None
+    # Set to delete the file, as when a study file is renamed.
+    removed: bool = False
 
 
 def check(project: Project, found: list[Change]) -> list[Issue]:
-    issues = [issue for change in found for issue in editing.check_text(change.path, change.text)]
+    issues = [
+        issue
+        for change in found
+        if not change.removed
+        for issue in editing.check_text(change.path, change.text)
+    ]
     return issues or new_issues(project, found)
 
 
@@ -50,6 +57,9 @@ def copy_issues(project: Project, found: list[Change]) -> list[Issue]:
             shutil.copyfile(bib, target)
         for change in found:
             path = root / change.path
+            if change.removed:
+                path.unlink()
+                continue
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(change.text, encoding="utf-8")
         try:
@@ -70,7 +80,9 @@ def write(project: Project, found: list[Change]) -> None:
         elif (project.root / change.path).exists():
             raise EditError(f"{change.path} already exists")
     for change in found:
-        if change.opened is not None:
+        if change.removed:
+            (project.root / change.path).unlink()
+        elif change.opened is not None:
             editing.save_file(project.root, change.opened, change.text)
         else:
             path = project.root / change.path

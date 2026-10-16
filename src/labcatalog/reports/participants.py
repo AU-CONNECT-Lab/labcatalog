@@ -12,9 +12,9 @@ def template_for(project: Project, study: str) -> str:
     return next(iter(own), None) or project.config.participants or DEFAULT_TEMPLATE
 
 
-def paragraph(project: Project, summary: Summary, study: str) -> str:
+def paragraph(project: Project, summary: Summary, study: str, template: str | None = None) -> str:
     values = placeholder_values(project, summary, study)
-    return " ".join(template_for(project, study).format_map(values).split())
+    return " ".join((template or template_for(project, study)).format_map(values).split())
 
 
 def placeholder_values(project: Project, summary: Summary, study: str) -> dict[str, str]:
