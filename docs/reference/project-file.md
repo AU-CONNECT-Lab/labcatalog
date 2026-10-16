@@ -123,6 +123,7 @@ Settings that change the numbers, kept in the project so that everyone gets the 
 | `correlation` | `pearson` | `pearson` or `spearman`. |
 | `t_test` | `welch` | `welch` or `student`. |
 | `cfa_estimator` | `wlsmv` | `wlsmv` (items as ordered categories) or `ml` (items as continuous). |
+| `invariance_free` | none | Items whose parameters an invariance test lets differ, each as `{instrument, item, parameter, across}`: `parameter` is `loading`, `threshold` or `intercept`, and `across` is `waves`, `reporters`, or the grouping item as `instrument.item`. Written by **Save and rerun** on the invariance tables. |
 
 ## prepare and prepare_with
 

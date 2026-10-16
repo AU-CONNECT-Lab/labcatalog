@@ -85,7 +85,7 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     "id_whitespace": ("IDs with a space before or after them.", SCRIPTS),
     "id_pattern": ("IDs that do not look like the project's IDs.", SCRIPTS),
     "id_duplicate": ("The same ID appears more than once in one file.", SCRIPTS),
-    "group_missing": ("IDs from which no family or group can be read.", SCRIPTS),
+    "group_missing": ("IDs from which the group ID cannot be read.", SCRIPTS),
     "excluded_present": ("Rows of people on the exclusion list are still in the data.", SCRIPTS),
     "possible_identifier": (
         "A column that may hold names, emails, phone numbers, addresses or birth dates. It "
@@ -94,8 +94,7 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     ),
     "date_unparseable": ("Dates that are not written the way the project expects.", SCRIPTS),
     "same_answer": (
-        "People who gave the same answer to every item; they may have answered without "
-        "reading.",
+        "People who gave the same answer to every item; they may have answered without reading.",
         LOOK,
     ),
     "score_mismatch": (
@@ -166,6 +165,10 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         dialog.close()
         await actions.reload()
 
+    def follow() -> None:
+        dialog.close()
+        actions.follow(issue.location)
+
     def copy_note() -> None:
         ui.clipboard.write(note_text(issue))
         ui.notify("Note copied")
@@ -189,12 +192,13 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
             )
         with ui.row().classes("w-full items-center gap-2"):
             if issue.code in PREPARE and issue.details.get("step"):
-                ui.button(f"Run {issue.details['step']} again", icon="play_arrow", on_click=run_step)
-            if issue.location:
-                path, _ = split_location(issue.location)
-                ui.button(f"Open {path}", icon="open_in_new").props("flat").on(
-                    "click", lambda: (dialog.close(), actions.follow(issue.location))
+                ui.button(
+                    f"Run {issue.details['step']} again", icon="play_arrow", on_click=run_step
                 )
+            if issue.location:
+                ui.button(
+                    f"Open {split_location(issue.location)[0]}", icon="open_in_new", on_click=follow
+                ).props("flat")
             ui.button("Copy a note", icon="content_copy", on_click=copy_note).props("flat")
             ui.space()
             if issue.level == "warning" and root is not None:

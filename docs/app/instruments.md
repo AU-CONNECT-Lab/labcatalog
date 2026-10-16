@@ -35,6 +35,9 @@ A table of every score in every wave: *N*, mean, *SD*, median, observed and poss
 - **Scores across waves**: the mean of each score in each wave, for everyone and for the people who took part in every wave.
 - **Stability across waves**: the correlation of the same people's scores one wave apart.
 - **Invariance across waves**: whether the score measures the same thing in each wave (configural, metric and scalar invariance). It needs R.
+- **Invariance across reporters**: the same test between reporters who answered the instrument in the same wave, such as a parent and a child rating the child's mood. The reporters of one group are paired through `stats.correlate_by`, so this section appears only when that names a group.
+
+Under each invariance table, **Which items differ** runs a score test for each item at the step you choose: how much the fit would improve if that item's loadings, thresholds or intercepts were free to differ. Tick the items to free and press **Save and rerun**; labcatalog writes them under `stats.invariance_free` in `labcatalog.yaml` and tests again with those items freed (partial invariance). The table note lists what is freed. To hold an item equal again, untick it in the same dialog.
 - **Against other scores**: how this score correlates with every other score measured in the same wave.
 
 ### Item analysis

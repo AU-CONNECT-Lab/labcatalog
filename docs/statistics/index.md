@@ -1,6 +1,6 @@
 # Statistics
 
-labcatalog computes the statistics most papers report: reliability (Cronbach's α, McDonald's ω, item-rest correlations), confirmatory factor analysis and measurement invariance across waves, correlations, regression, *t* tests and ANOVA, multilevel models, and attrition analyses. It uses established packages rather than its own formulas, and its defaults follow [JASP](https://jasp-stats.org/), so its numbers match what JASP gives with its default options.
+labcatalog computes the statistics most papers report: reliability (Cronbach's α, McDonald's ω, item-rest correlations), confirmatory factor analysis and measurement invariance across waves, reporters and groups, correlations, regression, *t* tests and ANOVA, multilevel models, and attrition analyses. It uses established packages rather than its own formulas, and its defaults follow [JASP](https://jasp-stats.org/), so its numbers match what JASP gives with its default options.
 
 ## R first, Python second
 
@@ -10,7 +10,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 |---|---|---|
 | Reliability, correlations, regression, group comparisons | psych, effectsize, MBESS | pingouin, scipy, statsmodels |
 | Confirmatory factor analysis, ω | lavaan, semTools | semopy |
-| Measurement invariance across waves | lavaan, semTools | not available |
+| Measurement invariance across waves, reporters and groups, score tests | lavaan, semTools | not available |
 | Multilevel models | lme4, lmerTest, performance | statsmodels |
 
 ## Settings that change the numbers
@@ -28,6 +28,7 @@ stats:
 - `correlation` sets the coefficient of the correlations between scores and variables. Item-rest correlations and regression always use Pearson.
 - `t_test` sets the test that compares two groups.
 - `cfa_estimator` sets how factor models treat the items.
+- `invariance_free` lists the items an invariance test lets differ (partial invariance). It is written by the invariance tables' **Save and rerun**; see [Instruments](../app/instruments.md).
 - `correlate_by` sets how people in different datasets are matched, for example a parent and their child through their family. See [IDs, Groups and Missing Codes](../concepts/ids-groups-missing.md).
 
 The number of decimal places is a setting of your computer, on the Settings page.

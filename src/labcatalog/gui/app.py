@@ -15,6 +15,7 @@ from labcatalog.gui import (
     common,
     datasets,
     edit,
+    fix,
     instruments,
     methods,
     overview,
@@ -38,6 +39,7 @@ from labcatalog.gui.instruments import (
 )
 from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
+from labcatalog.issues import Issue
 from labcatalog.metadata.browse import BrowseIndex, build_index
 from labcatalog.pipeline import (
     CatalogResult,
@@ -425,8 +427,16 @@ class Window:
         if self.result is None:
             ui.label(self.error or "Open a project folder to check it.").classes("lc-note")
         else:
-            problems.render(self.result.report.issues, self.root, self.edit_location)
+            problems.render(
+                self.result.report, self.root, self.edit_location, self.open_fix, self.reload
+            )
         self.get_missing_button()
+
+    def open_fix(self, issue: Issue) -> None:
+        actions = fix.FixActions(
+            lambda location: problems.follow(self.root, location, self.edit_location), self.reload
+        )
+        fix.open_fix(self.result, issue, actions)
 
     def has_catalog(self) -> bool:
         if self.result is None:

@@ -28,6 +28,10 @@ Choose one or more predictors (**X**) and an outcome (**Y**). Each predictor get
 
 Choose the **Groups**, an answer-option item of a demographics instrument, and the **Outcome**. Groups with fewer than two people are left out. With two groups, the test is Welch's *t* test, or Student's when `stats.t_test` is `student`, with Cohen's *d* and the mean difference, each with a 95% CI. With three or more, it is a one-way ANOVA with η² and ω². The page shows a table of *n*, *M* and *SD* per group, the test table, and a box plot with every person as a point.
 
+## Measurement invariance across groups
+
+Choose an **Instrument** in one of the chosen datasets and the **Groups**, an answer-option item of a demographics instrument, then press **Test**. labcatalog fits a multigroup factor model in R with one group per answer and tests configural, threshold (for ordered items), metric and scalar invariance, the same steps as across waves on the instrument page. The grouping item may be in another dataset, such as the child's gender reported by the parent; people are matched as in the Sample above. A group needs more people than the model has items, and smaller groups are left out and named. **Which items differ** and **Save and rerun** work as on the instrument page, with the freed items stored for this grouping item.
+
 ## Script
 
 **Write script** writes the correlations, regression and group comparison above, as currently chosen, as one R script and one Python script. **Save to outputs** saves them with the data as `analysis_data.csv`, so either script runs in that folder.
