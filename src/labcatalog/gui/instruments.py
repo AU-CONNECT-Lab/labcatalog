@@ -883,7 +883,7 @@ def measures_section(
         result.project, result.catalog, result.summary, instrument, dataset, omegas(fits)
     )
     heading(f"Measures paragraph for {dataset}")
-    ui.label(text).classes("max-w-4xl")
+    ui.label(text).classes("lc-prose")
     copy_text(text)
     note(
         "A draft for the paper's Measures section, with α and ω from this dataset. Add "
@@ -923,7 +923,7 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
             )
             shown.clear()
             with shown:
-                ui.label(draft.description).classes("max-w-4xl")
+                ui.label(draft.description)
                 copy_text(draft.description)
                 note(f"Check it against the reference, then paste it as description: in {path}.")
                 for line in draft.notes:

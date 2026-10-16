@@ -4,7 +4,7 @@ from nicegui import ui
 
 from labcatalog.charts import network, views
 from labcatalog.gui import theme
-from labcatalog.gui.common import apa, card, col, heading, note, table
+from labcatalog.gui.common import apa, block, caption, col, heading, note, table
 from labcatalog.pipeline import CatalogResult
 
 TABLE_MIN = 360
@@ -32,7 +32,7 @@ def side_by_side(*panels: tuple[str, go.Figure | None]) -> None:
         for title, fig in shown:
             with ui.column().classes("flex-1 min-w-0 gap-0"):
                 if title:
-                    heading(title)
+                    caption(title)
                 show(fig)
 
 
@@ -172,11 +172,11 @@ def overview_section(result: CatalogResult) -> None:
     timeline(result)
     pace = views.collection_pace(result)
     if pace is not None:
-        with card("Collection pace", "People with data, by week since each wave started"):
+        with block("Collection pace", "People with data, by week since each wave started"):
             show(pace)
     levels = views.score_levels(result)
     if levels is not None:
-        with card("Scores in each wave", "Mean score as a share of its possible range"):
+        with block("Scores in each wave", "Mean score as a share of its possible range"):
             show(levels)
     score_relations(result)
 
@@ -226,7 +226,7 @@ def score_relations(result: CatalogResult) -> None:
         return f"{len(picked['instruments'])} of {len(instruments)} instruments"
 
     coefficient = result.project.config.stats.coefficient()
-    with card(
+    with block(
         "How the scores relate", f"{coefficient} between scores measured in one wave"
     ) as tools:
         with tools:
@@ -263,7 +263,7 @@ def show_network(option: dict | None, empty: str) -> None:
 def timeline(result: CatalogResult) -> None:
     fig = views.timeline(result)
     if fig is not None:
-        with card(
+        with block(
             "Timeline", "Each wave's dates and counts, and the milestones in labcatalog.yaml"
         ):
             show(fig)

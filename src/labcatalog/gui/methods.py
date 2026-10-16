@@ -74,7 +74,7 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
     study = view.study
     section("Participants")
     text = participants.paragraph(result.project, result.summary, study)
-    ui.label(text).classes("max-w-4xl")
+    ui.label(text).classes("lc-prose")
     copy_text(text)
     note(
         "Change the wording with participants: in labcatalog.yaml or in the study's file in "
@@ -219,7 +219,7 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
         )
         texts.append(text)
         heading(f"{instrument.name} ({dataset})")
-        ui.label(text).classes("max-w-4xl")
+        ui.label(text).classes("lc-prose")
     copy_text("\n\n".join(texts))
 
 

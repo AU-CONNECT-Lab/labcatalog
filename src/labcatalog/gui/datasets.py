@@ -70,7 +70,7 @@ def methods_of(result: CatalogResult, study: str) -> dict[str, str]:
 
 def paragraphs(text: str) -> None:
     # Keeps the blank lines between paragraphs that YAML block text carries.
-    ui.label(text.strip()).style("white-space: pre-line").classes("max-w-4xl")
+    ui.label(text.strip()).style("white-space: pre-line").classes("lc-prose")
 
 
 def dataset_table(

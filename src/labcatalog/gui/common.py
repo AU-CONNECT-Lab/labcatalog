@@ -34,14 +34,14 @@ def keyed(rows: list[dict]) -> list[dict]:
 
 
 @contextmanager
-def card(title: str, subtitle: str = "") -> Iterator[ui.row]:
-    # Yields the header's right-hand row, for controls that belong to the card.
-    with ui.card().props("flat").classes("lc-card w-full"):
-        with ui.row().classes("w-full items-start no-wrap gap-4"):
+def block(title: str, subtitle: str = "") -> Iterator[ui.row]:
+    # Yields the title's right-hand row, for controls that belong to the block.
+    with ui.column().classes("w-full gap-2"):
+        with ui.row().classes("lc-block-head w-full items-end no-wrap gap-4"):
             with ui.column().classes("grow gap-0"):
-                ui.label(title).classes("lc-card-title")
+                ui.label(title).classes("lc-block-title")
                 if subtitle:
-                    ui.label(subtitle).classes("lc-card-subtitle")
+                    ui.label(subtitle).classes("lc-block-subtitle")
             tools = ui.row().classes("items-center no-wrap gap-3")
         yield tools
 
@@ -52,6 +52,10 @@ def section(text: str) -> None:
 
 def heading(text: str) -> None:
     ui.label(text).classes("lc-heading")
+
+
+def caption(text: str) -> None:
+    ui.label(text).classes("lc-caption")
 
 
 def note(text: str) -> None:

@@ -59,7 +59,7 @@ def render(result: CatalogResult, view, study: str, wave: str) -> None:
             )
 
             def content() -> None:
-                ui.label(text).classes("max-w-4xl")
+                ui.label(text).classes("lc-prose")
                 paper.copy_text(text)
                 paper.paper_table(shown)
                 note(engine)

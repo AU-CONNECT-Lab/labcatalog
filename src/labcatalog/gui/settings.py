@@ -32,7 +32,7 @@ def render(
     path = (
         ui.input("Rscript", value=preferences.load().get(preferences.RSCRIPT, ""))
         .props("outlined dense clearable")
-        .classes("w-full max-w-2xl mt-2")
+        .classes("w-full mt-2")
     )
     status = ui.label().classes("lc-note")
 

@@ -55,7 +55,7 @@ def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
     path = (
         ui.input("datalad", value=preferences.load().get(preferences.DATALAD, ""))
         .props("outlined dense clearable")
-        .classes("w-full max-w-2xl mt-2")
+        .classes("w-full mt-2")
     )
     status = ui.label().classes("lc-note")
 
