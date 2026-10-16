@@ -1,15 +1,18 @@
+import io
 import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from pydantic import BaseModel
+from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
-from labcatalog.config import CustomFieldDef, ProjectConfig
+from labcatalog.config import CustomFieldDef, FreedParameter, ProjectConfig
 from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.issues import Issue
+from labcatalog.metadata import records
 from labcatalog.metadata.varmap import load_variable_map
 from labcatalog.project import load_config, load_model
 from labcatalog.schema import Instrument, StudyContent
@@ -85,6 +88,24 @@ def save_file(root: Path, opened: Opened, text: str) -> Opened:
     body = text.replace("\r\n", "\n").rstrip("\n") + "\n"
     path.write_bytes(body.replace("\n", newline).encode("utf-8"))
     return Opened(opened.path, text, path.stat().st_mtime_ns)
+
+
+def save_freed(root: Path, freed: list[FreedParameter]) -> None:
+    opened = open_file(root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    stats = data.setdefault("stats", CommentedMap())
+    entries = CommentedSeq()
+    for f in freed:
+        entry = CommentedMap(f.model_dump())
+        entry.fa.set_flow_style()
+        entries.append(entry)
+    if entries:
+        stats["invariance_free"] = entries
+    else:
+        stats.pop("invariance_free", None)
+    out = io.StringIO()
+    records.round_trip().dump(data, out)
+    save_file(root, opened, out.getvalue())
 
 
 def free_instrument_path(root: Path, instrument_id: str) -> Path:

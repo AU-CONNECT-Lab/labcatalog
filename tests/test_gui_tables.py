@@ -2,6 +2,7 @@ from pathlib import Path
 
 from labcatalog.charts import views
 from labcatalog.gui import datasets, instruments, problems
+from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import split_location
 from labcatalog.issues import Issue
 from labcatalog.metadata.bibliography import citation
@@ -198,7 +199,7 @@ def test_invariance_table_shows_each_step_against_the_one_before():
             InvarianceStep("scalar", fit(132, 0.980, 0.030)),
         ],
     )
-    _, rows = instruments.invariance_table(test)
+    _, rows = invariance_view.invariance_table(test)
     assert [r["step"] for r in rows] == [
         "Configural",
         "Thresholds",

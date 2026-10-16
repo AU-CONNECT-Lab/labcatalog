@@ -6,7 +6,7 @@ from nicegui import ui
 
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import analysis_tables, charts, multilevel
+from labcatalog.gui import analysis_tables, charts, group_invariance, multilevel
 from labcatalog.gui.common import apa, col, fmt, note, p_value, panel, section
 from labcatalog.gui.paper import Chart, paper_table, save_button
 from labcatalog.pipeline import CatalogResult
@@ -29,6 +29,8 @@ class AnalysisView:
     group: str | None = None
     outcome: str | None = None
     multilevel: ml.Model | None = None
+    invariance_measure: str | None = None
+    invariance_group: str | None = None
     # The instruments whose variables the page offers; None until first shown, then all.
     instruments: list[str] | None = None
 
@@ -71,6 +73,7 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
             correlation_section(result, sample, view, choices)
             pair_section(result, sample, view, choices)
         analysis_tables.group_section(result, sample, view, choices)
+        group_invariance.render(result, sample, view)
         analysis_tables.script_section(result, sample, view, choices)
 
     def set_datasets(value: list[str]) -> None:

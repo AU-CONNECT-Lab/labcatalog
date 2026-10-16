@@ -7,7 +7,8 @@ import pytest
 from labcatalog.config import FreedParameter
 from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats import invariance
+from labcatalog.stats import analysis, group_invariance, invariance
+from labcatalog.stats.analysis import item_variable
 from labcatalog.stats.cfa import SUBSCALES
 from labcatalog.stats.rbridge import CFA_PACKAGES, r_status
 
@@ -191,3 +192,42 @@ def test_two_reporters_of_one_wave_pair_through_the_family(mock_project):
     later = next(m for m in models if m.instrument_id == "example_mood" and m.across == "waves")
     family = next(iter(set(parent.index) & {i[:4] for i in later.occasions["2"].index}))
     assert parent.loc[family].equals(later.occasions["2"].loc[f"{family}C"].rename(family))
+
+
+GENDER = "item:example_demographics.dem_gender@parent_w1"
+
+
+def test_groups_come_from_an_item_in_another_file_paired_through_the_family(result):
+    sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
+    labels = {n: n for n in sample.datasets}
+    choices = group_invariance.measure_choices(result, sample.datasets, ["example_mood"], labels)
+    assert list(choices) == ["example_mood@child_w1"]
+    [mood] = group_invariance.group_models(result, sample, "example_mood@child_w1", GENDER)
+    assert mood.across == "example_demographics.dem_gender" and mood.wave == "1"
+    gender = analysis.values(result, sample, GENDER)
+    options = item_variable(result, GENDER).response_options
+    for option in options:
+        if option.label in mood.occasions:
+            people = mood.occasions[option.label].index
+            assert (gender[people] == float(option.value)).all()
+    assert sum(len(f) for f in mood.occasions.values()) <= len(sample.people)
+    # Two people cannot carry nine items' covariances.
+    assert mood.left_out == {"Another gender": 2}
+
+
+@needs_r
+def test_a_multigroup_model_runs_every_step_and_frees_by_group(result):
+    sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
+    [held] = group_invariance.group_models(result, sample, "example_mood@child_w1", GENDER)
+    result.project.config.stats.invariance_free = [
+        FreedParameter(
+            instrument="example_mood", item="ems_3", parameter="loading", across=held.across
+        )
+    ]
+    [freed] = group_invariance.group_models(result, sample, "example_mood@child_w1", GENDER)
+    before, after = invariance.fit_models([held, freed], rscript(), "ml")
+    assert [s.step for s in before.steps] == ["configural", "metric", "scalar"]
+    assert before.problem is None and all(s.problem is None for s in before.steps)
+    assert before.steps[1].fit["df"] - after.steps[1].fit["df"] == len(held.occasions) - 1
+    scores = invariance.score_tests(held, "scalar", rscript(), "ml")
+    assert {s.parameter for s in scores} == {"intercept"} and len(scores) == 9

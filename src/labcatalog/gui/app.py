@@ -108,7 +108,9 @@ class Window:
         self.importing = ImportView()
         self.editing = EditView()
         self.preparing = PrepareView()
-        self.cfa = CfaView(open_settings=lambda: self.tabs.set_value("settings"))
+        self.cfa = CfaView(
+            open_settings=lambda: self.tabs.set_value("settings"), reload=self.reload
+        )
         self.dataset: str | None = None
         self.error: str | None = None
         # The project a frozen copy was opened from, while the copy is shown.

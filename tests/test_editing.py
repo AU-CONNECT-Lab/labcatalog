@@ -2,6 +2,7 @@ import os
 
 import pytest
 
+from labcatalog.config import FreedParameter
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing
 from labcatalog.project import load_project
@@ -66,3 +67,13 @@ def test_a_draft_is_listed_checked_and_moved_into_instruments(mock_project):
     (drafts / "mood_two.yaml").write_text(text, encoding="utf-8")
     with pytest.raises(EditError, match="already exists"):
         editing.move_draft(mock_project, "drafts/mood_two.yaml")
+
+
+def test_freed_parameters_are_saved_into_the_stats_settings(mock_project):
+    freed = [FreedParameter(instrument="example_mood", item="ems_2", parameter="loading")]
+    editing.save_freed(mock_project, freed)
+    text = (mock_project / "labcatalog.yaml").read_text()
+    assert "correlate_by: family" in text and "# Score correlations link" in text
+    assert load_project(mock_project).config.stats.invariance_free == freed
+    editing.save_freed(mock_project, [])
+    assert "invariance_free" not in (mock_project / "labcatalog.yaml").read_text()

@@ -43,6 +43,8 @@ class InvarianceModel:
     # The wave of every occasion; empty across waves.
     wave: str = ""
     freed: list[FreedParameter] = field(default_factory=list)
+    # Groups too small to fit, with their sizes.
+    left_out: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass

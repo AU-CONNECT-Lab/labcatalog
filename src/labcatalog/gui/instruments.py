@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
@@ -13,6 +13,7 @@ from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import charts, preferences
+from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
     cited,
@@ -27,7 +28,7 @@ from labcatalog.gui.common import (
     unique,
 )
 from labcatalog.gui.datalad import get_button
-from labcatalog.gui.paper import copy_text, paper_table, save_button
+from labcatalog.gui.paper import copy_text, paper_table, save_button, without_empty
 from labcatalog.metadata.browse import BrowseIndex, counts, matches
 from labcatalog.metadata.completeness import gaps
 from labcatalog.metadata.history import Change, file_history
@@ -55,7 +56,13 @@ from labcatalog.reports.export import (
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument, Reference, Text
 from labcatalog.stats.cfa import SUBSCALES, WLSMV, CfaFit, R
-from labcatalog.stats.invariance import STEPS, InvarianceTest
+from labcatalog.stats.invariance import (
+    REPORTERS,
+    WAVES,
+    InvarianceModel,
+    InvarianceTest,
+    build_models,
+)
 from labcatalog.stats.summary import VariableSummary
 
 PAGE_SIZE = 50
@@ -93,6 +100,8 @@ class CfaView:
     invariance: list[InvarianceTest] = field(default_factory=list)
     invariance_message: str = ""
     open_settings: Callable[[], None] | None = None
+    # Reloads the project, after a change to labcatalog.yaml.
+    reload: Callable[[], Awaitable[None]] | None = None
 
 
 def render(
@@ -502,7 +511,7 @@ def scores_part(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> 
             "wave apart (n people).",
         ):
             table(*stable)
-        invariance_section(result, instrument, cfa)
+    invariance_section(result, instrument, cfa, stable is not None)
     charts.other_scores(result, instrument.id)
 
 
@@ -1015,14 +1024,6 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
         shown = ui.column().classes("gap-1")
 
 
-def without_empty(
-    columns: list[dict], rows: list[dict], name: str
-) -> tuple[list[dict], list[dict]]:
-    if any(row.get(name) for row in rows):
-        return columns, rows
-    return [c for c in columns if c["name"] != name], rows
-
-
 def omegas(fits: list[CfaFit]) -> dict[str, float]:
     return {score: value for f in fits for score, value in f.omega.items()}
 
@@ -1093,103 +1094,74 @@ def loading_table(
 
 
 @ui.refreshable
-def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
+def invariance_section(
+    result: CatalogResult, instrument: Instrument, cfa: CfaView, several_waves: bool
+) -> None:
     tests = [t for t in cfa.invariance if t.instrument_id == instrument.id]
-    with panel("Invariance across waves"):
-        if cfa.invariance_status == CFA_UNSET:
-            settings_hint(
-                cfa, "Set the path to Rscript on the Settings page to test invariance across waves."
-            )
-        elif cfa.invariance_status == CFA_RUNNING:
-            note("Testing invariance across waves in R.")
-        elif cfa.invariance_status == CFA_FAILED:
-            note(cfa.invariance_message)
-        elif not tests:
-            note("No model: no score here has three or more items in two or more waves.")
-        else:
-            how = (
-                "WLSMV with the items as ordered categories, people who answered every item at a "
-                "wave. Each step holds one more set of parameters equal across waves; Δχ² is the "
-                "scaled difference test"
-                if result.project.config.stats.cfa_estimator == WLSMV
-                else "maximum likelihood with the items as continuous, full information for people "
-                "missing a wave. Each step holds one more set of parameters equal across waves; "
-                "Δχ² is the likelihood ratio test"
-            )
-            method = (
-                "lavaan and semTools: each wave's items load on their own factors, the same people "
-                f"are linked by ID, and each item's residuals correlate across waves; {how} against "
-                "the step before."
-            )
-            note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
-            labels = {s.id: s.label for s in instrument.scores}
-            for i, test in enumerate(tests, start=1):
-                names = ", ".join(labels[s] for s in test.factors)
-                kind = "Subscales" if test.kind == SUBSCALES else "One factor"
-                waves = ", ".join(
-                    f"{views.wave_name(result, test.study, wave)} {n}" for wave, n in test.n.items()
+    if several_waves:
+        with panel("Invariance across waves"):
+            waves = [t for t in tests if t.across == WAVES]
+            if cfa.invariance_status == CFA_UNSET:
+                settings_hint(
+                    cfa,
+                    "Set the path to Rscript on the Settings page to test invariance across waves.",
                 )
-                study = result.project.config.studies[test.study].label or test.study
-                ui.label(f"{kind}: {names}").classes("font-medium mt-2")
-                note(
-                    f"{study}, reported by {test.reporter}; people who answered every item: {waves}."
-                )
-                if test.problem:
-                    note(test.problem)
-                else:
-                    shown = PaperTable(
-                        f"Invariance of {instrument.name} Across Waves ({kind}: {names})",
-                        *without_empty(*invariance_table(test), "problem"),
-                        f"{method} n per wave: {waves}.",
+            elif cfa.invariance_status == CFA_RUNNING:
+                note("Testing invariance across waves in R.")
+            elif cfa.invariance_status == CFA_FAILED:
+                note(cfa.invariance_message)
+            elif not waves:
+                note("No model: no score here has three or more items in two or more waves.")
+            else:
+                note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
+                method = invariance_view.method_text(result, WAVES, "waves")
+                for i, test in enumerate(waves, start=1):
+                    counts = ", ".join(
+                        f"{views.wave_name(result, test.study, wave)} {n}"
+                        for wave, n in test.n.items()
                     )
-                    paper_table(shown)
-                    save_button(result, f"invariance_{instrument.id}_{i}", {"invariance": shown})
+                    study = result.project.config.studies[test.study].label or test.study
+                    invariance_view.test_block(
+                        result,
+                        instrument,
+                        test,
+                        f"Invariance of {instrument.name} Across Waves",
+                        f"{method} n per wave: {counts}.",
+                        f"{study}, reported by {test.reporter}; people who answered every item: "
+                        f"{counts}.",
+                        f"invariance_{instrument.id}_{i}",
+                        lambda test=test: model_of(result, test),
+                        cfa.reload,
+                    )
+    reporters = [t for t in tests if t.across == REPORTERS]
+    if reporters:
+        with panel("Invariance across reporters"):
+            note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
+            method = invariance_view.method_text(result, REPORTERS, "reporters")
+            for i, test in enumerate(reporters, start=1):
+                counts = ", ".join(f"{reporter} {n}" for reporter, n in test.n.items())
+                wave = views.wave_name(result, test.study, test.wave)
+                invariance_view.test_block(
+                    result,
+                    instrument,
+                    test,
+                    f"Invariance of {instrument.name} Across Reporters, {wave}",
+                    f"{method} n per reporter: {counts}.",
+                    f"{wave}; answered every item: {counts}.",
+                    f"invariance_reporters_{instrument.id}_{i}",
+                    lambda test=test: model_of(result, test),
+                    cfa.reload,
+                )
 
 
-def invariance_table(test: InvarianceTest) -> tuple[list[dict], list[dict]]:
-    names = {
-        "configural": "Configural",
-        "thresholds": "Thresholds",
-        "metric": "Metric (+ loadings)",
-        "scalar": "Scalar (+ intercepts)",
-    }
-    columns = [
-        col("step", "Step"),
-        col("chisq", "χ² (df)", numeric=True),
-        col("cfi", "CFI", numeric=True),
-        col("rmsea", "RMSEA", numeric=True),
-        col("srmr", "SRMR", numeric=True),
-        col("diff", "Δχ² (Δdf)", numeric=True),
-        col("p", "p", numeric=True),
-        col("dcfi", "ΔCFI", numeric=True),
-        col("drmsea", "ΔRMSEA", numeric=True),
-        col("problem", "Note", sortable=False),
-    ]
-    rows = []
-    previous = None
-    for step in sorted(test.steps, key=lambda s: STEPS.index(s.step)):
-        values = step.fit
-        before = previous.fit if previous and not previous.problem else {}
-        rows.append(
-            {
-                "step": names[step.step],
-                "chisq": f"{fmt(values['chisq'])} ({values['df']:g})" if values else "",
-                **{key: fmt(values.get(key), 3) for key in ("cfi", "rmsea", "srmr")},
-                "diff": f"{fmt(step.chisq_diff)} ({step.df_diff:g})"
-                if step.chisq_diff is not None
-                else "",
-                "p": p_value(step.p_diff),
-                **{
-                    f"d{key}": fmt(values[key] - before[key], 3)
-                    if values.get(key) is not None and before.get(key) is not None
-                    else ""
-                    for key in ("cfi", "rmsea")
-                },
-                "problem": step.problem or "",
-            }
-        )
-        previous = step
-    return columns, rows
+def model_of(result: CatalogResult, test: InvarianceTest) -> InvarianceModel:
+    return next(
+        m
+        for m in build_models(result.project, result.catalog, result.datasets)
+        if (m.instrument_id, m.across, m.study, m.reporter, m.wave, m.kind)
+        == (test.instrument_id, test.across, test.study, test.reporter, test.wave, test.kind)
+        and list(m.factors) == list(test.factors)
+    )
 
 
 def score_table(

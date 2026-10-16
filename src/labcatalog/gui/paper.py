@@ -95,6 +95,14 @@ def save_button(
         saved = ui.row().classes("items-center gap-2")
 
 
+def without_empty(
+    columns: list[dict], rows: list[dict], name: str
+) -> tuple[list[dict], list[dict]]:
+    if any(row.get(name) for row in rows):
+        return columns, rows
+    return [c for c in columns if c["name"] != name], rows
+
+
 async def image(chart: Chart, kind: str) -> bytes:
     options = {
         "format": kind,
