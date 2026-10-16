@@ -34,16 +34,17 @@ def keyed(rows: list[dict]) -> list[dict]:
 
 
 @contextmanager
-def block(title: str, subtitle: str = "") -> Iterator[ui.row]:
-    # Yields the title's right-hand row, for controls that belong to the block.
-    with ui.column().classes("w-full gap-2"):
-        with ui.row().classes("lc-block-head w-full items-end no-wrap gap-4"):
+def panel(title: str, subtitle: str = "") -> Iterator[ui.row]:
+    # Yields the title bar's right-hand row, for controls that belong to the panel.
+    with ui.column().classes("lc-panel w-full gap-0"):
+        with ui.row().classes("lc-panel-head w-full items-center no-wrap gap-4"):
             with ui.column().classes("grow gap-0"):
-                ui.label(title).classes("lc-block-title")
+                ui.label(title).classes("lc-panel-title")
                 if subtitle:
-                    ui.label(subtitle).classes("lc-block-subtitle")
+                    ui.label(subtitle).classes("lc-panel-subtitle")
             tools = ui.row().classes("items-center no-wrap gap-3")
-        yield tools
+        with ui.column().classes("lc-panel-body w-full gap-2"):
+            yield tools
 
 
 def section(text: str) -> None:

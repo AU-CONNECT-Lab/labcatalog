@@ -4,6 +4,7 @@
   --lc-faint: #8b949e;
   --lc-rule: #e3e6ea;
   --lc-rule-soft: #eff1f3;
+  --lc-border: #d0d7de;
   --lc-surface: #f6f8fa;
   --lc-accent: #1d4e89;
   --lc-accent-soft: #e8eef5;
@@ -88,18 +89,18 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 
 /* ---- Pages ---- */
 .q-tab-panel.lc-page { padding: 1.5rem 1.5rem 4rem; }
+.q-tab-panel.lc-dashboard { gap: 16px; }
+/* Only the active panel is in the page, so this greys the window behind the dashboard alone. */
+body:has(.q-tab-panel.lc-dashboard) { background: var(--lc-surface); }
 
-.lc-section, .lc-block-head {
+.lc-section {
   width: 100%;
   margin-top: 2.5rem;
   padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--lc-rule);
 }
-.lc-section, .lc-block-title { font-size: 1.1rem; font-weight: 600; color: var(--lc-ink); }
-.lc-page > .lc-section:first-child, .lc-page > .nicegui-column:first-child > .lc-block-head {
-  margin-top: 0.5rem;
-}
-.lc-block-subtitle { font-size: 0.85rem; color: var(--lc-faint); }
+.lc-section { font-size: 1.1rem; font-weight: 600; color: var(--lc-ink); }
+.lc-page > .lc-section:first-child { margin-top: 0.5rem; }
 .lc-heading {
   width: 100%;
   margin-top: 1.5rem;
@@ -120,9 +121,42 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-note { color: var(--lc-muted); }
 .lc-prose { width: 100%; font-family: var(--lc-serif); font-size: 0.98rem; line-height: 1.7; }
 
-.lc-facts { align-content: start; }
-.lc-facts > * { padding: 0.42rem 0; border-bottom: 1px solid var(--lc-rule-soft); }
-.lc-fact-key { color: var(--lc-muted); padding-right: 1rem; }
+/* ---- Dashboard ---- */
+.lc-tile, .lc-panel {
+  background: #fff;
+  border: 1px solid var(--lc-border);
+  border-radius: 8px;
+}
+.lc-tile {
+  padding: 14px 16px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.lc-tile:hover { border-color: var(--lc-accent); box-shadow: 0 1px 6px rgba(29, 78, 137, 0.12); }
+.lc-tile-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 1.15rem;
+}
+.lc-tile-label { font-size: 0.88rem; font-weight: 600; color: var(--lc-muted); }
+.lc-tile-go { font-size: 1.2rem; color: var(--lc-faint); }
+.lc-tile:hover .lc-tile-go { color: var(--lc-accent); }
+.lc-tile-value {
+  margin-top: 12px;
+  font-size: 2.1rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--lc-ink);
+}
+.lc-tile-detail { margin-top: 4px; font-size: 0.82rem; color: var(--lc-muted); }
+
+.lc-panel { overflow: hidden; }
+.lc-panel-head { padding: 12px 16px; border-bottom: 1px solid var(--lc-rule-soft); }
+.lc-panel-title { font-size: 0.98rem; font-weight: 600; color: var(--lc-ink); }
+.lc-panel-subtitle { font-size: 0.8rem; color: var(--lc-faint); }
+.lc-panel-body { padding: 8px 16px 12px; }
 
 .lc-group { margin-top: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--lc-rule); }
 .lc-group-title { font-size: 1.02rem; font-weight: 600; color: var(--lc-ink); }

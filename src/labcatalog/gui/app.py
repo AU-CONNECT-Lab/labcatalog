@@ -151,7 +151,7 @@ class Window:
         self.tabs = tabs
 
         with ui.tab_panels(tabs, value="overview").classes("w-full bg-transparent"):
-            with ui.tab_panel("overview").classes("lc-page"):
+            with ui.tab_panel("overview").classes("lc-page lc-dashboard"):
                 self.overview_panel()
             with ui.tab_panel("instruments").classes("lc-page"):
                 self.instruments_panel()
@@ -336,6 +336,7 @@ class Window:
             overview.render(
                 self.result,
                 lambda: self.open_instrument(None),
+                lambda: self.tabs.set_value("datasets"),
                 lambda: self.tabs.set_value("problems"),
             )
 
