@@ -87,6 +87,7 @@ def new_instrument(root: Path, instrument_id: str) -> str:
         MODELINE.format("instrument"),
         f"id: {instrument_id}",
         f"name: {instrument_id.replace('_', ' ').capitalize()}",
+        "response_sets: []",
         "items: []",
         "scores: []",
     ]

@@ -1,4 +1,5 @@
 import io
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal
@@ -9,7 +10,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from labcatalog import defaults
 from labcatalog.exceptions import EditError
 
-Kind = Literal["text", "bool", "number", "list", "choice"]
+Kind = Literal["text", "bool", "number", "list", "choice", "value"]
 # Where each list's rows came from in the file; new rows have none.
 ORIGIN = "_row"
 
@@ -24,44 +25,77 @@ class Column:
     default: Any = None
 
 
-ITEMS = (
-    Column("id", "ID"),
-    Column("text", "Text"),
-    Column("type", "Type", "choice", ("choice", "number", "text"), "choice"),
-    Column("response_set", "Options"),
-    Column("reverse", "Reverse", "bool", default=False),
-    Column("subscales", "Subscales", "list"),
-    Column("min", "Min", "number"),
-    Column("max", "Max", "number"),
+@dataclass(frozen=True)
+class Table:
+    label: str
+    columns: tuple[Column, ...]
+    # Set when rows come from a list inside each entry; the first column is then the entry's key.
+    inner: str | None = None
+
+
+ITEMS = Table(
+    "Items",
+    (
+        Column("id", "ID"),
+        Column("text", "Text"),
+        Column("type", "Type", "choice", ("choice", "number", "text"), "choice"),
+        Column("response_set", "Response set"),
+        Column("reverse", "Reverse", "bool", default=False),
+        Column("subscales", "Subscales", "list"),
+        Column("min", "Min", "number"),
+        Column("max", "Max", "number"),
+    ),
 )
-SCORES = (
-    Column("id", "ID"),
-    Column("label", "Label"),
-    Column("method", "Method", "choice", ("sum", "mean")),
-    Column("items", "Items", "list"),
-    Column("missing_rule", "Missing", "choice", ("complete", "prorate", "zero"), "complete"),
-    Column("min_valid", "Min answered", "number"),
+SCORES = Table(
+    "Scores",
+    (
+        Column("id", "ID"),
+        Column("label", "Label"),
+        Column("method", "Method", "choice", ("sum", "mean")),
+        Column("items", "Items", "list"),
+        Column("missing_rule", "Missing", "choice", ("complete", "prorate", "zero"), "complete"),
+        Column("min_valid", "Min answered", "number"),
+    ),
 )
-DATASETS = (
-    Column("name", "Name"),
-    Column("modality", "Modality"),
-    Column("study", "Study"),
-    Column("wave", "Wave"),
-    Column("reporter", "Reporter"),
-    Column("source", "Source", "choice", ("csv",)),
-    Column("path", "Path"),
-    Column("id_column", "ID column"),
-    Column("group_column", "Group column"),
-    Column("date_column", "Date column"),
-    Column("snapshot_date", "Snapshot date"),
+OPTIONS = Table(
+    "Response sets",
+    (Column("id", "Set"), Column("value", "Value", "value"), Column("label", "Label")),
+    inner="options",
+)
+ADMINISTRATIONS = Table(
+    "Administrations",
+    (
+        Column("instrument", "Instrument"),
+        Column("datasets", "Datasets", "list"),
+        Column("target", "Target"),
+        Column("abbreviation", "Abbreviation"),
+        Column("reversed_in_data", "Reversed in data", "bool", default=False),
+    ),
+)
+DATASETS = Table(
+    "Datasets",
+    (
+        Column("name", "Name"),
+        Column("modality", "Modality"),
+        Column("study", "Study"),
+        Column("wave", "Wave"),
+        Column("reporter", "Reporter"),
+        Column("source", "Source", "choice", ("csv",)),
+        Column("path", "Path"),
+        Column("id_column", "ID column"),
+        Column("group_column", "Group column"),
+        Column("date_column", "Date column"),
+        Column("snapshot_date", "Snapshot date"),
+    ),
 )
 TABLES = {
-    defaults.INSTRUMENTS_DIR: {"items": ITEMS, "scores": SCORES},
+    defaults.INSTRUMENTS_DIR: {"items": ITEMS, "scores": SCORES, "response_sets": OPTIONS},
+    defaults.STUDIES_DIR: {"administrations": ADMINISTRATIONS},
     "": {"datasets": DATASETS},
 }
 
 
-def tables_for(relative: str) -> dict[str, tuple[Column, ...]]:
+def tables_for(relative: str) -> dict[str, Table]:
     path = PurePosixPath(relative)
     if path.suffix not in defaults.YAML_SUFFIXES:
         return {}
@@ -79,46 +113,98 @@ def round_trip() -> YAML:
     return yaml
 
 
-def read_rows(text: str, key: str, columns: tuple[Column, ...]) -> list[dict[str, Any]]:
-    data = round_trip().load(text) or {}
+def read_rows(text: str, key: str, table: Table) -> list[dict[str, Any]]:
+    entries = (round_trip().load(text) or {}).get(key) or []
+    if table.inner is None:
+        return [{ORIGIN: n} | cells(entry, table.columns, key) for n, entry in enumerate(entries)]
+    group, *columns = table.columns
     rows = []
-    for n, entry in enumerate(data.get(key) or []):
-        row = {ORIGIN: n}
-        for column in columns:
-            value = entry.get(column.key)
-            if isinstance(value, dict):
-                raise EditError(
-                    f"{key} has {column.key} written per language; edit this file as text"
-                )
-            row[column.key] = shown(value, column)
-        rows.append(row)
+    for n, entry in enumerate(entries):
+        name = shown(entry.get(group.key), group)
+        if not entry.get(table.inner):
+            raise EditError(f"{key}: {name} has no {table.inner}; edit this file as text")
+        for m, part in enumerate(entry[table.inner]):
+            rows.append({ORIGIN: [n, m], group.key: name} | cells(part, columns, key))
     return rows
 
 
-def write_rows(text: str, key: str, columns: tuple[Column, ...], rows: list[dict]) -> str:
+def cells(entry: CommentedMap, columns: Iterable[Column], key: str) -> dict[str, Any]:
+    row = {}
+    for column in columns:
+        value = entry.get(column.key)
+        if isinstance(value, dict):
+            raise EditError(f"{key} has {column.key} written per language; edit this file as text")
+        row[column.key] = shown(value, column)
+    return row
+
+
+def write_rows(text: str, key: str, table: Table, rows: list[dict]) -> str:
     yaml = round_trip()
     data = yaml.load(text) or CommentedMap()
-    old = data.get(key)
-    if not old:
-        # An empty [] would keep new rows on its one line.
-        old = data[key] = CommentedSeq()
-    # Rows keep their order, so dropping and appending in place keeps comments between them.
-    kept = {row[ORIGIN] for row in rows if isinstance(row.get(ORIGIN), int)}
-    targets = [old[row[ORIGIN]] if row.get(ORIGIN) in kept else None for row in rows]
-    for n in reversed(range(len(old))):
-        if n not in kept:
-            del old[n]
-    for row, entry in zip(rows, targets, strict=True):
-        if entry is None:
-            entry = CommentedMap()
-            # One line per entry, as labcatalog and its example write them.
-            entry.fa.set_flow_style()
-            old.append(entry)
-        for column in columns:
-            update(entry, column, row.get(column.key))
+    if table.inner is None:
+        origins = [row.get(ORIGIN) for row in rows]
+        for row, entry in zip(rows, place(data, key, origins), strict=True):
+            fill(entry, table.columns, row)
+    else:
+        write_groups(data, key, table, rows)
     out = io.StringIO()
     yaml.dump(data, out)
     return out.getvalue()
+
+
+def write_groups(data: CommentedMap, key: str, table: Table, rows: list[dict]) -> None:
+    group, *columns = table.columns
+    members: dict[str, list[dict]] = {}
+    for row in rows:
+        name = stored(row.get(group.key), group)
+        if name is None:
+            raise EditError(f"{group.label}: every row needs one")
+        members.setdefault(name, []).append(row)
+    names = [str(entry.get(group.key)) for entry in data.get(key) or []]
+    # An entry stays with the rows that still carry its name, else with rows that came from it.
+    owner: dict[str, int | None] = {}
+    for name, found in members.items():
+        owner[name] = next((n for n in sources(found) if names[n] == name), None)
+    for name, found in members.items():
+        if owner[name] is None:
+            owner[name] = next((n for n in sources(found) if n not in owner.values()), None)
+    entries = place(data, key, list(owner.values()), flow=False)
+    for (name, found), entry in zip(members.items(), entries, strict=True):
+        update(entry, group, name)
+        origins = [
+            r[ORIGIN][1] if r.get(ORIGIN) and r[ORIGIN][0] == owner[name] else None for r in found
+        ]
+        for row, part in zip(found, place(entry, table.inner, origins), strict=True):
+            fill(part, columns, row)
+
+
+def sources(rows: list[dict]) -> list[int]:
+    return [row[ORIGIN][0] for row in rows if row.get(ORIGIN)]
+
+
+def place(parent: CommentedMap, key: str, origins: list[int | None], flow: bool = True) -> list:
+    old = parent.get(key)
+    if not old:
+        # An empty [] would keep new rows on its one line.
+        old = parent[key] = CommentedSeq()
+    entries = [None if n is None else old[n] for n in origins]
+    # Rows keep their order, so dropping and inserting in place keeps comments between them.
+    for n in reversed(range(len(old))):
+        if n not in origins:
+            del old[n]
+    for n, entry in enumerate(entries):
+        if entry is None:
+            entries[n] = CommentedMap()
+            if flow:
+                # One line per entry, as labcatalog and its example write them.
+                entries[n].fa.set_flow_style()
+            old.insert(n, entries[n])
+    return entries
+
+
+def fill(entry: CommentedMap, columns: Iterable[Column], row: dict) -> None:
+    for column in columns:
+        update(entry, column, row.get(column.key))
 
 
 def update(entry: CommentedMap, column: Column, cell: Any) -> None:
@@ -137,6 +223,8 @@ def shown(value: Any, column: Column) -> Any:
         return bool(value) if value is not None else bool(column.default)
     if column.kind == "list":
         return ", ".join(str(v) for v in value or [])
+    if column.kind == "value":
+        return "" if value is None else str(value)
     if value is None:
         return "" if column.default is None else column.default
     return value if column.kind == "number" else str(value)
@@ -156,4 +244,17 @@ def stored(cell: Any, column: Column) -> Any:
         except ValueError:
             raise EditError(f"{column.label}: '{text}' is not a number") from None
         return int(number) if number.is_integer() else number
+    if column.kind == "value":
+        return scalar(text)
+    return text
+
+
+def scalar(text: str) -> int | float | str:
+    # Only numbers written as YAML writes them count, so '01' stays text.
+    for kind in (int, float):
+        try:
+            if str(kind(text)) == text:
+                return kind(text)
+        except ValueError:
+            pass
     return text
