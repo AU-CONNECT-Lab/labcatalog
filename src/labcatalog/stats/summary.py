@@ -10,6 +10,7 @@ from labcatalog.config import ProjectConfig, missing_labels_for
 from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
 from labcatalog.data.scoring import item_values, scorable, score_items
 from labcatalog.sources import LoadedDataset
+from labcatalog.stats.link import link
 
 
 class VariableSummary(BaseModel):
@@ -470,25 +471,23 @@ def correlations(
 ) -> list[Correlation]:
     if correlate_by == "none":
         return []
-    waves: dict[tuple[str, str], dict[str, pd.Series]] = {}
-    ambiguous: dict[tuple[str, str], set] = {}
+    waves: dict[tuple[str, str], list[ResolvedScore]] = {}
     for score in catalog.scores:
-        loaded = datasets[score.dataset]
-        values = scores[score.dataset][score.key]
-        if values.notna().sum() == 0:
+        if scores[score.dataset][score.key].notna().sum() == 0:
             continue
-        by_id = correlate_by == "id" or loaded.group is None
-        link = loaded.frame[loaded.id_column] if by_id else loaded.group
-        linked = pd.Series(values.to_numpy(), index=link.to_numpy())
-        # A link value that repeats within a file (two children in one family) is ambiguous.
-        repeated = linked.index.duplicated(keep=False)
-        wave_key = (loaded.config.study, loaded.config.wave)
-        ambiguous.setdefault(wave_key, set()).update(linked.index[repeated])
-        waves.setdefault(wave_key, {})[score.key] = linked[~repeated & linked.index.notna()]
+        config = datasets[score.dataset].config
+        waves.setdefault((config.study, config.wave), []).append(score)
     rows = []
-    for (study, wave), series in sorted(waves.items(), key=lambda kv: wave_order(kv[0][1])):
-        if len(series) < 2:
+    for (study, wave), found in sorted(waves.items(), key=lambda kv: wave_order(kv[0][1])):
+        if len(found) < 2:
             continue
+        names = list(dict.fromkeys(s.dataset for s in found))
+        links = link(datasets, names, correlate_by)
+        series = {}
+        for s in found:
+            rows_of = links.rows[s.dataset]
+            values = scores[s.dataset][s.key].to_numpy()[rows_of.to_numpy()]
+            series[s.key] = pd.Series(values, index=rows_of.index)
         table = pd.DataFrame(series)
         present = table.notna().astype(float)
         pairs = present.T @ present
@@ -500,7 +499,7 @@ def correlations(
                 keys=list(table.columns),
                 r=[[None if pd.isna(r) else float(r) for r in row] for row in matrix.to_numpy()],
                 n=[[int(n) for n in row] for row in pairs.to_numpy()],
-                n_ambiguous=len(ambiguous.get((study, wave), set())),
+                n_ambiguous=links.repeated,
             )
         )
     return rows

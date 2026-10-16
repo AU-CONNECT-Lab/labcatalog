@@ -10,7 +10,7 @@ The choices here apply to every section of the page except the multilevel model.
 - **Only people in every selected dataset**: on (the default) keeps the people who are in all of them; off keeps everyone in any of them.
 - **Measures**: the instruments whose scores and numbers appear in the lists below, the multilevel model included. By default, all of them. The **Select** menu next to it can choose all, all of one modality, or none.
 
-The note below says how many people are in the sample and how they were matched across files: by ID, or by group when `stats.correlate_by` names one. Rows whose ID repeats within a file are left out.
+The note below says how many people are in the sample and how they were matched across files: by ID, or by group when `stats.correlate_by` names one. Rows whose ID repeats within a file are left out. When a file holds several people of one group (two children of a family), that group is taken person by person, as described under [Groups](../concepts/ids-groups-missing.md#groups), and the note says how many groups that affects.
 
 The variable lists hold every score and number item of the chosen measures in the chosen datasets, labeled with their wave. Type in a list to filter it.
 

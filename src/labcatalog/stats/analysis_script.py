@@ -27,6 +27,7 @@ from labcatalog.stats.cfa import is_total
 from labcatalog.stats.rbridge import install_command, package_check, run_r
 
 DATA_FILE = "analysis_data.csv"
+PERSON_ID = "id"
 SCORE = "score"
 WELCH = "welch"
 STUDENT = "student"
@@ -394,19 +395,19 @@ class AnalysisData:
         return f"{column}_{dataset}" if shared else column
 
     def align(self, dataset: str, values: np.ndarray) -> pd.Series:
-        keys = analysis.link_keys(self.result, dataset)
-        keep = analysis.linkable(keys)
-        return pd.Series(values[keep], index=keys.to_numpy()[keep]).reindex(self.sample.people)
+        return analysis.aligned(self.sample, dataset, values)
 
     def frame(self) -> pd.DataFrame:
-        presence = {}
-        for name in self.sample.datasets:
-            keys = analysis.link_keys(self.result, name)
-            found = set(keys[analysis.linkable(keys)])
-            presence[f"in_{name}"] = [int(p in found) for p in self.sample.people]
-        frame = pd.DataFrame(
-            {link_name(self.result): self.sample.people, **presence}, index=self.sample.people
-        )
+        people, split = self.sample.people, self.sample.links.split
+        keys = {link_name(self.result): [split.get(p, p) for p in people]}
+        # A group taken person by person repeats, so its people get their own IDs.
+        if split:
+            keys[PERSON_ID] = [p if p in split else "" for p in people]
+        presence = {
+            f"in_{name}": [int(p in self.sample.links.rows[name]) for p in people]
+            for name in self.sample.datasets
+        }
+        frame = pd.DataFrame({**keys, **presence}, index=people)
         return pd.concat([frame, pd.DataFrame(self.columns)], axis=1).reset_index(drop=True)
 
 
@@ -510,6 +511,8 @@ def headers(
     where = ", ".join(sample.datasets)
     title = f"Analysis of {result.project.config.project.name}, written by labcatalog."
     text = f"Sample: {len(sample.people)} people in {where}, matched by {matched}."
+    if notes := analysis.group_notes(result, sample):
+        text += "\n# " + notes
     needs = (
         R_PACKAGES.format(names=", ".join(packages), install=install_command(packages))
         if packages

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import pandas as pd
@@ -7,6 +7,7 @@ from scipy import stats
 from labcatalog import defaults
 from labcatalog.data.resolve import ResolvedVariable, numbers_in_range
 from labcatalog.pipeline import CatalogResult
+from labcatalog.stats.link import Links, link
 
 NUMBER = "number"
 CHOICE = "choice"
@@ -17,8 +18,7 @@ ITEM_PREFIX = "item:"
 class Sample:
     datasets: list[str]
     people: list[str]
-    # Rows left out because their ID or group repeats within a file.
-    ambiguous: int
+    links: Links
 
 
 @dataclass
@@ -54,20 +54,50 @@ def linkable(keys: pd.Series) -> np.ndarray:
 
 
 def build_sample(result: CatalogResult, datasets: list[str], intersect: bool) -> Sample:
-    found = []
-    for name in datasets:
-        keys = link_keys(result, name)
-        found.append(set(keys[linkable(keys)]))
-    ambiguous = sum(
-        int(link_keys(result, name).dropna().duplicated(keep=False).sum()) for name in datasets
-    )
+    links = link(result.datasets, list(datasets), result.project.config.stats.correlate_by)
+    found = [set(links.rows[name].index) for name in datasets]
     if not found:
         people: set[str] = set()
     elif intersect:
         people = set.intersection(*found)
     else:
         people = set().union(*found)
-    return Sample(list(datasets), sorted(people), ambiguous)
+    return Sample(list(datasets), sorted(people), links)
+
+
+def within(sample: Sample, datasets: list[str]) -> Sample:
+    # The people of a wider sample who have a row in these datasets.
+    rows = [sample.links.rows[name].index for name in datasets]
+    people = [p for p in sample.people if any(p in r for r in rows)]
+    return replace(sample, datasets=list(datasets), people=people)
+
+
+def group_notes(result: CatalogResult, sample: Sample) -> str:
+    group = result.project.config.ids.group
+    name = group.name if group else "group"
+    notes = []
+    if sample.links.repeated:
+        notes.append(
+            f"{sample.links.repeated} rows are left out because their ID repeats in a file."
+        )
+    split = len(set(sample.links.split.values()))
+    if split:
+        notes.append(
+            f"{split} {name} groups have several people in a file, so each person is a row and an "
+            f"answer given once for the {name} counts for each of them; a multilevel model with "
+            f"people nested in {name} groups allows for that."
+        )
+    if sample.links.crossed:
+        notes.append(
+            f"In {sample.links.crossed} {name} groups two files each hold several people with no "
+            "one in common, so their answers do not pair across those files."
+        )
+    return " ".join(notes)
+
+
+def aligned(sample: Sample, dataset: str, found: np.ndarray) -> pd.Series:
+    rows = sample.links.rows[dataset]
+    return pd.Series(found[rows.to_numpy()], index=rows.index).reindex(sample.people)
 
 
 def item_key(variable: ResolvedVariable) -> str:
@@ -112,10 +142,7 @@ def row_values(result: CatalogResult, key: str) -> np.ndarray:
 
 
 def values(result: CatalogResult, sample: Sample, key: str) -> pd.Series:
-    keys = link_keys(result, key.rsplit("@", 1)[1])
-    keep = linkable(keys)
-    found = row_values(result, key)[keep]
-    return pd.Series(found, index=keys.to_numpy()[keep]).reindex(sample.people)
+    return aligned(sample, key.rsplit("@", 1)[1], row_values(result, key))
 
 
 def table(result: CatalogResult, sample: Sample, keys: list[str]) -> pd.DataFrame:

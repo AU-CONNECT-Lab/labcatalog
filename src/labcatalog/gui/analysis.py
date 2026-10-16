@@ -174,9 +174,8 @@ def sample_text(result: CatalogResult, sample: analysis.Sample, where: str) -> s
     by = result.project.config.stats.correlate_by
     matched = "ID" if by in ("id", "none") else by
     text = f"{len(sample.people)} people {where}, matched across datasets by {matched}."
-    if sample.ambiguous:
-        text += f" {sample.ambiguous} rows are left out because their {matched} repeats in a file."
-    return text
+    notes = analysis.group_notes(result, sample)
+    return f"{text} {notes}" if notes else text
 
 
 def correlation_section(

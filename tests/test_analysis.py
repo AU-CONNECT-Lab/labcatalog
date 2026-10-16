@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from labcatalog.charts import views
@@ -5,7 +6,7 @@ from labcatalog.gui import analysis as page
 from labcatalog.gui import common
 from labcatalog.gui.common import p_value
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats import analysis, analysis_script
+from labcatalog.stats import analysis, analysis_script, attrition
 from labcatalog.stats import multilevel as ml
 
 EMS = "example_mood.ems_total@child_w1"
@@ -38,6 +39,60 @@ def test_a_pair_matches_the_correlation_of_the_summary(result):
     assert fit.correlation.n == wave.n[i][j]
     assert fit.correlation.low < fit.correlation.r < fit.correlation.high
     assert fit.correlation.p < 0.05
+
+
+def add_person(project, dataset: str, person: str, like: str) -> None:
+    # A new person in a file, answering like someone else.
+    path = project / "data" / f"{dataset}.csv"
+    data = pd.read_csv(path, dtype=str)
+    row = data[data["pid"] == like].assign(pid=person)
+    pd.concat([data, row]).to_csv(path, index=False)
+
+
+@pytest.fixture
+def siblings(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    config.write_text(config.read_text().replace("[PC]", "[PCD]"))
+    # Family 1001 has a second child; 1002 a second child and a second parent.
+    add_person(mock_project, "child_w1", "1001D", "1003C")
+    add_person(mock_project, "child_w1", "1002D", "1004C")
+    add_person(mock_project, "parent_w1", "1002Q", "1004P")
+    return run_catalog(mock_project)
+
+
+def test_a_family_with_two_children_counts_each_child(siblings):
+    sample = analysis.build_sample(siblings, ["parent_w1", "child_w1"], False)
+    assert {"1001C", "1001D", "1002C", "1002D", "1002P", "1002Q"} <= set(sample.people)
+    assert "1001" not in sample.people and "1003" in sample.people
+    frame = analysis.table(siblings, sample, [EMS, EPS])
+    # The one parent's answer goes with each child; two parents pair with neither child.
+    assert frame.loc["1001C", EPS] == frame.loc["1001D", EPS]
+    assert frame.loc["1001D", EMS] == frame.loc["1003", EMS]
+    assert frame.loc[["1002C", "1002D"], EPS].isna().all()
+    assert frame.loc[["1002P", "1002Q"], EMS].isna().all()
+    assert (sample.links.crossed, len(set(sample.links.split.values()))) == (1, 2)
+    notes = analysis.group_notes(siblings, sample)
+    assert "2 family groups have several people" in notes and "In 1 family groups" in notes
+    data = analysis_script.AnalysisData(siblings, sample)
+    data.variable(EMS)
+    written = data.frame().set_index("id")
+    assert written.loc["1001D", "family"] == "1001" and written.loc["1001D", "in_parent_w1"] == 1
+    # A file with one child per family keeps families as they were.
+    later = analysis.build_sample(siblings, ["child_w2"], True)
+    assert "1003" in later.people and not later.links.split
+    found = attrition.plan(siblings, "mock_study", "1", ["example_mood.ems_total"])
+    assert "1001D" in found.sample.people and found.stayed + found.left == len(found.sample.people)
+
+
+def test_the_summary_pairs_siblings_like_the_sample(siblings):
+    sample = analysis.build_sample(siblings, ["parent_w1", "child_w1"], False)
+    fit = analysis.regress(
+        analysis.values(siblings, sample, EMS), analysis.values(siblings, sample, EPS)
+    )
+    wave = next(c for c in siblings.summary.correlations if c.wave == "1")
+    i, j = wave.keys.index(EMS), wave.keys.index(EPS)
+    assert fit.correlation.r == pytest.approx(wave.r[i][j])
+    assert fit.correlation.n == wave.n[i][j]
 
 
 def test_the_correlation_table_reads_like_apa(result):

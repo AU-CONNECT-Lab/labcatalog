@@ -216,8 +216,11 @@ def plan(result: CatalogResult, study: str, wave: str, keys: list[str]) -> Plan 
     second = next_wave(result, study, wave)
     if second is None:
         return None
-    sample = analysis.build_sample(result, wave_files(result, study, wave), intersect=False)
-    later = set(analysis.build_sample(result, wave_files(result, study, second), False).people)
+    first, then = wave_files(result, study, wave), wave_files(result, study, second)
+    # Both waves together, so a group taken person by person is so in both.
+    both = analysis.build_sample(result, first + then, intersect=False)
+    sample = analysis.within(both, first)
+    later = set(analysis.within(both, then).people)
     data = AnalysisData(result, sample)
     # A variable in several files of the wave gets a row per file, as reporters may differ.
     variables = [
