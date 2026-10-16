@@ -6,10 +6,10 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.annex import DATALAD_CONFIG, dataset_root
-from labcatalog.paths import portable_path
+from labcatalog.annex import DATALAD_CONFIG, group_by_dataset, is_placeholder
+from labcatalog.paths import expand_path, portable_path
 from labcatalog.prepare import step_states
-from labcatalog.project import Project
+from labcatalog.project import Project, bib_path, references_root
 from labcatalog.sources import LoadedDataset
 from labcatalog.version import __version__
 
@@ -92,13 +92,32 @@ def original_branch(root: Path) -> str:
     return "HEAD"
 
 
+def used_paths(project: Project, datasets: dict[str, LoadedDataset]) -> list[Path]:
+    config, root = project.config, project.root
+    metadata = [
+        root / name
+        for name in (
+            defaults.CONFIG_FILENAME,
+            defaults.INSTRUMENTS_DIR,
+            defaults.STUDIES_DIR,
+            defaults.MAPS_DIR,
+            defaults.SCORING_DIR,
+        )
+    ]
+    metadata.append(bib_path(config, root))
+    if config.references.root:
+        metadata.append(references_root(config, root))
+    if config.exclusions:
+        metadata.append(expand_path(config.exclusions, root))
+    sources = [d.source_path for d in datasets.values() if d.source_path is not None]
+    inputs = [f.resolved for state in step_states(project) for f in state.inputs]
+    found = dict.fromkeys(p for p in [*metadata, *sources, *inputs] if p.exists() or is_placeholder(p))
+    return list(found)
+
+
 def datalad_records(project_root: Path, used: list[Path]) -> list[DataladRecord]:
-    found: dict[Path, list[str]] = {}
-    for path in used:
-        if folder := dataset_root(path):
-            relative = (path.parent.resolve() / path.name).relative_to(folder)
-            found.setdefault(folder, []).append(relative.as_posix())
-    records = (datalad_record(project_root, folder, paths) for folder, paths in found.items())
+    groups = group_by_dataset(used)
+    records = (datalad_record(project_root, folder, paths) for folder, paths in groups.items())
     return [record for record in records if record]
 
 
@@ -125,9 +144,6 @@ def run_git(root: Path, *args: str) -> str:
 
 def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Manifest:
     states = step_states(project)
-    sources = [d.source_path for d in datasets.values() if d.source_path is not None]
-    inputs = [f.resolved for state in states for f in state.inputs]
-    used = [project.root / defaults.CONFIG_FILENAME, *sources, *inputs]
     return Manifest(
         built_at=datetime.now().replace(microsecond=0),
         tool_version=__version__,
@@ -149,5 +165,5 @@ def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Mani
             for f in state.inputs
             if f.resolved.is_file() and not f.placeholder
         ],
-        datalad=datalad_records(project.root, used),
+        datalad=datalad_records(project.root, used_paths(project, datasets)),
     )

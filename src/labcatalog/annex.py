@@ -19,7 +19,20 @@ def fetch_advice(path: Path) -> str:
     return f'the content of {path} is not on this computer; get it with: datalad get "{path}"'
 
 
+def resolved(path: Path) -> Path:
+    # Resolving a file itself would follow a locked annex link into .git/annex/objects.
+    return path.resolve() if path.is_dir() else path.parent.resolve() / path.name
+
+
 def dataset_root(path: Path) -> Path | None:
     # The nearest one, so a file in a subdataset belongs to the subdataset.
-    folder = path.parent.resolve()
+    folder = resolved(path) if path.is_dir() else resolved(path).parent
     return next((f for f in (folder, *folder.parents) if (f / DATALAD_CONFIG).is_file()), None)
+
+
+def group_by_dataset(paths: list[Path]) -> dict[Path, list[str]]:
+    found: dict[Path, list[str]] = {}
+    for path in paths:
+        if folder := dataset_root(path):
+            found.setdefault(folder, []).append(resolved(path).relative_to(folder).as_posix())
+    return found
