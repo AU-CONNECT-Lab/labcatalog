@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from labcatalog.annex import fetch_advice, is_placeholder
+from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.exceptions import DataSourceError
 
 

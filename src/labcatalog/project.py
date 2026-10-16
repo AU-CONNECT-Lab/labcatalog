@@ -8,9 +8,9 @@ import yaml
 from pydantic import BaseModel, ValidationError
 
 from labcatalog import defaults
-from labcatalog.annex import fetch_advice, is_placeholder
 from labcatalog.bibliography import Bibliography, load_bibliography
 from labcatalog.config import ProjectConfig
+from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.exceptions import MetadataError, ProjectExistsError, ProjectNotFoundError
 from labcatalog.issues import Issue, issues_from_validation_error
 from labcatalog.paths import expand_path

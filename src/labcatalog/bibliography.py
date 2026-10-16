@@ -8,7 +8,7 @@ from bibtexparser.middlewares.names import (
 )
 from bibtexparser.model import Block, DuplicateBlockKeyBlock
 
-from labcatalog.annex import fetch_advice, is_placeholder
+from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.issues import Issue
 from labcatalog.paths import portable_path
 

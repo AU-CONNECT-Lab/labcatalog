@@ -4,8 +4,8 @@ import pytest
 from typer.testing import CliRunner
 
 from labcatalog.cli import app
+from labcatalog.datalad.freeze import RECORD_ONLY, list_freezes
 from labcatalog.exceptions import FreezeError
-from labcatalog.freeze import RECORD_ONLY, list_freezes
 from labcatalog.pipeline import run_freeze
 
 runner = CliRunner()

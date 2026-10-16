@@ -5,8 +5,8 @@ from nicegui import run, ui
 
 from labcatalog import defaults
 from labcatalog.config import dataset_by_name
+from labcatalog.datalad.freeze import RECORD_ONLY, datalad_datasets, list_freezes
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.freeze import RECORD_ONLY, datalad_datasets, list_freezes
 from labcatalog.gui import preferences, problems
 from labcatalog.gui.common import cited, col, heading, note, open_path, table, without_line
 from labcatalog.issues import Issue

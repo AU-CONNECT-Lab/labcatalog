@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from labcatalog import defaults
-from labcatalog.annex import fetch_advice, is_placeholder
+from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.issues import Issue
 
 MAP_COLUMNS = ("column", "instrument", "item")

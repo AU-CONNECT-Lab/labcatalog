@@ -4,12 +4,12 @@ from pathlib import Path
 import webview
 from nicegui import app, background_tasks, run, ui
 
-from labcatalog.annex import dataset_root
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
-from labcatalog.dataladbridge import use_folder
+from labcatalog.datalad.annex import dataset_root
+from labcatalog.datalad.bridge import use_folder
+from labcatalog.datalad.freeze import Freeze, differences, list_freezes
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.freeze import Freeze, differences, list_freezes
 from labcatalog.gui import (
     analysis,
     codebook_import,
@@ -26,7 +26,7 @@ from labcatalog.gui import (
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
-from labcatalog.gui.content import get_button
+from labcatalog.gui.datalad import get_button
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.instruments import (
     CFA_DONE,

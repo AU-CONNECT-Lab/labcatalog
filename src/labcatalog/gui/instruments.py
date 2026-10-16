@@ -7,11 +7,11 @@ import webview
 from nicegui import app, run, ui
 
 from labcatalog import ai_scoring, measures
-from labcatalog.annex import is_placeholder
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.export import VARIABLES, export_plan, write_export
 from labcatalog.gui import charts, preferences
@@ -29,7 +29,7 @@ from labcatalog.gui.common import (
     table,
     unique,
 )
-from labcatalog.gui.content import get_button
+from labcatalog.gui.datalad import get_button
 from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.history import file_history
 from labcatalog.invariance import STEPS, InvarianceTest

@@ -12,9 +12,9 @@ from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codebook import ImportResult
 from labcatalog.codegen import label_snippets, scoring_snippets
-from labcatalog.dataladbridge import get_content
+from labcatalog.datalad.bridge import get_content
+from labcatalog.datalad.freeze import Freeze, freeze_project, list_freezes, open_freeze
 from labcatalog.exceptions import CodebookError, MetadataError
-from labcatalog.freeze import Freeze, freeze_project, list_freezes, open_freeze
 from labcatalog.invariance import InvarianceTest
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client

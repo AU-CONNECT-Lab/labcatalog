@@ -8,7 +8,7 @@ from labcatalog import defaults
 from labcatalog.exceptions import DataladError, LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import note, open_path
-from labcatalog.gui.content import get_button
+from labcatalog.gui.datalad import get_button
 from labcatalog.pipeline import run_get
 from labcatalog.prepare import FileState, Session, StepState, run_steps, step_states, stop
 from labcatalog.project import load_project

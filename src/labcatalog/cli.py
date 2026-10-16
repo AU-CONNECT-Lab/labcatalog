@@ -7,9 +7,9 @@ from typing import Annotated
 import typer
 
 from labcatalog import defaults
+from labcatalog.datalad.freeze import RECORD_ONLY
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.export import run_export
-from labcatalog.freeze import RECORD_ONLY
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import (
     run_check,

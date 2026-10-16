@@ -2,9 +2,9 @@ from datetime import date
 from pathlib import Path
 
 from labcatalog import defaults
-from labcatalog.annex import is_placeholder
 from labcatalog.bibliography import citation
 from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LLMError
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
 from labcatalog.project import Project, reference_pdf

@@ -3,8 +3,10 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from labcatalog.annex import group_by_dataset
+from labcatalog.config import PrepareStep
+from labcatalog.datalad.annex import group_by_dataset
 from labcatalog.exceptions import DataladError
+from labcatalog.paths import expand_path, portable_path
 
 INSTALL = "uv tool install git-annex and uv tool install datalad"
 
@@ -60,3 +62,13 @@ def run_datalad(datalad: str, args: list[str], cwd: Path | None = None) -> str:
 def get_content(datalad: str, paths: list[Path]) -> None:
     for root, inside in group_by_dataset(paths).items():
         run_datalad(datalad, ["get", *inside], cwd=root)
+
+
+def run_args(step: PrepareStep, root: Path, datalad: str) -> list[str]:
+    paths = [("-i", path) for path in step.inputs] + [("-o", path) for path in step.outputs]
+    args = []
+    for flag, path in paths:
+        args += [flag, portable_path(expand_path(path, root), root).as_posix()]
+    # datalad run fills {inputs} and the like into the command, so literal braces are doubled.
+    command = step.run.replace("{", "{{").replace("}", "}}")
+    return [datalad, "run", "--explicit", "-m", step.name, *args, command]

@@ -5,7 +5,7 @@ from pathlib import Path
 from nicegui import run, ui
 
 from labcatalog.charts import style
-from labcatalog.dataladbridge import INSTALL, datalad_status, use_folder
+from labcatalog.datalad.bridge import INSTALL, datalad_status, use_folder
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import note, section

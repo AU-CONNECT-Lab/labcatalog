@@ -12,6 +12,10 @@ from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.tables import PaperTable
 
+ONE_EACH = (
+    "Each {group} holds one person here, so the {group} and person levels cannot be told "
+    "apart; turn one of them off."
+)
 R_FILE = "multilevel.R"
 PYTHON_FILE = "multilevel.py"
 SINGULAR = (
@@ -63,7 +67,7 @@ def render(result: CatalogResult, view) -> None:
                 "multilevel_random": PaperTable(
                     "Random Effects",
                     *random_table(fitted),
-                    "Variances and SDs; r is the correlation of the slope with the intercept.",
+                    random_note(model, long),
                 ),
                 "multilevel_summary": PaperTable(
                     "Model Summary", *summary_table(fitted), summary_note(fitted)
@@ -72,9 +76,11 @@ def render(result: CatalogResult, view) -> None:
 
             def content() -> None:
                 if fitted.singular:
-                    note(SINGULAR).classes("text-negative")
+                    ui.label(SINGULAR).classes("text-negative")
+                if model.by_person and fitted.groups == fitted.people:
+                    ui.label(ONE_EACH.format(group=long.group)).classes("text-negative")
                 for text in fitted.notes:
-                    note(f"Warning: {text}").classes("text-negative")
+                    ui.label(f"Warning: {text}").classes("text-negative")
                 for shown in papers.values():
                     paper.paper_table(shown)
                 note(engine)
@@ -151,6 +157,16 @@ def render(result: CatalogResult, view) -> None:
             on_change=lambda e: change(slope=e.value),
         )
     body()
+
+
+def random_note(model: ml.Model, long: ml.Long) -> str:
+    text = "Variances and SDs; r is the correlation of the slope with the intercept."
+    if model.by_person and model.slope and long.group and len(model.datasets) > 1:
+        text += (
+            " With groups as well, the slope is not correlated with the intercept, so that R "
+            "and Python fit the same model."
+        )
+    return text
 
 
 async def fit(

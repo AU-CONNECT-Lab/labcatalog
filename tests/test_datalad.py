@@ -8,11 +8,12 @@ from pathlib import Path
 import pytest
 
 from labcatalog.ai_scoring import reference_pdfs
-from labcatalog.annex import is_placeholder
-from labcatalog.check import check_git_annex, check_prepare_outputs
-from labcatalog.dataladbridge import datalad_status, use_folder
+from labcatalog.check import check_prepare_outputs
+from labcatalog.datalad.annex import is_placeholder
+from labcatalog.datalad.bridge import datalad_status, use_folder
+from labcatalog.datalad.check import check_git_annex
+from labcatalog.datalad.freeze import differences
 from labcatalog.exceptions import DataladError, DataSourceError, FreezeError, MetadataError
-from labcatalog.freeze import differences
 from labcatalog.history import file_history
 from labcatalog.ids import load_exclusions
 from labcatalog.manifest import build_manifest, git_commit
@@ -370,7 +371,7 @@ def test_steps_run_with_datalad_are_recorded_and_get_their_inputs(tmp_path, data
 
 
 def test_a_missing_git_annex_is_reported_only_for_datalad_projects(mock_project, monkeypatch):
-    monkeypatch.setattr("labcatalog.check.shutil.which", lambda name: None)
+    monkeypatch.setattr("labcatalog.datalad.check.shutil.which", lambda name: None)
     assert check_git_annex(load_project(mock_project)) == []
     (mock_project / ".datalad").mkdir()
     (mock_project / ".datalad" / "config").write_text("", encoding="utf-8")
