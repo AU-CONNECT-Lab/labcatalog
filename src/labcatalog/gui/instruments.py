@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
+import webview
 from nicegui import app, run, ui
 
 from labcatalog import ai_scoring, defaults
@@ -12,6 +13,7 @@ from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.export import VARIABLES, export_plan, write_export
 from labcatalog.gui import charts, preferences
 from labcatalog.gui.common import (
     as_text,
@@ -45,6 +47,8 @@ class BrowseView:
     query: str = ""
     items: bool = False
     instrument: str | None = None
+    # Instruments ticked for export, kept across filters and refreshes.
+    chosen: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -90,8 +94,28 @@ def browser(
     @ui.refreshable
     def results() -> None:
         found = matches(index, view.selected, view.query, view.items)
-        note(f"{len(found)} of {len(index.instruments)} instruments")
+
+        @ui.refreshable
+        def chosen_bar() -> None:
+            ui.label(f"{len(view.chosen)} chosen").classes("text-grey-7")
+            ui.button(
+                "Export", icon="download", on_click=lambda: export_dialog(result, found, view)
+            ).props("outline dense no-caps").set_enabled(bool(view.chosen))
+
+        def choose(selection: list[dict]) -> None:
+            # Instruments the filters hide stay chosen.
+            here = {row["id"] for row in shown.rows}
+            view.chosen = (view.chosen - here) | {row["id"] for row in selection}
+            chosen_bar.refresh()
+
+        with ui.row().classes("w-full items-center gap-3"):
+            note(f"{len(found)} of {len(index.instruments)} instruments")
+            ui.space()
+            chosen_bar()
         shown = table(*list_table(result, found), pagination=PAGE_SIZE)
+        shown.set_selection("multiple")
+        shown.selected = [row for row in shown.rows if row["id"] in view.chosen]
+        shown.on_select(lambda e: choose(e.selection))
         shown.classes("cursor-pointer")
         shown.on("rowClick", lambda e: on_open(e.args[1]["id"]))
 
@@ -123,6 +147,43 @@ def browser(
             ui.button("Clear filters", on_click=clear).props("flat dense no-caps")
         with ui.column().classes("grow min-w-0"):
             results()
+
+
+def export_dialog(result: CatalogResult, found: dict[str, list[str]], view: BrowseView) -> None:
+    plan = export_plan(result, found, view.chosen)
+    names = {i: s.abbreviation or s.name for i, s in result.project.instruments.items()}
+    left_out = [names[i] for i in view.chosen if not any(i in ids for ids in plan.values())]
+
+    async def go() -> None:
+        selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)
+        if not selection:
+            return
+        folder = await run.io_bound(write_export, result, plan, Path(selection[0]))
+        dialog.close()
+        ui.notify(f"Exported to {folder}")
+        open_path(folder)
+
+    with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
+        ui.label("Export").classes("text-xl font-medium")
+        if plan:
+            ui.label(
+                f"Writes a new folder with {VARIABLES}, which describes every variable, and one "
+                "data file per dataset: the ID and date columns, the chosen items as they are in "
+                "the data and the scores labcatalog computes. Open answers are listed but not "
+                "exported."
+            )
+            with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0"):
+                for dataset, ids in plan.items():
+                    ui.label(dataset).classes("font-medium")
+                    ui.label(", ".join(names[i] for i in ids))
+        else:
+            ui.label("None of the chosen instruments is in a dataset the filters show.")
+        if left_out:
+            note(f"Chosen but not in the filtered datasets: {', '.join(left_out)}")
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+            ui.button("Choose a folder and export", on_click=go).set_enabled(bool(plan))
+    dialog.open()
 
 
 def facet_panel(index: BrowseIndex, view: BrowseView, changed: Callable[[], None]) -> None:
