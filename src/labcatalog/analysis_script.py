@@ -28,14 +28,14 @@ PYTHON = "Python"
 R_HEADER = """\
 # {title}
 # {sample}
-# d is the analysis data saved from the Analysis page: one row per person, scores as labcatalog
+# d is the analysis data saved beside this script: one row per person, scores as labcatalog
 # computed them, and each score's items reversed where the scale says so.{packages}
 d <- read.csv({path}, check.names = FALSE)
 """
 PYTHON_HEADER = """\
 # {title}
 # {sample}
-# d is the analysis data saved from the Analysis page: one row per person, scores as labcatalog
+# d is the analysis data saved beside this script: one row per person, scores as labcatalog
 # computed them, and each score's items reversed where the scale says so.
 # Needs pandas and pingouin (pip install pingouin).
 import numpy as np
