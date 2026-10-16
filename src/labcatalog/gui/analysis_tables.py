@@ -86,7 +86,7 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
                     f"M (SD) for numbers and scores on everyone with a value, α on everyone "
                     f"who answered every item, n (%) of those who answered. {engine}"
                 )
-                page.csv_button(columns, shown, "table1.csv")
+                page.save_button(result, "table1", {"table1": (columns, shown)})
 
             return content
 
@@ -191,15 +191,18 @@ def group_section(
             def content() -> None:
                 with ui.row().classes("w-full gap-6 items-start"):
                     with charts.figure_column(fig):
-                        page.image_buttons(charts.show(fig), fig, "groups")
+                        drawn = page.Chart(charts.show(fig), fig)
                     with charts.rest_column():
                         table(group_columns, group_rows)
-                        page.csv_button(group_columns, group_rows, "groups.csv")
                         table(test_columns, test_rows)
-                        page.csv_button(test_columns, test_rows, "group_test.csv")
                         left = ", ".join(f"{text} ({n})" for text, n in comparison.left_out)
                         text = f"Left out, fewer than two people: {left}. " if left else ""
                         note(f"{text}{engine}")
+                        tables = {
+                            "groups": (group_columns, group_rows),
+                            "group_test": (test_columns, test_rows),
+                        }
+                        page.save_button(result, "groups", tables, drawn)
 
             return content
 
@@ -296,7 +299,8 @@ def script_section(
     section("Script")
     note(
         "The tables above as one R script and one Python script, for the choices made when "
-        f"you press the button. Save the data as {script.DATA_FILE} beside the script, then run it."
+        f"you press the button. Saving puts the data beside them as {script.DATA_FILE}, "
+        "so either script runs in that folder."
     )
 
     def write() -> None:
@@ -316,10 +320,12 @@ def script_section(
                 note("Nothing above to write a script for yet.")
                 return
             r_text, python_text, frame = found
-            with ui.row().classes("gap-2"):
-                download("Data CSV", frame.to_csv(index=False), script.DATA_FILE, "text/csv")
-                download("R script", r_text, "analysis.R", "text/plain")
-                download("Python script", python_text, "analysis.py", "text/x-python")
+            texts = {
+                script.DATA_FILE: frame.to_csv(index=False),
+                "analysis.R": r_text,
+                "analysis.py": python_text,
+            }
+            page.save_button(result, "script", texts=texts)
             with ui.tabs().props("dense no-caps align=left") as tabs:
                 ui.tab("r", label="R")
                 ui.tab("python", label="Python")
@@ -331,13 +337,6 @@ def script_section(
 
     ui.button("Write script", icon="code", on_click=write).classes("w-fit")
     holder = ui.column().classes("w-full gap-2")
-
-
-def download(label: str, text: str, filename: str, media: str) -> None:
-    content = text.encode("utf-8")
-    ui.button(
-        label, icon="download", on_click=lambda: ui.download.content(content, filename, media)
-    ).props("flat dense no-caps")
 
 
 def decimal(value: float | None) -> str:

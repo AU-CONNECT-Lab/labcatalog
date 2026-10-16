@@ -5,19 +5,26 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import partial
 
-import pandas as pd
 import plotly.graph_objects as go
-from nicegui import ui
+from nicegui import run, ui
 
-from labcatalog import analysis, analysis_script
+from labcatalog import analysis, analysis_script, outputs
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import analysis_tables, charts
-from labcatalog.gui.common import apa, col, heading, note, section, table
+from labcatalog.gui.common import apa, col, heading, note, open_path, section, table
+from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult
 
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
 IMAGE_WIDTH = 900
+IMAGE_KINDS = ("png", "svg")
+
+
+@dataclass
+class Chart:
+    plot: ui.plotly | None = None
+    fig: go.Figure | None = None
 
 
 @dataclass
@@ -127,6 +134,8 @@ def correlation_section(
             low, high = min(pairs), max(pairs)
             n = f"n {low}" if low == high else f"n {low} to {high}"
 
+            drawn = Chart()
+
             # Switching the style redraws the chart only; the correlations stay as computed.
             @ui.refreshable
             def chart() -> None:
@@ -137,7 +146,7 @@ def correlation_section(
                     ui.toggle(
                         matrices.STYLES, value=view.style, on_change=lambda e: restyle(e.value)
                     ).props("dense no-caps")
-                    image_buttons(charts.show(fig), fig, "correlations")
+                    drawn.plot, drawn.fig = charts.show(fig), fig
 
             def restyle(value: str) -> None:
                 view.style = value
@@ -152,7 +161,9 @@ def correlation_section(
                             f"Pearson r, each pair on everyone with both scores ({n}); "
                             f"* p < .05, ** p < .01, *** p < .001. {engine}"
                         )
-                        csv_button(columns, rows, "correlations.csv")
+                        save_button(
+                            result, "correlations", {"correlations": (columns, rows)}, drawn
+                        )
 
             return content
 
@@ -247,11 +258,11 @@ def pair_section(
             columns, rows = fit_table(fits, choices)
 
             def content() -> None:
-                image_buttons(charts.show(fig), fig, "regression")
+                drawn = Chart(charts.show(fig), fig)
                 heading("Statistics")
                 table(columns, rows)
                 note(engine)
-                csv_button(columns, rows, "regression.csv")
+                save_button(result, "regression", {"regression": (columns, rows)}, drawn)
 
             return content
 
@@ -332,45 +343,46 @@ def starred(found: analysis.Correlation) -> str:
     return apa(found.r) + next((stars for cut, stars in STARS if found.p < cut), "")
 
 
-def csv_button(columns: list[dict], rows: list[dict], filename: str) -> None:
-    frame = pd.DataFrame(rows, columns=[c["name"] for c in columns])
-    frame.columns = [c["label"] for c in columns]
-    # The byte order mark lets Excel read the file as UTF-8.
-    content = ("\ufeff" + frame.to_csv(index=False)).encode("utf-8")
-    ui.button(
-        "CSV", icon="download", on_click=lambda: ui.download.content(content, filename, "text/csv")
-    ).props("flat dense no-caps")
-
-
-def image_buttons(plot: ui.plotly | None, fig: go.Figure, name: str) -> None:
-    if plot is None:
-        return
-
-    async def save(kind: str) -> None:
-        options = {
-            "format": kind,
-            "width": fig.layout.width or IMAGE_WIDTH,
-            "height": fig.layout.height,
-            "scale": 2 if kind == "png" else 1,
-        }
-        # The page draws charts on a clear background, so the image comes from a copy with a white one.
-        url = await ui.run_javascript(
-            f"const plot = getElement({plot.id});"
-            "const figure = {data: plot.$el.data, layout: {...plot.$el.layout, paper_bgcolor: 'white'}};"
-            f"return await plot.Plotly.toImage(figure, {json.dumps(options)});",
-            timeout=20,
-        )
-        header, data = url.split(",", 1)
-        content = (
-            base64.b64decode(data)
-            if header.endswith(";base64")
-            else urllib.parse.unquote(data).encode()
-        )
-        media = "image/png" if kind == "png" else "image/svg+xml"
-        ui.download.content(content, f"{name}.{kind}", media)
-
-    with ui.row().classes("gap-2"):
-        for kind in ("png", "svg"):
-            ui.button(kind.upper(), icon="image", on_click=partial(save, kind)).props(
+def save_button(
+    result: CatalogResult,
+    name: str,
+    tables: dict[str, tuple[list[dict], list[dict]]] | None = None,
+    chart: Chart | None = None,
+    texts: dict[str, str] | None = None,
+) -> None:
+    async def save() -> None:
+        files = {f"{n}.csv": outputs.table_csv(*shown) for n, shown in (tables or {}).items()}
+        files |= {n: text.encode("utf-8") for n, text in (texts or {}).items()}
+        if chart is not None and chart.plot is not None:
+            for kind in IMAGE_KINDS:
+                files[f"{name}.{kind}"] = await image(chart, kind)
+        root = result.project.root
+        folder = await run.io_bound(outputs.write_output, root, name, files, result.manifest)
+        saved.clear()
+        with saved:
+            note(f"Saved to {portable_path(folder, root).as_posix()}")
+            ui.button("Open folder", icon="folder_open", on_click=lambda: open_path(folder)).props(
                 "flat dense no-caps"
             )
+
+    with ui.row().classes("items-center gap-2"):
+        ui.button("Save to outputs", icon="save", on_click=save).props("flat dense no-caps")
+        saved = ui.row().classes("items-center gap-2")
+
+
+async def image(chart: Chart, kind: str) -> bytes:
+    options = {
+        "format": kind,
+        "width": chart.fig.layout.width or IMAGE_WIDTH,
+        "height": chart.fig.layout.height,
+        "scale": 2 if kind == "png" else 1,
+    }
+    # The page draws charts on a clear background, so the image comes from a copy with a white one.
+    url = await ui.run_javascript(
+        f"const plot = getElement({chart.plot.id});"
+        "const figure = {data: plot.$el.data, layout: {...plot.$el.layout, paper_bgcolor: 'white'}};"
+        f"return await plot.Plotly.toImage(figure, {json.dumps(options)});",
+        timeout=20,
+    )
+    header, data = url.split(",", 1)
+    return base64.b64decode(data) if header.endswith(";base64") else urllib.parse.unquote(data).encode()

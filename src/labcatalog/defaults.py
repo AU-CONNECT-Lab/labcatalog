@@ -9,6 +9,8 @@ SCHEMAS_DIR = "schemas"
 CODEBOOK_DIR = "codebook"
 SCORING_DIR = "scoring"
 BIB_FILENAME = "references.bib"
+OUTPUTS_DIR = "outputs"
+MANIFEST_FILENAME = "manifest.json"
 SCORE_PREFIX = "score:"
 
 ID_COLUMN = "id"
