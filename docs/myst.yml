@@ -1,0 +1,69 @@
+# See docs at: https://mystmd.org/guide/frontmatter
+version: 1
+project:
+  title: labcatalog
+  description: Build a browsable catalog of a lab's study data, check it against the metadata, and turn it into tables and text for papers.
+  keywords: [codebook, data catalog, questionnaires, longitudinal data]
+  github: https://github.com/AU-CONNECT-Lab/labcatalog
+  authors:
+    - name: Qiuyu Yu
+  license: Apache-2.0
+  toc:
+    - file: index.md
+    - title: Getting Started
+      children:
+        - file: getting-started/installation.md
+        - file: getting-started/example-tour.md
+        - file: getting-started/first-project.md
+    - title: Concepts
+      children:
+        - file: concepts/project-folder.md
+        - file: concepts/studies-waves-datasets.md
+        - file: concepts/instruments.md
+        - file: concepts/variable-maps.md
+        - file: concepts/ids-groups-missing.md
+    - title: Using the App
+      children:
+        - file: app/index.md
+        - file: app/overview.md
+        - file: app/instruments.md
+        - file: app/datasets.md
+        - file: app/analysis.md
+        - file: app/methods.md
+        - file: app/prepare.md
+        - file: app/import.md
+        - file: app/edit.md
+        - file: app/problems.md
+        - file: app/settings.md
+    - title: How-To Guides
+      children:
+        - file: how-to/add-instrument.md
+        - file: how-to/add-dataset.md
+        - file: how-to/prepare-steps.md
+        - file: how-to/fix-problems.md
+        - file: how-to/copy-tables.md
+        - file: how-to/export-data.md
+        - file: how-to/write-methods.md
+        - file: how-to/datalad.md
+        - file: how-to/r-and-models.md
+    - title: Statistics
+      children:
+        - file: statistics/index.md
+        - file: statistics/reliability.md
+        - file: statistics/factor-structure.md
+        - file: statistics/correlation-regression.md
+        - file: statistics/group-comparisons.md
+        - file: statistics/multilevel.md
+        - file: statistics/attrition.md
+    - title: Reference
+      children:
+        - file: reference/project-file.md
+        - file: reference/instrument-file.md
+        - file: reference/study-file.md
+        - file: reference/column-maps.md
+        - file: reference/cli.md
+        - file: reference/problem-codes.md
+site:
+  template: book-theme
+  options:
+    logo_text: labcatalog
