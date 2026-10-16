@@ -111,8 +111,8 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
             def content() -> None:
                 paper.paper_table(shown)
                 note(engine)
-                code_view(texts)
                 paper.save_button(result, "table1", {"table1": shown}, texts=texts)
+                code_view(texts)
 
             return content
 
@@ -234,8 +234,8 @@ def group_section(
                         for shown in papers.values():
                             paper.paper_table(shown)
                         note(engine)
-                        code_view(texts)
                         paper.save_button(result, "groups", papers, drawn, texts)
+                code_view(texts)
 
             return content
 

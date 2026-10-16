@@ -157,8 +157,8 @@ def correlation_section(
                     with charts.rest_column():
                         paper_table(shown)
                         note(engine)
-                        analysis_tables.code_view(texts)
                         save_button(result, "correlations", {"correlations": shown}, drawn, texts)
+                analysis_tables.code_view(texts)
 
             return content
 
@@ -264,8 +264,8 @@ def pair_section(
                 drawn = Chart(charts.show(fig), fig)
                 paper_table(shown)
                 note(engine)
-                analysis_tables.code_view(texts)
                 save_button(result, "regression", {"regression": shown}, drawn, texts)
+                analysis_tables.code_view(texts)
 
             return content
 
