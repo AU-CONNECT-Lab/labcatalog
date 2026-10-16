@@ -147,10 +147,14 @@ def codebook_create(
         Path | None,
         typer.Option("--qualtrics", help="Qualtrics survey file (.qsf) to take the same from."),
     ] = None,
+    spss: Annotated[
+        Path | None,
+        typer.Option("--spss", help="SPSS data file (.sav) to take its labels from."),
+    ] = None,
     project: ProjectOption = Path("."),
 ) -> None:
     """Write three CSV files that list every column of the data file, to fill in."""
-    for path in run_codebook_create(project, dataset, redcap or qualtrics):
+    for path in run_codebook_create(project, dataset, redcap or qualtrics or spss):
         typer.echo(f"Wrote {path}")
     typer.echo(f"Fill them in, then run: labcatalog codebook import {dataset}")
 

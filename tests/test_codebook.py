@@ -2,9 +2,10 @@ import csv
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
-from labcatalog import redcap
+from labcatalog import redcap, spss
 from labcatalog.cli import main
 from labcatalog.codebook import (
     INSTRUMENTS,
@@ -287,6 +288,38 @@ def test_a_redcap_dictionary_fills_in_items_and_imports(pilot, tmp_path):
     assert result.issues == []
     mood = (pilot / "instruments" / "mood_scale.yaml").read_text(encoding="utf-8")
     assert "{value: 1, label: 'Sometimes, often'}" in mood
+
+
+def test_an_spss_file_fills_in_wording_options_and_types(pilot, tmp_path):
+    pyreadstat = pytest.importorskip("pyreadstat")
+    frame = pd.read_csv(pilot / "data" / "pilot_w1.csv", dtype={"id": str, "remarks": str})
+    options = {0.0: "Never", 1.0: "Sometimes; often", 2.0: "Often", -99.0: "Refused"}
+    sav = tmp_path / "pilot.sav"
+    pyreadstat.write_sav(
+        frame.fillna({"remarks": ""}),
+        sav,
+        column_labels=["ID", "Date", "I feel  nervous.", "I feel calm.", "I worry.", "Total", "Age", "Anything else?"],
+        variable_value_labels={f"anx{i}": options for i in (1, 2, 3)},
+        missing_ranges={f"anx{i}": [-99] for i in (1, 2, 3)},
+    )  # fmt: skip
+    project = load_project(pilot)
+    write_templates(project, "pilot_w1", sav)
+    assert codebook_paths(project, "pilot_w1")[ITEMS].read_text(
+        encoding="utf-8-sig"
+    ).splitlines() == [
+        "column,instrument,item,text,type,choices,reverse,min,max",
+        "id,,,,,,,,",
+        "date,,,,,,,,",
+        'anx1,anx,anx1,I feel nervous.,choice,"0=Never; 1=Sometimes, often; 2=Often",,,',
+        'anx2,anx,anx2,I feel calm.,choice,"0=Never; 1=Sometimes, often; 2=Often",,,',
+        'anx3,anx,anx3,I worry.,choice,"0=Never; 1=Sometimes, often; 2=Often",,,',
+        "anx_total,anx,anx_total,Total,number,,,,",
+        "age,,age,Age,number,,,,",
+        "remarks,,remarks,Anything else?,text,,,,",
+    ]
+    (tmp_path / "broken.sav").write_text("not spss", encoding="utf-8")
+    with pytest.raises(CodebookError, match="not an SPSS data file"):
+        spss.read_sav(tmp_path / "broken.sav")
 
 
 def test_the_redcap_api_dictionary_reads_the_same(tmp_path):

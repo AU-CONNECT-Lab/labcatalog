@@ -87,7 +87,8 @@ def render(result: CatalogResult, view: ImportView) -> None:
                 "and item from the column name. Given the data dictionary of a REDCap project "
                 "(Project Setup, Data Dictionary, Download) or a Qualtrics survey file (Survey, "
                 "Tools, Import/Export, Export Survey), it also fills in each item's wording, "
-                "options and type, with Qualtrics blocks as instruments."
+                "options and type, with Qualtrics blocks as instruments. An SPSS file (.sav) of "
+                "the same data gives the wording and options from its variable and value labels."
             )
             with ui.row().classes("items-center gap-4 mt-2"):
                 ui.button("Create the three files", icon="note_add", on_click=create)
@@ -100,6 +101,11 @@ def render(result: CatalogResult, view: ImportView) -> None:
                     "Create from a Qualtrics survey file",
                     icon="description",
                     on_click=lambda: create_from("Qualtrics survey files (*.qsf)"),
+                ).props("outline")
+                ui.button(
+                    "Create from an SPSS file",
+                    icon="description",
+                    on_click=lambda: create_from("SPSS data files (*.sav)"),
                 ).props("outline")
             return
         with ui.row().classes("items-center gap-4 mt-2"):

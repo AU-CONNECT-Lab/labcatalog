@@ -29,7 +29,9 @@ def read_sav(path: Path) -> dict[str, Field]:
             form=prefix(column) if prefixes[prefix(column)] > 1 else "",
             text=" ".join((meta.column_names_to_labels.get(column) or "").split()),
             type=kind(meta.original_variable_types[column], labels),
-            choices="; ".join(f"{code(v)}={label.replace(';', ',')}" for v, label in labels.items()),
+            choices="; ".join(
+                f"{code(v)}={label.replace(';', ',')}" for v, label in labels.items()
+            ),
         )
     return fields
 

@@ -10,7 +10,7 @@ from typing import Any, get_args
 import pandas as pd
 import yaml
 
-from labcatalog import defaults, qualtrics, redcap
+from labcatalog import defaults, qualtrics, redcap, spss
 from labcatalog.config import DatasetConfig, dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.exceptions import CodebookError
