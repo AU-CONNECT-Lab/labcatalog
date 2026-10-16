@@ -7,6 +7,7 @@ import typer
 
 from labcatalog import defaults
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
+from labcatalog.export import run_export
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import (
     run_check,
@@ -150,6 +151,24 @@ def codebook_import(dataset: DatasetArgument, project: ProjectOption = Path(".")
         typer.echo(instruction)
         typer.echo(lines)
     raise typer.Exit(EXIT_ISSUES if has_errors(result.issues) else EXIT_OK)
+
+
+@app.command()
+def export(
+    instruments: Annotated[list[str], typer.Argument(help="IDs of the instruments to export.")],
+    dataset: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--dataset", "-d", help="Only this dataset; repeat for more. Default: every dataset."
+        ),
+    ] = None,
+    out: Annotated[
+        Path, typer.Option("--out", "-o", help="Folder to create the export folder in.")
+    ] = Path("."),
+    project: ProjectOption = Path("."),
+) -> None:
+    """Write a variable list and each dataset's data for the chosen instruments."""
+    typer.echo(f"Wrote {run_export(project, instruments, dataset or [], out)}")
 
 
 @app.command()

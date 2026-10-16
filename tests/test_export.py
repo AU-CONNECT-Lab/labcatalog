@@ -1,7 +1,10 @@
+import sys
+
 import pandas as pd
 import pytest
 
 from labcatalog.browse import build_index, matches
+from labcatalog.cli import main
 from labcatalog.export import (
     COLUMNS,
     VARIABLES,
@@ -84,3 +87,24 @@ def test_export_writes_a_new_folder(result, tmp_path):
     data = pd.read_csv(folder / "child_w2.csv", dtype=str, keep_default_na=False)
     assert len(data) == len(result.datasets["child_w2"].frame)
     assert not (folder / "child_w2.csv").read_bytes().startswith(b"\xef\xbb\xbf")
+
+
+def run_cli(monkeypatch, capsys, *args: str) -> tuple[int, str, str]:
+    monkeypatch.setattr(sys, "argv", ["labcatalog", "export", *args])
+    with pytest.raises(SystemExit) as caught:
+        main()
+    out = capsys.readouterr()
+    return caught.value.code, out.out, out.err
+
+
+def test_cli_exports_named_instruments(mock_project, tmp_path, monkeypatch, capsys):
+    p = ["-p", str(mock_project), "-o", str(tmp_path)]
+    code, out, _ = run_cli(monkeypatch, capsys, "example_mood", "-d", "child_w3", *p)
+    assert code == 0
+    folder = next(tmp_path.iterdir())
+    assert out.strip() == f"Wrote {folder}"
+    assert sorted(f.name for f in folder.iterdir()) == ["child_w3.csv", VARIABLES]
+    code, _, err = run_cli(monkeypatch, capsys, "example_mood", "nope", *p)
+    assert (code, err.strip()) == (1, "Error: Not an instrument or dataset in this project: nope")
+    code, _, err = run_cli(monkeypatch, capsys, "example_mood", "-d", "parent_w1", *p)
+    assert (code, err.strip()) == (1, "Error: None of these instruments is in these datasets")

@@ -3,9 +3,11 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.browse import build_index, matches
 from labcatalog.codegen import output_name
 from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
-from labcatalog.pipeline import CatalogResult
+from labcatalog.exceptions import ExportError, MetadataError
+from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.resolve import ResolvedScore
 from labcatalog.scoring import scorable
 
@@ -134,6 +136,29 @@ def data_frame(result: CatalogResult, dataset: str, instrument_ids: list[str]) -
     for score in exported_scores(result, dataset, instrument_ids):
         frame[output_name(score)] = result.scores[dataset][score.key]
     return frame
+
+
+def run_export(root: Path, instrument_ids: list[str], datasets: list[str], parent: Path) -> Path:
+    result = run_catalog(root)
+    if result.project is None:
+        raise MetadataError(result.report.issues)
+    return write_export(result, named_plan(result, instrument_ids, datasets), parent)
+
+
+def named_plan(
+    result: CatalogResult, instrument_ids: list[str], datasets: list[str]
+) -> dict[str, list[str]]:
+    # Without dataset names, every dataset that gives one of the instruments.
+    project = result.project
+    unknown = [i for i in instrument_ids if i not in project.instruments]
+    unknown += [d for d in datasets if d not in {c.name for c in project.config.datasets}]
+    if unknown:
+        raise ExportError(f"Not an instrument or dataset in this project: {', '.join(unknown)}")
+    plan = export_plan(result, matches(build_index(project), {}), set(instrument_ids))
+    plan = {d: ids for d, ids in plan.items() if not datasets or d in datasets}
+    if not plan:
+        raise ExportError("None of these instruments is in these datasets")
+    return plan
 
 
 def write_export(result: CatalogResult, plan: dict[str, list[str]], parent: Path) -> Path:

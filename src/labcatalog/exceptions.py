@@ -34,6 +34,10 @@ class CodebookError(LabCatalogError):
     exit_code = EXIT_ISSUES
 
 
+class ExportError(LabCatalogError):
+    exit_code = EXIT_ISSUES
+
+
 class RError(LabCatalogError):
     pass
 
