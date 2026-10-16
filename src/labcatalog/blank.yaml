@@ -22,6 +22,7 @@ missing_codes: []
 #     cfa_estimator: wlsmv      # factor models with the items as ordered categories (wlsmv) or continuous (ml)
 #     t_test: welch             # two groups: Welch's (welch) or Student's (student) t test
 #     correlation: pearson      # correlations: pearson or spearman
+#     invariance_free: []       # items freed in invariance tests, for example: [{instrument: my_scale, item: q3, parameter: loading, across: waves}]
 
 # Each study and its waves, for example:  my_study: {label: My Study, waves: {1: {start: 2026-01-01}}}
 # A study can also have a description and a reference (the key in references.bib of how to cite its data); the Datasets page shows them.

@@ -351,6 +351,11 @@ class Window:
         self.tabs.set_value("edit")
         self.editing.open(path, line)
 
+    async def dataset_added(self, dataset: str) -> None:
+        ui.notify(f"Added {dataset}")
+        self.dataset = dataset
+        await self.reload()
+
     def show_dataset(self, dataset: str | None) -> None:
         self.dataset = dataset
         self.datasets_panel.refresh()
@@ -381,6 +386,7 @@ class Window:
                 self.reload,
                 None if self.home else self.open_freeze,
                 self.edit_location,
+                self.dataset_added,
             )
 
     @ui.refreshable_method

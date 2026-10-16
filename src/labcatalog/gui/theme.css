@@ -166,6 +166,7 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
 }
 .lc-note { color: var(--lc-muted); }
 .lc-faint { color: var(--lc-faint); }
+.lc-bad-text { color: var(--lc-bad); }
 .lc-mark { background: var(--lc-mark); }
 .lc-prose { width: 100%; font-family: var(--lc-serif); font-size: 0.98rem; line-height: 1.7; }
 

@@ -130,8 +130,7 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                 ui.button("Freeze", on_click=go)
         dialog.open()
 
-    with ui.row().classes("w-full justify-end"):
-        ui.button("Freeze", icon="ac_unit", on_click=open_dialog).props("flat no-caps")
+    ui.button("Freeze", icon="ac_unit", on_click=open_dialog).props("flat no-caps")
 
 
 # Only a freeze with a DataLad tag has its data to open.

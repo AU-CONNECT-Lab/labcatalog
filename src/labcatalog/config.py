@@ -96,6 +96,15 @@ class ReferencesConfig(StrictModel):
     root: str | None = None
 
 
+class FreedParameter(StrictModel):
+    # An exception to an equality constraint of an invariance test, chosen by the user.
+    instrument: str
+    item: str
+    parameter: Literal["loading", "threshold", "intercept"]
+    # waves, reporters, or the grouping item as instrument.item.
+    across: str = "waves"
+
+
 class StatsConfig(StrictModel):
     correlate_by: str = defaults.CORRELATE_BY
     # Factor models: items as ordered categories (WLSMV) or as continuous (ML).
@@ -105,6 +114,7 @@ class StatsConfig(StrictModel):
     t_test: Literal["welch", "student"] = "welch"
     # Correlations between scores and variables; item-rest and regression stay Pearson.
     correlation: Literal["pearson", "spearman"] = "pearson"
+    invariance_free: list[FreedParameter] = []
 
     def coefficient(self) -> str:
         return "Spearman's ρ" if self.correlation == "spearman" else "Pearson r"
