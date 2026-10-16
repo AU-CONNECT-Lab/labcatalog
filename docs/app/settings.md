@@ -14,9 +14,9 @@ The path to `datalad`. **Save and check** reports the versions of DataLad and gi
 
 The **Provider** (Anthropic, OpenAI, Gemini, or a local OpenAI-compatible server), the **Model**, and for a local server its address. A cloud provider's API key is read from an environment variable and never stored; the page says whether it is set. Press **Save**.
 
-## Charts
+## Appearance
 
-**Chart colors** chooses the color palette of every chart.
+**Light** (the default), **Dark**, or **Same as the system**. Charts follow the window's colors. **Chart colors** chooses the color palette of every chart.
 
 ## Tables
 

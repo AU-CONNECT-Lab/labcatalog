@@ -14,6 +14,10 @@ studies:
       2: {start: 2026-01-15}
 ```
 
+## Repeat a dataset from the window
+
+For a file that repeats one you already have, such as the same questionnaire in the next wave, press **Add a dataset** on the Datasets page. The window copies the file in, runs its cleaning step, matches its columns to the catalogued items, and shows the changes to `labcatalog.yaml`, the column map and the study file before writing them. A new wave is added to the study without dates, to fill in afterwards. See [Datasets](../app/datasets.md#add-a-dataset). For a new reporter or modality, a folder dataset, or a dataset made by a more involved prepare step, follow the steps below.
+
 ## Add a CSV dataset
 
 Put the cleaned file where the project can reach it, usually `data/`, and add an entry under `datasets`:
