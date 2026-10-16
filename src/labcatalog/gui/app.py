@@ -151,9 +151,9 @@ class Window:
         self.tabs = tabs
 
         with ui.tab_panels(tabs, value="overview").classes("w-full bg-transparent"):
-            with ui.tab_panel("overview").classes("lc-page lc-dashboard"):
+            with ui.tab_panel("overview").classes("lc-page lc-board"):
                 self.overview_panel()
-            with ui.tab_panel("instruments").classes("lc-page"):
+            with ui.tab_panel("instruments").classes("lc-page lc-board"):
                 self.instruments_panel()
             with ui.tab_panel("datasets").classes("lc-page"):
                 self.datasets_panel()

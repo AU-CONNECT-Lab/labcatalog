@@ -89,9 +89,9 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 
 /* ---- Pages ---- */
 .q-tab-panel.lc-page { padding: 1.5rem 1.5rem 4rem; }
-.q-tab-panel.lc-dashboard { gap: 16px; }
-/* Only the active panel is in the page, so this greys the window behind the dashboard alone. */
-body:has(.q-tab-panel.lc-dashboard) { background: var(--lc-surface); }
+.q-tab-panel.lc-board { gap: 16px; }
+/* Only the active panel is in the page, so this greys the window behind board pages alone. */
+body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
 
 .lc-section {
   width: 100%;
@@ -157,6 +157,37 @@ body:has(.q-tab-panel.lc-dashboard) { background: var(--lc-surface); }
 .lc-panel-title { font-size: 0.98rem; font-weight: 600; color: var(--lc-ink); }
 .lc-panel-subtitle { font-size: 0.8rem; color: var(--lc-faint); }
 .lc-panel-body { padding: 8px 16px 12px; }
+
+.lc-facet {
+  margin-top: 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lc-faint);
+}
+.lc-panel-body > .lc-facet:first-of-type { margin-top: 0.9rem; }
+
+/* An expansion drawn as a panel whose header is the title bar. */
+.q-expansion-item.lc-expansion > .q-expansion-item__container > .q-item {
+  padding: 8px 16px;
+  font-weight: 600;
+}
+.q-expansion-item.lc-expansion .q-expansion-item__content { padding: 0 16px 12px; }
+
+/* ---- Instrument page ---- */
+.lc-crumb-sep { color: var(--lc-faint); }
+.lc-crumb { font-weight: 600; color: var(--lc-ink); }
+.lc-summary { padding: 16px 20px; }
+.lc-summary-title { font-size: 1.4rem; font-weight: 600; line-height: 1.25; color: var(--lc-ink); }
+.lc-facts { align-items: baseline; column-gap: 24px; row-gap: 6px; padding-top: 12px; border-top: 1px solid var(--lc-rule-soft); }
+.lc-fact-key { font-size: 0.8rem; font-weight: 600; color: var(--lc-faint); padding-top: 2px; }
+.q-tabs.lc-subnav { border-bottom: 1px solid var(--lc-border); }
+.q-tabs.lc-subnav .q-tab { min-height: 40px; padding: 0 1rem; }
+.q-tabs.lc-subnav .q-tab__label { font-size: 0.92rem; }
+.q-tabs.lc-subnav .q-tab--active .q-tab__label { font-weight: 600; }
+.q-tabs.lc-subnav .q-tab__indicator { height: 2px; background: var(--lc-accent); }
+.q-tab-panel.lc-part { padding: 0; gap: 16px; }
 
 .lc-group { margin-top: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--lc-rule); }
 .lc-group-title { font-size: 1.02rem; font-weight: 600; color: var(--lc-ink); }
@@ -236,6 +267,7 @@ body:has(.q-tab-panel.lc-dashboard) { background: var(--lc-surface); }
 }
 .q-table__container.q-table--bordered { border: none; }
 .q-table thead th {
+  white-space: nowrap;
   color: var(--lc-muted);
   font-size: 0.8rem;
   font-weight: 600;

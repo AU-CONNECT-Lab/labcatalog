@@ -19,11 +19,10 @@ from labcatalog.gui.common import (
     code_tabs,
     col,
     fmt,
-    heading,
     note,
     open_path,
     p_value,
-    section,
+    panel,
     table,
     unique,
 )
@@ -31,7 +30,7 @@ from labcatalog.gui.datalad import get_button
 from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.metadata.browse import BrowseIndex, counts, matches
 from labcatalog.metadata.completeness import gaps
-from labcatalog.metadata.history import file_history
+from labcatalog.metadata.history import Change, file_history
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     CatalogResult,
@@ -72,6 +71,8 @@ class BrowseView:
     query: str = ""
     items: bool = False
     instrument: str | None = None
+    # The tab open on an instrument's page, kept when another instrument opens.
+    part: str = "items"
     # Instruments ticked for export, kept across filters and refreshes.
     chosen: set[str] = field(default_factory=set)
     asked: Search | None = None
@@ -105,11 +106,14 @@ def render(
         browser(result, index, view, on_open)
         return
     found = matches(index, view.selected, view.query, view.items, view.only)
-    ui.button("All instruments", icon="arrow_back", on_click=lambda: on_open(None)).props(
-        "flat dense no-caps"
-    )
-    detail(result, result.project.instruments[view.instrument], found.get(view.instrument, []), cfa)
-    history(result.project, view.instrument)
+    instrument = result.project.instruments[view.instrument]
+    with ui.row().classes("items-center gap-1 no-wrap"):
+        ui.button("Instruments", icon="arrow_back", on_click=lambda: on_open(None)).props(
+            "flat dense no-caps"
+        )
+        ui.icon("chevron_right").classes("lc-crumb-sep")
+        ui.label(instrument.abbreviation or instrument.name).classes("lc-crumb")
+    detail(result, instrument, found.get(view.instrument, []), cfa, view)
 
 
 def browser(
@@ -128,10 +132,10 @@ def browser(
 
         @ui.refreshable
         def chosen_bar() -> None:
-            ui.label(f"{len(view.chosen)} chosen").classes("text-grey-7")
+            ui.label(f"{len(view.chosen)} chosen").classes("lc-note")
             ui.button(
                 "Export", icon="download", on_click=lambda: export_dialog(result, found, view)
-            ).props("outline dense no-caps").set_enabled(bool(view.chosen))
+            ).props("flat dense no-caps").classes("lc-quiet-btn").set_enabled(bool(view.chosen))
 
         def choose(selection: list[dict]) -> None:
             # Instruments the filters hide stay chosen.
@@ -139,11 +143,10 @@ def browser(
             view.chosen = (view.chosen - here) | {row["id"] for row in selection}
             chosen_bar.refresh()
 
-        with ui.row().classes("w-full items-center gap-3"):
-            note(f"{len(found)} of {len(index.instruments)} instruments")
-            ui.space()
-            chosen_bar()
-        shown = table(*list_table(result, found), pagination=PAGE_SIZE)
+        with panel("Instruments", f"{len(found)} of {len(index.instruments)} shown") as tools:
+            with tools:
+                chosen_bar()
+            shown = table(*list_table(result, found), pagination=PAGE_SIZE)
         shown.set_selection("multiple")
         shown.selected = [row for row in shown.rows if row["id"] in view.chosen]
         shown.on_select(lambda e: choose(e.selection))
@@ -167,8 +170,10 @@ def browser(
         view.selected.clear()
         changed()
 
-    with ui.row().classes("w-full no-wrap items-start gap-6"):
-        with ui.column().classes("w-60 shrink-0 gap-1"):
+    with ui.row().classes("w-full no-wrap items-start gap-4"):
+        with ui.column().classes("w-64 shrink-0"), panel("Filters") as tools:
+            with tools:
+                ui.button("Clear", on_click=clear).props("flat dense no-caps")
             ui.input(
                 placeholder="Search", value=view.query, on_change=lambda e: set_query(e.value)
             ).props("dense outlined clearable").classes("w-full")
@@ -176,8 +181,7 @@ def browser(
                 "Also search item text", value=view.items, on_change=lambda e: set_items(e.value)
             ).props("dense")
             facets()
-            ui.button("Clear filters", on_click=clear).props("flat dense no-caps")
-        with ui.column().classes("grow min-w-0"):
+        with ui.column().classes("grow min-w-0 gap-4"):
             ask_panel(result, view, changed, on_open)
             results()
 
@@ -249,7 +253,9 @@ def ask_panel(
         answer.refresh()
         changed()
 
-    with ui.expansion("Ask the language model", icon="manage_search", value=bool(view.asked)):
+    with ui.expansion(
+        "Ask the language model", icon="manage_search", value=bool(view.asked)
+    ).classes("lc-panel lc-expansion w-full"):
         if not preferences.model_set():
             note("Set a language model on the Settings page to search the catalog with it.")
             return
@@ -343,7 +349,7 @@ def facet_panel(index: BrowseIndex, view: BrowseView, changed: Callable[[], None
         if len(facet.values) < 2:
             continue
         chosen = view.selected.setdefault(facet.name, set())
-        ui.label(facet.label).classes("font-medium mt-3")
+        ui.label(facet.label).classes("lc-facet")
         for value, label in facet.values.items():
             n = found[facet.name][value]
             if n or value in chosen:
@@ -379,7 +385,7 @@ def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list
         col("reporters", "Reporter"),
         col("targets", "About"),
         col("items", "Items", numeric=True),
-        col("missing", "Missing"),
+        {**col("missing", "Missing"), "style": "min-width: 12rem"},
         *[col(f"d{i}", name, numeric=True) for i, name in enumerate(datasets)],
     ]
     rows = []
@@ -405,54 +411,105 @@ def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list
     return without_empty(columns, rows, "missing")
 
 
+PARTS = {
+    "items": "Items",
+    "scores": "Scores",
+    "analysis": "Item analysis",
+    "dataset": "One dataset",
+    "history": "History",
+}
+
+
 def detail(
-    result: CatalogResult, instrument: Instrument, preferred: list[str], cfa: CfaView
+    result: CatalogResult,
+    instrument: Instrument,
+    preferred: list[str],
+    cfa: CfaView,
+    view: BrowseView,
 ) -> None:
     about(result, instrument)
-    definition(result, instrument)
     datasets = administered_in(result, instrument.id)
-    if not datasets:
-        return
-    if any(s.instrument_id == instrument.id for s in result.catalog.scores):
-        scores_part(result, instrument, cfa)
-    items_part(result, instrument)
-    dataset_part(result, instrument, datasets, preferred, cfa)
+    changes = file_history(result.project.root, result.project.instrument_files[instrument.id])
+    shown = {
+        "items": True,
+        "scores": bool(datasets)
+        and any(s.instrument_id == instrument.id for s in result.catalog.scores),
+        "analysis": bool(datasets),
+        "dataset": bool(datasets),
+        "history": changes is not None,
+    }
+    if not shown.get(view.part):
+        view.part = "items"
+
+    def pick(name: str) -> None:
+        view.part = name
+
+    with (
+        ui.tabs(value=view.part, on_change=lambda e: pick(e.value))
+        .props("dense no-caps align=left")
+        .classes("lc-subnav w-full") as tabs
+    ):
+        for name, on in shown.items():
+            if on:
+                ui.tab(name, label=PARTS[name])
+    with ui.tab_panels(tabs, value=view.part).classes("w-full bg-transparent"):
+        with ui.tab_panel("items").classes("lc-part"):
+            definition(result, instrument)
+        if shown["scores"]:
+            with ui.tab_panel("scores").classes("lc-part"):
+                scores_part(result, instrument, cfa)
+        if shown["analysis"]:
+            with ui.tab_panel("analysis").classes("lc-part"):
+                items_part(result, instrument)
+        if shown["dataset"]:
+            with ui.tab_panel("dataset").classes("lc-part"):
+                dataset_part(result, instrument, datasets, preferred, cfa)
+        if shown["history"]:
+            with ui.tab_panel("history").classes("lc-part"):
+                history(result.project, instrument.id, changes)
 
 
 def definition(result: CatalogResult, instrument: Instrument) -> None:
-    section("Items")
-    with ui.row().classes("w-full gap-6 items-start"):
-        with ui.column().classes("gap-1 min-w-0").style("flex: 1 1 480px"):
+    reverse = sum(item.reverse for item in instrument.items)
+    counted = f"{len(instrument.items)} items" + (f", {reverse} reverse-keyed" if reverse else "")
+    with ui.row().classes("w-full gap-4 items-start"):
+        with ui.column().classes("min-w-0").style("flex: 1 1 480px"), panel("Items", counted):
             table(*item_table(result, instrument))
-        with ui.column().classes("gap-1"):
+        with ui.column().classes("gap-4").style("flex: 0 1 18rem"):
             for response_set in instrument.response_sets:
-                heading(f"Options: {response_set.id}")
-                table(
-                    [col("value", "Value", numeric=True), col("label", "Label")],
-                    [o.model_dump() for o in response_set.options],
-                ).classes(remove="w-full")
-            heading("Missing codes")
-            table(*missing_code_table(result, instrument)).classes(remove="w-full")
+                with panel("Options", response_set.id):
+                    table(
+                        [col("value", "Value", numeric=True), col("label", "Label")],
+                        [o.model_dump() for o in response_set.options],
+                    )
+            with panel("Missing codes"):
+                table(*missing_code_table(result, instrument))
 
 
 def scores_part(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
-    section("Scores")
-    score_statistics(result, instrument, cfa)
+    with panel(
+        "Score statistics",
+        "α uses pairwise complete cases, as JASP's reliability analysis does; ω comes from the "
+        "factor model on people who answered every item.",
+    ):
+        score_statistics(result, instrument, cfa)
     charts.score_charts(result, instrument.id)
     stable = stability_table(result, instrument)
     if stable is not None:
-        heading("Stability across waves")
-        note("r between the same people's scores one wave apart (n people).")
-        table(*stable).classes(remove="w-full")
+        with panel(
+            "Stability across waves",
+            f"{result.project.config.stats.coefficient()} between the same people's scores one "
+            "wave apart (n people).",
+        ):
+            table(*stable)
         invariance_section(result, instrument, cfa)
     charts.other_scores(result, instrument.id)
 
 
 def items_part(result: CatalogResult, instrument: Instrument) -> None:
-    section("Item analysis")
     if instrument.kind == "demographics":
-        heading("Sample by wave")
-        table(*sample_table(result, instrument))
+        with panel("Sample by wave"):
+            table(*sample_table(result, instrument))
     charts.item_charts(result, instrument.id)
     item_totals(result, instrument)
     charts.item_correlation_section(result, instrument.id)
@@ -469,18 +526,19 @@ def dataset_part(
 
     @ui.refreshable
     def one_dataset(dataset: str) -> None:
-        heading(f"Items in {dataset}")
-        table(*variable_table(result, instrument, dataset))
+        with panel(f"Items in {dataset}"):
+            table(*variable_table(result, instrument, dataset))
         factor_structure(result, instrument, dataset, cfa)
         measures_section(result, instrument, dataset, cfa)
         description_draft(result, instrument)
         charts.instrument_dataset_section(result, instrument.id, dataset)
         scoring_code(result, instrument, dataset)
 
-    section("One dataset")
-    ui.toggle(datasets, value=first, on_change=lambda e: one_dataset.refresh(e.value)).props(
-        "dense no-caps"
-    ).classes("mt-4")
+    with ui.row().classes("items-center gap-3"):
+        ui.label("Dataset").classes("lc-facet")
+        ui.toggle(datasets, value=first, on_change=lambda e: one_dataset.refresh(e.value)).props(
+            "dense no-caps"
+        )
     one_dataset(first)
 
 
@@ -500,41 +558,35 @@ def item_totals(result: CatalogResult, instrument: Instrument) -> None:
 
     @ui.refreshable
     def body(score_id: str) -> None:
-        table(*item_total_waves(result, instrument, score_id)).classes(remove="w-full")
+        table(*item_total_waves(result, instrument, score_id))
 
-    heading("Item-total correlations")
-    if len(choices) > 1:
-        ui.select(
-            choices, value=first, label="Score", on_change=lambda e: body.refresh(e.value)
-        ).props("dense outlined").classes("w-72")
-    body(first)
-    note(
+    with panel(
+        "Item-total correlations",
         "r of each item with the sum of the other items answered; α without the item in "
-        "brackets. Both use pairwise complete cases, as JASP's reliability analysis does."
-    )
+        "brackets. Both use pairwise complete cases, as JASP's reliability analysis does.",
+    ) as tools:
+        if len(choices) > 1:
+            with tools:
+                ui.select(
+                    choices, value=first, label="Score", on_change=lambda e: body.refresh(e.value)
+                ).classes("w-64")
+        body(first)
 
 
-def history(project: Project, instrument_id: str) -> None:
+def history(project: Project, instrument_id: str, changes: list[Change]) -> None:
     path = project.instrument_files[instrument_id]
-    changes = file_history(project.root, path)
-    if changes is None:
-        return
-    section("History")
-    if not changes:
-        note(f"No commits include {path} yet.")
-        return
-    note(f"Changes to {path} recorded in git; open one to see what changed.")
-    for change in changes:
-        caption = f"{change.date}, {change.author}" if change.commit else None
-        with ui.expansion(change.message, caption=caption).classes("w-full"):
-            ui.code(change.diff, language="diff").classes("w-full")
+    with panel("History", f"Changes to {path} recorded in git; open one to see what changed."):
+        if not changes:
+            note(f"No commits include {path} yet.")
+        for change in changes:
+            caption = f"{change.date}, {change.author}" if change.commit else None
+            with ui.expansion(change.message, caption=caption).classes("w-full"):
+                ui.code(change.diff, language="diff").classes("w-full")
 
 
 def about(result: CatalogResult, instrument: Instrument) -> None:
     variables = [v for v in result.catalog.variables if v.instrument_id == instrument.id]
-    ui.label(instrument.name).classes("text-2xl font-medium mt-4")
     facts = [
-        instrument.abbreviation,
         instrument.construct_name,
         reported(variables),
         *[
@@ -543,15 +595,30 @@ def about(result: CatalogResult, instrument: Instrument) -> None:
             if f.applies_to == "instrument" and f.name in instrument.custom
         ],
     ]
-    note(" · ".join(fact for fact in facts if fact))
-    if instrument.instructions:
-        ui.label(text_of(instrument.instructions)).classes("italic")
-    for reference in instrument.references:
-        reference_row(result.project, reference)
-    if instrument.license:
-        note(f"License: {instrument.license}")
-    if missing := gaps(instrument):
-        note(f"Missing from the catalog: {', '.join(missing)}.")
+    with ui.column().classes("lc-panel lc-summary w-full gap-3"):
+        with ui.column().classes("gap-1"):
+            with ui.row().classes("items-center gap-3"):
+                ui.label(instrument.name).classes("lc-summary-title")
+                if instrument.abbreviation:
+                    ui.label(instrument.abbreviation).classes("lc-pill lc-info")
+            note(" · ".join(fact for fact in facts if fact))
+        with ui.grid(columns="max-content 1fr").classes("lc-facts w-full"):
+            if instrument.instructions:
+                ui.label("Instructions").classes("lc-fact-key")
+                ui.label(text_of(instrument.instructions)).classes("italic")
+            if instrument.references:
+                ui.label("Reference").classes("lc-fact-key")
+                with ui.column().classes("gap-1 min-w-0"):
+                    for reference in instrument.references:
+                        reference_row(result.project, reference)
+            if instrument.license:
+                ui.label("License").classes("lc-fact-key")
+                ui.label(instrument.license)
+            if missing := gaps(instrument):
+                ui.label("Missing").classes("lc-fact-key")
+                with ui.row().classes("gap-1"):
+                    for gap in missing:
+                        ui.label(gap).classes("lc-pill lc-warn")
 
 
 def reference_row(project: Project, reference: Reference) -> None:
@@ -679,17 +746,15 @@ def cfa_changed() -> None:
 @ui.refreshable
 def score_statistics(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
     table(*score_table(result, instrument, cfa.fits))
-    note(
-        "α uses pairwise complete cases, as JASP's reliability analysis does; ω comes from the "
-        "factor model on people who answered every item."
-    )
 
 
 def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
     snippets = result.snippets.get((instrument.id, dataset))
     if snippets is not None:
-        heading(f"Scoring code for {dataset}")
-        code_tabs(snippets)
+        with panel(
+            "Scoring code", f"R and Python that compute this instrument's scores in {dataset}"
+        ):
+            code_tabs(snippets)
     written_scripts(result, instrument, dataset)
 
 
@@ -729,14 +794,14 @@ def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str)
         finally:
             button.enable()
 
-    heading(f"Scoring script from the reference PDF for {dataset}")
-    if preferences.model_set():
-        with ui.row().classes("items-center gap-3"):
-            button = ui.button("Write with the language model", on_click=write)
-            status = ui.label().classes("lc-note")
-    else:
-        note("Set a language model on the Settings page to write the scripts from the PDF.")
-    saved()
+    with panel("Scoring script from the reference PDF", dataset):
+        if preferences.model_set():
+            with ui.row().classes("items-center gap-3"):
+                button = ui.button("Write with the language model", on_click=write)
+                status = ui.label().classes("lc-note")
+        else:
+            note("Set a language model on the Settings page to write the scripts from the PDF.")
+        saved()
 
 
 def item_total_waves(
@@ -825,53 +890,53 @@ def factor_structure(
     if not score_summaries(result, instrument, dataset):
         return
     fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
-    heading(f"Factor structure in {dataset}")
-    if cfa.status in (CFA_UNSET, CFA_RUNNING):
-        note("Fitting factor models.")
-    elif cfa.status == CFA_FAILED:
-        note(cfa.message)
-    elif not fits:
-        note("No factor model: no score here has three or more items.")
-    else:
-        engine, estimator = fits[0].engine, fits[0].estimator
-        ordinal = estimator == WLSMV
-        package = "lavaan" if engine == R else "semopy"
-        how = (
-            "WLSMV with the items as ordered categories"
-            if ordinal
-            else "maximum likelihood with the items as continuous"
-        )
-        method = f"{package}, {how}, people who answered every item."
-        omega = (
-            "ω is semTools' categorical omega."
-            if ordinal
-            else "ω is the factor's share of the observed variance of the summed items, as "
-            "semTools gives it for continuous items."
-        )
-        papers = {
-            "cfa_fit": PaperTable(
-                f"Fit of Factor Models for {instrument.name}",
-                *without_empty(*without_empty(*fit_table(instrument, fits), "problem"), "srmr"),
-                method,
-            ),
-            "cfa_loadings": PaperTable(
-                f"Standardized Loadings and ω for {instrument.name}",
-                *loading_table(result, instrument, dataset, fits),
-                f"{method} {omega}",
-            ),
-        }
-        for shown in papers.values():
-            paper_table(shown)
-        save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
-        if cfa.message:
+    with panel("Factor structure", dataset):
+        if cfa.status in (CFA_UNSET, CFA_RUNNING):
+            note("Fitting factor models.")
+        elif cfa.status == CFA_FAILED:
             note(cfa.message)
-        elif result.project.config.stats.cfa_estimator != estimator:
-            # The project asks for ordered items, which only lavaan in R can fit.
-            settings_hint(
-                cfa,
-                "This project's stats: cfa_estimator is wlsmv; set Rscript on the Settings "
-                "page to fit the items as ordered categories in lavaan.",
+        elif not fits:
+            note("No factor model: no score here has three or more items.")
+        else:
+            engine, estimator = fits[0].engine, fits[0].estimator
+            ordinal = estimator == WLSMV
+            package = "lavaan" if engine == R else "semopy"
+            how = (
+                "WLSMV with the items as ordered categories"
+                if ordinal
+                else "maximum likelihood with the items as continuous"
             )
+            method = f"{package}, {how}, people who answered every item."
+            omega = (
+                "ω is semTools' categorical omega."
+                if ordinal
+                else "ω is the factor's share of the observed variance of the summed items, as "
+                "semTools gives it for continuous items."
+            )
+            papers = {
+                "cfa_fit": PaperTable(
+                    f"Fit of Factor Models for {instrument.name}",
+                    *without_empty(*without_empty(*fit_table(instrument, fits), "problem"), "srmr"),
+                    method,
+                ),
+                "cfa_loadings": PaperTable(
+                    f"Standardized Loadings and ω for {instrument.name}",
+                    *loading_table(result, instrument, dataset, fits),
+                    f"{method} {omega}",
+                ),
+            }
+            for shown in papers.values():
+                paper_table(shown)
+            save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
+            if cfa.message:
+                note(cfa.message)
+            elif result.project.config.stats.cfa_estimator != estimator:
+                # The project asks for ordered items, which only lavaan in R can fit.
+                settings_hint(
+                    cfa,
+                    "This project's stats: cfa_estimator is wlsmv; set Rscript on the Settings "
+                    "page to fit the items as ordered categories in lavaan.",
+                )
 
 
 def settings_hint(cfa: CfaView, text: str) -> None:
@@ -891,21 +956,21 @@ def measures_section(
     text = measures.paragraph(
         result.project, result.catalog, result.summary, instrument, dataset, fits
     )
-    heading(f"Measures paragraph for {dataset}")
-    ui.label(text).classes("lc-prose")
-    copy_text(text)
-    note(
-        "A draft for the paper's Measures section, with α and ω from this dataset. Add "
-        "description: to the instrument's YAML for what it measures; change the wording with "
-        "measures: in labcatalog.yaml or in the instrument's YAML."
-    )
+    with panel(
+        "Measures paragraph",
+        f"A draft for the paper's Measures section, with α and ω from {dataset}",
+    ) as tools:
+        with tools:
+            copy_text(text)
+        ui.label(text).classes("lc-prose")
+        note(
+            "Add description: to the instrument's YAML for what it measures; change the wording "
+            "with measures: in labcatalog.yaml or in the instrument's YAML."
+        )
 
 
 def description_draft(result: CatalogResult, instrument: Instrument) -> None:
     if not ai_scoring.reference_pdfs(result.project, instrument):
-        return
-    if not preferences.model_set():
-        note("Set a language model on the Settings page to draft the description from the PDF.")
         return
     path = result.project.instrument_files[instrument.id]
 
@@ -940,10 +1005,14 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
         finally:
             button.enable()
 
-    with ui.row().classes("items-center gap-3"):
-        button = ui.button("Draft the description from the reference PDF", on_click=write)
-        status = ui.label().classes("lc-note")
-    shown = ui.column().classes("gap-1")
+    with panel("Description from the reference PDF", "For description: in the instrument's YAML"):
+        if not preferences.model_set():
+            note("Set a language model on the Settings page to draft the description from the PDF.")
+            return
+        with ui.row().classes("items-center gap-3"):
+            button = ui.button("Draft the description", on_click=write)
+            status = ui.label().classes("lc-note")
+        shown = ui.column().classes("gap-1")
 
 
 def without_empty(
@@ -1026,53 +1095,55 @@ def loading_table(
 @ui.refreshable
 def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
     tests = [t for t in cfa.invariance if t.instrument_id == instrument.id]
-    heading("Invariance across waves")
-    if cfa.invariance_status == CFA_UNSET:
-        settings_hint(
-            cfa, "Set the path to Rscript on the Settings page to test invariance across waves."
-        )
-    elif cfa.invariance_status == CFA_RUNNING:
-        note("Testing invariance across waves in R.")
-    elif cfa.invariance_status == CFA_FAILED:
-        note(cfa.invariance_message)
-    elif not tests:
-        note("No model: no score here has three or more items in two or more waves.")
-    else:
-        how = (
-            "WLSMV with the items as ordered categories, people who answered every item at a "
-            "wave. Each step holds one more set of parameters equal across waves; Δχ² is the "
-            "scaled difference test"
-            if result.project.config.stats.cfa_estimator == WLSMV
-            else "maximum likelihood with the items as continuous, full information for people "
-            "missing a wave. Each step holds one more set of parameters equal across waves; "
-            "Δχ² is the likelihood ratio test"
-        )
-        method = (
-            "lavaan and semTools: each wave's items load on their own factors, the same people "
-            f"are linked by ID, and each item's residuals correlate across waves; {how} against "
-            "the step before."
-        )
-        note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
-        labels = {s.id: s.label for s in instrument.scores}
-        for i, test in enumerate(tests, start=1):
-            names = ", ".join(labels[s] for s in test.factors)
-            kind = "Subscales" if test.kind == SUBSCALES else "One factor"
-            waves = ", ".join(
-                f"{views.wave_name(result, test.study, wave)} {n}" for wave, n in test.n.items()
+    with panel("Invariance across waves"):
+        if cfa.invariance_status == CFA_UNSET:
+            settings_hint(
+                cfa, "Set the path to Rscript on the Settings page to test invariance across waves."
             )
-            study = result.project.config.studies[test.study].label or test.study
-            ui.label(f"{kind}: {names}").classes("font-medium mt-2")
-            note(f"{study}, reported by {test.reporter}; people who answered every item: {waves}.")
-            if test.problem:
-                note(test.problem)
-            else:
-                shown = PaperTable(
-                    f"Invariance of {instrument.name} Across Waves ({kind}: {names})",
-                    *without_empty(*invariance_table(test), "problem"),
-                    f"{method} n per wave: {waves}.",
+        elif cfa.invariance_status == CFA_RUNNING:
+            note("Testing invariance across waves in R.")
+        elif cfa.invariance_status == CFA_FAILED:
+            note(cfa.invariance_message)
+        elif not tests:
+            note("No model: no score here has three or more items in two or more waves.")
+        else:
+            how = (
+                "WLSMV with the items as ordered categories, people who answered every item at a "
+                "wave. Each step holds one more set of parameters equal across waves; Δχ² is the "
+                "scaled difference test"
+                if result.project.config.stats.cfa_estimator == WLSMV
+                else "maximum likelihood with the items as continuous, full information for people "
+                "missing a wave. Each step holds one more set of parameters equal across waves; "
+                "Δχ² is the likelihood ratio test"
+            )
+            method = (
+                "lavaan and semTools: each wave's items load on their own factors, the same people "
+                f"are linked by ID, and each item's residuals correlate across waves; {how} against "
+                "the step before."
+            )
+            note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
+            labels = {s.id: s.label for s in instrument.scores}
+            for i, test in enumerate(tests, start=1):
+                names = ", ".join(labels[s] for s in test.factors)
+                kind = "Subscales" if test.kind == SUBSCALES else "One factor"
+                waves = ", ".join(
+                    f"{views.wave_name(result, test.study, wave)} {n}" for wave, n in test.n.items()
                 )
-                paper_table(shown)
-                save_button(result, f"invariance_{instrument.id}_{i}", {"invariance": shown})
+                study = result.project.config.studies[test.study].label or test.study
+                ui.label(f"{kind}: {names}").classes("font-medium mt-2")
+                note(
+                    f"{study}, reported by {test.reporter}; people who answered every item: {waves}."
+                )
+                if test.problem:
+                    note(test.problem)
+                else:
+                    shown = PaperTable(
+                        f"Invariance of {instrument.name} Across Waves ({kind}: {names})",
+                        *without_empty(*invariance_table(test), "problem"),
+                        f"{method} n per wave: {waves}.",
+                    )
+                    paper_table(shown)
+                    save_button(result, f"invariance_{instrument.id}_{i}", {"invariance": shown})
 
 
 def invariance_table(test: InvarianceTest) -> tuple[list[dict], list[dict]]:

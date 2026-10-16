@@ -5,7 +5,7 @@ from nicegui import ui
 from labcatalog import defaults
 from labcatalog.charts import network, views
 from labcatalog.gui import theme
-from labcatalog.gui.common import apa, caption, col, heading, note, panel, table
+from labcatalog.gui.common import apa, caption, col, note, panel, table
 from labcatalog.pipeline import CatalogResult
 
 TABLE_MIN = 360
@@ -38,33 +38,40 @@ def side_by_side(*panels: tuple[str, go.Figure | None]) -> None:
 
 
 def score_charts(result: CatalogResult, instrument_id: str) -> None:
-    side_by_side(
-        ("", views.score_boxes(result, instrument_id)),
-        ("", views.score_distribution(result, instrument_id)),
-    )
+    boxes = views.score_boxes(result, instrument_id)
+    spread = views.score_distribution(result, instrument_id)
+    if boxes is not None or spread is not None:
+        with panel("Distributions", "Each score by wave, and the total score's density"):
+            side_by_side(("", boxes), ("", spread))
     means = views.score_means(result, instrument_id)
     if means is not None:
-        heading("Scores across waves")
-        show(means)
+        with panel("Scores across waves"):
+            show(means)
 
 
 def item_charts(result: CatalogResult, instrument_id: str) -> None:
-    for fig in views.item_responses(result, instrument_id):
-        show(fig)
-    for fig in views.number_distributions(result, instrument_id):
-        show(fig)
+    responses = [
+        *views.item_responses(result, instrument_id),
+        *views.number_distributions(result, instrument_id),
+    ]
+    if responses:
+        with panel("Item responses"):
+            for fig in responses:
+                show(fig)
     item_means(result, instrument_id)
     profiles = views.wave_profiles(result, instrument_id)
     if profiles is not None:
-        heading("Each wave against the others")
-        show(profiles)
+        with panel("Each wave against the others"):
+            show(profiles)
 
 
 def item_correlation_section(result: CatalogResult, instrument_id: str) -> None:
     waves = views.item_waves(result, instrument_id)
     if waves:
-        heading("Item correlations")
-        one_wave(waves, lambda dataset: item_correlations(result, instrument_id, dataset))
+        with panel("Item correlations") as tools:
+            one_wave(
+                waves, lambda dataset: item_correlations(result, instrument_id, dataset), tools
+            )
 
 
 def figure_column(fig: go.Figure) -> ui.column:
@@ -114,10 +121,8 @@ def item_means(result: CatalogResult, instrument_id: str) -> None:
     radars = views.subscale_radars(result, instrument_id)
     if radars is None:
         return
-    heading("Item means")
-    if views.radar_note(result, instrument_id):
-        note(views.radar_note(result, instrument_id))
-    show(radars)
+    with panel("Item means", views.radar_note(result, instrument_id) or ""):
+        show(radars)
 
 
 def other_scores(result: CatalogResult, instrument_id: str) -> None:
@@ -133,40 +138,47 @@ def other_scores(result: CatalogResult, instrument_id: str) -> None:
             "No other score was measured in the same wave.",
         )
 
-    heading("Against other scores")
-    if len(own) > 1:
-        ui.select(
-            own, value=first, label="Score", on_change=lambda e: correlates.refresh(e.value)
-        ).props("dense outlined").classes("w-72")
-    correlates(first)
+    with panel("Against other scores") as tools:
+        if len(own) > 1:
+            with tools:
+                ui.select(
+                    own, value=first, label="Score", on_change=lambda e: correlates.refresh(e.value)
+                ).classes("w-64")
+        correlates(first)
 
 
 def instrument_dataset_section(result: CatalogResult, instrument_id: str, dataset: str) -> None:
     profiles = views.people_profiles(result, instrument_id, dataset)
     if profiles is not None:
-        heading("Everyone's answers")
-        show(profiles)
+        with panel("Everyone's answers"):
+            show(profiles)
     pages = views.page_count(result, dataset)
 
     @ui.refreshable
-    def people(page: int) -> None:
-        heading("Answers by participant")
+    def answers(page: int) -> None:
         show(
             views.answer_grid(result, dataset, page, instrument_id),
             "No items of this instrument are mapped in this dataset.",
         )
-        standardized = views.standardized_scores(result, dataset, page, instrument_id)
-        if standardized is not None:
-            heading("Standardized scores")
-            show(standardized)
 
-    if pages > 1:
-        with ui.row().classes("items-center gap-2 mt-6"):
-            ui.label("Participants page").classes("text-grey-7")
-            ui.pagination(
-                1, pages, direction_links=True, on_change=lambda e: people.refresh(e.value)
-            )
-    people(1)
+    @ui.refreshable
+    def standardized(page: int) -> None:
+        fig = views.standardized_scores(result, dataset, page, instrument_id)
+        if fig is not None:
+            with panel("Standardized scores"):
+                show(fig)
+
+    def turn(page: int) -> None:
+        answers.refresh(page)
+        standardized.refresh(page)
+
+    with panel("Answers by participant") as tools:
+        if pages > 1:
+            with tools:
+                ui.label("Page").classes("lc-note")
+                ui.pagination(1, pages, direction_links=True, on_change=lambda e: turn(e.value))
+        answers(1)
+    standardized(1)
 
 
 def overview_section(result: CatalogResult) -> None:
@@ -188,12 +200,13 @@ def wave_picker(choices: dict[str, str], value: str, changed) -> None:
     ).classes("w-56")
 
 
-def one_wave(choices: dict[str, str], render) -> None:
+def one_wave(choices: dict[str, str], render, tools: ui.row) -> None:
     @ui.refreshable
     def grid(choice: str) -> None:
         render(choice)
 
-    wave_picker(choices, next(iter(choices)), grid.refresh)
+    with tools:
+        wave_picker(choices, next(iter(choices)), grid.refresh)
     grid(next(iter(choices)))
 
 
