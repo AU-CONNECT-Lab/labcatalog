@@ -12,6 +12,7 @@ from labcatalog.gui import (
     codebook_import,
     datasets,
     instruments,
+    methods,
     overview,
     preferences,
     prepare,
@@ -29,6 +30,7 @@ from labcatalog.gui.instruments import (
     BrowseView,
     CfaView,
 )
+from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
 from labcatalog.pipeline import CatalogResult, run_catalog, run_cfa, run_invariance
 from labcatalog.version import __version__
@@ -39,6 +41,7 @@ PAGES = (
     ("instruments", "Instruments", "list_alt"),
     ("datasets", "Datasets", "table_chart"),
     ("analysis", "Analysis", "query_stats"),
+    ("methods", "Methods", "description"),
     ("prepare", "Prepare", "play_circle"),
     ("import", "Import", "upload_file"),
     ("problems", "Problems", "report_problem"),
@@ -83,6 +86,7 @@ class Window:
         self.index: BrowseIndex | None = None
         self.view = BrowseView()
         self.analysis = AnalysisView()
+        self.methods = MethodsView()
         self.importing = ImportView()
         self.preparing = PrepareView()
         self.cfa = CfaView()
@@ -135,6 +139,8 @@ class Window:
                 self.datasets_panel()
             with ui.tab_panel("analysis").classes("lc-paper"):
                 self.analysis_panel()
+            with ui.tab_panel("methods").classes("lc-paper"):
+                self.methods_panel()
             with ui.tab_panel("prepare").classes("lc-paper"):
                 self.prepare_panel()
             with ui.tab_panel("import").classes("lc-paper"):
@@ -164,6 +170,7 @@ class Window:
             if root != self.root:
                 self.view = BrowseView()
                 self.analysis = AnalysisView()
+                self.methods = MethodsView()
                 self.importing = ImportView()
                 self.preparing = PrepareView()
                 self.root = root
@@ -180,21 +187,21 @@ class Window:
         cfa.invariance, cfa.invariance_message = [], ""
         if result is None or result.project is None or not rscript:
             cfa.status = cfa.invariance_status = CFA_UNSET
-            instruments.cfa_changed()
+            cfa_changed()
             return
         cfa.status = cfa.invariance_status = CFA_RUNNING
-        instruments.cfa_changed()
+        cfa_changed()
         found = await in_r(run_cfa, result, rscript)
         # A newer Refresh has started its own run.
         if self.result is not result:
             return
         cfa.fits, cfa.message, cfa.status = found
-        instruments.cfa_changed()
+        cfa_changed()
         found = await in_r(run_invariance, result, rscript)
         if self.result is not result:
             return
         cfa.invariance, cfa.invariance_message, cfa.invariance_status = found
-        instruments.cfa_changed()
+        cfa_changed()
 
     def set_palette(self, name: str) -> None:
         style.use_palette(name)
@@ -226,6 +233,7 @@ class Window:
             self.instruments_panel,
             self.datasets_panel,
             self.analysis_panel,
+            self.methods_panel,
             self.prepare_panel,
             self.import_panel,
             self.problems_panel,
@@ -266,6 +274,11 @@ class Window:
             analysis.render(self.result, self.analysis)
 
     @ui.refreshable_method
+    def methods_panel(self) -> None:
+        if self.has_catalog():
+            methods.render(self.result, self.methods, self.cfa)
+
+    @ui.refreshable_method
     def prepare_panel(self) -> None:
         if self.root is None:
             ui.label("Open a project folder to run its prepare steps.").classes("lc-note")
@@ -292,6 +305,11 @@ class Window:
                 "lc-note"
             )
         return self.result is not None and self.result.project is not None
+
+
+def cfa_changed() -> None:
+    instruments.cfa_changed()
+    methods.cfa_changed()
 
 
 async def in_r(

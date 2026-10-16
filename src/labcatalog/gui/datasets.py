@@ -49,9 +49,6 @@ def studies(
                 with ui.row().classes("items-baseline gap-2"):
                     ui.label("How to cite").classes("text-grey-7")
                     cited(result.project.bibliography, study_config.reference)
-            for modality, text in methods_of(result, study).items():
-                with ui.expansion(f"Methods: {modality}").props("dense").classes("w-full"):
-                    paragraphs(text)
             shown = table(*dataset_table(result, [summaries[n] for n in names])).classes("mt-2")
             shown.classes("cursor-pointer")
             shown.on("rowClick", lambda e: on_select(e.args[1]["name"]))

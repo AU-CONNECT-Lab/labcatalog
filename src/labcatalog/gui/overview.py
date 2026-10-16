@@ -45,14 +45,14 @@ def kpi(
         ui.label(str(value)).classes("lc-kpi-value")
 
 
-def wave_table(result: CatalogResult) -> tuple[list[dict], list[dict]]:
+def wave_table(result: CatalogResult, only: str | None = None) -> tuple[list[dict], list[dict]]:
     config, summary = result.project.config, result.summary
     reporters = unique(r.reporter for r in summary.retention)
     counts = {(r.study, r.wave, r.reporter): r.n for r in summary.retention}
     groups = {(g.study, g.wave): g for g in summary.groups}
     group = summary.group_name
     columns = [
-        col("study", "Study"),
+        *([] if only else [col("study", "Study")]),
         col("wave", "Wave"),
         col("dates", "Dates", sortable=False),
         *[col(f"n_{r}", r.capitalize(), numeric=True) for r in reporters],
@@ -64,6 +64,8 @@ def wave_table(result: CatalogResult) -> tuple[list[dict], list[dict]]:
         ]
     rows = []
     for study, study_config in config.studies.items():
+        if only and study != only:
+            continue
         for wave in sorted_waves(study_config.waves):
             found = groups.get((study, wave))
             rows.append(
