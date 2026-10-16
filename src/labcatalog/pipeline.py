@@ -17,7 +17,14 @@ from labcatalog.data.prepare import Session, StepRun, run_steps
 from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.data.scoring import compute_scores
 from labcatalog.datalad.bridge import get_content
-from labcatalog.datalad.freeze import Freeze, freeze_project, list_freezes, open_freeze
+from labcatalog.datalad.freeze import (
+    Freeze,
+    freeze_project,
+    freeze_roots,
+    list_freezes,
+    open_freeze,
+    push_freeze,
+)
 from labcatalog.exceptions import CodebookError, MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
@@ -164,6 +171,10 @@ def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze
         raise MetadataError(result.report.issues)
     participants = {d.dataset: d.n_ids for d in result.summary.datasets}
     return freeze_project(result.project, result.datasets, participants, name, datalad)
+
+
+def run_push_freeze(root: Path, name: str, datalad: str) -> list[Path]:
+    return push_freeze(freeze_roots(load_project(root)), name, datalad)
 
 
 def run_prepare(root: Path, echo: Callable[[str], None], datalad: str | None) -> list[StepRun]:

@@ -74,6 +74,35 @@ def freeze_project(
     return path, record
 
 
+def push_targets(roots: list[Path]) -> dict[Path, str | None]:
+    # The only sibling, or origin among several; None when it is not clear where to push.
+    found = {}
+    for root in roots:
+        remotes = run_git(root, "remote").split()
+        found[root] = (
+            remotes[0] if len(remotes) == 1 else ("origin" if "origin" in remotes else None)
+        )
+    return found
+
+
+def freeze_roots(project: Project) -> list[Path]:
+    # The datasets a freeze tags: those holding the data and the one holding the records.
+    folder = project.root / defaults.FREEZES_DIR
+    return sorted({*datalad_datasets(project), *group_by_dataset([folder])})
+
+
+def push_freeze(roots: list[Path], name: str, datalad: str) -> list[Path]:
+    # datalad push sends neither tags nor older content, so both go explicitly.
+    pushed = []
+    for root, sibling in push_targets(roots).items():
+        if sibling is None:
+            continue
+        run_datalad(datalad, ["push", "--to", sibling, "--data", "anything"], cwd=root)
+        run_git(root, "push", sibling, name)
+        pushed.append(root)
+    return pushed
+
+
 def datalad_datasets(project: Project) -> dict[Path, list[str]]:
     return group_by_dataset(used_paths(project.config, project.root))
 

@@ -15,12 +15,13 @@ from labcatalog.data.prepare import Session, run_steps, step_states
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.bridge import datalad_status, use_folder
 from labcatalog.datalad.check import check_git_annex
-from labcatalog.datalad.freeze import differences
+from labcatalog.datalad.freeze import differences, push_targets
 from labcatalog.exceptions import DataladError, DataSourceError, FreezeError, MetadataError
 from labcatalog.metadata.history import file_history
 from labcatalog.pipeline import (
     run_catalog,
     run_freeze,
+    run_push_freeze,
     run_get,
     run_get_missing,
     run_open_freeze,
@@ -479,9 +480,7 @@ def test_a_pushed_freeze_opens_from_another_clone(mock_project, datalad, tmp_pat
     datalad(mock_project, "siblings", "add", "-s", "store", "--url", store)
     datalad(mock_project, "push", "--to", "store")
     _, record = run_freeze(mock_project, "pilot", datalad_exe())
-    # datalad push sends neither tags nor the content of older versions.
-    datalad(mock_project, "push", "--to", "store", "--data", "anything")
-    git(mock_project, "push", "store", "pilot")
+    assert run_push_freeze(mock_project, "pilot", datalad_exe()) == [mock_project.resolve()]
     change_child_w2(mock_project, datalad)
     datalad(mock_project, "save", "-m", "Later change")
     datalad(mock_project, "push", "--to", "store")
@@ -490,3 +489,21 @@ def test_a_pushed_freeze_opens_from_another_clone(mock_project, datalad, tmp_pat
     datalad(tmp_path / "elsewhere", "clone", store, "lab")
     copy = run_open_freeze(tmp_path / "elsewhere" / "lab", "pilot", datalad_exe())
     assert differences(record, run_catalog(copy).manifest) == []
+
+
+@needs_git
+def test_a_freeze_pushes_to_the_only_sibling_or_to_origin(tmp_path):
+    roots = []
+    for name, remotes in [
+        ("none", []),
+        ("one", ["store"]),
+        ("origin", ["store", "origin"]),
+        ("two", ["a", "b"]),
+    ]:
+        root = tmp_path / name
+        root.mkdir()
+        git(root, "init", "-q")
+        for remote in remotes:
+            git(root, "remote", "add", remote, str(tmp_path / "elsewhere.git"))
+        roots.append(root)
+    assert list(push_targets(roots).values()) == [None, "store", "origin", None]

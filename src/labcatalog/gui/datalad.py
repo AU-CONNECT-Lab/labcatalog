@@ -10,13 +10,15 @@ from labcatalog.datalad.freeze import (
     Freeze,
     datalad_datasets,
     differences,
+    freeze_roots,
     list_freezes,
+    push_targets,
 )
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import col, heading, note, section, table
 from labcatalog.paths import portable_path
-from labcatalog.pipeline import CatalogResult, run_freeze
+from labcatalog.pipeline import CatalogResult, run_freeze, run_push_freeze
 
 
 def get_button(
@@ -94,11 +96,24 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                 f"participants) to {defaults.FREEZES_DIR}, so you can say later which data a "
                 "result used."
             )
+            push = None
             if tagged:
                 note(
                     "The data are in DataLad, so the freeze also saves these datasets and tags "
                     f"them with its name, which lets you get this version back: {', '.join(tagged)}."
                 )
+                targets = push_targets(freeze_roots(result.project))
+                siblings = sorted({t for t in targets.values() if t})
+                if siblings:
+                    push = ui.checkbox(
+                        f"Then push the tag and the data to {', '.join(siblings)}", value=True
+                    )
+                unclear = [portable_path(r, root).as_posix() for r, t in targets.items() if not t]
+                if unclear:
+                    note(
+                        f"{', '.join(unclear)} has no single sibling to push to; push it "
+                        "yourself after freezing."
+                    )
             else:
                 note(RECORD_ONLY)
             name = (
@@ -118,11 +133,19 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                 except LabCatalogError as err:
                     status.set_text(str(err))
                     return
-                dialog.close()
                 done = f"Froze {record.name} in {portable_path(path, root).as_posix()}"
                 if record.tag:
                     done += f" and tagged {len(record.manifest.datalad)} DataLad dataset(s)"
-                ui.notify(done)
+                if push is not None and push.value:
+                    status.set_text("Pushing")
+                    try:
+                        pushed = await run.io_bound(run_push_freeze, root, record.name, datalad)
+                        done += f", pushed {len(pushed)}"
+                    except LabCatalogError as err:
+                        # The freeze stands; only the push is left to do.
+                        done += f", but the push failed: {err}"
+                dialog.close()
+                ui.notify(done, multi_line=True)
                 await on_frozen()
 
             with ui.row().classes("w-full justify-end"):

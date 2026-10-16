@@ -17,6 +17,7 @@ from labcatalog.pipeline import (
     run_codebook_prompt,
     run_freeze,
     run_prepare,
+    run_push_freeze,
     run_schema,
     run_validate,
 )
@@ -122,14 +123,21 @@ def freeze(
         str, typer.Argument(help="Name of the freeze, for example 2026-06-submission.")
     ],
     project: ProjectOption = Path("."),
+    push: Annotated[
+        bool, typer.Option(help="Push the tag and the data to each DataLad dataset's sibling.")
+    ] = False,
 ) -> None:
     """Record the data as they are now; DataLad datasets are also saved and tagged."""
-    path, record = run_freeze(project, name, shutil.which("datalad"))
+    datalad = shutil.which("datalad")
+    path, record = run_freeze(project, name, datalad)
     typer.echo(f"Wrote {path}")
-    if record.tag:
-        typer.echo(f"Tagged {record.tag} in {len(record.manifest.datalad)} DataLad dataset(s).")
-    else:
+    if not record.tag:
         typer.echo(RECORD_ONLY)
+        return
+    typer.echo(f"Tagged {record.tag} in {len(record.manifest.datalad)} DataLad dataset(s).")
+    if push:
+        pushed = run_push_freeze(project, record.name, datalad)
+        typer.echo(f"Pushed {len(pushed)} dataset(s).")
 
 
 codebook_app = typer.Typer(
