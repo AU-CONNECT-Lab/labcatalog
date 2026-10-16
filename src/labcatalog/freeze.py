@@ -1,3 +1,4 @@
+import os
 import re
 from datetime import date, datetime
 from pathlib import Path
@@ -8,7 +9,14 @@ from labcatalog import defaults
 from labcatalog.annex import group_by_dataset
 from labcatalog.dataladbridge import run_datalad
 from labcatalog.exceptions import DataladError, FreezeError
-from labcatalog.manifest import Manifest, build_manifest, original_branch, run_git, used_paths
+from labcatalog.manifest import (
+    ADJUSTED,
+    Manifest,
+    build_manifest,
+    original_branch,
+    run_git,
+    used_paths,
+)
 from labcatalog.project import Project
 from labcatalog.sources import LoadedDataset
 
@@ -92,3 +100,37 @@ def list_freezes(root: Path) -> list[Freeze]:
         for path in (root / defaults.FREEZES_DIR).glob("*.json")
     ]
     return sorted(found, key=lambda f: f.frozen_at, reverse=True)
+
+
+def open_freeze(project_root: Path, record: Freeze, folder: Path, datalad: str) -> Path:
+    if record.tag is None:
+        raise FreezeError(f"{record.name} is only a record; {RECORD_ONLY}")
+    roots = [(project_root / r.path).resolve() for r in record.manifest.datalad]
+    tops = [r for r in roots if not any(other in r.parents for other in roots)]
+    if not any(t == project_root or t in project_root.parents for t in tops):
+        raise FreezeError(f"{record.name} cannot be opened: the project folder was not in DataLad")
+    # The copy keeps the datasets where they were relative to each other and to the project.
+    base = Path(os.path.commonpath(tops))
+    for top in tops:
+        copy = folder / top.relative_to(base)
+        run_datalad(datalad, ["clone", str(top), str(copy)])
+        checkout_tag(copy, record.tag)
+    # Installed at the commit their superdataset recorded, which is the tagged one.
+    for root in sorted(set(roots) - set(tops), key=lambda r: len(r.parts)):
+        top = next(t for t in tops if t in root.parents)
+        inside = root.relative_to(top).as_posix()
+        run_datalad(datalad, ["get", "-n", inside], cwd=folder / top.relative_to(base))
+    return folder / project_root.relative_to(base)
+
+
+def checkout_tag(root: Path, tag: str) -> None:
+    adjusted = run_git(root, "branch", "--show-current").startswith(ADJUSTED)
+    run_git(root, "checkout", "-q", "-b", f"freeze-{tag}", tag)
+    if adjusted:
+        # Checked out as is, annexed files are link text; adjusting turns them into pointer files.
+        run_git(root, "annex", "adjust", "--unlock")
+
+
+def differences(record: Freeze, manifest: Manifest) -> list[str]:
+    now = {f.dataset: f.sha256 for f in manifest.files}
+    return [f.dataset for f in record.manifest.files if now.get(f.dataset) != f.sha256]

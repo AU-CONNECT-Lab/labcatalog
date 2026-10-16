@@ -5,9 +5,10 @@ from functools import partial
 from nicegui import ui
 
 from labcatalog import analysis, analysis_script
+from labcatalog import multilevel as ml
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import analysis_tables, charts
+from labcatalog.gui import analysis_tables, charts, multilevel
 from labcatalog.gui.common import apa, col, note, p_value, section
 from labcatalog.gui.paper import Chart, paper_table, save_button
 from labcatalog.pipeline import CatalogResult
@@ -27,6 +28,7 @@ class AnalysisView:
     y: str | None = None
     group: str | None = None
     outcome: str | None = None
+    multilevel: ml.Model | None = None
 
 
 def render(result: CatalogResult, view: AnalysisView) -> None:
@@ -73,6 +75,8 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
             on_change=lambda e: set_intersect(e.value),
         )
     tools()
+    # Its own waves and people, so changing the sample does not refit it.
+    multilevel.render(result, view)
 
 
 def first_wave(result: CatalogResult, names: list[str]) -> list[str]:

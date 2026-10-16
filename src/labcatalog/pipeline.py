@@ -1,3 +1,4 @@
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -13,7 +14,7 @@ from labcatalog.codebook import ImportResult
 from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.dataladbridge import get_content
 from labcatalog.exceptions import CodebookError, MetadataError
-from labcatalog.freeze import Freeze, freeze_project
+from labcatalog.freeze import Freeze, freeze_project, list_freezes, open_freeze
 from labcatalog.invariance import InvarianceTest
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
@@ -159,6 +160,14 @@ def run_get_missing(root: Path, datalad: str) -> None:
     # Reference PDFs come one at a time, when someone opens them.
     pdfs = references_root(config, root) if config.references.root else None
     get_content(datalad, [p for p in used_paths(config, root) if p != pdfs])
+
+
+def run_open_freeze(root: Path, name: str, datalad: str) -> Path:
+    record = next(f for f in list_freezes(root) if f.name == name)
+    folder = Path(tempfile.mkdtemp(prefix=f"labcatalog-{name}-"))
+    copy = open_freeze(root.resolve(), record, folder, datalad)
+    run_get_missing(copy, datalad)
+    return copy
 
 
 def run_schema(out_dir: Path) -> list[Path]:

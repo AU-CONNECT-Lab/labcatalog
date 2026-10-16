@@ -61,8 +61,9 @@ def render(result: CatalogResult, view) -> None:
                     f"Fixed Effects for {label}", *fixed_table(fitted), fixed_note(fitted, long)
                 ),
                 "multilevel_random": PaperTable(
-                    "Random Effects", *random_table(fitted), "Variances and SDs; r is the "
-                    "correlation of the slope with the intercept."
+                    "Random Effects",
+                    *random_table(fitted),
+                    "Variances and SDs; r is the correlation of the slope with the intercept.",
                 ),
                 "multilevel_summary": PaperTable(
                     "Model Summary", *summary_table(fitted), summary_note(fitted)
@@ -99,9 +100,10 @@ def render(result: CatalogResult, view) -> None:
         names = ml.occasions(result, value)
         study = result.project.config.datasets
         first = next(d.study for d in study if d.name == names[0])
-        change(outcome=value, datasets=[n for n in names if any(
-            d.name == n and d.study == first for d in study
-        )])
+        change(
+            outcome=value,
+            datasets=[n for n in names if any(d.name == n and d.study == first for d in study)],
+        )
         waves.set_options({n: labels[n] for n in ml.occasions(result, value)}, value=model.datasets)
 
     with ui.row().classes("w-full items-center gap-4"):

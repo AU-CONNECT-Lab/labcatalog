@@ -24,7 +24,8 @@ def render(
     section("R")
     note(
         "Factor models (CFA) and ω run in R with lavaan and semTools, and the Analysis page "
-        "uses R first, with psych and effectsize; without R it uses Python. Install R and "
+        "uses R first, with psych and effectsize, and lme4, lmerTest and performance for the "
+        "multilevel model; without R it uses Python. Install R and "
         f"the packages yourself ({install_command(ALL_PACKAGES)}), then give the path to "
         f"Rscript, which is in R's bin folder, for example {RSCRIPT_EXAMPLE}."
     )
