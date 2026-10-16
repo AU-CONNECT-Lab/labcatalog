@@ -287,7 +287,9 @@ class Window:
     @ui.refreshable_method
     def datasets_panel(self) -> None:
         if self.has_catalog():
-            datasets.render(self.result, self.dataset, self.show_dataset, self.open_instrument)
+            datasets.render(
+                self.result, self.dataset, self.show_dataset, self.open_instrument, self.reload
+            )
 
     @ui.refreshable_method
     def analysis_panel(self) -> None:

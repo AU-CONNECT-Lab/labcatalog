@@ -106,7 +106,7 @@ def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
         path.value = value
         preferences.save({preferences.DATALAD: value})
         if not value:
-            status.set_text("No DataLad set: freezes only write a record, and no datalad run.")
+            status.set_text("No DataLad set.")
             return
         use_folder(value)
         status.set_text("Checking DataLad")

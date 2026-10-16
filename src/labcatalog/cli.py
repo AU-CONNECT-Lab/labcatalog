@@ -113,7 +113,9 @@ def prepare(project: ProjectOption = Path(".")) -> None:
 
 @app.command()
 def freeze(
-    name: Annotated[str, typer.Argument(help="Name of the freeze, for example 2026-06-submission.")],
+    name: Annotated[
+        str, typer.Argument(help="Name of the freeze, for example 2026-06-submission.")
+    ],
     project: ProjectOption = Path("."),
 ) -> None:
     """Record the data as they are now; DataLad datasets are also saved and tagged."""

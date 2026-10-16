@@ -111,7 +111,9 @@ def used_paths(project: Project, datasets: dict[str, LoadedDataset]) -> list[Pat
         metadata.append(expand_path(config.exclusions, root))
     sources = [d.source_path for d in datasets.values() if d.source_path is not None]
     inputs = [f.resolved for state in step_states(project) for f in state.inputs]
-    found = dict.fromkeys(p for p in [*metadata, *sources, *inputs] if p.exists() or is_placeholder(p))
+    found = dict.fromkeys(
+        p for p in [*metadata, *sources, *inputs] if p.exists() or is_placeholder(p)
+    )
     return list(found)
 
 
