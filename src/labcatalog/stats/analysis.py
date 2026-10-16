@@ -5,7 +5,12 @@ import pandas as pd
 from scipy import stats
 
 from labcatalog import defaults
+from labcatalog.data.resolve import ResolvedVariable, numbers_in_range
 from labcatalog.pipeline import CatalogResult
+
+NUMBER = "number"
+CHOICE = "choice"
+ITEM_PREFIX = "item:"
 
 
 @dataclass
@@ -65,11 +70,47 @@ def build_sample(result: CatalogResult, datasets: list[str], intersect: bool) ->
     return Sample(list(datasets), sorted(people), ambiguous)
 
 
+def item_key(variable: ResolvedVariable) -> str:
+    return f"{ITEM_PREFIX}{variable.instrument_id}.{variable.item_id}@{variable.dataset}"
+
+
+def item_variable(result: CatalogResult, key: str) -> ResolvedVariable:
+    return next(v for v in result.catalog.variables if item_key(v) == key)
+
+
+def item_numbers(result: CatalogResult, variable: ResolvedVariable) -> pd.Series:
+    # Only answers that count: a listed option, or a number within the item's range.
+    numbers = result.datasets[variable.dataset].numbers(variable.column)
+    if variable.type == CHOICE:
+        return numbers.where(numbers.isin([float(o.value) for o in variable.response_options]))
+    return numbers.where(numbers_in_range(numbers, variable))
+
+
+def number_items(result: CatalogResult, datasets: list[str]) -> list[ResolvedVariable]:
+    # Number items analyse as they are, like a score: features of other modalities, ages, counts.
+    return [
+        v
+        for name in datasets
+        for v in result.catalog.variables_for(name)
+        if v.type == NUMBER and v.column in result.datasets[name].frame.columns
+    ]
+
+
+def instrument_of(key: str) -> str:
+    return key.removeprefix(ITEM_PREFIX).split(".", 1)[0]
+
+
+def row_values(result: CatalogResult, key: str) -> np.ndarray:
+    # A score or an item, one value per row of its dataset.
+    if key.startswith(ITEM_PREFIX):
+        return item_numbers(result, item_variable(result, key)).to_numpy(dtype=float)
+    return result.scores[key.rsplit("@", 1)[1]][key].to_numpy(dtype=float)
+
+
 def values(result: CatalogResult, sample: Sample, key: str) -> pd.Series:
-    score = next(s for s in result.catalog.scores if s.key == key)
-    keys = link_keys(result, score.dataset)
+    keys = link_keys(result, key.rsplit("@", 1)[1])
     keep = linkable(keys)
-    found = result.scores[score.dataset][key].to_numpy(dtype=float)[keep]
+    found = row_values(result, key)[keep]
     return pd.Series(found, index=keys.to_numpy()[keep]).reindex(sample.people)
 
 

@@ -65,6 +65,23 @@ def test_default_model_follows_a_total_score_over_waves(result):
     assert ml.problem(result, model) is None
 
 
+def test_a_number_item_is_an_outcome_and_a_covariate(result):
+    faa, motion = "item:eeg_resting.frontal_alpha_asymmetry", "item:fmri_resting.mean_fd@fmri_w1"
+    assert faa in ml.outcome_choices(result)
+    assert ml.occasions(result, faa) == ["eeg_w1", "eeg_w3"]
+    assert motion in ml.covariate_choices(result, {n: n for n in result.datasets})
+    model = ml.Model(faa, ["eeg_w1", "eeg_w3"], covariates=[motion], slope=False)
+    long = ml.long_frame(result, model)
+    assert long.outcome == "frontal_alpha_asymmetry"
+    eeg = result.datasets["eeg_w3"].frame
+    later = long.frame[long.frame["time"] == 1].set_index("id")[long.outcome]
+    assert later.to_dict() == pytest.approx(
+        pd.to_numeric(eeg["frontal_alpha_asymmetry"]).set_axis(eeg["pid"]).to_dict()
+    )
+    fitted = ml.run(result, model, long, "EEG frontal alpha asymmetry", None)
+    assert len(fitted.fixed) == 3 and fitted.observations > 0
+
+
 def test_problems_are_named(result):
     assert ml.problem(result, growth(datasets=["child_w1", "parent_w1"])) == (
         "Choose one dataset per wave."

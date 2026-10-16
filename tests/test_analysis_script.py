@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from labcatalog.charts import views
 from labcatalog.gui import analysis_tables
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import analysis
@@ -16,6 +17,7 @@ from labcatalog.stats.rbridge import ANALYSIS_PACKAGES, r_status
 EMS = "example_mood.ems_total@child_w1"
 EPS = "example_parent_stress.eps_mean@parent_w1"
 GENDER = "item:example_demographics.dem_gender@parent_w1"
+FAA = "item:eeg_resting.frontal_alpha_asymmetry@eeg_w1"
 
 
 def rscript() -> str | None:
@@ -259,3 +261,37 @@ def test_correlations_and_regression_agree_in_r_and_python(result, sample):
         (py_fit.slope, py_fit.slope_se, py_fit.correlation.p)
     )
     assert r_fit.correlation.high == pytest.approx(py_fit.correlation.high, abs=0.006)
+
+
+def test_number_items_analyse_beside_scores(result, tmp_path, monkeypatch):
+    sample = analysis.build_sample(result, ["child_w1", "eeg_w1"], True)
+    choices = views.variable_choices(result, sample.datasets)
+    assert FAA in choices and FAA not in views.total_choices(result, sample.datasets)
+    # Children link by family under the example's correlate_by.
+    eeg = result.datasets["eeg_w1"].frame
+    expected = pd.Series(
+        pd.to_numeric(eeg["frontal_alpha_asymmetry"]).to_numpy(), index=eeg["pid"].str[:4]
+    ).reindex(sample.people)
+    pd.testing.assert_series_equal(
+        analysis.values(result, sample, FAA), expected, check_names=False
+    )
+    r_text, python_text, frame = script.page_script(
+        result, sample, scores=[EMS, FAA], xs=[FAA], y=EMS, group=None, outcome=None
+    )
+    assert "frontal_alpha_asymmetry_eeg_w1" in frame.columns
+    frame.to_csv(tmp_path / script.DATA_FILE, index=False)
+    monkeypatch.chdir(tmp_path)
+    names: dict = {}
+    exec(python_text, names)
+    direct = analysis.correlate(analysis.values(result, sample, EMS), expected)
+    found = names["correlations"].iloc[0]
+    assert (found["n"], found["r"]) == (direct.n, pytest.approx(direct.r))
+    assert names["regressions"].iloc[0]["n"] == direct.n
+
+
+def test_table_one_offers_number_items_but_starts_without_them(result):
+    datasets = ["child_w1", "parent_w1", "eeg_w1"]
+    key = "item:eeg_resting.frontal_alpha_asymmetry"
+    assert key in script.measures(result, datasets)
+    defaults = script.default_measures(result, datasets)
+    assert key not in defaults and "item:example_demographics.dem_gender" in defaults

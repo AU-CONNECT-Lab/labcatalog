@@ -29,7 +29,7 @@ def render(result: CatalogResult, view) -> None:
     section("Multilevel model")
     outcomes = ml.outcome_choices(result)
     if not outcomes:
-        note("Needs a score in at least one dataset.")
+        note("Needs a score or number in at least one dataset.")
         return
     if view.multilevel is None or view.multilevel.outcome not in outcomes:
         view.multilevel = ml.default_model(result)

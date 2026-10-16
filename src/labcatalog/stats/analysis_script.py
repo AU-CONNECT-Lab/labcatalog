@@ -9,19 +9,25 @@ import numpy as np
 import pandas as pd
 
 from labcatalog import defaults
-from labcatalog.data.resolve import ResolvedVariable, numbers_in_range
+from labcatalog.data.resolve import ResolvedVariable
 from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.codegen import number
 from labcatalog.stats import analysis
+from labcatalog.stats.analysis import (
+    CHOICE,
+    ITEM_PREFIX,
+    NUMBER,
+    instrument_of,
+    item_key,
+    item_variable,
+    number_items,
+)
 from labcatalog.stats.cfa import is_total
 from labcatalog.stats.rbridge import install_command, package_check, run_r
 
 DATA_FILE = "analysis_data.csv"
 SCORE = "score"
-NUMBER = "number"
-CHOICE = "choice"
-ITEM_PREFIX = "item:"
 MIN_GROUP = 2
 R = "R"
 PYTHON = "Python"
@@ -30,14 +36,16 @@ R_HEADER = """\
 # {title}
 # {sample}
 # d is the analysis data saved beside this script: one row per person, scores as labcatalog
-# computed them, and each score's items reversed where the scale says so.{packages}
+# computed them, each score's items reversed where the scale says so, and numbers blank
+# where they fall outside the item's range.{packages}
 d <- read.csv({path}, check.names = FALSE)
 """
 PYTHON_HEADER = """\
 # {title}
 # {sample}
 # d is the analysis data saved beside this script: one row per person, scores as labcatalog
-# computed them, and each score's items reversed where the scale says so.
+# computed them, each score's items reversed where the scale says so, and numbers blank
+# where they fall outside the item's range.
 # Needs pandas and pingouin (pip install pingouin).
 import numpy as np
 import pandas as pd
@@ -97,27 +105,28 @@ table1 = pd.DataFrame([
 print(table1)
 """
 R_CORRELATIONS = """\
-# Correlations: n, M and SD of each score (psych::describe), then Pearson r for each pair on
-# everyone with both scores (psych::corr.test, p values not adjusted).
-scores <- c({columns})
-descriptives <- data.frame(score = scores, psych::describe(d[scores])[c("n", "mean", "sd")],
-                           row.names = NULL)
+# Correlations: n, M and SD of each variable (psych::describe), then Pearson r for each pair
+# on everyone with both values (psych::corr.test, p values not adjusted).
+variables <- c({columns})
+descriptives <- data.frame(variable = variables,
+                           psych::describe(d[variables])[c("n", "mean", "sd")], row.names = NULL)
 print(descriptives)
-test <- psych::corr.test(d[scores], adjust = "none")
+test <- psych::corr.test(d[variables], adjust = "none")
 pairs <- which(lower.tri(test$r), arr.ind = TRUE)
-correlations <- data.frame(x = scores[pairs[, "col"]], y = scores[pairs[, "row"]],
+correlations <- data.frame(x = variables[pairs[, "col"]], y = variables[pairs[, "row"]],
                            n = if (is.matrix(test$n)) test$n[pairs] else test$n,
                            r = test$r[pairs], p = test$p[pairs])
 print(correlations)
 """
 PYTHON_CORRELATIONS = """\
-# Correlations: n, M and SD of each score, then Pearson r for each pair on everyone with both
-# scores (pingouin, p values not adjusted).
-scores = [{columns}]
-descriptives = pd.DataFrame(dict(score=scores, n=d[scores].count().to_numpy(),
-                                 mean=d[scores].mean().to_numpy(), sd=d[scores].std().to_numpy()))
+# Correlations: n, M and SD of each variable, then Pearson r for each pair on everyone with
+# both values (pingouin, p values not adjusted).
+variables = [{columns}]
+descriptives = pd.DataFrame(dict(variable=variables, n=d[variables].count().to_numpy(),
+                                 mean=d[variables].mean().to_numpy(),
+                                 sd=d[variables].std().to_numpy()))
 print(descriptives)
-correlations = pg.pairwise_corr(d, columns=scores, padjust="none")[["X", "Y", "n", "r", "p_unc"]]
+correlations = pg.pairwise_corr(d, columns=variables, padjust="none")[["X", "Y", "n", "r", "p_unc"]]
 correlations.columns = ["x", "y", "n", "r", "p"]
 print(correlations)
 """
@@ -293,6 +302,9 @@ class AnalysisData:
         self.sample = sample
         self.columns: dict[str, pd.Series] = {}
 
+    def variable(self, key: str) -> Variable:
+        return self.item(key) if key.startswith(ITEM_PREFIX) else self.score(key)
+
     def score(self, key: str, items: bool = False) -> Variable:
         score = next(s for s in self.result.catalog.scores if s.key == key)
         instrument = self.result.project.instruments[score.instrument_id]
@@ -317,9 +329,8 @@ class AnalysisData:
     def item(self, key: str) -> Variable:
         variable = item_variable(self.result, key)
         options = [(float(o.value), o.label) for o in variable.response_options]
-        valid = item_numbers(self.result, variable)
         column = self.column_name(variable.dataset, variable.column)
-        self.columns[column] = self.align(variable.dataset, valid.to_numpy(dtype=float))
+        self.columns[column] = analysis.values(self.result, self.sample, key)
         instrument = self.result.project.instruments[variable.instrument_id]
         return Variable(
             key=key,
@@ -363,22 +374,6 @@ def link_name(result: CatalogResult) -> str:
     return "id" if by in ("id", "none") else by
 
 
-def item_key(variable: ResolvedVariable) -> str:
-    return f"{ITEM_PREFIX}{variable.instrument_id}.{variable.item_id}@{variable.dataset}"
-
-
-def item_variable(result: CatalogResult, key: str) -> ResolvedVariable:
-    return next(v for v in result.catalog.variables if item_key(v) == key)
-
-
-def item_numbers(result: CatalogResult, variable: ResolvedVariable) -> pd.Series:
-    # Only answers that count: a listed option, or a number within the item's range.
-    numbers = result.datasets[variable.dataset].numbers(variable.column)
-    if variable.type == CHOICE:
-        return numbers.where(numbers.isin([float(o.value) for o in variable.response_options]))
-    return numbers.where(numbers_in_range(numbers, variable))
-
-
 def demographic_items(result: CatalogResult, datasets: list[str]) -> list[ResolvedVariable]:
     instruments = result.project.instruments
     return [
@@ -389,28 +384,44 @@ def demographic_items(result: CatalogResult, datasets: list[str]) -> list[Resolv
     ]
 
 
+def other_numbers(result: CatalogResult, datasets: list[str]) -> list[ResolvedVariable]:
+    instruments = result.project.instruments
+    return [
+        v
+        for v in number_items(result, datasets)
+        if instruments[v.instrument_id].kind != "demographics"
+    ]
+
+
+def item_label(result: CatalogResult, variable: ResolvedVariable) -> str:
+    instrument = result.project.instruments[variable.instrument_id]
+    return f"{abbreviation(instrument)}: {next(iter(variable.text.values()))}"
+
+
 def measures(result: CatalogResult, datasets: list[str]) -> dict[str, str]:
-    # What Table 1 can show, across the chosen files: demographic items, then scores.
+    # What Table 1 can show, across the chosen files: demographic items, scores, other numbers.
     found = {}
     for v in demographic_items(result, datasets):
-        instrument = result.project.instruments[v.instrument_id]
-        text = next(iter(v.text.values()))
-        found[f"{ITEM_PREFIX}{v.instrument_id}.{v.item_id}"] = f"{abbreviation(instrument)}: {text}"
+        found[f"{ITEM_PREFIX}{v.instrument_id}.{v.item_id}"] = item_label(result, v)
     for name in datasets:
         for s in result.catalog.scores_for(name):
             instrument = result.project.instruments[s.instrument_id]
             found[f"{s.instrument_id}.{s.score_id}"] = f"{abbreviation(instrument)} {s.label}"
+    for v in other_numbers(result, datasets):
+        found[f"{ITEM_PREFIX}{v.instrument_id}.{v.item_id}"] = item_label(result, v)
     return found
 
 
 def default_measures(result: CatalogResult, datasets: list[str]) -> list[str]:
     instruments = result.project.instruments
-    return [
-        key
-        for key in measures(result, datasets)
-        if key.startswith(ITEM_PREFIX)
-        or is_total(instruments[key.split(".", 1)[0]], key.split(".", 1)[1])
-    ]
+
+    def shown(key: str) -> bool:
+        instrument = instruments[instrument_of(key)]
+        if key.startswith(ITEM_PREFIX):
+            return instrument.kind == "demographics"
+        return is_total(instrument, key.split(".", 1)[1])
+
+    return [key for key in measures(result, datasets) if shown(key)]
 
 
 def measure_variables(
@@ -520,7 +531,7 @@ def regression_code(xs: list[Variable], y: Variable) -> Code:
 
 
 def fittable(frame: pd.DataFrame, x: str, y: str) -> bool:
-    # A line needs three people with both scores, and both scores must vary.
+    # A line needs three people with both values, and both must vary.
     both = frame[[x, y]].dropna()
     return (
         len(both) >= defaults.MIN_CORRELATION_N and both[x].nunique() > 1 and both[y].nunique() > 1
@@ -585,17 +596,17 @@ def page_script(
     data = AnalysisData(result, sample)
     codes = []
     if len(scores) >= 2:
-        codes.append(correlation_code([data.score(k) for k in scores]))
+        codes.append(correlation_code([data.variable(k) for k in scores]))
     if y is not None:
-        target = data.score(y)
-        variables = [data.score(x) for x in xs if x != y]
+        target = data.variable(y)
+        variables = [data.variable(x) for x in xs if x != y]
         frame = data.frame()
         fitted = [v for v in variables if fittable(frame, v.column, target.column)]
         if fitted:
             codes.append(regression_code(fitted, target))
     if group is not None and outcome is not None:
         # The frame holds only the variables asked for so far, so ask first.
-        grouping, measured = data.item(group), data.score(outcome)
+        grouping, measured = data.item(group), data.variable(outcome)
         plan = comparison_plan(data.frame(), grouping, measured)
         if plan is not None:
             codes.append(plan.code)

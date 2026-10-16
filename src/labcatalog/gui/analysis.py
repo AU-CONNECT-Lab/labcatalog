@@ -45,7 +45,7 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         sample_note(result, sample, where)
         choices = views.variable_choices(result, view.datasets)
         if len(choices) < 2:
-            note("Pick datasets with at least two scores between them for correlations.")
+            note("Pick datasets with at least two scores or numbers between them for correlations.")
         else:
             correlation_section(result, sample, view, choices)
             pair_section(result, sample, view, choices)
@@ -108,13 +108,13 @@ def correlation_section(
     @ui.refreshable
     def body() -> None:
         if len(view.scores) < 2:
-            note("Pick at least two scores.")
+            note("Pick at least two variables.")
             return
         keys = list(view.scores)
 
         async def fill() -> Callable:
             data = analysis_script.AnalysisData(result, sample)
-            variables = [data.score(k) for k in keys]
+            variables = [data.variable(k) for k in keys]
             code = analysis_script.correlation_code(variables)
             frame = data.frame()
             found, engine = await analysis_tables.compute(result, sample, frame, code)
@@ -147,10 +147,10 @@ def correlation_section(
                 chart.refresh()
 
             shown = PaperTable(
-                "Correlations Among Scores",
+                "Correlations Among Variables",
                 columns,
                 rows,
-                f"Pearson r, each pair on everyone with both scores ({n}). {STARS_NOTE}",
+                f"Pearson r, each pair on everyone with both values ({n}). {STARS_NOTE}",
             )
 
             def content() -> None:
@@ -177,7 +177,7 @@ def correlation_section(
                 choices,
                 multiple=True,
                 value=view.scores,
-                label="Scores",
+                label="Variables",
                 with_input=True,
                 on_change=lambda e: set_scores(e.value),
             )
@@ -238,8 +238,8 @@ def pair_section(
 
         async def fill() -> Callable:
             data = analysis_script.AnalysisData(result, sample)
-            y = data.score(y_key)
-            variables = {x: data.score(x) for x in xs}
+            y = data.variable(y_key)
+            variables = {x: data.variable(x) for x in xs}
             frame = data.frame()
             usable = {
                 x: v
@@ -247,7 +247,7 @@ def pair_section(
                 if analysis_script.fittable(frame, v.column, y.column)
             }
             if not usable:
-                return lambda: note("Too few people have an X score and the Y score.")
+                return lambda: note("Too few people have an X value and the Y value.")
             code = analysis_script.regression_code(list(usable.values()), y)
             found, engine = await analysis_tables.compute(result, sample, frame, code)
             texts = analysis_tables.section_files(result, sample, frame, code)
@@ -259,7 +259,7 @@ def pair_section(
                 columns,
                 rows,
                 "Each row is a separate regression of the outcome on one predictor, on everyone "
-                "with both scores; r with its 95% confidence interval.",
+                "with both values; r with its 95% confidence interval.",
             )
 
             def content() -> None:

@@ -11,17 +11,15 @@ import pandas as pd
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.codegen import number
 from labcatalog.stats import analysis
+from labcatalog.stats.analysis import CHOICE, ITEM_PREFIX, item_key, item_variable
 from labcatalog.stats.analysis_script import (
-    CHOICE,
-    ITEM_PREFIX,
     PYTHON,
     R,
     abbreviation,
     demographic_items,
-    item_key,
-    item_numbers,
-    item_variable,
+    item_label,
     none,
+    other_numbers,
     r_string,
 )
 from labcatalog.stats.cfa import is_total
@@ -245,17 +243,27 @@ def group_name(result: CatalogResult) -> str | None:
     return None if group is None else group.name
 
 
+def loaded_names(result: CatalogResult) -> list[str]:
+    return [d.name for d in result.project.config.datasets if d.name in result.datasets]
+
+
 def outcome_choices(result: CatalogResult) -> dict[str, str]:
     found: dict[str, str] = {}
     for s in result.catalog.scores:
         instrument = result.project.instruments[s.instrument_id]
         found.setdefault(f"{s.instrument_id}.{s.score_id}", f"{abbreviation(instrument)} {s.label}")
+    for v in analysis.number_items(result, loaded_names(result)):
+        found.setdefault(f"{ITEM_PREFIX}{v.instrument_id}.{v.item_id}", item_label(result, v))
     return found
 
 
 def occasions(result: CatalogResult, outcome: str) -> list[str]:
     configs = {d.name: d for d in result.project.config.datasets}
-    names = [s.dataset for s in result.catalog.scores if s.key.split("@")[0] == outcome]
+    if outcome.startswith(ITEM_PREFIX):
+        keys = [item_key(v) for v in analysis.number_items(result, loaded_names(result))]
+    else:
+        keys = [s.key for s in result.catalog.scores]
+    names = [k.rsplit("@", 1)[1] for k in keys if k.rsplit("@", 1)[0] == outcome]
     return sorted(names, key=lambda n: (configs[n].study, wave_order(configs[n].wave), n))
 
 
@@ -266,6 +274,8 @@ def default_model(result: CatalogResult) -> Model | None:
     instruments = result.project.instruments
 
     def repeated_total(key: str) -> bool:
+        if key.startswith(ITEM_PREFIX):
+            return False
         instrument_id, score_id = key.split(".", 1)
         return is_total(instruments[instrument_id], score_id) and len(occasions(result, key)) > 1
 
@@ -278,11 +288,10 @@ def default_model(result: CatalogResult) -> Model | None:
 
 def covariate_choices(result: CatalogResult, labels: dict[str, str]) -> dict[str, str]:
     instruments = result.project.instruments
-    names = [d.name for d in result.project.config.datasets if d.name in result.datasets]
+    names = loaded_names(result)
     found = {
-        item_key(v): f"{abbreviation(instruments[v.instrument_id])}: "
-        f"{next(iter(v.text.values()))} ({labels[v.dataset]})"
-        for v in demographic_items(result, names)
+        item_key(v): f"{item_label(result, v)} ({labels[v.dataset]})"
+        for v in demographic_items(result, names) + other_numbers(result, names)
     }
     for s in result.catalog.scores:
         instrument = instruments[s.instrument_id]
@@ -328,7 +337,7 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
         part = pd.DataFrame({PERSON: people, WAVE: configs[name].wave, TIME: time})
         if group:
             part[group] = loaded.group.astype("string").to_numpy()[keep]
-        part[outcome] = result.scores[name][f"{model.outcome}@{name}"].to_numpy(dtype=float)[keep]
+        part[outcome] = analysis.row_values(result, f"{model.outcome}@{name}")[keep]
         links = analysis.link_keys(result, name).to_numpy()[keep]
         for c in covariates:
             part[c.column] = c.lookup(people, links)
@@ -338,11 +347,10 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
 
 def covariate(result: CatalogResult, key: str, taken: set[str]) -> Covariate:
     dataset = key.rsplit("@", 1)[1]
+    values = analysis.row_values(result, key)
     if key.startswith(ITEM_PREFIX):
         variable = item_variable(result, key)
-        instrument = result.project.instruments[variable.instrument_id]
-        values = item_numbers(result, variable).to_numpy(dtype=float)
-        label = f"{abbreviation(instrument)}: {next(iter(variable.text.values()))}"
+        label = item_label(result, variable)
         column = variable.column
         levels = (
             [(float(o.value), o.label) for o in variable.response_options]
@@ -352,7 +360,6 @@ def covariate(result: CatalogResult, key: str, taken: set[str]) -> Covariate:
     else:
         score = next(s for s in result.catalog.scores if s.key == key)
         instrument = result.project.instruments[score.instrument_id]
-        values = result.scores[dataset][key].to_numpy(dtype=float)
         label = f"{abbreviation(instrument)} {score.label}"
         column = f"{score.score_id}_{dataset}"
         levels = []

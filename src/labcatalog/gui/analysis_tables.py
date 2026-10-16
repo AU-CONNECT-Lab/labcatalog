@@ -191,7 +191,10 @@ def group_section(
     groups = script.group_choices(result, sample.datasets, labels)
     section("Group comparison")
     if not groups or not scores:
-        note("Needs a demographics item with answer options and a score in the chosen datasets.")
+        note(
+            "Needs a demographics item with answer options and a score or number in the chosen "
+            "datasets."
+        )
         return
     if view.group not in groups:
         view.group = next(iter(groups))
@@ -203,11 +206,11 @@ def group_section(
         async def fill() -> Callable:
             data = AnalysisData(result, sample)
             group = data.item(view.group)
-            outcome = data.score(view.outcome)
+            outcome = data.variable(view.outcome)
             frame = data.frame()
             plan = script.comparison_plan(frame, group, outcome)
             if plan is None:
-                return lambda: note("Fewer than two groups have two or more people with a score.")
+                return lambda: note("Fewer than two groups have two or more people with a value.")
             found, engine = await compute(result, sample, frame, plan.code)
             texts = section_files(result, sample, frame, plan.code)
             comparison = script.read_comparison(found, plan)
@@ -260,7 +263,7 @@ def group_section(
         ui.select(
             scores,
             value=view.outcome,
-            label="Score",
+            label="Outcome",
             with_input=True,
             on_change=lambda e: choose_outcome(e.value),
         ).props("dense outlined").classes("w-96")

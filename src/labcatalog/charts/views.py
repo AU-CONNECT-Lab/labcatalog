@@ -1055,14 +1055,22 @@ def dataset_label(result: CatalogResult, name: str) -> str:
 
 
 def variable_choices(result: CatalogResult, datasets: list[str]) -> dict[str, str]:
-    # Every score of the chosen files, named by score and by wave (and reporter where a wave has several).
+    # Every score and number item of the chosen files, named by wave (and reporter where a wave has several).
     names = series_names(result, dataset_order(result, datasets))
-    return {
-        s.key: f"{short_label(result.project.instruments[s.instrument_id], definition(result, s))}"
-        f" ({names[s.dataset]})"
-        for name in names
-        for s in result.catalog.scores_for(name)
-    }
+    instruments = result.project.instruments
+    found = {}
+    for name in names:
+        for s in result.catalog.scores_for(name):
+            found[s.key] = (
+                f"{short_label(instruments[s.instrument_id], definition(result, s))} ({names[name]})"
+            )
+        for v in analysis.number_items(result, [name]):
+            instrument = instruments[v.instrument_id]
+            text = next(iter(v.text.values()))
+            found[analysis.item_key(v)] = (
+                f"{instrument.abbreviation or instrument.id}: {text} ({names[name]})"
+            )
+    return found
 
 
 def wave_groups(
@@ -1082,6 +1090,8 @@ def wave_groups(
 def total_choices(result: CatalogResult, datasets: list[str]) -> list[str]:
     found = []
     for key in variable_choices(result, datasets):
+        if key.startswith(analysis.ITEM_PREFIX):
+            continue
         score = score_of(result, key)
         if is_total(result.project.instruments[score.instrument_id], definition(result, score)):
             found.append(key)
@@ -1115,7 +1125,7 @@ def correlation_chart(
             z,
             labels,
             hover,
-            [score_of(result, k).instrument_id for k in keys],
+            [analysis.instrument_of(k) for k in keys],
             instrument_order(result),
             instrument_names(result),
             "Pearson r",
