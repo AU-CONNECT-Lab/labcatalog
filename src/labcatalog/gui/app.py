@@ -57,6 +57,8 @@ def launch(project: Path | None = None) -> None:
     saved = preferences.load().get(preferences.PALETTE)
     # A palette saved by another version may no longer exist.
     style.use_palette(saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
+    if datalad := preferences.load().get(preferences.DATALAD):
+        use_folder(datalad)
     # Saving a table or figure goes through the window's own save dialog.
     app.native.settings["ALLOW_DOWNLOADS"] = True
     ui.run(
@@ -154,7 +156,9 @@ class Window:
             with ui.tab_panel("problems").classes("lc-paper"):
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-paper"):
-                settings.render(self.set_palette, self.start_cfa, self.instruments_panel.refresh)
+                settings.render(
+                    self.set_palette, self.start_cfa, self.instruments_panel.refresh, self.reload
+                )
 
     async def choose_folder(self) -> None:
         selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)

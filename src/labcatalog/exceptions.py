@@ -46,5 +46,9 @@ class RError(LabCatalogError):
     pass
 
 
+class DataladError(LabCatalogError):
+    exit_code = EXIT_ISSUES
+
+
 class LLMError(LabCatalogError):
     pass
