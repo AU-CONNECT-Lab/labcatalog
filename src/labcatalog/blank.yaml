@@ -16,6 +16,13 @@ vocab:
 # Codes in the data that mean "no answer"; they are counted, never scored. Blank cells always count as missing.
 missing_codes: []
 
+# Optional: how the statistics run, shown here with their defaults. Everyone opening the project gets the same numbers.
+#   stats:
+#     correlate_by: id          # how people in different files are matched: id, a group name under ids, or none
+#     cfa_estimator: wlsmv      # factor models with the items as ordered categories (wlsmv) or continuous (ml)
+#     t_test: welch             # two groups: Welch's (welch) or Student's (student) t test
+#     correlation: pearson      # correlations: pearson or spearman
+
 # Each study and its waves, for example:  my_study: {label: My Study, waves: {1: {start: 2026-01-01}}}
 # A study can also have a description and a reference (the key in references.bib of how to cite its data); the Datasets page shows them.
 # Deadlines and other dates go in milestones, for example: milestones: [{name: Interim report, date: 2026-12-15}]; the Overview timeline shows them.

@@ -31,9 +31,14 @@ ids:
     name: family
     from_id: '^(\d{4})'
 
-# Score correlations link a parent and a child through their family.
+# Score correlations link a parent and a child through their family. The other three are the defaults:
+# factor models with the items as ordered categories (wlsmv) or continuous (ml); two groups compared
+# with Welch's (welch) or Student's (student) t test; correlations as Pearson (pearson) or Spearman (spearman).
 stats:
   correlate_by: family
+  cfa_estimator: wlsmv
+  t_test: welch
+  correlation: pearson
 
 # Each study and its waves; a wave with no end date is still collecting.
 studies:
