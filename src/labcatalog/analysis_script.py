@@ -47,14 +47,14 @@ d = pd.read_csv({path})
 R_PACKAGES = "\n# Needs the R packages {names}; install them once with: {install}"
 R_TABLE_ONE = """\
 # Table 1: N in each dataset; n, M and SD (psych::describe) for numbers and scores, with
-# Cronbach's alpha (psych::alpha) on everyone who answered every item; n (%) for answer options.
+# Cronbach's alpha (psych::alpha) on pairwise complete cases; n (%) for answer options.
 n_row <- function(dataset, present) {{
   data.frame(variable = "N", dataset = dataset, level = "", n = sum(present), mean = NA,
              sd = NA, percent = NA, alpha = NA)
 }}
 number_row <- function(variable, dataset, x, items = NULL) {{
   described <- psych::describe(x)
-  alpha <- if (is.null(items)) NA else psych::alpha(na.omit(items), warnings = FALSE)$total$raw_alpha
+  alpha <- if (is.null(items)) NA else psych::alpha(items, warnings = FALSE)$total$raw_alpha
   data.frame(variable = variable, dataset = dataset, level = "", n = described$n,
              mean = described$mean, sd = described$sd, percent = NA, alpha = alpha)
 }}
@@ -72,13 +72,13 @@ print(table1)
 """
 PYTHON_TABLE_ONE = """\
 # Table 1: N in each dataset; n, M and SD for numbers and scores, with Cronbach's alpha
-# (pingouin) on everyone who answered every item; n (%) for answer options.
+# (pingouin) on pairwise complete cases; n (%) for answer options.
 def n_row(dataset, present):
     return [dict(variable="N", dataset=dataset, level="", n=present.sum())]
 
 
 def number_row(variable, dataset, x, items=None):
-    alpha = np.nan if items is None else pg.cronbach_alpha(items, nan_policy="listwise")[0]
+    alpha = np.nan if items is None else pg.cronbach_alpha(items, nan_policy="pairwise")[0]
     return [dict(variable=variable, dataset=dataset, level="", n=x.count(), mean=x.mean(),
                  sd=x.std(), alpha=alpha)]
 
@@ -163,19 +163,22 @@ groups <- data.frame(group = levels(group), n = as.vector(table(group)),
 print(groups)
 """
 R_WELCH = """\
-# Welch's t test (unequal variances); Cohen's d with the pooled SD and its 95% CI (effectsize).
+# Welch's t test (unequal variances); Cohen's d with the mean of the two group variances
+# and its 95% CI (effectsize).
 test <- t.test(y ~ group)
 print(test)
-effect <- effectsize::cohens_d(y ~ group, pooled_sd = TRUE)
+effect <- effectsize::cohens_d(y ~ group, pooled_sd = FALSE)
 print(effect)
 """
 R_ANOVA = """\
-# One-way analysis of variance; eta squared and its 95% CI (effectsize).
+# One-way analysis of variance; eta squared and omega squared with their 95% CIs (effectsize).
 fit <- aov(y ~ group)
 anova_table <- summary(fit)[[1]]
 print(anova_table)
 effect <- effectsize::eta_squared(fit, partial = FALSE, alternative = "two.sided")
 print(effect)
+omega <- effectsize::omega_squared(fit, partial = FALSE, alternative = "two.sided")
+print(omega)
 """
 PYTHON_GROUPS = """\
 # Group comparison: {outcome_label} by {group_label}{left_out}
@@ -186,17 +189,17 @@ groups = groups.reset_index().set_axis(["group", "n", "mean", "sd"], axis=1)
 print(groups)
 """
 PYTHON_WELCH = """\
-# Welch's t test (unequal variances) and Cohen's d with the pooled SD and its 95% CI (pingouin).
-# pingouin gives d without a sign, so it takes the sign of t (first group minus second).
+# Welch's t test (unequal variances) and Cohen's d with the mean of the two group variances,
+# with its 95% CI (pingouin). pingouin's own d uses the pooled SD, so d is written out here.
 first, second = (data.loc[data["group"] == g, "y"] for g in levels)
 test = pg.ttest(first, second, correction=True)
 print(test)
-cohens_d = np.copysign(test["cohen_d"].iloc[0], test["T"].iloc[0])
+cohens_d = (first.mean() - second.mean()) / np.sqrt((first.var() + second.var()) / 2)
 d_low, d_high = pg.compute_esci(cohens_d, len(first), len(second), eftype="cohen", decimals=4)
 print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
 """
 PYTHON_ANOVA = """\
-# One-way analysis of variance and eta squared (pingouin).
+# One-way analysis of variance and eta squared (pingouin, which has no omega squared).
 test = pg.anova(data=data, dv="y", between="group", detailed=True, effsize="n2")
 print(test)
 """
@@ -204,20 +207,23 @@ R_TEST_OUT = {
     "welch": "test_result <- data.frame(statistic = unname(test$statistic), "
     "df1 = unname(test$parameter), df2 = NA, p = test$p.value, low = test$conf.int[1], "
     "high = test$conf.int[2], effect = effect$Cohens_d, effect_low = effect$CI_low, "
-    "effect_high = effect$CI_high)",
+    "effect_high = effect$CI_high, omega = NA, omega_low = NA, omega_high = NA)",
     "anova": 'test_result <- data.frame(statistic = anova_table[["F value"]][1], '
     'df1 = anova_table[["Df"]][1], df2 = anova_table[["Df"]][2], '
     'p = anova_table[["Pr(>F)"]][1], low = NA, high = NA, effect = effect$Eta2, '
-    "effect_low = effect$CI_low, effect_high = effect$CI_high)",
+    "effect_low = effect$CI_low, effect_high = effect$CI_high, omega = omega$Omega2, "
+    "omega_low = omega$CI_low, omega_high = omega$CI_high)",
 }
 PYTHON_TEST_OUT = {
     "welch": "test_result = pd.DataFrame([dict(statistic=test['T'].iloc[0], "
     "df1=test['dof'].iloc[0], df2=np.nan, p=test['p_val'].iloc[0], "
     "low=test['CI95'].iloc[0][0], high=test['CI95'].iloc[0][1], effect=cohens_d, "
-    "effect_low=d_low, effect_high=d_high)])",
+    "effect_low=d_low, effect_high=d_high, omega=np.nan, omega_low=np.nan, "
+    "omega_high=np.nan)])",
     "anova": "test_result = pd.DataFrame([dict(statistic=test['F'][0], df1=test['DF'][0], "
     "df2=test['DF'][1], p=test['p_unc'][0], low=np.nan, high=np.nan, effect=test['n2'][0], "
-    "effect_low=np.nan, effect_high=np.nan)])",
+    "effect_low=np.nan, effect_high=np.nan, omega=np.nan, omega_low=np.nan, "
+    "omega_high=np.nan)])",
 }
 
 
@@ -273,6 +279,9 @@ class Comparison:
     high: float | None = None
     effect_low: float | None = None
     effect_high: float | None = None
+    omega: float | None = None
+    omega_low: float | None = None
+    omega_high: float | None = None
     left_out: list[tuple[str, int]] = field(default_factory=list)
 
 
@@ -649,6 +658,9 @@ def read_comparison(found: dict[str, pd.DataFrame], plan: ComparisonPlan) -> Com
         high=none(test["high"]),
         effect_low=none(test["effect_low"]),
         effect_high=none(test["effect_high"]),
+        omega=none(test["omega"]),
+        omega_low=none(test["omega_low"]),
+        omega_high=none(test["omega_high"]),
         left_out=plan.left_out,
     )
 

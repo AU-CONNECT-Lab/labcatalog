@@ -72,9 +72,9 @@ def test_table_one_matches_a_direct_calculation(result, sample):
     assert gender["level"].tolist() == ["Girl", "Boy", "Another gender"]
     assert gender["n"].sum() == frame["dem_gender_w1"].notna().sum()
     assert gender["percent"].sum() == pytest.approx(100)
-    items = frame[[f"ems_{i}_w1" for i in range(1, 10)]].dropna()
-    k = items.shape[1]
-    expected = k / (k - 1) * (1 - items.var().sum() / items.sum(axis=1).var())
+    cov = frame[[f"ems_{i}_w1" for i in range(1, 10)]].cov().to_numpy()
+    k = cov.shape[0]
+    expected = k / (k - 1) * (1 - np.trace(cov) / cov.sum())
     ems = table[table["variable"] == "EMS Total score"].iloc[0]
     assert ems["alpha"] == pytest.approx(expected)
     assert ems["alpha"] == pytest.approx(0.9, abs=0.02)
@@ -130,8 +130,9 @@ def test_r_and_python_give_the_same_numbers(result, sample):
                 (in_python.effect_low, in_python.effect_high), abs=0.01
             )
         else:
-            assert in_python.effect_low is None
+            assert in_python.effect_low is None and in_python.omega is None
             assert 0 <= in_r.effect_low <= in_r.effect <= in_r.effect_high
+            assert in_r.omega_low <= in_r.omega <= in_r.effect
 
 
 def page(result, sample):
@@ -206,7 +207,7 @@ def test_test_tables_name_the_test_and_effect(result, sample):
     assert row["effect"].count("[") == 1
     anova, _ = comparison(result, sample, two_groups=False)
     columns, [row] = analysis_tables.test_table(anova)
-    assert [c["label"] for c in columns] == ["Test", "F", "df", "p", "η² [95% CI]"]
+    assert [c["label"] for c in columns] == ["Test", "F", "df", "p", "η² [95% CI]", "ω² [95% CI]"]
     assert row["df"] == f"2, {sum(g.n for g in anova.groups) - 3}"
     assert pd.notna(row["p"])
 

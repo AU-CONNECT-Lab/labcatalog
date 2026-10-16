@@ -359,7 +359,10 @@ def item_totals(result: CatalogResult, instrument: Instrument) -> None:
             choices, value=first, label="Score", on_change=lambda e: body.refresh(e.value)
         ).props("dense outlined").classes("w-72")
     body(first)
-    note("r of each item with the sum of the other items; α without the item in brackets.")
+    note(
+        "r of each item with the sum of the other items answered; α without the item in "
+        "brackets. Both use pairwise complete cases, as JASP's reliability analysis does."
+    )
 
 
 def history(project: Project, instrument_id: str) -> None:
@@ -514,6 +517,10 @@ def cfa_changed() -> None:
 @ui.refreshable
 def score_statistics(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
     table(*score_table(result, instrument, cfa.fits))
+    note(
+        "α uses pairwise complete cases, as JASP's reliability analysis does; ω comes from the "
+        "factor model on people who answered every item."
+    )
 
 
 def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) -> None:

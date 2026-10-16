@@ -2,6 +2,7 @@ from datetime import date
 
 import numpy as np
 import pandas as pd
+import pingouin as pg
 from pydantic import BaseModel
 
 from labcatalog import defaults
@@ -227,8 +228,8 @@ def summarize_score(loaded: LoadedDataset, score: ResolvedScore, values: pd.Seri
         items = score_items(loaded, score)
         complete = items.dropna()
         summary.n_complete = len(complete)
-        summary.alpha = cronbach_alpha(complete)
-        summary.item_total = item_total(complete) if summary.alpha is not None else []
+        summary.alpha = cronbach_alpha(items)
+        summary.item_total = item_total(items) if summary.alpha is not None else []
         summary.item_columns = list(items.columns)
         summary.item_correlations = item_correlations(complete)
     return summary
@@ -269,37 +270,28 @@ def histogram(
 
 
 def cronbach_alpha(items: pd.DataFrame) -> float | None:
-    complete = items.dropna()
-    if complete.shape[1] < 2 or len(complete) < defaults.MIN_CORRELATION_N:
+    # Pairwise complete cases, so someone who skipped one item still counts.
+    answered = items.dropna(how="all")
+    if items.shape[1] < 2 or len(answered) < defaults.MIN_CORRELATION_N:
         return None
-    return alpha_from_cov(np.cov(complete.to_numpy(dtype=float), rowvar=False))
+    with np.errstate(divide="ignore", invalid="ignore"):
+        found = pg.cronbach_alpha(answered, nan_policy="pairwise")[0]
+    return float(found) if np.isfinite(found) else None
 
 
-def alpha_from_cov(cov: np.ndarray) -> float | None:
-    k = cov.shape[0]
-    total = cov.sum()
-    if k < 2 or total == 0:
-        return None
-    return float(k / (k - 1) * (1 - np.trace(cov) / total))
-
-
-def item_total(complete: pd.DataFrame) -> list[ItemTotal]:
-    # Everything follows from one covariance matrix, so the data is read only once.
-    k = complete.shape[1]
-    if k < 3:
+def item_total(items: pd.DataFrame) -> list[ItemTotal]:
+    if items.shape[1] < 3:
         return []
-    cov = np.cov(complete.to_numpy(dtype=float), rowvar=False)
     rows = []
-    for i, column in enumerate(complete.columns):
-        rest = [j for j in range(k) if j != i]
-        rest_cov = cov[np.ix_(rest, rest)]
-        spread = cov[i, i] * rest_cov.sum()
-        r = cov[i, rest].sum() / np.sqrt(spread) if spread > 0 else None
+    for column in items.columns:
+        rest = items.drop(columns=column)
+        # The rest score sums whatever was answered, so a skipped item counts as zero.
+        r = items[column].corr(rest.sum(axis=1))
         rows.append(
             ItemTotal(
                 column=column,
-                r=None if r is None else float(r),
-                alpha_if_deleted=alpha_from_cov(rest_cov),
+                r=float(r) if np.isfinite(r) else None,
+                alpha_if_deleted=cronbach_alpha(rest),
             )
         )
     return rows

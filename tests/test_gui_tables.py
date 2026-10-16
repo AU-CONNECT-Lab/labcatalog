@@ -81,7 +81,7 @@ def test_item_total_and_stability_tables_have_a_column_per_wave(mock_project):
     assert [c["label"] for c in columns[2:]] == [
         "Wave 1 (α 0.90)",
         "Wave 2 (α 0.91)",
-        "Wave 3 (α 0.89)",
+        "Wave 3 (α 0.90)",
     ]
     assert [r["item"] for r in rows] == [f"ems_{i}" for i in range(1, 10)]
     assert all(r["d0"] and r["d2"] for r in rows)

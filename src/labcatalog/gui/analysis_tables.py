@@ -104,8 +104,8 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
                 "Descriptive Statistics",
                 columns,
                 rows,
-                "M (SD) for numbers and scores on everyone with a value, α on everyone who "
-                "answered every item, n (%) of those who answered.",
+                "M (SD) for numbers and scores on everyone with a value, α on pairwise "
+                "complete cases, n (%) of those who answered.",
             )
 
             def content() -> None:
@@ -297,10 +297,13 @@ def test_note(comparison: Comparison) -> str:
     if comparison.test == "welch":
         first, second = comparison.groups[0], comparison.groups[1]
         return (
-            "d is Cohen's d with the pooled SD; the difference is "
-            f"{first.label} minus {second.label}, with its 95% confidence interval."
+            "d is Cohen's d with the mean of the two group variances, as JASP gives it with "
+            "Welch's test; its confidence interval is computed differently from JASP's, so it "
+            f"can differ a little. The difference is {first.label} minus {second.label}, with "
+            "its 95% confidence interval."
         )
-    return "η² with its 95% confidence interval."
+    omega = "" if comparison.omega is not None else " ω² is computed only in R."
+    return f"η² and ω² (JASP's default) with their 95% confidence intervals.{omega}"
 
 
 def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
@@ -314,19 +317,24 @@ def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
     ]
     if welch:
         columns.append(col("ci", "Difference [95% CI]", numeric=True, sortable=False))
+    else:
+        columns.append(col("omega", "ω² [95% CI]", numeric=True, sortable=False))
     shown = decimal if welch else apa
-    interval = (
-        f" [{shown(comparison.effect_low)}, {shown(comparison.effect_high)}]"
-        if comparison.effect_low is not None
-        else ""
-    )
+
+    def with_interval(value, low, high) -> str:
+        if value is None:
+            return ""
+        return f"{shown(value)} [{shown(low)}, {shown(high)}]" if low is not None else shown(value)
+
     row = {
         "test": TESTS[comparison.test],
         "statistic": decimal(comparison.statistic),
         "df": f"{comparison.df1:.1f}" if welch else f"{comparison.df1:g}, {comparison.df2:g}",
         "p": p_value(comparison.p),
-        "effect": f"{shown(comparison.effect)}{interval}",
+        "effect": with_interval(comparison.effect, comparison.effect_low, comparison.effect_high),
     }
+    if not welch:
+        row["omega"] = with_interval(comparison.omega, comparison.omega_low, comparison.omega_high)
     if welch:
         first, second = comparison.groups[0], comparison.groups[1]
         row["ci"] = (
