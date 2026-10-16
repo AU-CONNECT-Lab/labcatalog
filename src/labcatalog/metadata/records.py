@@ -90,8 +90,10 @@ DATASETS = Table(
         Column("snapshot_date", "Snapshot date"),
     ),
 )
+INSTRUMENT_TABLES = {"items": ITEMS, "scores": SCORES, "response_sets": OPTIONS}
 TABLES = {
-    defaults.INSTRUMENTS_DIR: {"items": ITEMS, "scores": SCORES, "response_sets": OPTIONS},
+    defaults.INSTRUMENTS_DIR: INSTRUMENT_TABLES,
+    defaults.DRAFTS_DIR: INSTRUMENT_TABLES,
     defaults.STUDIES_DIR: {"administrations": ADMINISTRATIONS},
     "": {"datasets": DATASETS},
 }

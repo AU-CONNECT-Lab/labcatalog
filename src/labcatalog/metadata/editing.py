@@ -16,6 +16,7 @@ from labcatalog.schema import Instrument, StudyContent
 
 FOLDERS: dict[str, type[BaseModel]] = {
     defaults.INSTRUMENTS_DIR: Instrument,
+    defaults.DRAFTS_DIR: Instrument,
     defaults.STUDIES_DIR: StudyContent,
 }
 NEW_ID = re.compile(r"[a-z][a-z0-9_]*")
@@ -37,6 +38,7 @@ def editable_files(root: Path) -> dict[str, list[str]]:
     return {
         "Settings": [defaults.CONFIG_FILENAME],
         "Instruments": listed(defaults.INSTRUMENTS_DIR, defaults.YAML_SUFFIXES),
+        "Drafts": listed(defaults.DRAFTS_DIR, defaults.YAML_SUFFIXES),
         "Studies": listed(defaults.STUDIES_DIR, defaults.YAML_SUFFIXES),
         "Column maps": listed(defaults.MAPS_DIR, (".csv",)),
     }
@@ -77,12 +79,28 @@ def save_file(root: Path, opened: Opened, text: str) -> Opened:
     return Opened(opened.path, text, path.stat().st_mtime_ns)
 
 
-def new_instrument(root: Path, instrument_id: str) -> str:
+def free_instrument_path(root: Path, instrument_id: str) -> Path:
     if not NEW_ID.fullmatch(instrument_id):
         raise EditError("Use lower-case letters, digits and underscores, starting with a letter")
     path = root / defaults.INSTRUMENTS_DIR / f"{instrument_id}.yaml"
     if path.exists():
         raise EditError(f"{path.relative_to(root).as_posix()} already exists")
+    return path
+
+
+def is_draft(relative: str) -> bool:
+    return Path(relative).parent.name == defaults.DRAFTS_DIR
+
+
+def move_draft(root: Path, relative: str) -> str:
+    path = free_instrument_path(root, Path(relative).stem)
+    path.parent.mkdir(exist_ok=True)
+    (root / relative).rename(path)
+    return path.relative_to(root).as_posix()
+
+
+def new_instrument(root: Path, instrument_id: str) -> str:
+    path = free_instrument_path(root, instrument_id)
     lines = [
         MODELINE.format("instrument"),
         f"id: {instrument_id}",
