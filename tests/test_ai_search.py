@@ -56,4 +56,4 @@ def test_the_found_instruments_narrow_the_list_and_the_counts(mock_project):
     only = {"example_mood"}
     assert list(matches(index, {}, only=only)) == ["example_mood"]
     reporters = counts(index, {}, only=only)["reporter"]
-    assert reporters == {"parent": 0, "child": 1}
+    assert reporters == {"parent": 0, "child": 1, "observer": 0}
