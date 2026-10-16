@@ -205,9 +205,8 @@ def template_items(
         if column not in skipped:
             known = known_item(column, mapped, item_ids)
             name = None if known else next((f for f in field_names if holds(column, f)), None)
-            if name and len(found := wordings.get(wording(fields[name].text), set())) == 1:
-                [known] = found
-                name = None
+            if name and (same := same_wording(wordings, fields[name].text)):
+                known, name = same, None
             if known:
                 row.update(instrument=known[0], item=known[1])
             elif name:
@@ -249,6 +248,15 @@ def catalog_wordings(project: Project) -> dict[str, set[tuple[str, str]]]:
                 found.setdefault(wording(text), set()).add((instrument.id, item.id))
     found.pop("", None)
     return found
+
+
+def same_wording(wordings: dict[str, set[tuple[str, str]]], text: str) -> tuple[str, str] | None:
+    # Qualtrics labels a matrix row "stem - row", so the row alone is tried next.
+    for candidate in (text, text.rpartition(" - ")[2]):
+        found = wordings.get(wording(candidate), set())
+        if len(found) == 1:
+            return next(iter(found))
+    return None
 
 
 def wording(text: str) -> str:

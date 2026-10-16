@@ -452,3 +452,15 @@ def test_wording_shared_by_two_catalog_items_is_not_guessed(pilot, tmp_path):
     write_templates(load_project(pilot), "pilot_w1", dictionary)
     rows = codebook_paths(load_project(pilot), "pilot_w1")[ITEMS].read_text(encoding="utf-8-sig")
     assert any(line.startswith("mood_1_w1,mood_scale,mood_1,") for line in rows.splitlines())
+
+
+def test_a_qualtrics_style_label_matches_on_its_row_text(pilot, tmp_path):
+    (pilot / "data" / "pilot_w1.csv").write_text(REDCAP_DATA, encoding="utf-8")
+    dictionary = write_dictionary(tmp_path / "dictionary.csv", REDCAP_HEADER)
+    text = dictionary.read_text(encoding="utf-8-sig")
+    stem = "How often in the past week did you feel this way? - I feel sad"
+    dictionary.write_text(text.replace("<p>I feel <i>sad</i></p>", stem), encoding="utf-8-sig")
+    (pilot / "instruments" / "feelings.yaml").write_text(FEELINGS, encoding="utf-8")
+    write_templates(load_project(pilot), "pilot_w1", dictionary)
+    rows = codebook_paths(load_project(pilot), "pilot_w1")[ITEMS].read_text(encoding="utf-8-sig")
+    assert "mood_1_w1,feelings,feel_sad,,,,,," in rows.splitlines()
