@@ -51,7 +51,7 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     ),
     "unknown_reference": (
         "Something names an ID that does not exist, often a typo in the ID.",
-        SETTINGS,
+        PICK,
     ),
     "duplicate_id": ("Two things share one ID; one of them needs another.", SETTINGS),
     "invalid_value": ("A value that cannot work as written.", SETTINGS),
@@ -194,10 +194,18 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         dialog.close()
         await actions.reload()
 
-    async def save(found: list[Change]) -> None:
-        problems = changes.check(project, found)
+    async def save(found: list[Change], anyway: bool = False) -> None:
+        problems = [] if anyway else changes.check(project, found)
         if problems:
-            status.set_text("; ".join(i.message for i in problems))
+            # Often a problem the first one hid, such as a typo in an administration skipped so far.
+            status.set_text(
+                "After this change labcatalog would report: "
+                + "; ".join(i.message for i in problems)
+                + ". If that was already wrong before, save anyway and fix it next."
+            )
+            log.clear()
+            with log:
+                ui.button("Save anyway", on_click=lambda: save(found, True)).props("flat")
             return
         try:
             changes.write(project, found)
@@ -413,7 +421,29 @@ def stray_values(project: Project, result: CatalogResult, issue: Issue, save) ->
     ui.button("Save", icon="check", on_click=apply)
 
 
+def wrong_id(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    details = issue.details
+    if "path" not in details or not details["choices"]:
+        note("This one has no single value to swap; open the file below to fix it.")
+        return
+    caption("Fix the ID")
+    with ui.row().classes("items-center gap-3"):
+        choice = ui.select(
+            details["choices"],
+            value=fixes.closest(details["value"], details["choices"]),
+            label=f"Instead of {details['value']}",
+        ).classes("w-64")
+
+        async def replace() -> None:
+            if choice.value:
+                path, _ = split_location(issue.location)
+                await save([fixes.replace_at(project, path, details["path"], choice.value)])
+
+        ui.button("Use this ID", on_click=replace)
+
+
 REPAIRS = {
+    "unknown_reference": wrong_id,
     "unexpected_value": stray_values,
     "column_unmapped": unlisted_columns,
     "not_in_vocab": wrong_word,

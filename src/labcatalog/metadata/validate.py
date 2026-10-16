@@ -60,7 +60,15 @@ def check_vocab(project: Project) -> list[Issue]:
             )
         study = config.studies.get(dataset.study)
         if study is None:
-            issues.append(unknown(f"{where}.study: '{dataset.study}' is not under studies", CONFIG))
+            issues.append(
+                unknown(
+                    f"{where}.study: '{dataset.study}' is not under studies",
+                    CONFIG,
+                    path=["datasets", n - 1, "study"],
+                    value=dataset.study,
+                    choices=list(config.studies),
+                )
+            )
         elif dataset.wave not in study.waves:
             message = f"{where}.wave: wave {dataset.wave} is not listed for study {dataset.study}"
             issues.append(unknown(message, CONFIG))
@@ -107,13 +115,29 @@ def check_cross_references(project: Project) -> list[Issue]:
             instrument = project.instruments.get(administration.instrument)
             if instrument is None:
                 message = f"{where}.instrument: no instrument with id '{administration.instrument}'"
-                issues.append(unknown(message, location))
+                issues.append(
+                    unknown(
+                        message,
+                        location,
+                        path=["administrations", n - 1, "instrument"],
+                        value=administration.instrument,
+                        choices=sorted(project.instruments),
+                    )
+                )
                 continue
-            for dataset_name in administration.datasets:
+            for k, dataset_name in enumerate(administration.datasets):
                 dataset = datasets.get(dataset_name)
                 if dataset is None:
                     message = f"{where}.datasets: no dataset named '{dataset_name}' in {CONFIG}"
-                    issues.append(unknown(message, location))
+                    issues.append(
+                        unknown(
+                            message,
+                            location,
+                            path=["administrations", n - 1, "datasets", k],
+                            value=dataset_name,
+                            choices=[d.name for d in datasets.values() if d.study == content.study],
+                        )
+                    )
                 elif dataset.study != content.study:
                     message = f"{where}.datasets: '{dataset_name}' belongs to study {dataset.study}"
                     issues.append(unknown(message, location))
@@ -123,7 +147,15 @@ def check_cross_references(project: Project) -> list[Issue]:
                 prefix = f"{where}.overrides[{m}]"
                 if override.item not in item_ids:
                     message = f"{prefix}.item: {instrument.id} has no item '{override.item}'"
-                    issues.append(unknown(message, location))
+                    issues.append(
+                        unknown(
+                            message,
+                            location,
+                            path=["administrations", n - 1, "overrides", m - 1, "item"],
+                            value=override.item,
+                            choices=sorted(item_ids),
+                        )
+                    )
                 if override.dataset and override.dataset not in administration.datasets:
                     message = (
                         f"{prefix}.dataset: '{override.dataset}' is not in this administration"
@@ -160,12 +192,28 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
                 issues.append(problem("duplicate_id", message, location))
     if instrument.default_response_set and instrument.default_response_set not in set_ids:
         message = f"default_response_set: no response set '{instrument.default_response_set}'"
-        issues.append(unknown(message, location))
+        issues.append(
+            unknown(
+                message,
+                location,
+                path=["default_response_set"],
+                value=instrument.default_response_set,
+                choices=sorted(set_ids),
+            )
+        )
     for n, item in enumerate(instrument.items, start=1):
         where = f"items[{n}] ({item.id})"
         if item.response_set and item.response_set not in set_ids:
             message = f"{where}.response_set: no response set '{item.response_set}'"
-            issues.append(unknown(message, location))
+            issues.append(
+                unknown(
+                    message,
+                    location,
+                    path=["items", n - 1, "response_set"],
+                    value=item.response_set,
+                    choices=sorted(set_ids),
+                )
+            )
         if item.type != "choice" and item.response_set:
             message = f"{where}.response_set: {item.type} items have no response options"
             issues.append(problem("invalid_value", message, location))
@@ -551,8 +599,9 @@ def problem(
     return Issue(level=level, code=code, message=message, location=location, details=details)
 
 
-def unknown(message: str, location: str) -> Issue:
-    return problem("unknown_reference", message, location)
+def unknown(message: str, location: str, **details: Any) -> Issue:
+    # Where one value holds the wrong ID: its path in the file, the value and the IDs it could be.
+    return problem("unknown_reference", message, location, **details)
 
 
 def not_in_vocab(where: str, value: str, vocab: str, **details: Any) -> Issue:

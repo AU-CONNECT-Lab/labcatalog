@@ -19,16 +19,20 @@ The location names the file, and where it can, the line or the entry: `datasets[
 
 The command line exits with status 1 when there are errors, so `labcatalog check` can stop a script or a CI job.
 
+## Use the Fix panel
+
+On the Problems page, **Fix** at the end of a row opens a panel for that problem: what it means, who usually fixes it, the rows of the data it is about, and, where the fix is a change to the project files, the change itself. The panel checks a change before it saves it and refuses one that would leave a new error. [Problems](../app/problems.md#the-fix-panel) lists what it offers for each code. Work from the top: errors first, and one problem at a time, since fixing one can bring out another that it hid.
+
 ## Problems in the metadata
 
 | Code | What it means | What to do |
 |---|---|---|
 | YAML errors, unknown keys | A file cannot be read, or a key is misspelled. | Fix the file at the line shown. Every key labcatalog does not know is an error, so typos never pass silently. |
-| `not_in_vocab` | A modality, reporter or target is not in `vocab`. | Add the word to `vocab`, or fix its spelling. |
-| `unknown_reference` | Something names an ID that does not exist: an instrument, item, response set, dataset or study. | Fix the ID, or add what it names. |
+| `not_in_vocab` | A modality, reporter or target is not in `vocab`. | In the Fix panel, pick the word it should be, or add the new word to `vocab`. |
+| `unknown_reference` | Something names an ID that does not exist: an instrument, item, response set, dataset or study. | In the Fix panel, pick the ID it should be; or add what it names. |
 | `duplicate_id` | Two things share an ID. | Rename one. |
 | `map_missing` | A dataset has administrations but no column map. | Create `maps/<dataset>.csv`, for example with a codebook import. |
-| `unmapped_item` | An administered instrument has items with no column in the map. | Map them, or record them as dropped with an override. |
+| `unmapped_item` | An administered instrument has items with no column in the map. | In the Fix panel, pick each item's column, or record that the dataset did not ask it (a dropped override). |
 | `missing_code_collision` | A missing code is also a response option. | Change the missing code, or use dataset-specific `missing_codes`. |
 | `reference_missing`, `bib_missing`, `pdf_missing` | A reference key is not in `references.bib`, or a file is not where it should be. | Export `references.bib` again, or fix `references.root` or the `pdf` path. |
 
@@ -36,18 +40,24 @@ The command line exits with status 1 when there are errors, so `labcatalog check
 
 | Code | What it means | What to do |
 |---|---|---|
-| `unexpected_value` | A value is neither a response option nor a missing code, or a number is outside `min` and `max`. | Fix the data in your cleaning script, or add the option or missing code if it is real. |
+| `unexpected_value` | A value is neither a response option nor a missing code, or a number is outside `min` and `max`. | The Fix panel lists the rows. A typo is fixed in the cleaning script; a real value is added in the panel as a missing code or a new answer option. |
 | `id_whitespace`, `id_missing`, `id_duplicate`, `id_pattern` | An ID has stray spaces, is empty, appears twice in one file, or does not match `ids.pattern`. | Fix the IDs in your cleaning script. |
 | `column_missing` | The map names a column the data file does not have. | Fix the map, or the column name in the data. |
-| `column_unmapped` | The data file has a column the map does not list. | Add it to the map, with an empty instrument and item if it is not an item. |
+| `column_unmapped` | The data file has a column the map does not list. | In the Fix panel, add it to the map as not an item, or as the item it holds. |
 | `score_mismatch` | A score in the data differs from the score labcatalog computes. | Check the scoring rule: reversed items, `missing_rule`, `min_valid`. |
-| `same_answer` | People gave the same answer to every item of a score. | Look at them; they may have answered without reading. |
+| `same_answer` | People gave the same answer to every item of a score. | Look at them; they may have answered without reading. If their answers are real, record the warning as fine. |
 | `possible_identifier` | A column's name suggests it holds names, emails, phone numbers, addresses or birth dates. | Remove it from the data the catalog reads. |
 | `excluded_present` | Rows belong to someone on the exclusion list. | Remove them in your cleaning script. |
-| `prepare_outdated`, `prepare_output_missing` | A prepare step's inputs are newer than its outputs, or an output does not exist. | Run the step on the Prepare page. |
+| `prepare_outdated`, `prepare_output_missing` | A prepare step's inputs are newer than its outputs, or an output does not exist. | Run the step from the Fix panel or on the Prepare page. |
 | `not_downloaded` | A file in a DataLad dataset has no content on this computer. | Get it; see [Using labcatalog with DataLad](datalad.md). |
 
 [Problem Codes](../reference/problem-codes.md) lists every code.
+
+## A warning that is fine
+
+A warning can be fine as it stands: three children who answered "never" to every mood item may simply have had a good fortnight. In the Fix panel, write why in **Why it is fine** and press **It is fine**. The warning leaves the Problems page and `labcatalog check`, which says how many accepted warnings it left out. The reason, who gave it and when are kept in `accepted_warnings.yaml` in the project folder; commit it with the rest of the project so others see the same list.
+
+The warning comes back by itself when its message changes, for example when a new export adds a fourth child, so a decision about three children is not taken as one about four. To bring one back sooner, press **Show again** at the bottom of the Problems page. Errors cannot be accepted.
 
 ## Fix the data, not the catalog
 

@@ -135,3 +135,31 @@ def test_a_stray_value_becomes_an_option_or_a_missing_code(mock_project):
         fixes.add_missing_codes(load_project(mock_project), "parent_w2", [("45", "typo")], True),
     )
     assert not any(i.message.startswith("dem_age_w2") for i in run_check(mock_project).issues)
+
+
+def test_a_mistyped_id_is_swapped_for_the_one_meant(mock_project):
+    study = mock_project / "studies" / "mock_study.yaml"
+    old = "{instrument: example_mood, datasets: [child_w1, child_w2,"
+    edit(study, old, "{instrument: example_mod, datasets: [child_w1, chld_w2,")
+    edit(
+        mock_project / "instruments" / "example_parent_stress.yaml", "id: agreement", "id: agrement"
+    )
+    seen = set()
+    # One at a time, as a person would: a wrong instrument hides the check of its datasets.
+    while found := [
+        i
+        for i in run_validate(mock_project)
+        if i.code == "unknown_reference" and "path" in i.details
+    ]:
+        issue = found[0]
+        seen.add(issue.details["value"])
+        wanted = fixes.closest(issue.details["value"], issue.details["choices"])
+        path = issue.location.split(":")[0]
+        project = load_project(mock_project)
+        change = fixes.replace_at(project, path, issue.details["path"], wanted)
+        # Only the typo the wrong instrument hid may come up; the panel then offers Save anyway.
+        revealed = [i.details.get("value") for i in changes.check(project, [change])]
+        assert set(revealed) <= {"chld_w2"}
+        changes.write(project, [change])
+    assert {"example_mod", "chld_w2", "agreement"} <= seen
+    assert run_validate(mock_project) == []

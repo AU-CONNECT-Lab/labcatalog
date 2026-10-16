@@ -67,6 +67,26 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 
 Problems found by **Check and import** on the Import page, or by `labcatalog codebook import`, all have the code `codebook`. The location is the codebook file and line, such as `codebook/parent_w1/items.csv:12`, and the message says what is wrong in that row.
 
+## Accepted warnings
+
+`accepted_warnings.yaml` in the project folder lists the warnings someone looked at and recorded as fine, from the Fix panel on the Problems page. labcatalog writes it; it can also be edited by hand.
+
+```yaml
+accepted:
+  - {code: same_answer, location: data/child_w1.csv, message: 'example_mood.ems_total@child_w1: 2 participant(s) gave the same answer to every item: 1021C, 1093C', reason: Checked the paper forms, by: Qiuyu, date: 2026-10-16}
+```
+
+| Key | Meaning |
+|---|---|
+| `code` | The problem's code. |
+| `location` | The problem's location, left out when it has none. |
+| `message` | The problem's message, word for word. |
+| `reason` | Why the warning is fine. |
+| `by` | Who accepted it: the name git records for them, or the computer's user name. |
+| `date` | The day it was accepted. |
+
+A warning is hidden only while its code, location and message all match an entry, so it shows again as soon as its message changes. Entries that match an error do nothing: errors are always reported. `labcatalog check` ends with the number of accepted warnings it did not print. A mistake in the file itself is reported like a mistake in any other project file.
+
 ## Errors that stop a command
 
 Some problems stop a command before any check can run, and are printed as `Error: ...` instead: a data file or ID column that cannot be found, a data file that is not UTF-8, or a missing exclusion list. Fix the cause and run the command again.

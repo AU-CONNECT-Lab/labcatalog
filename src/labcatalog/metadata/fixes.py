@@ -164,3 +164,14 @@ def pair(key: str, value: str, label: str) -> CommentedMap:
     entry[key] = records.scalar(value)
     entry["label"] = records.as_text(label)
     return entry
+
+
+def replace_at(project: Project, relative: str, path: list[str | int], value: str) -> Change:
+    # One value, found by its keys and positions from the top of the file.
+    opened = editing.open_file(project.root, relative)
+    data = records.load(opened.text)
+    node = data
+    for key in path[:-1]:
+        node = node[key]
+    node[path[-1]] = records.as_text(value)
+    return Change(relative, records.dumped(data), opened)
