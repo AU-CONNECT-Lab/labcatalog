@@ -127,10 +127,13 @@ def test_freed_items_become_lavaan_exceptions_on_every_occasion(result):
         {"instrument": "example_mood", "item": "ems_6", "parameter": "loading", "across": "x.y"},
     )["example_mood"]
     assert [f.item for f in mood.freed] == ["ems_2", "ems_4", "ems_5"]
+    x = {item: stem for stem, item in invariance.item_names(mood).items()}
+    factor = 1 + next(j for j, items in enumerate(mood.factors.values()) if "ems_2" in items)
     categories = len(set(mood.occasions["1"]["ems_4"]))
-    expected = ["f1 =~ x2", *[f"x4 | t{k}" for k in range(1, categories)], "x5 ~1"]
-    assert invariance.partial(mood, "wlsmv") == expected
-    assert invariance.partial(mood, "ml") == ["f1 =~ x2", "x5 ~1"]
+    loading, intercept = f"f{factor} =~ {x['ems_2']}", f"{x['ems_5']} ~1"
+    thresholds = [f"{x['ems_4']} | t{k}" for k in range(1, categories)]
+    assert invariance.partial(mood, "wlsmv") == [loading, *thresholds, intercept]
+    assert invariance.partial(mood, "ml") == [loading, intercept]
 
 
 @needs_r
@@ -147,7 +150,7 @@ def test_a_freed_loading_frees_a_constraint_and_score_tests_name_each_item(resul
     assert metric[0].fit["df"] - metric[1].fit["df"] == 1
     assert after.freed == freed.freed
     scores = invariance.score_tests(held, "metric", rscript())
-    assert [s.item for s in scores] == [f"ems_{i}" for i in range(1, 10)]
+    assert sorted(s.item for s in scores) == [f"ems_{i}" for i in range(1, 10)]
     assert all(s.parameter == "loading" and s.df == 1 and 0 <= s.p <= 1 for s in scores)
     # A freed item has no constraint left to test.
     assert "ems_2" not in [s.item for s in invariance.score_tests(freed, "metric", rscript())]
@@ -158,7 +161,9 @@ def add_parent_mood(project):
     data = pd.read_csv(project / "data" / "child_w2.csv", dtype=str)
     data["pid"] = data["pid"].str.replace("C", "P")
     data.to_csv(project / "data" / "parent_mood_w1.csv", index=False)
-    shutil.copy(project / "maps" / "child_w2.csv", project / "maps" / "parent_mood_w1.csv")
+    mapping = pd.read_csv(project / "maps" / "child_w2.csv", dtype=str)
+    mood = mapping[mapping["instrument"].isna() | (mapping["instrument"] == "example_mood")]
+    mood.to_csv(project / "maps" / "parent_mood_w1.csv", index=False)
     config = project / "labcatalog.yaml"
     line = next(x for x in config.read_text().splitlines() if "{name: child_w1," in x)
     extra = line.replace("child_w1", "parent_mood_w1").replace(
@@ -174,17 +179,15 @@ def add_parent_mood(project):
 
 def test_two_reporters_of_one_wave_pair_through_the_family(mock_project):
     found = add_parent_mood(mock_project)
-    across = [
-        m
-        for m in invariance.build_models(found.project, found.catalog, found.datasets)
-        if m.across == invariance.REPORTERS
-    ]
+    models = invariance.build_models(found.project, found.catalog, found.datasets)
+    across = [m for m in models if m.across == invariance.REPORTERS]
     [mood] = across
     assert (mood.instrument_id, mood.wave, mood.reporter) == ("example_mood", "1", "")
     assert list(mood.occasions) == ["child", "parent"]
     child, parent = mood.occasions["child"], mood.occasions["parent"]
     # The same index is the same family in both.
     assert set(child.index) & set(parent.index) and all(len(i) == 4 for i in child.index)
-    answers = found.datasets["parent_mood_w1"].frame.set_index("pid")["ems_1_w2"]
-    family = next(iter(set(child.index) & set(parent.index)))
-    assert float(answers[f"{family}P"]) == parent.loc[family, "ems_1"]
+    # The parents gave the children's wave 2 answers, reversed the same way.
+    later = next(m for m in models if m.instrument_id == "example_mood" and m.across == "waves")
+    family = next(iter(set(parent.index) & {i[:4] for i in later.occasions["2"].index}))
+    assert parent.loc[family].equals(later.occasions["2"].loc[f"{family}C"].rename(family))

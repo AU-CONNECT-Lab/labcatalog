@@ -314,6 +314,7 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
   border-radius: 6px;
 }
 .nicegui-code pre, .nicegui-code code { font-size: 0.8rem; line-height: 1.55; }
+.nicegui-code.lc-wrap pre, .nicegui-code.lc-wrap code { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ---- Tables: flat, a firmer rule under the header ---- */
 .q-table__container.q-table__card {

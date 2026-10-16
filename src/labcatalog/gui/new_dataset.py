@@ -180,7 +180,7 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
             )
             shown = [line for line in lines if line[:1] in "+-" and line[:3] not in ("+++", "---")]
             ui.label(change.path + ("" if change.opened else " (new)")).classes("font-medium")
-            ui.code("\n".join(shown), language="diff").classes("w-full")
+            ui.code("\n".join(shown), language="diff").classes("w-full lc-wrap")
 
     async def finish() -> None:
         try:
@@ -188,6 +188,8 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
         except LabCatalogError as err:
             review_status.set_text(str(err))
             return
+        # Written now, so closing the window must no longer remove them.
+        state["created"] = []
         dialog.close()
         await on_done(draft().name)
 
@@ -246,4 +248,6 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
                     ui.button("Add the dataset", icon="check", on_click=finish)
                     ui.button("Back", on_click=stepper.previous).props("flat")
                     ui.button("Cancel", on_click=cancel).props("flat")
+    # Closing the window halfway leaves no copied files behind.
+    ui.context.client.on_disconnect(cleanup)
     dialog.open()
