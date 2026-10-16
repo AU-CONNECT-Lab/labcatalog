@@ -220,6 +220,6 @@ def test_dragged_rows_move_their_entries(mock_project):
     rows = records.read_rows(text, "items", records.ITEMS)
     rows.insert(0, rows.pop(8))
     written = records.write_rows(text, "items", records.ITEMS, rows)
-    ids = [line.split(",")[0] for line in written.splitlines() if line.startswith("  - {id: ems_")]
+    ids = [line.split(",")[0] for line in written.splitlines() if ", text: " in line]
     assert ids[:2] == ["  - {id: ems_9", "  - {id: ems_1"] and len(ids) == 9
     assert editing.check_text(MOOD, written) == []

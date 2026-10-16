@@ -15,7 +15,7 @@ from labcatalog.metadata import editing, records
 from labcatalog.pipeline import run_instrument_draft
 
 TEXT = "text"
-WIDE = {"text", "label", "path", "instrument", "datasets"}
+WIDE = {"text", "label", "path", "instrument", "datasets", "administration"}
 
 
 @dataclass
