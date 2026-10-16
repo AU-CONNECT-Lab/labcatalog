@@ -21,6 +21,7 @@ def render(
     on_select: Callable[[str | None], None],
     on_instrument: Callable[[str], None],
     on_frozen: Callable[[], Awaitable[None]],
+    on_open_freeze: Callable[[str], Awaitable[None]] | None,
 ) -> None:
     summaries = {d.dataset: d for d in result.summary.datasets}
     if not summaries:
@@ -29,7 +30,7 @@ def render(
     if selected not in summaries:
         freeze_button(result, on_frozen)
         studies(result, summaries, on_select)
-        freezes_table(result.project.root)
+        freezes_table(result.project.root, on_open_freeze)
         return
     ui.button("All datasets", icon="arrow_back", on_click=lambda: on_select(None)).props(
         "flat dense no-caps"
@@ -115,7 +116,16 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
         ui.button("Freeze", icon="ac_unit", on_click=open_dialog).props("flat no-caps")
 
 
-def freezes_table(root: Path) -> None:
+# Only a freeze with a DataLad tag has its data to open.
+OPEN_CELL = r"""
+<q-td :props="props">
+  <q-btn v-if="props.row.tagged" flat dense no-caps color="primary" label="Open"
+         @click="$parent.$emit('open_freeze', props.row)" />
+</q-td>
+"""
+
+
+def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) -> None:
     found = list_freezes(root)
     if not found:
         return
@@ -126,16 +136,22 @@ def freezes_table(root: Path) -> None:
         col("tag", "DataLad tag"),
         col("files", "Data files", numeric=True),
     ]
+    if on_open:
+        columns.append(col("open", "", sortable=False))
     rows = [
         {
             "frozen": f.frozen_at.strftime("%Y-%m-%d %H:%M"),
             "name": f.name,
             "tag": f.tag or "none, record only",
             "files": len(f.manifest.files),
+            "tagged": f.tag is not None,
         }
         for f in found
     ]
-    table(columns, rows).classes(remove="w-full")
+    shown = table(columns, rows).classes(remove="w-full")
+    if on_open:
+        shown.add_slot("body-cell-open", OPEN_CELL)
+        shown.on("open_freeze", lambda e: on_open(e.args["name"]))
 
 
 def methods_of(result: CatalogResult, study: str) -> dict[str, str]:

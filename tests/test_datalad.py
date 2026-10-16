@@ -11,11 +11,18 @@ from labcatalog.ai_scoring import reference_pdfs
 from labcatalog.annex import is_placeholder
 from labcatalog.check import check_git_annex, check_prepare_outputs
 from labcatalog.dataladbridge import datalad_status, use_folder
-from labcatalog.exceptions import DataladError, DataSourceError, MetadataError
+from labcatalog.exceptions import DataladError, DataSourceError, FreezeError, MetadataError
+from labcatalog.freeze import differences
 from labcatalog.history import file_history
 from labcatalog.ids import load_exclusions
 from labcatalog.manifest import build_manifest, git_commit
-from labcatalog.pipeline import run_catalog, run_freeze, run_get, run_get_missing
+from labcatalog.pipeline import (
+    run_catalog,
+    run_freeze,
+    run_get,
+    run_get_missing,
+    run_open_freeze,
+)
 from labcatalog.prepare import Session, run_steps, step_states
 from labcatalog.project import init_project, load_project
 from labcatalog.sources import load_datasets
@@ -417,3 +424,43 @@ def test_history_works_in_a_real_dataset(mock_project, datalad):
     assert uncommitted.message == "Uncommitted changes"
     assert "+# checked" in uncommitted.diff
     assert committed.message == "Add the catalog"
+
+
+def test_a_record_only_freeze_cannot_be_opened(mock_project):
+    run_freeze(mock_project, "pilot", None)
+    with pytest.raises(FreezeError, match="pilot is only a record"):
+        run_open_freeze(mock_project, "pilot", "datalad")
+
+
+def change_child_w2(root, datalad) -> None:
+    datalad(root / "data", "unlock", "child_w2.csv")
+    path = root / "data" / "child_w2.csv"
+    path.write_text(path.read_text(encoding="utf-8").replace(",2,", ",3,", 1), encoding="utf-8")
+
+
+@needs_datalad
+def test_an_opened_freeze_has_the_frozen_data(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    _, record = run_freeze(mock_project, "pilot", datalad_exe())
+    change_child_w2(mock_project, datalad)
+    datalad(mock_project, "save", "-m", "Later change")
+
+    copy = run_open_freeze(mock_project, "pilot", datalad_exe())
+    assert differences(record, run_catalog(copy).manifest) == []
+    assert differences(record, run_catalog(mock_project).manifest) == ["child_w2"]
+
+
+@needs_datalad
+def test_an_opened_freeze_installs_its_subdatasets_at_the_tag(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    datalad(mock_project, "create", "-d", ".", "--force", "data")
+    datalad(mock_project, "save", "-r", "-m", "Add the catalog")
+    _, record = run_freeze(mock_project, "pilot", datalad_exe())
+    change_child_w2(mock_project, datalad)
+    datalad(mock_project, "save", "-r", "-m", "Later change")
+
+    copy = run_open_freeze(mock_project, "pilot", datalad_exe())
+    assert differences(record, run_catalog(copy).manifest) == []

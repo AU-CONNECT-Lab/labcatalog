@@ -9,6 +9,7 @@ from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
 from labcatalog.dataladbridge import use_folder
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.freeze import Freeze, differences, list_freezes
 from labcatalog.gui import (
     analysis,
     codebook_import,
@@ -43,6 +44,7 @@ from labcatalog.pipeline import (
     run_cfa,
     run_get_missing,
     run_invariance,
+    run_open_freeze,
 )
 from labcatalog.version import __version__
 
@@ -107,6 +109,8 @@ class Window:
         self.cfa = CfaView()
         self.dataset: str | None = None
         self.error: str | None = None
+        # The project a frozen copy was opened from, while the copy is shown.
+        self.home: Path | None = None
 
     def build(self) -> None:
         with ui.header().classes("lc-header items-center gap-4 px-5 py-3"):
@@ -114,6 +118,12 @@ class Window:
             with self.title:
                 self.path_tip = ui.tooltip("")
             self.as_of = ui.label().classes("lc-as-of")
+            with ui.row().classes("items-center gap-2") as self.frozen_bar:
+                self.frozen_label = ui.label().classes("lc-as-of")
+                ui.button("Back to the project", on_click=self.leave_freeze).props(
+                    "flat no-caps"
+                ).classes("lc-quiet-btn")
+            self.frozen_bar.visible = False
             ui.space()
             self.spinner = ui.spinner(size="sm")
             self.spinner.visible = False
@@ -172,6 +182,8 @@ class Window:
     async def choose_folder(self) -> None:
         selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)
         if selection:
+            self.home = None
+            self.frozen_bar.visible = False
             await self.load(Path(selection[0]))
 
     async def load(self, root: Path) -> None:
@@ -199,6 +211,32 @@ class Window:
         self.show_result()
         # R is slow, so the factor models fill in after the rest of the catalog shows.
         background_tasks.create(self.start_cfa())
+
+    async def open_freeze(self, name: str) -> None:
+        datalad = preferences.load().get(preferences.DATALAD)
+        if not datalad:
+            ui.notify("Set the path to datalad on the Settings page first", type="warning")
+            return
+        self.set_busy(True)
+        try:
+            copy = await run.io_bound(run_open_freeze, self.root, name, datalad)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative", multi_line=True)
+            return
+        finally:
+            self.set_busy(False)
+        record = next(f for f in list_freezes(self.root) if f.name == name)
+        home = self.root
+        await self.load(copy)
+        self.home = home
+        self.frozen_label.set_text(frozen_text(record, self.result))
+        self.frozen_bar.visible = True
+        self.datasets_panel.refresh()
+
+    async def leave_freeze(self) -> None:
+        home, self.home = self.home, None
+        self.frozen_bar.visible = False
+        await self.load(home)
 
     async def reload(self) -> None:
         if self.root is not None:
@@ -296,7 +334,12 @@ class Window:
     def datasets_panel(self) -> None:
         if self.has_catalog():
             datasets.render(
-                self.result, self.dataset, self.show_dataset, self.open_instrument, self.reload
+                self.result,
+                self.dataset,
+                self.show_dataset,
+                self.open_instrument,
+                self.reload,
+                None if self.home else self.open_freeze,
             )
 
     @ui.refreshable_method
@@ -351,6 +394,16 @@ class Window:
         failed = self.result is None or self.result.project is None
         if self.root is not None and failed and dataset_root(self.root):
             get_button("Get missing content", run_get_missing, [self.root], self.reload)
+
+
+def frozen_text(record: Freeze, result: CatalogResult | None) -> str:
+    text = f"Frozen version {record.name}, a copy: edits here do not change the project"
+    if result is None or result.manifest is None:
+        return text
+    changed = differences(record, result.manifest)
+    if changed:
+        return f"{text}. Differs from the freeze record: {', '.join(changed)}"
+    return f"{text}. All {len(record.manifest.files)} data files match the freeze record"
 
 
 def cfa_changed() -> None:
