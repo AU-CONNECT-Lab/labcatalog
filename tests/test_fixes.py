@@ -1,0 +1,87 @@
+from labcatalog.metadata import changes, fixes
+from labcatalog.pipeline import run_check, run_validate
+from labcatalog.project import load_project
+
+
+def edit(path, old, new):
+    text = path.read_text(encoding="utf-8")
+    assert old in text
+    path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+def apply(root, change):
+    project = load_project(root)
+    assert changes.check(project, [change]) == []
+    changes.write(project, [change])
+
+
+def codes(issues):
+    return {i.code for i in issues}
+
+
+def test_an_unlisted_column_is_added_to_the_map(mock_project):
+    [issue] = [i for i in run_check(mock_project).issues if i.code == "column_unmapped"]
+    assert issue.details == {"dataset": "child_w3", "columns": ["notes"]}
+    project = load_project(mock_project)
+    apply(mock_project, fixes.map_rows(project, "child_w3", [("notes", "", "")]))
+    assert "column_unmapped" not in codes(run_check(mock_project).issues)
+
+
+def test_a_misspelled_word_is_replaced_or_added(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    edit(config, "wave: 1, reporter: child", "wave: 1, reporter: chlid")
+    [issue] = [i for i in run_validate(mock_project) if i.code == "not_in_vocab"]
+    details = issue.details
+    assert (details["vocab"], details["value"], details["field"]) == (
+        "reporters",
+        "chlid",
+        "reporter",
+    )
+    project = load_project(mock_project)
+    assert fixes.closest("chlid", project.config.vocab.reporters) == "child"
+    before = config.read_text(encoding="utf-8")
+    apply(mock_project, fixes.replace_word(project, details, "child"))
+    assert "not_in_vocab" not in codes(run_validate(mock_project))
+    config.write_text(before, encoding="utf-8")
+    apply(mock_project, fixes.add_to_vocab(load_project(mock_project), "reporters", "chlid"))
+    assert "not_in_vocab" not in codes(run_validate(mock_project))
+    assert "reporters: [parent, child, chlid]" in config.read_text(encoding="utf-8")
+
+
+def test_a_misspelled_target_is_fixed_in_the_study_file(mock_project):
+    study = mock_project / "studies" / "mock_study.yaml"
+    edit(
+        study,
+        "datasets: [child_w1, child_w2, child_w3], target: self",
+        "datasets: [child_w1, child_w2, child_w3], target: slef",
+    )
+    [issue] = [i for i in run_validate(mock_project) if i.code == "not_in_vocab"]
+    assert issue.details["study"] == "mock_study" and issue.details["administration"] == 2
+    apply(mock_project, fixes.replace_word(load_project(mock_project), issue.details, "self"))
+    assert run_validate(mock_project) == []
+
+
+def test_an_unmapped_item_is_mapped_or_recorded_as_not_asked(mock_project):
+    map_file = mock_project / "maps" / "child_w1.csv"
+    edit(map_file, "ems_9_w1,example_mood,ems_9\n", "")
+    before = map_file.read_text(encoding="utf-8")
+    [issue] = [i for i in run_validate(mock_project) if i.code == "unmapped_item"]
+    assert issue.details == {
+        "dataset": "child_w1",
+        "instrument": "example_mood",
+        "items": ["ems_9"],
+    }
+    project = load_project(mock_project)
+    assert fixes.free_columns(project, "child_w1", ["pid", "ems_9_w1"]) == ["ems_9_w1"]
+    apply(
+        mock_project, fixes.map_rows(project, "child_w1", [("ems_9_w1", "example_mood", "ems_9")])
+    )
+    assert run_validate(mock_project) == []
+    map_file.write_text(before, encoding="utf-8")
+    apply(
+        mock_project,
+        fixes.not_asked(load_project(mock_project), "child_w1", "example_mood", ["ems_9"]),
+    )
+    assert run_validate(mock_project) == []
+    text = (mock_project / "studies" / "mock_study.yaml").read_text(encoding="utf-8")
+    assert "{item: ems_9, dataset: child_w1, dropped: true}" in text

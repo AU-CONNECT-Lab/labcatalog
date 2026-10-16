@@ -1,15 +1,19 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 from nicegui import run, ui
 
+from labcatalog.codebook.core import holds
 from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
-from labcatalog.gui.common import note, split_location
+from labcatalog.gui.common import caption, note, split_location
 from labcatalog.issues import Issue
-from labcatalog.metadata import accepted
+from labcatalog.metadata import accepted, changes, fixes
+from labcatalog.metadata.changes import Change
 from labcatalog.pipeline import CatalogResult
+from labcatalog.project import Project, load_project
 
 YOU = "You can fix this yourself."
 SETTINGS = (
@@ -119,6 +123,7 @@ PREPARE = ("prepare_outdated", "prepare_output_missing")
 class FixActions:
     follow: Callable[[str], None]
     reload: Callable[[], Awaitable[None]]
+    root: Path
 
 
 def note_text(issue: Issue) -> str:
@@ -127,7 +132,8 @@ def note_text(issue: Issue) -> str:
 
 
 def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
-    root = result.project.root if result.project else None
+    root = actions.root
+    project = result.project or loaded(root)
     what, who = EXPLAIN.get(issue.code, ("", SETTINGS))
 
     async def run_step() -> None:
@@ -137,7 +143,7 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         try:
             runs = await run.io_bound(
                 run_steps,
-                result.project,
+                project,
                 [step],
                 Session(),
                 False,
@@ -165,6 +171,19 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         dialog.close()
         await actions.reload()
 
+    async def save(found: list[Change]) -> None:
+        problems = changes.check(project, found)
+        if problems:
+            status.set_text("; ".join(i.message for i in problems))
+            return
+        try:
+            changes.write(project, found)
+        except LabCatalogError as err:
+            status.set_text(str(err))
+            return
+        dialog.close()
+        await actions.reload()
+
     def follow() -> None:
         dialog.close()
         actions.follow(issue.location)
@@ -184,9 +203,11 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         with ui.row().classes("items-start gap-2 no-wrap"):
             ui.icon("person_outline").classes("lc-faint mt-1")
             note(who)
+        if project is not None and issue.code in REPAIRS:
+            REPAIRS[issue.code](project, result, issue, save)
         status = ui.label().classes("lc-bad-text")
         log = ui.column().classes("w-full")
-        if issue.level == "warning" and root is not None:
+        if issue.level == "warning":
             why = ui.input("Why it is fine", placeholder="e.g. checked the paper forms").classes(
                 "w-full"
             )
@@ -201,7 +222,113 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
                 ).props("flat")
             ui.button("Copy a note", icon="content_copy", on_click=copy_note).props("flat")
             ui.space()
-            if issue.level == "warning" and root is not None:
+            if issue.level == "warning":
                 ui.button("It is fine", icon="check", on_click=accept).props("flat")
             ui.button("Close", on_click=dialog.close).props("flat")
     dialog.open()
+
+
+def loaded(root: Path) -> Project | None:
+    # A project whose files read but do not validate, so its mistakes can still be fixed here.
+    try:
+        return load_project(root)
+    except LabCatalogError:
+        return None
+
+
+def unlisted_columns(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    dataset = issue.details["dataset"]
+    items = {
+        i: [item.id for item in project.instruments[i].items]
+        for i in fixes.administered(project, dataset)
+    }
+    caption("Add to the column map")
+    note("Leave Instrument empty for a column that is not an item, such as notes or a date.")
+    picks = []
+    for column in issue.details["columns"]:
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.label(column).classes("font-mono w-48")
+            instrument = ui.select(
+                {"": "not an item", **{i: i for i in items}}, value="", label="Instrument"
+            ).classes("w-56")
+            item = ui.select([], label="Item").classes("w-40")
+            item.set_visibility(False)
+
+            def chosen(e, item=item) -> None:
+                item.set_options(items.get(e.value, []), value=None)
+                item.set_visibility(bool(e.value))
+
+            instrument.on_value_change(chosen)
+            picks.append((column, instrument, item))
+
+    async def add() -> None:
+        if any(i.value and not t.value for _, i, t in picks):
+            ui.notify("Pick the item for each column given an instrument", type="warning")
+            return
+        rows = [(column, i.value or "", t.value or "") for column, i, t in picks]
+        await save([fixes.map_rows(project, dataset, rows)])
+
+    ui.button("Add to the column map", icon="playlist_add", on_click=add)
+
+
+def wrong_word(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    details = issue.details
+    kind, value = details["vocab"], details["value"]
+    words = list(getattr(project.config.vocab, kind))
+    caption("Fix the word")
+    with ui.row().classes("items-center gap-3"):
+        if "field" in details and words:
+            choice = ui.select(words, value=fixes.closest(value, words), label="Change to").classes(
+                "w-48"
+            )
+
+            async def replace() -> None:
+                if choice.value:
+                    await save([fixes.replace_word(project, details, choice.value)])
+
+            ui.button("Use this word", on_click=replace)
+        ui.button(
+            f"Add '{value}' as a new word",
+            on_click=lambda: save([fixes.add_to_vocab(project, kind, value)]),
+        ).props("flat")
+
+
+def unmapped_items(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    dataset, instrument = issue.details["dataset"], issue.details["instrument"]
+    loaded = result.datasets.get(dataset)
+    columns = fixes.free_columns(project, dataset, list(loaded.frame.columns) if loaded else [])
+    choices = {
+        "": "leave as it is",
+        fixes.NOT_ASKED: f"not asked in {dataset}",
+        **{c: c for c in columns},
+    }
+    caption("Where each item is")
+    note(f"Pick the data column that holds the item, or record that {dataset} did not ask it.")
+    picks = []
+    for item in issue.details["items"]:
+        guess = next((c for c in columns if holds(c, item)), "")
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.label(item).classes("font-mono w-40")
+            picks.append((item, ui.select(choices, value=guess, label="Column").classes("w-64")))
+
+    async def apply() -> None:
+        rows = [
+            (s.value, instrument, item) for item, s in picks if s.value not in ("", fixes.NOT_ASKED)
+        ]
+        dropped = [item for item, s in picks if s.value == fixes.NOT_ASKED]
+        found = []
+        if rows:
+            found.append(fixes.map_rows(project, dataset, rows))
+        if dropped:
+            found.append(fixes.not_asked(project, dataset, instrument, dropped))
+        if found:
+            await save(found)
+
+    ui.button("Save", icon="check", on_click=apply)
+
+
+REPAIRS = {
+    "column_unmapped": unlisted_columns,
+    "not_in_vocab": wrong_word,
+    "unmapped_item": unmapped_items,
+}

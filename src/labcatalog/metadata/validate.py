@@ -39,9 +39,25 @@ def check_vocab(project: Project) -> list[Issue]:
     for n, dataset in enumerate(config.datasets, start=1):
         where = f"datasets[{n}] ({dataset.name})"
         if dataset.modality not in vocab.modalities:
-            issues.append(not_in_vocab(f"{where}.modality", dataset.modality, "vocab.modalities"))
+            issues.append(
+                not_in_vocab(
+                    f"{where}.modality",
+                    dataset.modality,
+                    "vocab.modalities",
+                    dataset=dataset.name,
+                    field="modality",
+                )
+            )
         if dataset.reporter not in vocab.reporters:
-            issues.append(not_in_vocab(f"{where}.reporter", dataset.reporter, "vocab.reporters"))
+            issues.append(
+                not_in_vocab(
+                    f"{where}.reporter",
+                    dataset.reporter,
+                    "vocab.reporters",
+                    dataset=dataset.name,
+                    field="reporter",
+                )
+            )
         study = config.studies.get(dataset.study)
         if study is None:
             issues.append(unknown(f"{where}.study: '{dataset.study}' is not under studies", CONFIG))
@@ -57,7 +73,16 @@ def check_vocab(project: Project) -> list[Issue]:
         for n, administration in enumerate(content.administrations, start=1):
             target = administration.target
             if target and target not in vocab.targets:
-                found.append(not_in_vocab(f"administrations[{n}].target", target, "vocab.targets"))
+                found.append(
+                    not_in_vocab(
+                        f"administrations[{n}].target",
+                        target,
+                        "vocab.targets",
+                        study=name,
+                        administration=n - 1,
+                        field="target",
+                    )
+                )
         for issue in found:
             issue.location = project.study_files[name]
         issues.extend(found)
@@ -382,7 +407,17 @@ def check_variable_maps(project: Project) -> list[Issue]:
             if unmapped:
                 shown = ", ".join(unmapped[:5]) + (" ..." if len(unmapped) > 5 else "")
                 message = f"{instrument_id}: {len(unmapped)} item(s) have no column: {shown}"
-                issues.append(problem("unmapped_item", message, location, level="warning"))
+                issues.append(
+                    problem(
+                        "unmapped_item",
+                        message,
+                        location,
+                        level="warning",
+                        dataset=dataset.name,
+                        instrument=instrument_id,
+                        items=unmapped,
+                    )
+                )
     return issues
 
 
@@ -510,13 +545,18 @@ def check_templates(project: Project) -> list[Issue]:
     ]
 
 
-def problem(code: str, message: str, location: str, level: IssueLevel = "error") -> Issue:
-    return Issue(level=level, code=code, message=message, location=location)
+def problem(
+    code: str, message: str, location: str, level: IssueLevel = "error", **details: Any
+) -> Issue:
+    return Issue(level=level, code=code, message=message, location=location, details=details)
 
 
 def unknown(message: str, location: str) -> Issue:
     return problem("unknown_reference", message, location)
 
 
-def not_in_vocab(where: str, value: str, vocab: str) -> Issue:
-    return problem("not_in_vocab", f"{where}: '{value}' is not in {vocab}", CONFIG)
+def not_in_vocab(where: str, value: str, vocab: str, **details: Any) -> Issue:
+    # The vocab list, the value and, where one entry holds it, which entry, for the Fix panel.
+    kind = vocab.removeprefix("vocab.")
+    message = f"{where}: '{value}' is not in {vocab}"
+    return problem("not_in_vocab", message, CONFIG, vocab=kind, value=value, **details)

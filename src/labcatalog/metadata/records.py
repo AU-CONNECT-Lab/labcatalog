@@ -8,7 +8,9 @@ from typing import Any, Literal
 import yaml
 from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.error import CommentMark
 from ruamel.yaml.scalarstring import SingleQuotedScalarString
+from ruamel.yaml.tokens import CommentToken
 
 from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
@@ -184,6 +186,54 @@ def load(text: str) -> CommentedMap:
         return round_trip().load(text) or CommentedMap()
     except YAMLError as err:
         raise EditError(f"The file is not valid YAML; fix it as text first. {err}") from None
+
+
+def dumped(data: CommentedMap) -> str:
+    out = io.StringIO()
+    round_trip().dump(data, out)
+    return out.getvalue()
+
+
+def take_tail(node: CommentedMap | CommentedSeq) -> str:
+    # The lines after the last value under node, such as the next section's heading comment.
+    holder, key = tail_slot(node)
+    if key is None:
+        text = "".join(token.value for token in holder.ca.end)
+        holder.ca.end = []
+        return text
+    slot = holder.ca.items.get(key)
+    if not slot or slot[2] is None:
+        return ""
+    # A comment on the value's own line stays with it.
+    own, _, text = slot[2].value.partition("\n")
+    slot[2] = CommentToken(own + "\n", CommentMark(0), None) if own else None
+    return text
+
+
+def put_tail(node: CommentedMap | CommentedSeq, text: str) -> None:
+    if not text:
+        return
+    holder, key = tail_slot(node)
+    if key is None:
+        holder.ca.end = [CommentToken(text, CommentMark(0), None)]
+        return
+    slot = holder.ca.items.setdefault(key, [None, None, None, None])
+    own = slot[2].value if slot[2] is not None else "\n"
+    slot[2] = CommentToken(own + text, CommentMark(0), None)
+
+
+def tail_slot(node: CommentedMap | CommentedSeq) -> tuple[Any, Any]:
+    # Where ruamel keeps what follows a subtree: after its last scalar, or at the end of a list.
+    while True:
+        last = node[-1] if isinstance(node, CommentedSeq) and node else None
+        if isinstance(node, CommentedMap) and node:
+            key = list(node)[-1]
+            last = node[key]
+        if not isinstance(last, (CommentedMap, CommentedSeq)) or not last or last.fa.flow_style():
+            if isinstance(node, CommentedSeq):
+                return node, None
+            return node, (key if node else None)
+        node = last
 
 
 def round_trip() -> YAML:

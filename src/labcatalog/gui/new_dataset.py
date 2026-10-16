@@ -9,7 +9,7 @@ from nicegui import app, run, ui
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import note
-from labcatalog.metadata import new_dataset
+from labcatalog.metadata import changes, new_dataset
 from labcatalog.pipeline import CatalogResult
 
 DATA_FILES = "Data files (*.csv)"
@@ -152,7 +152,7 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
         except LabCatalogError as err:
             columns_status.set_text(str(err))
             return
-        issues = new_dataset.check(project, found)
+        issues = changes.check(project, found)
         if issues:
             columns_status.set_text("; ".join(str(i) for i in issues))
             return
@@ -189,7 +189,7 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
 
     async def finish() -> None:
         try:
-            new_dataset.write(project, state["changes"])
+            changes.write(project, state["changes"])
         except LabCatalogError as err:
             review_status.set_text(str(err))
             return

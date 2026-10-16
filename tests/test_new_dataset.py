@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from labcatalog.exceptions import EditError
-from labcatalog.metadata import new_dataset
+from labcatalog.metadata import changes, new_dataset
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
 
@@ -59,8 +59,8 @@ def test_a_new_wave_follows_its_template_into_every_file(project_root, export):
     assert new_dataset.check_rows(project, rows) == []
 
     found = new_dataset.changes(project, draft, placement, rows)
-    assert new_dataset.check(project, found) == []
-    new_dataset.write(project, found)
+    assert changes.check(project, found) == []
+    changes.write(project, found)
     after = load_project(project_root)
     assert validate_project(after) == []
     assert "4" in after.config.studies["mock_study"].waves
@@ -121,8 +121,8 @@ def test_problems_across_files_are_caught_before_writing(project_root):
     config = (project_root / "labcatalog.yaml").read_text(encoding="utf-8")
     line = "  - {name: child_w9, modality: questionnaire, study: mock_study, wave: 9, reporter: child, source: csv, path: data/child_w9.csv}\n"
     text = config.replace("datasets:\n", "datasets:\n" + line, 1)
-    found = [new_dataset.Change("labcatalog.yaml", text)]
-    issues = new_dataset.check(project, found)
+    found = [changes.Change("labcatalog.yaml", text)]
+    issues = changes.check(project, found)
     assert [i.message.split(" ", 1)[1] for i in issues] == [
         "(child_w9).wave: wave 9 is not listed for study mock_study"
     ]

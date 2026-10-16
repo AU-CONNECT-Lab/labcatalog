@@ -67,7 +67,16 @@ def check_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[
         undescribed = [column for column in loaded.frame if column not in described]
         if undescribed:
             message = f"{len(undescribed)} column(s) not in {map_file}: {examples(undescribed)}"
-            issues.append(problem("column_unmapped", message, location(project, loaded), "warning"))
+            issues.append(
+                problem(
+                    "column_unmapped",
+                    message,
+                    location(project, loaded),
+                    "warning",
+                    dataset=name,
+                    columns=undescribed,
+                )
+            )
     return issues
 
 

@@ -23,6 +23,7 @@ from labcatalog.gui import (
     prepare,
     problems,
     settings,
+    studies,
     theme,
 )
 from labcatalog.gui.analysis import AnalysisView
@@ -39,6 +40,7 @@ from labcatalog.gui.instruments import (
 )
 from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
+from labcatalog.gui.studies import StudiesView
 from labcatalog.issues import Issue
 from labcatalog.metadata.browse import BrowseIndex, build_index
 from labcatalog.pipeline import (
@@ -55,6 +57,7 @@ WINDOW_SIZE = (1280, 820)
 PAGES = (
     ("overview", "Overview"),
     ("instruments", "Instruments"),
+    ("studies", "Studies"),
     ("datasets", "Datasets"),
     ("analysis", "Analysis"),
     ("methods", "Methods"),
@@ -105,6 +108,7 @@ class Window:
         self.result: CatalogResult | None = None
         self.index: BrowseIndex | None = None
         self.view = BrowseView()
+        self.studying = StudiesView()
         self.analysis = AnalysisView()
         self.methods = MethodsView()
         self.importing = ImportView()
@@ -166,6 +170,8 @@ class Window:
                 self.overview_panel()
             with ui.tab_panel("instruments").classes("lc-page lc-board"):
                 self.instruments_panel()
+            with ui.tab_panel("studies").classes("lc-page"):
+                self.studies_panel()
             with ui.tab_panel("datasets").classes("lc-page"):
                 self.datasets_panel()
             with ui.tab_panel("analysis").classes("lc-page"):
@@ -211,6 +217,7 @@ class Window:
             # Refreshing keeps the filters; opening another project starts over.
             if root != self.root:
                 self.view = BrowseView()
+                self.studying = StudiesView()
                 self.analysis = AnalysisView()
                 self.methods = MethodsView()
                 self.importing = ImportView()
@@ -336,6 +343,7 @@ class Window:
         for panel in (
             self.overview_panel,
             self.instruments_panel,
+            self.studies_panel,
             self.datasets_panel,
             self.analysis_panel,
             self.methods_panel,
@@ -378,6 +386,15 @@ class Window:
     def instruments_panel(self) -> None:
         if self.has_catalog():
             instruments.render(self.result, self.index, self.view, self.open_instrument, self.cfa)
+
+    @ui.refreshable_method
+    def studies_panel(self) -> None:
+        if self.has_catalog():
+            studies.render(self.result, self.studying, self.reload, self.open_dataset)
+
+    def open_dataset(self, dataset: str) -> None:
+        self.show_dataset(dataset)
+        self.tabs.set_value("datasets")
 
     @ui.refreshable_method
     def datasets_panel(self) -> None:
@@ -434,7 +451,9 @@ class Window:
 
     def open_fix(self, issue: Issue) -> None:
         actions = fix.FixActions(
-            lambda location: problems.follow(self.root, location, self.edit_location), self.reload
+            lambda location: problems.follow(self.root, location, self.edit_location),
+            self.reload,
+            self.root,
         )
         fix.open_fix(self.result, issue, actions)
 
