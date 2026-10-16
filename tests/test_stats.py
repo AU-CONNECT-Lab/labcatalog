@@ -27,18 +27,18 @@ def test_variable_counts_add_up(mock_project):
     eps4 = next(v for v in summary.variables if v.column == "eps_4_w1")
     assert eps4.n_unexpected == 1
     assert list(eps4.value_counts) == ["1", "2", "3", "4", "5"]
-    assert eps4.n_valid + sum(eps4.missing.values()) + eps4.n_unexpected == eps4.n_total == 146
+    assert eps4.n_valid + sum(eps4.missing.values()) + eps4.n_unexpected == eps4.n_total == 191
     assert set(eps4.missing) == {"blank", "refused", "not applicable", "don't know"}
 
 
 def test_score_summary_of_the_example(mock_project):
     summary = summary_for(mock_project)
     ems = next(s for s in summary.scores if s.key == "example_mood.ems_total@child_w1")
-    assert ems.n_valid == 139
-    assert round(ems.mean, 2) == 8.39
+    assert ems.n_valid == 181
+    assert round(ems.mean, 2) == 11.52
     assert round(ems.alpha, 2) == 0.90
     assert ems.possible_range == (0, 27)
-    assert sum(count for _, _, count in ems.histogram) == 139
+    assert sum(count for _, _, count in ems.histogram) == 181
     assert len(ems.item_total) == 9
     assert len(ems.item_correlations) == 9 and ems.item_correlations[0][0] == 1.0
     assert all(r > 0 for row in ems.item_correlations for r in row)
@@ -59,18 +59,18 @@ def test_unmarked_reverse_item_shows_negative_correlations(mock_project):
 def test_dataset_summary(mock_project):
     summary = summary_for(mock_project)
     parent = next(d for d in summary.datasets if d.dataset == "parent_w1")
-    assert (parent.n_rows, parent.n_ids) == (146, 146)
+    assert (parent.n_rows, parent.n_ids) == (191, 191)
     # " 1031P" gives no family ID until the lab fixes the space.
-    assert parent.n_groups == 145
-    assert sum(parent.collected_by_month.values()) == 146
+    assert parent.n_groups == 190
+    assert sum(parent.collected_by_month.values()) == 191
     eps = next(c for c in parent.completeness if c.instrument_id == "example_parent_stress")
-    assert eps.complete + eps.partial + eps.empty == 146
+    assert eps.complete + eps.partial + eps.empty == 191
 
 
 def test_retention_and_groups(mock_project):
     summary = summary_for(mock_project)
     wave2 = next(r for r in summary.retention if r.reporter == "parent" and r.wave == "2")
-    assert wave2.n == 128 and wave2.n_from_previous + wave2.n_new == 128
+    assert wave2.n == 170 and wave2.n_from_previous + wave2.n_new == 170
     assert summary.group_name == "family"
     assert [g.wave for g in summary.groups] == ["1", "2", "3"]
 
@@ -122,7 +122,7 @@ def test_number_and_text_items(mock_project):
     summary = summary_for(mock_project)
     by_column = {v.column: v for v in summary.variables}
     age = by_column["dem_age_w2"]
-    assert (age.n_valid, age.n_unexpected, age.value_counts) == (127, 1, {})
+    assert (age.n_valid, age.n_unexpected, age.value_counts) == (167, 1, {})
     assert 3 <= age.minimum <= age.median <= age.maximum <= 18
     comment = by_column["dem_comment_w2"]
     assert comment.n_valid + comment.missing["blank"] == comment.n_total

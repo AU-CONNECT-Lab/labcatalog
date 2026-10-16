@@ -15,12 +15,12 @@ def edit(path, old, new):
 def test_loads_every_dataset_as_text(mock_project):
     datasets = load_datasets(load_project(mock_project))
     assert {name: len(d.frame) for name, d in datasets.items()} == {
-        "parent_w1": 146,
-        "parent_w2": 128,
-        "parent_w3": 61,
-        "child_w1": 140,
-        "child_w2": 116,
-        "child_w3": 56,
+        "parent_w1": 191,
+        "parent_w2": 170,
+        "parent_w3": 160,
+        "child_w1": 182,
+        "child_w2": 153,
+        "child_w3": 148,
     }
     frame = datasets["parent_w1"].frame
     assert all(pd.api.types.is_string_dtype(dtype) for dtype in frame.dtypes)
