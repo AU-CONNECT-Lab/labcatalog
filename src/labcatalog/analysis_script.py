@@ -315,13 +315,8 @@ class AnalysisData:
 
     def item(self, key: str) -> Variable:
         variable = item_variable(self.result, key)
-        loaded = self.result.datasets[variable.dataset]
-        numbers = loaded.numbers(variable.column)
         options = [(float(o.value), o.label) for o in variable.response_options]
-        if variable.type == CHOICE:
-            valid = numbers.where(numbers.isin([value for value, _ in options]))
-        else:
-            valid = numbers.where(numbers_in_range(numbers, variable))
+        valid = item_numbers(self.result, variable)
         column = self.column_name(variable.dataset, variable.column)
         self.columns[column] = self.align(variable.dataset, valid.to_numpy(dtype=float))
         instrument = self.result.project.instruments[variable.instrument_id]
@@ -373,6 +368,14 @@ def item_key(variable: ResolvedVariable) -> str:
 
 def item_variable(result: CatalogResult, key: str) -> ResolvedVariable:
     return next(v for v in result.catalog.variables if item_key(v) == key)
+
+
+def item_numbers(result: CatalogResult, variable: ResolvedVariable) -> pd.Series:
+    # Only answers that count: a listed option, or a number within the item's range.
+    numbers = result.datasets[variable.dataset].numbers(variable.column)
+    if variable.type == CHOICE:
+        return numbers.where(numbers.isin([float(o.value) for o in variable.response_options]))
+    return numbers.where(numbers_in_range(numbers, variable))
 
 
 def demographic_items(result: CatalogResult, datasets: list[str]) -> list[ResolvedVariable]:
