@@ -4,7 +4,7 @@ from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.gui import analysis_tables, attrition
-from labcatalog.gui.analysis import sample_note
+from labcatalog.gui.analysis import sample_text
 from labcatalog.gui.common import col, heading, note, section, sorted_waves, unique
 from labcatalog.gui.datasets import methods_of, paragraphs
 from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView
@@ -106,7 +106,7 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
         d.name for d in result.project.config.datasets if (d.study, d.wave) == (study, view.wave)
     ]
     sample = analysis.build_sample(result, datasets, intersect=False)
-    sample_note(result, sample, "with data in this wave")
+    note(sample_text(result, sample, "with data in this wave"))
     analysis_tables.table_one_section(result, sample, view)
     attrition.render(result, view, study, view.wave)
 

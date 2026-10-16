@@ -103,8 +103,10 @@ def test_measures_filter_every_list_of_the_page(result):
     measures = list(views.analysis_instruments(result))
     assert measures.index("example_demographics") < measures.index("eeg_resting")
     assert measures.index("eeg_resting") < measures.index("fmri_resting")
-    groups = views.instrument_groups(result)
-    assert groups["All EEG"] == ["eeg_resting"] and "example_mood" in groups["All questionnaires"]
+    groups = page.modality_groups(result, measures)
+    assert groups["EEG"] == ["eeg_resting"] and "example_mood" in groups["questionnaires"]
+    waves = page.wave_groups(result, ["child_w1", "eeg_w1", "child_w2"])
+    assert waves == {"Wave 1": ["child_w1", "eeg_w1"], "Wave 2": ["child_w2"]}
     view = page.AnalysisView(datasets=["child_w1", "eeg_w1"], instruments=["eeg_resting"])
     choices = page.variables(view)(result, view.datasets)
     assert choices and all(k.startswith("item:eeg_resting.") for k in choices)

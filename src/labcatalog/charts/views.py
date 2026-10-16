@@ -1171,18 +1171,6 @@ def analysis_instruments(result: CatalogResult) -> dict[str, str]:
     return {i: names[i] for i in sorted(found, key=rank)}
 
 
-def instrument_groups(result: CatalogResult) -> dict[str, list[str]]:
-    # "All EEG" and the like, where the instruments come from more than one modality.
-    vocab = result.project.config.vocab
-    by_modality: dict[str, list[str]] = {}
-    found = instrument_modalities(result)
-    for instrument_id in analysis_instruments(result):
-        by_modality.setdefault(found[instrument_id], []).append(instrument_id)
-    if len(by_modality) < 2:
-        return {}
-    return {f"All {vocab.modality_label(m)}": ids for m, ids in by_modality.items()}
-
-
 def menu_groups(
     result: CatalogResult,
     datasets: list[str],

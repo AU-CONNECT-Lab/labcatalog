@@ -7,7 +7,7 @@ from nicegui import ui
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import analysis_tables, charts, multilevel
-from labcatalog.gui.common import apa, col, fmt, note, p_value, section
+from labcatalog.gui.common import apa, col, fmt, note, p_value, panel, section
 from labcatalog.gui.paper import Chart, paper_table, save_button
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
@@ -54,11 +54,13 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         view.instruments = list(measures)
     view.instruments = [i for i in view.instruments if i in measures]
 
+    counted: dict[str, ui.label] = {}
+
     @ui.refreshable
     def tools() -> None:
         sample = analysis.build_sample(result, view.datasets, view.intersect)
         where = "in every selected dataset" if view.intersect else "in any selected dataset"
-        sample_note(result, sample, where)
+        counted["label"].set_text(sample_text(result, sample, where))
         choices = variables(view)(result, view.datasets)
         if len(choices) < 2:
             note(
@@ -71,16 +73,18 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         analysis_tables.group_section(result, sample, view, choices)
         analysis_tables.script_section(result, sample, view, choices)
 
-    def set_datasets(value: list[str] | None) -> None:
-        view.datasets = value or []
+    def set_datasets(value: list[str]) -> None:
+        view.datasets = [n for n in names if n in value]
+        sidebar.refresh()
         tools.refresh()
 
     def set_intersect(value: bool) -> None:
         view.intersect = value
         tools.refresh()
 
-    def set_instruments(value: list[str] | None) -> None:
-        view.instruments = value or []
+    def set_instruments(value: list[str]) -> None:
+        view.instruments = [i for i in measures if i in value]
+        sidebar.refresh()
         tools.refresh()
         models.refresh()
 
@@ -89,36 +93,71 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
     def models() -> None:
         multilevel.render(result, view)
 
-    section("Sample")
-    with ui.row().classes("w-full items-center gap-4"):
-        ui.select(
-            {n: views.dataset_label(result, n) for n in names},
-            multiple=True,
-            value=view.datasets,
-            label="Datasets",
-            on_change=lambda e: set_datasets(e.value),
-        ).props("dense outlined use-chips").classes("min-w-96 grow")
-        ui.switch(
-            "Only people in every selected dataset",
-            value=view.intersect,
-            on_change=lambda e: set_intersect(e.value),
-        )
-    with ui.row().classes("w-full items-center gap-2 no-wrap"):
-        chosen = (
-            ui.select(
-                measures,
-                multiple=True,
-                value=view.instruments,
-                label="Measures (every list on this page, the multilevel model too)",
-                with_input=True,
-                on_change=lambda e: set_instruments(e.value),
-            )
-            .props("dense outlined use-chips")
-            .classes("grow")
-        )
-        pick_menu(chosen, views.instrument_groups(result))
-    tools()
-    models()
+    @ui.refreshable
+    def sidebar() -> None:
+        with panel("Sample"):
+            counted["label"] = ui.label().classes("lc-note")
+            ui.switch(
+                "Only people in every selected dataset",
+                value=view.intersect,
+                on_change=lambda e: set_intersect(e.value),
+            ).props("dense")
+            for title, group in wave_groups(result, names).items():
+                ticks(title, group, {n: n for n in group}, view.datasets, set_datasets)
+            labels = views.instrument_names(result)
+            for title, group in modality_groups(result, list(measures)).items():
+                ticks(title, group, labels, view.instruments, set_instruments)
+
+    with ui.row().classes("w-full no-wrap items-start gap-4"):
+        with ui.column().classes("w-72 shrink-0 lc-sticky"):
+            sidebar()
+        with ui.column().classes("grow min-w-0 gap-0"):
+            tools()
+            models()
+
+
+def ticks(
+    title: str,
+    group: list[str],
+    labels: dict[str, str],
+    chosen: list[str],
+    changed: Callable[[list[str]], None],
+) -> None:
+    def toggle(key: str, on: bool) -> None:
+        changed([k for k in chosen if k != key] + ([key] if on else []))
+
+    every = all(k in chosen for k in group)
+    with ui.row().classes("w-full items-center no-wrap lc-facet"):
+        ui.label(title)
+        ui.space()
+        rest = [k for k in chosen if k not in group]
+        if len(group) > 1:
+            ui.button(
+                "None" if every else "All",
+                on_click=lambda: changed(rest if every else rest + group),
+            ).props("flat dense no-caps size=sm")
+    for key in group:
+        ui.checkbox(
+            labels[key], value=key in chosen, on_change=lambda e, k=key: toggle(k, e.value)
+        ).props("dense")
+
+
+def wave_groups(result: CatalogResult, names: list[str]) -> dict[str, list[str]]:
+    config = result.project.config
+    groups: dict[str, list[str]] = {}
+    for name in names:
+        d = dataset_by_name(config, name)
+        groups.setdefault(views.wave_name(result, d.study, d.wave), []).append(name)
+    return groups
+
+
+def modality_groups(result: CatalogResult, instrument_ids: list[str]) -> dict[str, list[str]]:
+    vocab = result.project.config.vocab
+    found = views.instrument_modalities(result)
+    groups: dict[str, list[str]] = {}
+    for instrument_id in instrument_ids:
+        groups.setdefault(vocab.modality_label(found[instrument_id]), []).append(instrument_id)
+    return groups
 
 
 def first_wave(result: CatalogResult, names: list[str]) -> list[str]:
@@ -131,13 +170,13 @@ def first_wave(result: CatalogResult, names: list[str]) -> list[str]:
     ]
 
 
-def sample_note(result: CatalogResult, sample: analysis.Sample, where: str) -> None:
+def sample_text(result: CatalogResult, sample: analysis.Sample, where: str) -> str:
     by = result.project.config.stats.correlate_by
     matched = "ID" if by in ("id", "none") else by
     text = f"{len(sample.people)} people {where}, matched across datasets by {matched}."
     if sample.ambiguous:
         text += f" {sample.ambiguous} rows are left out because their {matched} repeats in a file."
-    note(text)
+    return text
 
 
 def correlation_section(
