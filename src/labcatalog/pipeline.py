@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog import codebook, invariance
+from labcatalog.ai_measures import Draft, draft_description
 from labcatalog.ai_scoring import write_scoring_scripts
 from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
@@ -120,6 +121,13 @@ def run_scoring_script(
 ) -> CallMetadata:
     client = make_llm_client(provider, model, url)
     return write_scoring_scripts(result.project, result.catalog, instrument_id, dataset, client)
+
+
+def run_description_draft(
+    result: CatalogResult, instrument_id: str, provider: str, model: str, url: str
+) -> Draft:
+    client = make_llm_client(provider, model, url)
+    return draft_description(result.project, instrument_id, client)
 
 
 def run_prepare(root: Path, echo: Callable[[str], None]) -> list[StepRun]:

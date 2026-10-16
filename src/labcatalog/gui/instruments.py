@@ -30,7 +30,7 @@ from labcatalog.gui.common import (
 from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.history import file_history
 from labcatalog.invariance import STEPS, InvarianceTest
-from labcatalog.pipeline import CatalogResult, run_scoring_script
+from labcatalog.pipeline import CatalogResult, run_description_draft, run_scoring_script
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument, Reference, Text
@@ -323,6 +323,7 @@ def dataset_part(
         table(*variable_table(result, instrument, dataset))
         factor_structure(result, instrument, dataset, cfa)
         measures_section(result, instrument, dataset, cfa)
+        description_draft(result, instrument)
         charts.instrument_dataset_section(result, instrument.id, dataset)
         scoring_code(result, instrument, dataset)
 
@@ -708,6 +709,48 @@ def measures_section(
         "description: to the instrument's YAML for what it measures; change the wording with "
         "measures: in labcatalog.yaml or in the instrument's YAML."
     )
+
+
+def description_draft(result: CatalogResult, instrument: Instrument) -> None:
+    if not ai_scoring.reference_pdfs(result.project, instrument):
+        return
+    path = result.project.instrument_files[instrument.id]
+
+    async def write() -> None:
+        button.disable()
+        status.set_text("Reading the reference and drafting the description.")
+        chosen = preferences.load()
+        try:
+            draft = await run.io_bound(
+                run_description_draft,
+                result,
+                instrument.id,
+                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
+                chosen.get(preferences.LLM_MODEL, ""),
+                chosen.get(preferences.LLM_URL, ""),
+            )
+        except LabCatalogError as err:
+            status.set_text(str(err))
+        else:
+            meta = draft.meta
+            status.set_text(
+                f"Drafted by {meta.model} in {meta.latency_ms / 1000:.0f} s, "
+                f"{meta.input_tokens} tokens in and {meta.output_tokens} out."
+            )
+            shown.clear()
+            with shown:
+                ui.label(draft.description).classes("max-w-4xl")
+                copy_text(draft.description)
+                note(f"Check it against the reference, then paste it as description: in {path}.")
+                for line in draft.notes:
+                    note(f"Note from the model: {line}")
+        finally:
+            button.enable()
+
+    with ui.row().classes("items-center gap-3"):
+        button = ui.button("Draft the description from the reference PDF", on_click=write)
+        status = ui.label().classes("lc-note")
+    shown = ui.column().classes("gap-1")
 
 
 def without_empty(
