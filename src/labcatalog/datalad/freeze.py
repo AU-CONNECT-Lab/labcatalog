@@ -108,23 +108,13 @@ def open_freeze(project_root: Path, record: Freeze, folder: Path, datalad: str) 
     for top in tops:
         copy = folder / top.relative_to(base)
         run_datalad(datalad, ["clone", str(top), str(copy)])
-        absolute_remotes(copy, top)
         checkout_tag(copy, record.tag)
     # Installed at the commit their superdataset recorded, which is the tagged one.
     for root in sorted(set(roots) - set(tops), key=lambda r: len(r.parts)):
         top = next(t for t in tops if t in root.parents)
         inside = root.relative_to(top).as_posix()
         run_datalad(datalad, ["get", "-n", inside], cwd=folder / top.relative_to(base))
-        absolute_remotes(folder / root.relative_to(base), root)
     return folder / project_root.relative_to(base)
-
-
-def absolute_remotes(copy: Path, source: Path) -> None:
-    # A clone takes the source's other remotes as they are, relative paths still relative to it.
-    for remote in run_git(copy, "remote").split():
-        url = run_git(copy, "remote", "get-url", remote)
-        if ":" not in url and not Path(url).is_absolute():
-            run_git(copy, "remote", "set-url", remote, (source / url).resolve().as_posix())
 
 
 def checkout_tag(root: Path, tag: str) -> None:

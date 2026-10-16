@@ -474,7 +474,9 @@ def test_a_pushed_freeze_opens_from_another_clone(mock_project, datalad, tmp_pat
         handle.write("data/** annex.largefiles=anything\n")
     datalad(mock_project, "save", "-m", "Add the catalog")
     subprocess.run(["git", "init", "-q", "--bare", str(tmp_path / "store.git")], check=True)
-    datalad(mock_project, "siblings", "add", "-s", "store", "--url", "../store.git")
+    # A relative URL would be copied as it is into clones, where it no longer points at the store.
+    store = (tmp_path / "store.git").as_posix()
+    datalad(mock_project, "siblings", "add", "-s", "store", "--url", store)
     datalad(mock_project, "push", "--to", "store")
     _, record = run_freeze(mock_project, "pilot", datalad_exe())
     # datalad push sends neither tags nor the content of older versions.
@@ -485,6 +487,6 @@ def test_a_pushed_freeze_opens_from_another_clone(mock_project, datalad, tmp_pat
     datalad(mock_project, "push", "--to", "store")
 
     (tmp_path / "elsewhere").mkdir()
-    datalad(tmp_path / "elsewhere", "clone", "../store.git", "lab")
+    datalad(tmp_path / "elsewhere", "clone", store, "lab")
     copy = run_open_freeze(tmp_path / "elsewhere" / "lab", "pilot", datalad_exe())
     assert differences(record, run_catalog(copy).manifest) == []
