@@ -11,6 +11,7 @@ from labcatalog.gui import (
     analysis,
     codebook_import,
     datasets,
+    edit,
     instruments,
     methods,
     overview,
@@ -22,6 +23,7 @@ from labcatalog.gui import (
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
+from labcatalog.gui.edit import EditView
 from labcatalog.gui.instruments import (
     CFA_DONE,
     CFA_FAILED,
@@ -44,6 +46,7 @@ PAGES = (
     ("methods", "Methods", "description"),
     ("prepare", "Prepare", "play_circle"),
     ("import", "Import", "upload_file"),
+    ("edit", "Edit", "edit_note"),
     ("problems", "Problems", "report_problem"),
     ("settings", "Settings", "settings"),
 )
@@ -88,6 +91,7 @@ class Window:
         self.analysis = AnalysisView()
         self.methods = MethodsView()
         self.importing = ImportView()
+        self.editing = EditView()
         self.preparing = PrepareView()
         self.cfa = CfaView()
         self.dataset: str | None = None
@@ -145,6 +149,8 @@ class Window:
                 self.prepare_panel()
             with ui.tab_panel("import").classes("lc-paper"):
                 self.import_panel()
+            with ui.tab_panel("edit").classes("lc-paper"):
+                self.edit_panel()
             with ui.tab_panel("problems").classes("lc-paper"):
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-paper"):
@@ -172,6 +178,7 @@ class Window:
                 self.analysis = AnalysisView()
                 self.methods = MethodsView()
                 self.importing = ImportView()
+                self.editing = EditView()
                 self.preparing = PrepareView()
                 self.root = root
             self.set_busy(False)
@@ -236,6 +243,7 @@ class Window:
             self.methods_panel,
             self.prepare_panel,
             self.import_panel,
+            self.edit_panel,
             self.problems_panel,
         ):
             panel.refresh()
@@ -284,6 +292,13 @@ class Window:
             ui.label("Open a project folder to run its prepare steps.").classes("lc-note")
         else:
             prepare.render(self.root, self.preparing, lambda: self.load(self.root))
+
+    @ui.refreshable_method
+    def edit_panel(self) -> None:
+        if self.root is None:
+            ui.label("Open a project folder to edit its files.").classes("lc-note")
+        else:
+            edit.render(self.root, self.editing, lambda: self.load(self.root))
 
     @ui.refreshable_method
     def import_panel(self) -> None:
