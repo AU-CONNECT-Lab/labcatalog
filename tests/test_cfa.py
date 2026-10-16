@@ -1,12 +1,14 @@
 import shutil
+import subprocess
 from glob import glob
 
+import pandas as pd
 import pytest
 
 from labcatalog.data.scoring import score_items
 from labcatalog.exceptions import RError
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats.cfa import ONE_FACTOR, SUBSCALES, build_models, fit_models
+from labcatalog.stats.cfa import ONE_FACTOR, PYTHON, SUBSCALES, build_models, fit_models
 from labcatalog.stats.rbridge import CFA_PACKAGES, r_status
 
 
@@ -95,6 +97,62 @@ def test_three_items_give_omega_but_no_fit_indices(result):
     [fit] = fit_models([mood], rscript())
     assert fit.fit == {"chisq": None, "df": 0.0}
     assert set(fit.omega) == {"ems_sadness"}
+
+
+def test_models_fit_in_python_without_r(result):
+    models = [m for m in models_of(result) if m.dataset == "child_w1"]
+    fits = {(f.instrument_id, f.kind): f for f in fit_models(models, None)}
+    mood = fits[("example_mood", SUBSCALES)]
+    assert mood.engine == PYTHON and mood.problem is None
+    assert mood.fit["df"] == 24 and mood.fit["srmr"] is None and mood.fit["cfi"] <= 1
+    assert set(mood.omega) == {"ems_sadness", "ems_worry", "ems_low_positive"}
+    assert len(mood.loadings) == 9 and all(0.5 < v < 1 for v in mood.loadings.values())
+    sadness = next(m for m in models if m.kind == SUBSCALES and m.instrument_id == "example_mood")
+    sadness.kind, sadness.factors = ONE_FACTOR, {"ems_sadness": sadness.factors["ems_sadness"]}
+    sadness.data = sadness.data[sadness.factors["ems_sadness"]]
+    [three] = fit_models([sadness], None)
+    assert three.fit == {"chisq": None, "df": 0.0} and set(three.omega) == {"ems_sadness"}
+
+
+ML_SCRIPT = """\
+args <- commandArgs(trailingOnly = TRUE)
+fit <- lavaan::cfa(readLines(args[2]), data = read.csv(args[1]), estimator = "ML", std.lv = TRUE)
+measures <- lavaan::fitMeasures(fit, c("chisq", "df", "cfi", "tli", "rmsea"))
+std <- lavaan::standardizedSolution(fit)
+std <- std[std$op == "=~", ]
+omega <- unlist(semTools::compRelSEM(fit))
+write.csv(data.frame(name = c(names(measures), paste(std$lhs, std$rhs), names(omega)),
+                     value = c(unname(measures), std$est.std, unname(omega))),
+          args[3], row.names = FALSE)
+"""
+
+
+@needs_r
+def test_python_matches_lavaan_ml(result, tmp_path):
+    mood = next(m for m in models_of(result) if m.dataset == "child_w1" and m.kind == SUBSCALES)
+    [fit] = fit_models([mood], None)
+    columns = list(mood.data.columns)
+    mood.data.set_axis([f"x{i}" for i in range(1, 10)], axis=1).to_csv(
+        tmp_path / "data.csv", index=False
+    )
+    syntax = "; ".join(
+        f"f{i} =~ {' + '.join(f'x{columns.index(c) + 1}' for c in cols)}"
+        for i, cols in enumerate(mood.factors.values(), start=1)
+    )
+    (tmp_path / "syntax.txt").write_text(syntax + "\n", encoding="utf-8")
+    (tmp_path / "ml.R").write_text(ML_SCRIPT, encoding="utf-8")
+    paths = [str(tmp_path / n) for n in ("ml.R", "data.csv", "syntax.txt", "out.csv")]
+    subprocess.run([rscript(), *paths], check=True, capture_output=True)
+    found = dict(pd.read_csv(tmp_path / "out.csv").itertuples(index=False))
+    for key in ("chisq", "df", "tli", "rmsea"):
+        assert fit.fit[key] == pytest.approx(found[key], abs=1e-3)
+    assert fit.fit["cfi"] == pytest.approx(found["cfi"], abs=1e-3)
+    scores = list(mood.factors)
+    for (score, column), value in fit.loadings.items():
+        name = f"f{scores.index(score) + 1} x{columns.index(column) + 1}"
+        assert value == pytest.approx(found[name], abs=1e-3)
+    for score, value in fit.omega.items():
+        assert value == pytest.approx(found[f"f{scores.index(score) + 1}"], abs=1e-3)
 
 
 @needs_r

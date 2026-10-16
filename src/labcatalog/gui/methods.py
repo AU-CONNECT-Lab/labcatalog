@@ -203,10 +203,8 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
         "Each instrument's paragraph with α and ω from that dataset; change the wording with "
         "measures: and description: as the instrument's page says."
     )
-    if cfa.status == CFA_UNSET:
-        note("Set the path to Rscript on the Settings page to add ω.")
-    elif cfa.status == CFA_RUNNING:
-        note("ω fills in when the factor models finish in R.")
+    if cfa.status in (CFA_UNSET, CFA_RUNNING):
+        note("ω fills in when the factor models finish.")
     texts = []
     for instrument_id, dataset in used:
         instrument = result.project.instruments[instrument_id]

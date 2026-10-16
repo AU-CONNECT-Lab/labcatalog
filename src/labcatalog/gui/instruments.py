@@ -53,7 +53,7 @@ from labcatalog.reports.export import (
 )
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument, Reference, Text
-from labcatalog.stats.cfa import SUBSCALES, CfaFit
+from labcatalog.stats.cfa import SUBSCALES, CfaFit, R
 from labcatalog.stats.invariance import STEPS, InvarianceTest
 from labcatalog.stats.summary import VariableSummary
 
@@ -89,6 +89,7 @@ class CfaView:
     invariance_status: str = CFA_UNSET
     invariance: list[InvarianceTest] = field(default_factory=list)
     invariance_message: str = ""
+    open_settings: Callable[[], None] | None = None
 
 
 def render(
@@ -812,33 +813,58 @@ def factor_structure(
         return
     fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
     heading(f"Factor structure in {dataset}")
-    if cfa.status == CFA_UNSET:
-        note("Set the path to Rscript on the Settings page to fit factor models (CFA) and get ω.")
-    elif cfa.status == CFA_RUNNING:
-        note("Fitting factor models in R.")
+    if cfa.status in (CFA_UNSET, CFA_RUNNING):
+        note("Fitting factor models.")
     elif cfa.status == CFA_FAILED:
         note(cfa.message)
     elif not fits:
         note("No factor model: no score here has three or more items.")
     else:
+        in_r = fits[0].engine == R
         method = (
             "lavaan, WLSMV with the items as ordered categories, people who answered every item."
+            if in_r
+            else "semopy, maximum likelihood with the items as continuous, people who answered "
+            "every item."
+        )
+        omega = (
+            "ω is semTools' categorical omega."
+            if in_r
+            else "ω is the factor's share of the observed variance of the summed items, as "
+            "semTools gives it for continuous items."
         )
         papers = {
             "cfa_fit": PaperTable(
                 f"Fit of Factor Models for {instrument.name}",
-                *without_empty(*fit_table(instrument, fits), "problem"),
+                *without_empty(*without_empty(*fit_table(instrument, fits), "problem"), "srmr"),
                 method,
             ),
             "cfa_loadings": PaperTable(
                 f"Standardized Loadings and ω for {instrument.name}",
                 *loading_table(result, instrument, dataset, fits),
-                f"{method} ω is semTools' categorical omega.",
+                f"{method} {omega}",
             ),
         }
         for shown in papers.values():
             paper_table(shown)
         save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
+        if cfa.message:
+            note(cfa.message)
+        elif not in_r:
+            settings_hint(
+                cfa,
+                "Set Rscript on the Settings page to fit with WLSMV in lavaan, as JASP does "
+                "for ordinal items.",
+            )
+
+
+def settings_hint(cfa: CfaView, text: str) -> None:
+    with ui.row().classes("items-center gap-2"):
+        note(text)
+        if cfa.open_settings:
+            ui.button("Open Settings", icon="settings", on_click=cfa.open_settings).props(
+                "flat dense no-caps"
+            )
 
 
 @ui.refreshable
@@ -986,7 +1012,9 @@ def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaVi
     tests = [t for t in cfa.invariance if t.instrument_id == instrument.id]
     heading("Invariance across waves")
     if cfa.invariance_status == CFA_UNSET:
-        note("Set the path to Rscript on the Settings page to test invariance across waves.")
+        settings_hint(
+            cfa, "Set the path to Rscript on the Settings page to test invariance across waves."
+        )
     elif cfa.invariance_status == CFA_RUNNING:
         note("Testing invariance across waves in R.")
     elif cfa.invariance_status == CFA_FAILED:

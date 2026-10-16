@@ -106,7 +106,7 @@ class Window:
         self.importing = ImportView()
         self.editing = EditView()
         self.preparing = PrepareView()
-        self.cfa = CfaView()
+        self.cfa = CfaView(open_settings=lambda: self.tabs.set_value("settings"))
         self.dataset: str | None = None
         self.error: str | None = None
         # The project a frozen copy was opened from, while the copy is shown.
@@ -257,7 +257,10 @@ class Window:
         fits, message, status = await in_r(run_cfa, result, rscript)
         if status == CFA_FAILED:
             fits = await run.io_bound(run_cfa, result, None)
-            message, status = f"R failed, so the factor models were fitted in Python: {message}", CFA_DONE
+            message, status = (
+                f"R failed, so the factor models were fitted in Python: {message}",
+                CFA_DONE,
+            )
         # A newer Refresh has started its own run.
         if self.result is not result:
             return
