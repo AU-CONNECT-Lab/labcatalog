@@ -203,7 +203,8 @@ def ask_panel(
                         ui.label(f"{found.item_id}: {as_text(items[found.item_id].text)}")
                     note(found.reason)
         if asked.dropped:
-            note(f"Left out {asked.dropped} matches naming items the catalog does not have.")
+            note(f"Left out {asked.dropped} of the model's matches: not in the catalog.")
+        note("The list below shows only these instruments; Clear shows them all again.")
 
     async def ask() -> None:
         query = (box.value or "").strip()
@@ -226,9 +227,8 @@ def ask_panel(
         else:
             meta = asked.meta
             status.set_text(
-                f"{len(asked.matches)} matches in {len(asked.instruments)} instruments, from "
-                f"{meta.model} in {meta.latency_ms / 1000:.0f} s, {meta.input_tokens} tokens in "
-                f"and {meta.output_tokens} out. The list below shows only these instruments."
+                f"Answered by {meta.model} in {meta.latency_ms / 1000:.0f} s, "
+                f"{meta.input_tokens} tokens in and {meta.output_tokens} out."
             )
             view.asked = asked
             answer.refresh()
