@@ -1,13 +1,11 @@
 import os
 from collections.abc import Awaitable, Callable
-from pathlib import Path
 
 from nicegui import run, ui
 
 from labcatalog.charts import style
-from labcatalog.datalad.bridge import INSTALL, datalad_status, use_folder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import preferences
+from labcatalog.gui import datalad, preferences
 from labcatalog.gui.common import note, section
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.rbridge import ALL_PACKAGES, install_command, r_status
@@ -62,7 +60,7 @@ def render(
 
     ui.button("Save and check", on_click=save).classes("mt-2")
 
-    datalad_section(on_datalad)
+    datalad.datalad_section(on_datalad)
     models_section(on_model)
 
     section("Charts")
@@ -84,42 +82,6 @@ def render(
         value=preferences.load().get(preferences.TABLE_FORMAT, preferences.RICH),
         on_change=lambda e: preferences.save({preferences.TABLE_FORMAT: e.value}),
     ).props("no-caps").classes("mt-2")
-
-
-def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
-    section("DataLad")
-    example = Path.home() / ".local" / "bin" / "datalad.exe"
-    note(
-        "When the data are in DataLad datasets, labcatalog records which version it read, "
-        "freezes tag that version, and prepare steps can run through datalad run. Install "
-        f"DataLad and git-annex yourself, for example with {INSTALL}, then give the path to "
-        f"datalad, for example {example}."
-    )
-    path = (
-        ui.input("datalad", value=preferences.load().get(preferences.DATALAD, ""))
-        .props("outlined dense clearable")
-        .classes("w-full max-w-2xl mt-2")
-    )
-    status = ui.label().classes("lc-note")
-
-    async def save() -> None:
-        value = (path.value or "").strip().strip('"')
-        path.value = value
-        preferences.save({preferences.DATALAD: value})
-        if not value:
-            status.set_text("No DataLad set.")
-            return
-        use_folder(value)
-        status.set_text("Checking DataLad")
-        try:
-            found = await run.io_bound(datalad_status, value)
-        except LabCatalogError as err:
-            status.set_text(str(err))
-            return
-        status.set_text(f"{found.datalad}, with git-annex {found.annex}.")
-        await on_datalad()
-
-    ui.button("Save and check", on_click=save).classes("mt-2")
 
 
 def models_section(on_model: Callable[[], None]) -> None:

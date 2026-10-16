@@ -1,17 +1,14 @@
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.config import dataset_by_name
-from labcatalog.datalad.freeze import RECORD_ONLY, datalad_datasets, list_freezes
-from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import preferences, problems
+from labcatalog.gui import datalad, problems
 from labcatalog.gui.common import cited, col, heading, note, open_path, table, without_line
 from labcatalog.issues import Issue
-from labcatalog.paths import portable_path
-from labcatalog.pipeline import CatalogResult, run_freeze
+from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import DatasetSummary
 
 
@@ -28,9 +25,9 @@ def render(
         note(f"No datasets yet; add them under datasets in {defaults.CONFIG_FILENAME}.")
         return
     if selected not in summaries:
-        freeze_button(result, on_frozen)
+        datalad.freeze_button(result, on_frozen)
         studies(result, summaries, on_select)
-        freezes_table(result.project.root, on_open_freeze)
+        datalad.freezes_table(result.project.root, on_open_freeze)
         return
     ui.button("All datasets", icon="arrow_back", on_click=lambda: on_select(None)).props(
         "flat dense no-caps"
@@ -59,99 +56,6 @@ def studies(
             shown = table(*dataset_table(result, [summaries[n] for n in names])).classes("mt-2")
             shown.classes("cursor-pointer")
             shown.on("rowClick", lambda e: on_select(e.args[1]["name"]))
-
-
-def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]]) -> None:
-    root = result.project.root
-    tagged = [
-        "the project folder" if p == root else portable_path(p, root).as_posix()
-        for p in datalad_datasets(result.project)
-    ]
-
-    def open_dialog() -> None:
-        with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
-            ui.label("Freeze the data").classes("text-lg font-medium")
-            note(
-                "A freeze writes a record of every data file labcatalog reads (checksum, rows, "
-                f"participants) to {defaults.FREEZES_DIR}, so you can say later which data a "
-                "result used."
-            )
-            if tagged:
-                note(
-                    "The data are in DataLad, so the freeze also saves these datasets and tags "
-                    f"them with its name, which lets you get this version back: {', '.join(tagged)}."
-                )
-            else:
-                note(RECORD_ONLY)
-            name = (
-                ui.input("Name", placeholder="2026-06-submission")
-                .props("outlined dense autofocus")
-                .classes("w-full")
-            )
-            status = ui.label().classes("lc-note")
-
-            async def go() -> None:
-                datalad = preferences.load().get(preferences.DATALAD)
-                status.set_text("Freezing")
-                try:
-                    path, record = await run.io_bound(
-                        run_freeze, root, (name.value or "").strip(), datalad
-                    )
-                except LabCatalogError as err:
-                    status.set_text(str(err))
-                    return
-                dialog.close()
-                done = f"Froze {record.name} in {portable_path(path, root).as_posix()}"
-                if record.tag:
-                    done += f" and tagged {len(record.manifest.datalad)} DataLad dataset(s)"
-                ui.notify(done)
-                await on_frozen()
-
-            with ui.row().classes("w-full justify-end"):
-                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
-                ui.button("Freeze", on_click=go)
-        dialog.open()
-
-    with ui.row().classes("w-full justify-end"):
-        ui.button("Freeze", icon="ac_unit", on_click=open_dialog).props("flat no-caps")
-
-
-# Only a freeze with a DataLad tag has its data to open.
-OPEN_CELL = r"""
-<q-td :props="props">
-  <q-btn v-if="props.row.tagged" flat dense no-caps color="primary" label="Open"
-         @click="$parent.$emit('open_freeze', props.row)" />
-</q-td>
-"""
-
-
-def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) -> None:
-    found = list_freezes(root)
-    if not found:
-        return
-    heading("Freezes")
-    columns = [
-        col("frozen", "Frozen"),
-        col("name", "Name"),
-        col("tag", "DataLad tag"),
-        col("files", "Data files", numeric=True),
-    ]
-    if on_open:
-        columns.append(col("open", "", sortable=False))
-    rows = [
-        {
-            "frozen": f.frozen_at.strftime("%Y-%m-%d %H:%M"),
-            "name": f.name,
-            "tag": f.tag or "none, record only",
-            "files": len(f.manifest.files),
-            "tagged": f.tag is not None,
-        }
-        for f in found
-    ]
-    shown = table(columns, rows).classes(remove="w-full")
-    if on_open:
-        shown.add_slot("body-cell-open", OPEN_CELL)
-        shown.on("open_freeze", lambda e: on_open(e.args["name"]))
 
 
 def methods_of(result: CatalogResult, study: str) -> dict[str, str]:

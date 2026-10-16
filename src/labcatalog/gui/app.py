@@ -8,7 +8,7 @@ from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
 from labcatalog.datalad.annex import dataset_root
 from labcatalog.datalad.bridge import use_folder
-from labcatalog.datalad.freeze import Freeze, differences, list_freezes
+from labcatalog.datalad.freeze import list_freezes
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import (
     analysis,
@@ -26,7 +26,7 @@ from labcatalog.gui import (
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
-from labcatalog.gui.datalad import get_button
+from labcatalog.gui.datalad import frozen_text, get_button
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.instruments import (
     CFA_DONE,
@@ -394,16 +394,6 @@ class Window:
         failed = self.result is None or self.result.project is None
         if self.root is not None and failed and dataset_root(self.root):
             get_button("Get missing content", run_get_missing, [self.root], self.reload)
-
-
-def frozen_text(record: Freeze, result: CatalogResult | None) -> str:
-    text = f"Frozen version {record.name}, a copy: edits here do not change the project"
-    if result is None or result.manifest is None:
-        return text
-    changed = differences(record, result.manifest)
-    if changed:
-        return f"{text}. Differs from the freeze record: {', '.join(changed)}"
-    return f"{text}. All {len(record.manifest.files)} data files match the freeze record"
 
 
 def cfa_changed() -> None:
