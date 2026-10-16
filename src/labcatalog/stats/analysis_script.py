@@ -110,13 +110,13 @@ table1 = pd.DataFrame([
 print(table1)
 """
 R_CORRELATIONS = """\
-# Correlations: n, M and SD of each variable (psych::describe), then Pearson r for each pair
-# on everyone with both values (psych::corr.test, p values not adjusted).
+# Correlations: n, M and SD of each variable (psych::describe), then {coefficient} for each
+# pair on everyone with both values (psych::corr.test, p values not adjusted).
 variables <- c({columns})
 descriptives <- data.frame(variable = variables,
                            psych::describe(d[variables])[c("n", "mean", "sd")], row.names = NULL)
 print(descriptives)
-test <- psych::corr.test(d[variables], adjust = "none")
+test <- psych::corr.test(d[variables], method = "{method}", adjust = "none")
 pairs <- which(lower.tri(test$r), arr.ind = TRUE)
 correlations <- data.frame(x = variables[pairs[, "col"]], y = variables[pairs[, "row"]],
                            n = if (is.matrix(test$n)) test$n[pairs] else test$n,
@@ -124,14 +124,15 @@ correlations <- data.frame(x = variables[pairs[, "col"]], y = variables[pairs[, 
 print(correlations)
 """
 PYTHON_CORRELATIONS = """\
-# Correlations: n, M and SD of each variable, then Pearson r for each pair on everyone with
-# both values (pingouin, p values not adjusted).
+# Correlations: n, M and SD of each variable, then {coefficient} for each pair on everyone
+# with both values (pingouin, p values not adjusted).
 variables = [{columns}]
 descriptives = pd.DataFrame(dict(variable=variables, n=d[variables].count().to_numpy(),
                                  mean=d[variables].mean().to_numpy(),
                                  sd=d[variables].std().to_numpy()))
 print(descriptives)
-correlations = pg.pairwise_corr(d, columns=variables, padjust="none")[["X", "Y", "n", "r", "p_unc"]]
+correlations = pg.pairwise_corr(d, columns=variables, method="{method}", padjust="none")
+correlations = correlations[["X", "Y", "n", "r", "p_unc"]]
 correlations.columns = ["x", "y", "n", "r", "p"]
 print(correlations)
 """
@@ -530,12 +531,14 @@ def table_one_code(datasets: list[str], rows: list[tuple[str, list[Variable]]]) 
     )
 
 
-def correlation_code(variables: list[Variable]) -> Code:
+def correlation_code(variables: list[Variable], method: str = "pearson") -> Code:
     columns = ", ".join(r_string(v.column) for v in variables)
+    coefficient = "Spearman's rho" if method == "spearman" else "Pearson r"
+    fields = dict(columns=columns, method=method, coefficient=coefficient)
     return Code(
         title="Correlations",
-        r=R_CORRELATIONS.format(columns=columns),
-        python=PYTHON_CORRELATIONS.format(columns=columns),
+        r=R_CORRELATIONS.format(**fields),
+        python=PYTHON_CORRELATIONS.format(**fields),
         outputs=("descriptives", "correlations"),
         packages=("psych",),
     )
@@ -624,7 +627,8 @@ def page_script(
     data = AnalysisData(result, sample)
     codes = []
     if len(scores) >= 2:
-        codes.append(correlation_code([data.variable(k) for k in scores]))
+        method = result.project.config.stats.correlation
+        codes.append(correlation_code([data.variable(k) for k in scores], method))
     if y is not None:
         target = data.variable(y)
         variables = [data.variable(x) for x in xs if x != y]

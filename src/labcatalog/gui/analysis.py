@@ -155,7 +155,8 @@ def correlation_section(
         async def fill() -> Callable:
             data = analysis_script.AnalysisData(result, sample)
             variables = [data.variable(k) for k in keys]
-            code = analysis_script.correlation_code(variables)
+            stats = result.project.config.stats
+            code = analysis_script.correlation_code(variables, stats.correlation)
             frame = data.frame()
             found, engine = await analysis_tables.compute(result, sample, frame, code)
             texts = analysis_tables.section_files(result, sample, frame, code)
@@ -190,7 +191,8 @@ def correlation_section(
                 "Correlations Among Variables",
                 columns,
                 rows,
-                f"Pearson r, each pair on everyone with both values ({n}). {STARS_NOTE}",
+                f"{stats.coefficient()}, each pair on everyone with both values ({n}). "
+                f"{STARS_NOTE}",
             )
 
             def content() -> None:

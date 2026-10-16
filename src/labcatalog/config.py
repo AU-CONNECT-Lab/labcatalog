@@ -101,6 +101,11 @@ class StatsConfig(StrictModel):
     # Two groups: Welch's t test with d from the mean of the two variances, or Student's with
     # the pooled SD, as JASP gives it by default.
     t_test: Literal["welch", "student"] = "welch"
+    # Correlations between scores and variables; item-rest and regression stay Pearson.
+    correlation: Literal["pearson", "spearman"] = "pearson"
+
+    def coefficient(self) -> str:
+        return "Spearman's ρ" if self.correlation == "spearman" else "Pearson r"
 
 
 class PrepareStep(StrictModel):

@@ -169,8 +169,10 @@ def summarize(
         modalities=modality_counts(datasets),
         group_name=config.ids.group.name if config.ids.group else None,
         groups=wave_groups(datasets),
-        correlations=correlations(catalog, datasets, scores, config.stats.correlate_by),
-        stability=stability(by_wave),
+        correlations=correlations(
+            catalog, datasets, scores, config.stats.correlate_by, config.stats.correlation
+        ),
+        stability=stability(by_wave, config.stats.correlation),
         retained=retained(by_wave),
     )
 
@@ -464,6 +466,7 @@ def correlations(
     datasets: dict[str, LoadedDataset],
     scores: dict[str, pd.DataFrame],
     correlate_by: str,
+    method: str = "pearson",
 ) -> list[Correlation]:
     if correlate_by == "none":
         return []
@@ -489,7 +492,7 @@ def correlations(
         table = pd.DataFrame(series)
         present = table.notna().astype(float)
         pairs = present.T @ present
-        matrix = table.corr(min_periods=defaults.MIN_CORRELATION_N)
+        matrix = table.corr(method=method, min_periods=defaults.MIN_CORRELATION_N)
         rows.append(
             Correlation(
                 study=study,
@@ -524,14 +527,16 @@ def waves_of_scores(
     return found
 
 
-def stability(found: dict[ScoreKey, dict[str, pd.Series]]) -> list[ScoreStability]:
+def stability(
+    found: dict[ScoreKey, dict[str, pd.Series]], method: str = "pearson"
+) -> list[ScoreStability]:
     rows = []
     for (study, reporter, instrument_id, score_id), waves in found.items():
         order = sorted(waves, key=wave_order)
         for earlier, later in zip(order, order[1:], strict=False):
             both = pd.concat([waves[earlier], waves[later]], axis=1, join="inner")
             r = (
-                both.iloc[:, 0].corr(both.iloc[:, 1])
+                both.iloc[:, 0].corr(both.iloc[:, 1], method=method)
                 if len(both) >= defaults.MIN_CORRELATION_N
                 else None
             )

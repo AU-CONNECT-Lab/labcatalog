@@ -490,7 +490,7 @@ def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -
     return plots.dot_rows(
         [("", [members[m] for m in ordered])],
         series,
-        "Pearson r",
+        result.project.config.stats.coefficient(),
         f"{short_label(instrument, score)} against every other score",
     )
 
@@ -1227,6 +1227,7 @@ def correlation_chart(
     style: str = "heatmap",
 ) -> go.Figure | None:
     z = matrices.as_matrix([[c.r for c in row] for row in matrix])
+    coefficient = result.project.config.stats.coefficient()
     hover = [
         [
             f"{labels[i]} × {labels[j]}<br>r = {c.r:.2f}, n = {c.n}, "
@@ -1245,9 +1246,9 @@ def correlation_chart(
             [analysis.instrument_of(k) for k in keys],
             instrument_order(result),
             instrument_names(result),
-            "Pearson r",
+            coefficient,
         )
-    return matrices.heatmap(z, labels, hover, "Pearson r")
+    return matrices.heatmap(z, labels, hover, coefficient)
 
 
 def pair_scatter(
