@@ -1056,7 +1056,7 @@ def dataset_label(result: CatalogResult, name: str) -> str:
 
 def variable_choices(result: CatalogResult, datasets: list[str]) -> dict[str, str]:
     # Every score and number item of the chosen files, named by wave (and reporter where a wave has several).
-    names = series_names(result, dataset_order(result, datasets))
+    names = series_names(result, modality_order(result, datasets))
     instruments = result.project.instruments
     found = {}
     for name in names:
@@ -1085,6 +1085,38 @@ def wave_groups(
         d = dataset_by_name(config, name)
         by_wave.setdefault(wave_name(result, d.study, d.wave), []).append(name)
     return {wave: list(choices(result, names)) for wave, names in by_wave.items()}
+
+
+def modality_order(result: CatalogResult, datasets: list[str]) -> list[str]:
+    # Each modality's files together, in the order vocab lists them, waves in order within.
+    config = result.project.config
+    modalities = config.vocab.modalities
+
+    def rank(name: str) -> int:
+        modality = dataset_by_name(config, name).modality
+        return modalities.index(modality) if modality in modalities else len(modalities)
+
+    return sorted(dataset_order(result, datasets), key=rank)
+
+
+def menu_groups(
+    result: CatalogResult,
+    datasets: list[str],
+    choices: Callable[[CatalogResult, list[str]], dict[str, str]],
+) -> dict[str, list[str]]:
+    # Shortcuts to add a wave's or a modality's choices at once, where there is more than one.
+    config = result.project.config
+    waves = wave_groups(result, datasets, choices)
+    found = {f"All in {wave}": keys for wave, keys in waves.items()} if len(waves) > 1 else {}
+    by_modality: dict[str, list[str]] = {}
+    for name in modality_order(result, datasets):
+        by_modality.setdefault(dataset_by_name(config, name).modality, []).append(name)
+    if len(by_modality) > 1:
+        for modality, names in by_modality.items():
+            keys = list(choices(result, names))
+            if keys:
+                found[f"All {config.vocab.modality_label(modality)}"] = keys
+    return found
 
 
 def total_choices(result: CatalogResult, datasets: list[str]) -> list[str]:

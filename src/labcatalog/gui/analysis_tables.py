@@ -136,7 +136,7 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
             .props("dense outlined use-chips")
             .classes("grow")
         )
-        page.pick_menu(chosen, views.wave_groups(result, sample.datasets, script.measures))
+        page.pick_menu(chosen, views.menu_groups(result, sample.datasets, script.measures))
     body()
 
 

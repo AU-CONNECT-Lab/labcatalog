@@ -80,6 +80,23 @@ def test_wave_groups_put_every_reporter_of_a_wave_together(result):
     assert set(measures["Wave 2"]) < set(analysis_script.measures(result, datasets))
 
 
+def test_choices_come_in_modality_blocks_with_a_shortcut_each(result):
+    datasets = ["eeg_w1", "child_w1", "fmri_w1", "eeg_w3", "child_w3"]
+    keys = list(views.variable_choices(result, datasets))
+    order = [k.rsplit("@", 1)[1] for k in keys]
+    assert list(dict.fromkeys(order)) == ["child_w1", "child_w3", "eeg_w1", "eeg_w3", "fmri_w1"]
+    menu = views.menu_groups(result, datasets, views.variable_choices)
+    assert list(menu) == [
+        "All in Wave 1",
+        "All in Wave 3",
+        "All questionnaires",
+        "All EEG",
+        "All fMRI",
+    ]
+    assert {k.rsplit("@", 1)[1] for k in menu["All EEG"]} == {"eeg_w1", "eeg_w3"}
+    assert views.menu_groups(result, ["child_w1"], views.variable_choices) == {}
+
+
 def test_apa_numbers():
     assert page.apa(0.4512) == ".45"
     assert page.apa(-0.1234) == "-.12"
