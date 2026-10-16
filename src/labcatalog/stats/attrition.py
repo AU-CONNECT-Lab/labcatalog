@@ -219,7 +219,12 @@ def plan(result: CatalogResult, study: str, wave: str, keys: list[str]) -> Plan 
     sample = analysis.build_sample(result, wave_files(result, study, wave), intersect=False)
     later = set(analysis.build_sample(result, wave_files(result, study, second), False).people)
     data = AnalysisData(result, sample)
-    variables = [(label, found[0]) for label, found in measure_variables(data, keys)]
+    # A variable in several files of the wave gets a row per file, as reporters may differ.
+    variables = [
+        (label if len(found) == 1 else f"{label} ({v.dataset})", v)
+        for label, found in measure_variables(data, keys)
+        for v in found
+    ]
     frame = data.frame()
     frame[RETURNED] = [int(p in later) for p in sample.people]
     stayed = int(frame[RETURNED].sum())

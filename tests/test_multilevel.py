@@ -78,7 +78,8 @@ def test_a_covariate_can_take_each_waves_own_value(result):
     assert "item:fnirs_social.pfc_hbo_social" not in choices
     long = ml.long_frame(result, eeg_model([EPOCHS]))
     assert long.covariates[0].column == "epochs_kept"
-    for time, name in enumerate(["eeg_w1", "eeg_w3"]):
+    # Wave 2 has no EEG, so wave 3 is two waves on.
+    for time, name in [(0, "eeg_w1"), (2, "eeg_w3")]:
         eeg = result.datasets[name].frame
         rows = long.frame[long.frame["time"] == time].set_index("id")["epochs_kept"]
         expected = pd.to_numeric(eeg["epochs_kept"]).astype(float).set_axis(eeg["pid"])
@@ -99,7 +100,7 @@ def test_a_number_item_is_an_outcome_and_a_covariate(result):
     long = ml.long_frame(result, model)
     assert long.outcome == "frontal_alpha_asymmetry"
     eeg = result.datasets["eeg_w3"].frame
-    later = long.frame[long.frame["time"] == 1].set_index("id")[long.outcome]
+    later = long.frame[long.frame["time"] == 2].set_index("id")[long.outcome]
     expected = pd.to_numeric(eeg["frontal_alpha_asymmetry"]).set_axis(eeg["pid"])
     pd.testing.assert_series_equal(
         later, expected.reindex(later.index), check_names=False, check_index_type=False
@@ -124,6 +125,11 @@ def test_long_data_has_a_row_per_person_and_wave(result):
     frame = long.frame
     assert list(frame.columns) == ["id", "wave", "time", "ems_total", "dem_gender_w1"]
     assert frame.groupby("wave")["time"].first().to_dict() == {"1": 0, "2": 1, "3": 2}
+    # Time starts at the first chosen wave and keeps the gap of a skipped one.
+    later = ml.long_frame(result, growth(datasets=["child_w2", "child_w3"])).frame
+    assert later.groupby("wave")["time"].first().to_dict() == {"2": 0, "3": 1}
+    skipped = ml.long_frame(result, growth(datasets=["child_w1", "child_w3"])).frame
+    assert skipped.groupby("wave")["time"].first().to_dict() == {"1": 0, "3": 2}
     assert len(frame) + long.left_out == sum(len(result.datasets[n].frame) for n in CHILD)
     # A parent's answer reaches the child through the family.
     parent = result.datasets["parent_w1"]

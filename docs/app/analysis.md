@@ -39,7 +39,7 @@ A linear mixed model of one outcome across waves. This section picks its own wav
 - **Outcome**: a score or number item. By default, the first total score measured in two or more waves.
 - **Waves**: the datasets that hold the outcome, one per wave, from one study. By default, all of them.
 - **Covariates**: a variable from one dataset, used at every wave, or a variable marked "(each wave)", which uses each wave's own value.
-- **Waves within people**: people as a level, with time as the waves since the first. On by default.
+- **Waves within people**: people as a level, with time as the waves since the first chosen wave (a wave you leave out still counts, so waves 1 and 3 give times 0 and 2). On by default.
 - **People within each** group: groups as a level, when `labcatalog.yaml` names a group under `ids`. Off by default.
 - **Random slope of time for each person**: on by default.
 - **Split each-wave covariates into person mean and deviation**: separates the effect between people from the effect within a person. Shown when an each-wave covariate is chosen.

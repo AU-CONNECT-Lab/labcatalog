@@ -41,14 +41,16 @@ DEVIATION = ", deviation from the person mean"
 R_HEADER = """\
 # Multilevel model for {project}, written by labcatalog.
 # d is the data saved beside this script: one row per person and wave, with time counting
-# waves from the first (0, 1, 2, ...) and scores as labcatalog computed them.
+# the study's waves from the first one chosen (0, 1, 2, ...; a skipped wave leaves a gap) and
+# scores as labcatalog computed them.
 # Needs the R packages {names}; install them once with: {install}
 d <- read.csv({path}, check.names = FALSE)
 """
 PYTHON_HEADER = """\
 # Multilevel model for {project}, written by labcatalog.
 # d is the data saved beside this script: one row per person and wave, with time counting
-# waves from the first (0, 1, 2, ...) and scores as labcatalog computed them.
+# the study's waves from the first one chosen (0, 1, 2, ...; a skipped wave leaves a gap) and
+# scores as labcatalog computed them.
 # Needs pandas and statsmodels (pip install statsmodels).
 import warnings
 
@@ -397,8 +399,12 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
     taken = {PERSON, TIME, WAVE, outcome, *([group] if group else [])}
     study = configs[ordered[0]].study
     covariates = [covariate(result, key, taken, study) for key in model.covariates]
+    # Time counts the study's waves, so a skipped wave leaves a gap.
+    waves = sorted({d.wave for d in configs.values() if d.study == study}, key=wave_order)
+    first = waves.index(configs[ordered[0]].wave)
     parts, left_out = [], 0
-    for time, name in enumerate(ordered):
+    for name in ordered:
+        time = waves.index(configs[name].wave) - first
         loaded = result.datasets[name]
         ids = loaded.frame[loaded.id_column].astype("string")
         keep = analysis.linkable(ids)

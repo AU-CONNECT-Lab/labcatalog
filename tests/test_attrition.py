@@ -53,6 +53,27 @@ def test_returned_means_in_any_file_of_the_next_wave(result):
     assert attrition.plan(result, "mock_study", "3", [EMS]) is None
 
 
+def test_a_variable_in_two_files_of_the_wave_gets_a_row_each(mock_project):
+    # Split child_w1 into two files of wave 1 that both hold the mood scale.
+    data = pd.read_csv(mock_project / "data" / "child_w1.csv", dtype=str)
+    half = len(data) // 2
+    data.iloc[:half].to_csv(mock_project / "data" / "child_w1.csv", index=False)
+    data.iloc[half:].to_csv(mock_project / "data" / "child_w1b.csv", index=False)
+    shutil.copy(mock_project / "maps" / "child_w1.csv", mock_project / "maps" / "child_w1b.csv")
+    config = mock_project / "labcatalog.yaml"
+    line = next(x for x in config.read_text().splitlines() if "{name: child_w1," in x)
+    extra = line.replace("child_w1", "child_w1b")
+    config.write_text(config.read_text().replace(line, f"{line}\n{extra}"))
+    study = mock_project / "studies" / "mock_study.yaml"
+    study.write_text(study.read_text().replace("[child_w1,", "[child_w1, child_w1b,"))
+    found_plan = attrition.plan(run_catalog(mock_project), "mock_study", "1", [EMS])
+    first, second = found_plan.labels
+    assert first.endswith(" (child_w1)") and second.endswith(" (child_w1b)")
+    columns = found_plan.frame[["ems_total_child_w1", "ems_total_child_w1b"]].notna()
+    assert columns.all(axis=0).sum() == 0 and columns.any(axis=0).all()
+    assert not columns.all(axis=1).any()
+
+
 def test_python_matches_scipy(result):
     found_plan, compared, engine = run(result, [EMS, GENDER])
     assert engine == script.PYTHON
