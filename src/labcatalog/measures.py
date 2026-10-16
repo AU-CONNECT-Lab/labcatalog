@@ -5,7 +5,7 @@ from labcatalog.config import dataset_by_name
 from labcatalog.project import Project
 from labcatalog.resolve import Catalog, ResolvedScore
 from labcatalog.schema import Instrument
-from labcatalog.stats import Summary
+from labcatalog.stats.summary import Summary
 
 DEFAULT_TEMPLATE = "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}"
 PLACEHOLDERS = (

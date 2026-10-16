@@ -9,7 +9,7 @@ from labcatalog.gui import datalad, problems
 from labcatalog.gui.common import cited, col, heading, note, open_path, table, without_line
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
-from labcatalog.stats import DatasetSummary
+from labcatalog.stats.summary import DatasetSummary
 
 
 def render(

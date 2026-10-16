@@ -7,11 +7,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from labcatalog import analysis
-from labcatalog import analysis_script as script
 from labcatalog.gui import analysis_tables
 from labcatalog.pipeline import run_catalog
-from labcatalog.rbridge import ANALYSIS_PACKAGES, r_status
+from labcatalog.stats import analysis
+from labcatalog.stats import analysis_script as script
+from labcatalog.stats.rbridge import ANALYSIS_PACKAGES, r_status
 
 EMS = "example_mood.ems_total@child_w1"
 EPS = "example_parent_stress.eps_mean@parent_w1"

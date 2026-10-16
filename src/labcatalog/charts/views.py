@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
 
-from labcatalog import analysis, defaults
+from labcatalog import defaults
 from labcatalog.browse import as_set, facet_label, facet_names, value_order
 from labcatalog.charts import matrices, network, plots, scatter
 from labcatalog.charts.style import group_color, natural_key, pair_color, wave_color
@@ -16,7 +16,8 @@ from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.pipeline import CatalogResult
 from labcatalog.resolve import ResolvedScore, as_text_dict
 from labcatalog.schema import Instrument, Score
-from labcatalog.stats import wave_order
+from labcatalog.stats import analysis
+from labcatalog.stats.summary import wave_order
 
 RADAR_AXES = 3
 # Room beyond 0% and 100% so dots at either end stay whole.

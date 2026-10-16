@@ -1,10 +1,10 @@
 import pytest
 
-from labcatalog import analysis, analysis_script
 from labcatalog.charts import views
 from labcatalog.gui import analysis as page
 from labcatalog.gui.common import p_value
 from labcatalog.pipeline import run_catalog
+from labcatalog.stats import analysis, analysis_script
 
 EMS = "example_mood.ems_total@child_w1"
 EPS = "example_parent_stress.eps_mean@parent_w1"

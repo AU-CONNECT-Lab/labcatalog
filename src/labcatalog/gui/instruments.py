@@ -8,7 +8,6 @@ from nicegui import app, run, ui
 
 from labcatalog import ai_scoring, measures
 from labcatalog.browse import BrowseIndex, counts, matches
-from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.datalad.annex import is_placeholder
@@ -32,7 +31,6 @@ from labcatalog.gui.common import (
 from labcatalog.gui.datalad import get_button
 from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.history import file_history
-from labcatalog.invariance import STEPS, InvarianceTest
 from labcatalog.pipeline import (
     CatalogResult,
     run_description_draft,
@@ -42,7 +40,9 @@ from labcatalog.pipeline import (
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument, Reference, Text
-from labcatalog.stats import VariableSummary
+from labcatalog.stats.cfa import SUBSCALES, CfaFit
+from labcatalog.stats.invariance import STEPS, InvarianceTest
+from labcatalog.stats.summary import VariableSummary
 from labcatalog.tables import PaperTable
 
 PAGE_SIZE = 50

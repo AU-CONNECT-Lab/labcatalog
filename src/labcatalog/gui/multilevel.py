@@ -3,13 +3,13 @@ from dataclasses import replace
 
 from nicegui import run, ui
 
-from labcatalog import multilevel as ml
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
 from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
 from labcatalog.pipeline import CatalogResult
+from labcatalog.stats import multilevel as ml
 from labcatalog.tables import PaperTable
 
 ONE_EACH = (

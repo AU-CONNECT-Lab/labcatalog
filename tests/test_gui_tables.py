@@ -2,12 +2,12 @@ from pathlib import Path
 
 from labcatalog.bibliography import citation
 from labcatalog.browse import build_index, matches
-from labcatalog.cfa import ONE_FACTOR, SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.gui import datasets, instruments, overview
 from labcatalog.gui.common import split_location
-from labcatalog.invariance import InvarianceStep, InvarianceTest
 from labcatalog.pipeline import run_catalog
+from labcatalog.stats.cfa import ONE_FACTOR, SUBSCALES, CfaFit
+from labcatalog.stats.invariance import InvarianceStep, InvarianceTest
 
 
 def test_location_splits_off_the_line_number():

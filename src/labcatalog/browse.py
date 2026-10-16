@@ -5,7 +5,7 @@ from labcatalog.config import ProjectConfig, dataset_by_name
 from labcatalog.project import Project
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument
-from labcatalog.stats import wave_order
+from labcatalog.stats.summary import wave_order
 
 
 @dataclass

@@ -8,13 +8,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from labcatalog import analysis, defaults
-from labcatalog.cfa import is_total
+from labcatalog import defaults
 from labcatalog.codegen import number
 from labcatalog.pipeline import CatalogResult
-from labcatalog.rbridge import install_command, package_check, run_r
 from labcatalog.resolve import ResolvedVariable, numbers_in_range
 from labcatalog.scoring import score_items
+from labcatalog.stats import analysis
+from labcatalog.stats.cfa import is_total
+from labcatalog.stats.rbridge import install_command, package_check, run_r
 
 DATA_FILE = "analysis_data.csv"
 SCORE = "score"

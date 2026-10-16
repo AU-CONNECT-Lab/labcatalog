@@ -4,14 +4,14 @@ from functools import partial
 
 from nicegui import ui
 
-from labcatalog import analysis, analysis_script
-from labcatalog import multilevel as ml
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import analysis_tables, charts, multilevel
 from labcatalog.gui.common import apa, col, note, p_value, section
 from labcatalog.gui.paper import Chart, paper_table, save_button
 from labcatalog.pipeline import CatalogResult
+from labcatalog.stats import analysis, analysis_script
+from labcatalog.stats import multilevel as ml
 from labcatalog.tables import PaperTable
 
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))

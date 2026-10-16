@@ -10,7 +10,7 @@ from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.bibliography import Bibliography, citation
-from labcatalog.stats import wave_order
+from labcatalog.stats.summary import wave_order
 
 LINE_SUFFIX = re.compile(r":(\d+)$")
 ROW_KEY = "_row"

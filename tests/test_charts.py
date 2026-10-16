@@ -2,11 +2,11 @@ from datetime import date
 
 import pytest
 
-from labcatalog import analysis
 from labcatalog.charts import views
 from labcatalog.charts.style import STATUS_COLORS
 from labcatalog.gui import charts as gui_charts
 from labcatalog.pipeline import run_catalog
+from labcatalog.stats import analysis
 
 
 @pytest.fixture

@@ -8,8 +8,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from labcatalog import analysis
-from labcatalog.analysis_script import (
+from labcatalog.codegen import number
+from labcatalog.pipeline import CatalogResult
+from labcatalog.stats import analysis
+from labcatalog.stats.analysis_script import (
     CHOICE,
     ITEM_PREFIX,
     PYTHON,
@@ -22,12 +24,10 @@ from labcatalog.analysis_script import (
     none,
     r_string,
 )
-from labcatalog.cfa import is_total
-from labcatalog.codegen import number
-from labcatalog.pipeline import CatalogResult
-from labcatalog.rbridge import MULTILEVEL_PACKAGES as PACKAGES
-from labcatalog.rbridge import install_command, package_check, run_r
-from labcatalog.stats import wave_order
+from labcatalog.stats.cfa import is_total
+from labcatalog.stats.rbridge import MULTILEVEL_PACKAGES as PACKAGES
+from labcatalog.stats.rbridge import install_command, package_check, run_r
+from labcatalog.stats.summary import wave_order
 
 DATA_FILE = "multilevel_data.csv"
 PERSON = "id"

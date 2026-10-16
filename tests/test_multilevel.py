@@ -7,9 +7,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from labcatalog import multilevel as ml
 from labcatalog.pipeline import run_catalog
-from labcatalog.rbridge import MULTILEVEL_PACKAGES, r_status
+from labcatalog.stats import multilevel as ml
+from labcatalog.stats.rbridge import MULTILEVEL_PACKAGES, r_status
 
 EMS = "example_mood.ems_total"
 CHILD = ["child_w1", "child_w2", "child_w3"]

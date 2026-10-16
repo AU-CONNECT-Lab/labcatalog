@@ -5,17 +5,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from labcatalog import codebook, invariance
+from labcatalog import codebook
 from labcatalog.ai_measures import Draft, draft_description
 from labcatalog.ai_scoring import write_scoring_scripts
-from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codebook import ImportResult
 from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.datalad.bridge import get_content
 from labcatalog.datalad.freeze import Freeze, freeze_project, list_freezes, open_freeze
 from labcatalog.exceptions import CodebookError, MetadataError
-from labcatalog.invariance import InvarianceTest
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.manifest import Manifest, build_manifest, metadata_paths, used_paths
@@ -24,7 +22,10 @@ from labcatalog.project import Project, load_config, load_project, references_ro
 from labcatalog.resolve import Catalog, resolve_catalog
 from labcatalog.scoring import compute_scores
 from labcatalog.sources import LoadedDataset, load_datasets
-from labcatalog.stats import Summary, summarize
+from labcatalog.stats import invariance
+from labcatalog.stats.cfa import CfaFit, build_models, fit_models
+from labcatalog.stats.invariance import InvarianceTest
+from labcatalog.stats.summary import Summary, summarize
 from labcatalog.validate import validate_project
 
 

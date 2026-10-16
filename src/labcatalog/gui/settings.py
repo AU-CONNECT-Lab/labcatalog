@@ -8,7 +8,7 @@ from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import datalad, preferences
 from labcatalog.gui.common import note, section
 from labcatalog.llm import KEY_ENV, PROVIDERS
-from labcatalog.rbridge import ALL_PACKAGES, install_command, r_status
+from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
 
 RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
 

@@ -5,11 +5,11 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog.project import Project
-from labcatalog.rbridge import run_r
 from labcatalog.resolve import Catalog, ResolvedScore
 from labcatalog.schema import Instrument
 from labcatalog.scoring import scorable, score_items
 from labcatalog.sources import LoadedDataset
+from labcatalog.stats.rbridge import run_r
 
 R_SCRIPT = Path(__file__).parent / "cfa.R"
 MIN_ITEMS = 3

@@ -5,7 +5,7 @@ from labcatalog.pipeline import load_validated
 from labcatalog.resolve import resolve_catalog
 from labcatalog.scoring import compute_scores
 from labcatalog.sources import load_datasets
-from labcatalog.stats import cronbach_alpha, histogram, summarize
+from labcatalog.stats.summary import cronbach_alpha, histogram, summarize
 
 
 def summary_for(root):

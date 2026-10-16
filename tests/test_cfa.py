@@ -3,11 +3,11 @@ from glob import glob
 
 import pytest
 
-from labcatalog.cfa import ONE_FACTOR, SUBSCALES, build_models, fit_models
 from labcatalog.exceptions import RError
 from labcatalog.pipeline import run_catalog
-from labcatalog.rbridge import CFA_PACKAGES, r_status
 from labcatalog.scoring import score_items
+from labcatalog.stats.cfa import ONE_FACTOR, SUBSCALES, build_models, fit_models
+from labcatalog.stats.rbridge import CFA_PACKAGES, r_status
 
 
 def rscript() -> str | None:

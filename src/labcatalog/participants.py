@@ -1,7 +1,7 @@
 from labcatalog.config import WaveConfig
 from labcatalog.measures import number, series
 from labcatalog.project import Project
-from labcatalog.stats import Summary, WaveRetention, wave_order
+from labcatalog.stats.summary import Summary, WaveRetention, wave_order
 
 DEFAULT_TEMPLATE = "{waves} {counts} {retention}"
 PLACEHOLDERS = ("study", "n_waves", "waves", "counts", "retention")
