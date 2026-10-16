@@ -7,6 +7,7 @@ from labcatalog import defaults
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import datalad, new_dataset, problems
 from labcatalog.gui.common import col, heading, note, open_path, table, without_line
+from labcatalog.gui.database import database_button
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats.summary import DatasetSummary
@@ -32,6 +33,7 @@ def render(
                     on_click=lambda: new_dataset.open_wizard(result, on_added),
                 ).props("flat no-caps").classes("lc-quiet-btn")
             if summaries:
+                database_button(result)
                 datalad.freeze_button(result, on_frozen)
         if not summaries:
             note("No datasets yet; press Add a dataset, after adding a study on the Studies page.")

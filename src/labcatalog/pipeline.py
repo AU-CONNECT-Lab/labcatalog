@@ -170,7 +170,17 @@ def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze
     if result.project is None:
         raise MetadataError(result.report.issues)
     participants = {d.dataset: d.n_ids for d in result.summary.datasets}
-    return freeze_project(result.project, result.datasets, participants, name, datalad)
+    # Here, since the database module builds on this one.
+    from labcatalog.reports.database import write_database
+
+    return freeze_project(
+        result.project,
+        result.datasets,
+        participants,
+        name,
+        datalad,
+        lambda path: write_database(result, path),
+    )
 
 
 def run_push_freeze(root: Path, name: str, datalad: str) -> list[Path]:

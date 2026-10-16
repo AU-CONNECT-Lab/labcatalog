@@ -22,6 +22,7 @@ from labcatalog.pipeline import (
     run_validate,
 )
 from labcatalog.project import init_project
+from labcatalog.reports.database import run_database
 from labcatalog.reports.export import BY_DATASET, run_export
 
 app = typer.Typer(
@@ -217,6 +218,12 @@ def export(
     typer.echo(f"Wrote {done.folder}")
     for name, n in done.left_out.items():
         typer.echo(f"Left out {n} rows of {name}: their {by} repeats in that file")
+
+
+@app.command()
+def database(project: ProjectOption = Path(".")) -> None:
+    """Rebuild the project's DuckDB database from its data and metadata."""
+    typer.echo(f"Wrote {run_database(project)}")
 
 
 @app.command()

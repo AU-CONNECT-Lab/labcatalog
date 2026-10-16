@@ -50,6 +50,14 @@ labcatalog freeze NAME [--push] [-p PROJECT]
 
 Record the data as they are now under `NAME`, for example `2026-06-submission`. Datasets in DataLad are also saved and tagged; with `--push`, the tag and the data then go to each dataset's sibling (its only one, or `origin`). See [Using labcatalog with DataLad](../how-to/datalad.md).
 
+## database
+
+```bash
+labcatalog database [-p PROJECT]
+```
+
+Rebuild `database/labcatalog.duckdb` from the data and metadata. See [Query the Data in a Database](../how-to/database.md).
+
 ## export
 
 ```bash

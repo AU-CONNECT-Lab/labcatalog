@@ -4,8 +4,8 @@ import duckdb
 import pandas as pd
 
 from labcatalog import defaults
-from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.exceptions import MetadataError
+from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.reports.export import data_frame, item_statistics, score_statistics, variable_rows
 
 DATA_SCHEMA = "data"

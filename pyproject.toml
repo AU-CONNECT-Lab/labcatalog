@@ -27,6 +27,7 @@ dependencies = [
     "ruamel.yaml>=0.18",
     "pyreadstat>=1.2",
     "semopy>=2.3",
+    "duckdb>=1.1",
 ]
 
 [project.optional-dependencies]

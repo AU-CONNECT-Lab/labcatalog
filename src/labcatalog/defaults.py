@@ -14,6 +14,7 @@ DATA_DIR = "data"
 BIB_FILENAME = "references.bib"
 OUTPUTS_DIR = "outputs"
 FREEZES_DIR = "freezes"
+DATABASE_FILE = "database/labcatalog.duckdb"
 MANIFEST_FILENAME = "manifest.json"
 SCORE_PREFIX = "score:"
 

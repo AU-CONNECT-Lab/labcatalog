@@ -1,5 +1,6 @@
 import os
 import re
+from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
 
@@ -36,6 +37,7 @@ def freeze_project(
     participants: dict[str, int],
     name: str,
     datalad: str | None,
+    write_database: Callable[[Path], Path],
 ) -> tuple[Path, Freeze]:
     folder = project.root / defaults.FREEZES_DIR
     check_name(folder, name)
@@ -64,8 +66,9 @@ def freeze_project(
     folder.mkdir(exist_ok=True)
     path = folder / f"{date.today()}_{name}.json"
     path.write_text(record.model_dump_json(indent=2), encoding="utf-8")
+    database = write_database(path.with_suffix(".duckdb"))
     if groups:
-        holding = group_by_dataset([path])
+        holding = group_by_dataset([path, database])
         for root, paths in holding.items():
             run_datalad(datalad, ["save", "-m", f"Freeze {name}: record", *paths], cwd=root)
         # The original branch, because datalad save --version-tag tags a commit no clone has.

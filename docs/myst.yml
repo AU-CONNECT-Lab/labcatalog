@@ -45,6 +45,7 @@ project:
         - file: how-to/fix-problems.md
         - file: how-to/copy-tables.md
         - file: how-to/export-data.md
+        - file: how-to/database.md
         - file: how-to/write-methods.md
         - file: how-to/datalad.md
         - file: how-to/r-and-models.md
