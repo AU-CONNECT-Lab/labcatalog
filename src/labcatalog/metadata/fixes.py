@@ -5,14 +5,17 @@ import io
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
-from labcatalog.config import dataset_by_name
+from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.exceptions import EditError
+from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
 from labcatalog.metadata.changes import Change
 from labcatalog.project import Project
+from labcatalog.sources import LoadedDataset
 
 # Chosen for an unmapped item that was not asked in that dataset.
 NOT_ASKED = "-"
+EVIDENCE_ROWS = 50
 
 
 def closest(word: str, choices: list[str]) -> str | None:
@@ -106,3 +109,58 @@ def flow(values: list[str]) -> CommentedSeq:
     seq = CommentedSeq(values)
     seq.fa.set_flow_style()
     return seq
+
+
+def evidence(loaded: LoadedDataset, issue: Issue) -> list[dict[str, str]]:
+    # The rows a data problem is about, as the person checking the source would look them up.
+    column = issue.details.get("column")
+    shown = []
+    for n in issue.details.get("rows", [])[:EVIDENCE_ROWS]:
+        person = loaded.frame[loaded.id_column].iloc[n]
+        row = {"row": str(n + 1), "id": repr(person) if person != person.strip() else person}
+        if column in loaded.frame:
+            row["value"] = loaded.frame[column].iloc[n]
+        shown.append(row)
+    return shown
+
+
+def add_missing_codes(
+    project: Project, dataset: str, codes: list[tuple[str, str]], everywhere: bool
+) -> Change:
+    opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    if everywhere:
+        if not data.get("missing_codes"):
+            data["missing_codes"] = CommentedSeq()
+        target = data["missing_codes"]
+    else:
+        entry = next(d for d in data["datasets"] if d["name"] == dataset)
+        if "missing_codes" not in entry:
+            # A dataset's own list replaces the project's, so it starts as a copy of it.
+            config = dataset_by_name(project.config, dataset)
+            known = missing_codes_for(project.config, config)
+            entry["missing_codes"] = flow([{"code": m.code, "label": m.label} for m in known])
+        target = entry["missing_codes"]
+    for value, label in codes:
+        target.append(pair("code", value, label))
+    return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
+
+
+def add_options(
+    project: Project, instrument: str, response_set: str, options: list[tuple[str, str]]
+) -> Change:
+    relative = project.instrument_files[instrument]
+    opened = editing.open_file(project.root, relative)
+    data = records.load(opened.text)
+    found = next(r for r in data["response_sets"] if r["id"] == response_set)
+    for value, label in options:
+        found["options"].append(pair("value", value, label))
+    return Change(relative, records.dumped(data), opened)
+
+
+def pair(key: str, value: str, label: str) -> CommentedMap:
+    entry = CommentedMap()
+    entry.fa.set_flow_style()
+    entry[key] = records.scalar(value)
+    entry["label"] = records.as_text(label)
+    return entry

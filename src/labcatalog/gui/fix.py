@@ -8,7 +8,7 @@ from labcatalog.codebook.core import holds
 from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
-from labcatalog.gui.common import caption, note, split_location
+from labcatalog.gui.common import caption, col, note, split_location, table
 from labcatalog.issues import Issue
 from labcatalog.metadata import accepted, changes, fixes
 from labcatalog.metadata.changes import Change
@@ -84,7 +84,9 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     "unexpected_value": (
         "Values that are neither response options nor missing codes. Either the data have a "
         "typo, or the value is real and the instrument or the missing codes leave it out.",
-        SCRIPTS,
+        "A typo is fixed by the person who looks after the cleaning scripts, since labcatalog "
+        "never changes data files; copy a note for them below. A real value you can record "
+        "below.",
     ),
     "id_missing": ("Rows without an ID.", SCRIPTS),
     "id_whitespace": ("IDs with a space before or after them.", SCRIPTS),
@@ -127,9 +129,29 @@ class FixActions:
     root: Path
 
 
-def note_text(issue: Issue) -> str:
+def note_text(issue: Issue, rows: list[dict[str, str]]) -> str:
     where = f" in {issue.location}" if issue.location else ""
-    return f"labcatalog found a problem{where} ({issue.level}, {issue.code}):\n{issue.message}"
+    lines = [f"labcatalog found a problem{where} ({issue.level}, {issue.code}):", issue.message]
+    lines += [", ".join(f"{k} {v}" for k, v in row.items()) for row in rows]
+    return "\n".join(lines)
+
+
+def rows_of(result: CatalogResult, issue: Issue) -> list[dict[str, str]]:
+    loaded = result.datasets.get(issue.details.get("dataset", ""))
+    return fixes.evidence(loaded, issue) if loaded and "rows" in issue.details else []
+
+
+def rows_section(issue: Issue, rows: list[dict[str, str]]) -> None:
+    caption("The rows")
+    columns = [col("row", "Row", numeric=True), col("id", "ID")]
+    if any("value" in row for row in rows):
+        columns.append(col("value", issue.details.get("column", "Value")))
+    table(columns, rows).classes(remove="w-full")
+    more = len(issue.details["rows"]) - len(rows)
+    note(
+        "Rows count from the first line below the header of the data file."
+        + (f" {more} more rows are not shown." if more > 0 else "")
+    )
 
 
 def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
@@ -190,7 +212,7 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         actions.follow(issue.location)
 
     def copy_note() -> None:
-        ui.clipboard.write(note_text(issue))
+        ui.clipboard.write(note_text(issue, rows))
         ui.notify("Note copied")
 
     with ui.dialog() as dialog, ui.card().classes("w-[44rem] max-w-full gap-3"):
@@ -204,6 +226,9 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         with ui.row().classes("items-start gap-2 no-wrap"):
             ui.icon("person_outline").classes("lc-faint mt-1")
             note(who)
+        rows = rows_of(result, issue)
+        if rows:
+            rows_section(issue, rows)
         if project is not None and issue.code in REPAIRS:
             REPAIRS[issue.code](project, result, issue, save)
         status = ui.label().classes("lc-bad-text")
@@ -340,7 +365,56 @@ def unmapped_items(project: Project, result: CatalogResult, issue: Issue, save) 
     ui.button("Save", icon="check", on_click=apply)
 
 
+def stray_values(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    details = issue.details
+    dataset = details["dataset"]
+    variables = result.catalog.variables if result.catalog else []
+    variable = next(
+        (v for v in variables if (v.dataset, v.column) == (dataset, details["column"])), None
+    )
+    choices = {"": "a typo, to fix in the data", "missing": "a missing code"}
+    if variable is not None and variable.response_set:
+        choices["option"] = f"a new answer in {variable.response_set}"
+    caption("What each value is")
+    note(
+        "A typo goes to whoever makes the data file (Copy a note). A value that means no "
+        "answer, such as 99 for refused, is a missing code. A real answer the instrument leaves "
+        "out is a new answer option, which changes the instrument for every dataset."
+    )
+    picks = []
+    for value in details["values"]:
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.label(value).classes("font-mono w-24")
+            kind = ui.select(choices, value="", label="It is").classes("w-64")
+            label = ui.input("Label", placeholder="e.g. refused").classes("w-48")
+            picks.append((value, kind, label))
+    scope = ui.select(
+        {"dataset": f"only in {dataset}", "all": "in every dataset"},
+        value="dataset",
+        label="New missing codes count",
+    ).classes("w-64")
+
+    async def apply() -> None:
+        chosen = [(v, k.value, (t.value or "").strip()) for v, k, t in picks if k.value]
+        if any(not label for _, _, label in chosen):
+            ui.notify("Give each value a label, such as refused", type="warning")
+            return
+        codes = [(v, label) for v, kind, label in chosen if kind == "missing"]
+        options = [(v, label) for v, kind, label in chosen if kind == "option"]
+        found = []
+        if codes:
+            found.append(fixes.add_missing_codes(project, dataset, codes, scope.value == "all"))
+        if options:
+            instrument = details["instrument"]
+            found.append(fixes.add_options(project, instrument, variable.response_set, options))
+        if found:
+            await save(found)
+
+    ui.button("Save", icon="check", on_click=apply)
+
+
 REPAIRS = {
+    "unexpected_value": stray_values,
     "column_unmapped": unlisted_columns,
     "not_in_vocab": wrong_word,
     "unmapped_item": unmapped_items,

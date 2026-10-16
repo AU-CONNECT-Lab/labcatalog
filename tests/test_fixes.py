@@ -1,5 +1,5 @@
 from labcatalog.metadata import changes, fixes
-from labcatalog.pipeline import run_check, run_validate
+from labcatalog.pipeline import run_catalog, run_check, run_validate
 from labcatalog.project import load_project
 
 
@@ -92,3 +92,46 @@ def test_an_unmapped_item_is_mapped_or_recorded_as_not_asked(mock_project):
     assert run_validate(mock_project) == []
     text = (mock_project / "studies" / "mock_study.yaml").read_text(encoding="utf-8")
     assert "{item: ems_9, dataset: child_w1, dropped: true}" in text
+
+
+def find(root, code, text):
+    return next(i for i in run_check(root).issues if i.code == code and text in i.message)
+
+
+def test_a_data_problem_shows_its_rows(mock_project):
+    result = run_catalog(mock_project)
+    spaced = next(i for i in result.report.issues if i.code == "id_whitespace")
+    [row] = fixes.evidence(result.datasets[spaced.details["dataset"]], spaced)
+    assert row["id"] == "' 1031P'"
+    stray = next(i for i in result.report.issues if i.message.startswith("eps_4_w1"))
+    [row] = fixes.evidence(result.datasets["parent_w1"], stray)
+    assert row["value"] == "7" and stray.details["values"] == ["7"]
+
+
+def test_a_stray_value_becomes_an_option_or_a_missing_code(mock_project):
+    stray = find(mock_project, "unexpected_value", "eps_4_w1")
+    project = load_project(mock_project)
+    variables = run_catalog(mock_project).catalog.variables
+    set_id = next(v.response_set for v in variables if v.column == "eps_4_w1")
+    apply(
+        mock_project,
+        fixes.add_options(project, stray.details["instrument"], set_id, [("7", "Always")]),
+    )
+    assert not any(i.message.startswith("eps_4_w1") for i in run_check(mock_project).issues)
+
+    find(mock_project, "unexpected_value", "ems_3_w1")
+    apply(
+        mock_project,
+        fixes.add_missing_codes(load_project(mock_project), "child_w1", [("4", "skipped")], False),
+    )
+    assert not any(i.message.startswith("ems_3_w1") for i in run_check(mock_project).issues)
+    config = load_project(mock_project).config
+    own = next(d for d in config.datasets if d.name == "child_w1").missing_codes
+    assert [m.code for m in own] == [-99, -98, -97, "", 4]
+
+    find(mock_project, "unexpected_value", "dem_age_w2")
+    apply(
+        mock_project,
+        fixes.add_missing_codes(load_project(mock_project), "parent_w2", [("45", "typo")], True),
+    )
+    assert not any(i.message.startswith("dem_age_w2") for i in run_check(mock_project).issues)
