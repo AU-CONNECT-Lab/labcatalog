@@ -39,12 +39,12 @@ studies:
     label: Mock Family Study
     reference: mockstudy2026
     waves:
-      1: {start: 2024-09-01, end: 2025-05-31}
-      2: {start: 2025-09-01, end: 2026-05-31}
-      3: {start: 2026-09-01}
+      1: {start: 2024-03-01, end: 2024-10-31}
+      2: {start: 2025-03-01, end: 2025-10-31}
+      3: {start: 2026-03-01}
     milestones:
       - {name: Interim report, date: 2026-12-15}
-      - {name: Wave 3 data freeze, date: 2027-06-30}
+      - {name: Wave 3 data freeze, date: 2027-01-31}
 
 # One entry per data file: which study, wave and reporter it holds, and where it is.
 datasets:
