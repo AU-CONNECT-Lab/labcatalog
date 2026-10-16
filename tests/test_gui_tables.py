@@ -33,14 +33,24 @@ def test_instrument_list_shows_only_the_matched_datasets(mock_project):
     index = build_index(result.project)
     found = matches(index, {"reporter": {"child"}})
     columns, rows = instruments.list_table(result, found)
-    assert [c["label"] for c in columns[-4:]] == ["child_w1", "child_w2", "child_w3", "Missing"]
+    assert [c["label"] for c in columns[-4:-1]] == ["child_w1", "child_w2", "child_w3"]
     by_id = {r["id"]: r for r in rows}
     assert set(by_id) == {"example_mood", "example_screen_time"}
     screen = by_id["example_screen_time"]
     assert (screen["d0"], screen["d1"], screen["d2"]) == ("", 153, 148)
     assert by_id["example_mood"]["reporters"] == "child"
+
+
+def test_instrument_list_says_what_each_instrument_lacks(mock_project):
+    result = run_catalog(mock_project)
+    found = {"example_mood": [], "example_screen_time": []}
+    columns, rows = instruments.list_table(result, found)
+    assert columns[-1]["label"] == "Missing"
+    by_id = {r["id"]: r for r in rows}
     assert by_id["example_mood"]["missing"] == ""
     assert by_id["example_screen_time"]["missing"].startswith("description, scores")
+    columns, _ = instruments.list_table(result, {"example_mood": []})
+    assert "missing" not in [c["name"] for c in columns]
 
 
 def test_instrument_items_list_each_dataset_column(mock_project):
