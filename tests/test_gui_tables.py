@@ -21,9 +21,9 @@ def test_wave_table(mock_project):
     result = run_catalog(mock_project)
     _, waves = overview.wave_table(result)
     assert [(w["wave"], w["n_parent"], w["n_child"]) for w in waves] == [
-        ("1", 146, 140),
-        ("2", 128, 116),
-        ("3", 60, 56),
+        ("1", 191, 182),
+        ("2", 170, 153),
+        ("3", 159, 148),
     ]
 
 
@@ -36,7 +36,7 @@ def test_instrument_list_shows_only_the_matched_datasets(mock_project):
     by_id = {r["id"]: r for r in rows}
     assert set(by_id) == {"example_mood", "example_screen_time"}
     screen = by_id["example_screen_time"]
-    assert (screen["d0"], screen["d1"], screen["d2"]) == ("", 116, 56)
+    assert (screen["d0"], screen["d1"], screen["d2"]) == ("", 153, 148)
     assert by_id["example_mood"]["reporters"] == "child"
 
 
@@ -79,8 +79,8 @@ def test_item_total_and_stability_tables_have_a_column_per_wave(mock_project):
     columns, rows = instruments.item_total_waves(result, mood, "ems_total")
     assert [c["label"] for c in columns[2:]] == [
         "Wave 1 (α 0.90)",
-        "Wave 2 (α 0.93)",
-        "Wave 3 (α 0.91)",
+        "Wave 2 (α 0.91)",
+        "Wave 3 (α 0.89)",
     ]
     assert [r["item"] for r in rows] == [f"ems_{i}" for i in range(1, 10)]
     assert all(r["d0"] and r["d2"] for r in rows)
@@ -106,7 +106,7 @@ def test_sample_table_reads_like_a_table_one(mock_project):
     assert [c["label"] for c in columns[2:]] == ["parent_w1", "parent_w2", "parent_w3"]
     by_label = {(r["item"] or "", r["value"]): r for r in rows}
     age = "How old is your child (in years)?"
-    assert by_label[(age, "n")]["d1"] == 127
+    assert by_label[(age, "n")]["d1"] == 167
     assert [r["value"] for r in rows[1:4]] == ["Mean (SD)", "Median", "Range"]
     girls = by_label[("", "Girl")]["d1"]
     assert girls.endswith("%)") and int(girls.split()[0]) > 0

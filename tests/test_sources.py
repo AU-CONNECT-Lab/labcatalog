@@ -24,8 +24,8 @@ def test_loads_every_dataset_as_text(mock_project):
     }
     frame = datasets["parent_w1"].frame
     assert all(pd.api.types.is_string_dtype(dtype) for dtype in frame.dtypes)
-    assert "-99" in set(frame["eps_3_w1"])
-    assert "" in set(frame["eps_3_w1"])
+    assert "-97" in set(frame["eps_1_w1"])
+    assert "" in set(frame["eps_1_w1"])
 
 
 def test_ids_are_read_as_is_and_groups_derived(mock_project):

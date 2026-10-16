@@ -26,7 +26,7 @@ def test_mock_reports_only_the_planted_problems(mock_project):
     report = run_check(mock_project)
     errors = {i.code for i in report.issues if i.level == "error"}
     assert errors == {"unexpected_value", "id_whitespace", "id_duplicate"}
-    assert "1023C" in found(report)["same_answer"][-1]
+    assert "1021C" in found(report)["same_answer"][-1]
 
 
 def test_metadata_errors_stop_before_reading_data(mock_project):
@@ -64,8 +64,8 @@ def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):
         "exclusions: withdrawn.csv\n\ncustom_fields:",
     )
     messages = found(run_check(mock_project))["excluded_present"]
-    # 1032P is in parent waves 1 and 2; family 1003 has a parent and a child in both.
-    assert len(messages) == 4
+    # 1032P is in all three parent waves; family 1003 has a parent and a child in all three.
+    assert len(messages) == 6
     assert any("1032P" in m and "1003P" in m for m in messages)
 
 

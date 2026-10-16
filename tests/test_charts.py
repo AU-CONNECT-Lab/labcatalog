@@ -77,16 +77,16 @@ def test_timeline_draws_waves_up_to_today_and_the_milestones(result):
     bars = [t for t in fig.data if t.type == "bar"]
     # Wave 3 has no end yet: a faint bar as long as wave 2 took, a solid one up to today.
     projected, solid = bars[2], bars[3]
-    assert projected.base[0] == solid.base[0] == "2026-09-01"
-    assert projected.x[0] == (date(2026, 5, 31) - date(2025, 9, 1)).days * 86_400_000
-    assert solid.x[0] == (today - date(2026, 9, 1)).days * 86_400_000
+    assert projected.base[0] == solid.base[0] == "2026-03-01"
+    assert projected.x[0] == (date(2025, 10, 31) - date(2025, 3, 1)).days * 86_400_000
+    assert solid.x[0] == (today - date(2026, 3, 1)).days * 86_400_000
     marks = next(t for t in fig.data if t.type == "scatter")
     assert list(marks.text) == ["Interim report", "Wave 3 data freeze"]
     texts = [a.text for a in fig.layout.annotations if a.text != "Today"]
     assert texts == [
-        "parent 146, child 140",
-        "parent 128, child 116",
-        "parent 60 of 128 (47%), child 56 of 116 (48%)",
+        "parent 191, child 182",
+        "parent 170, child 153",
+        "parent 159 of 170 (94%), child 148 of 153 (97%)",
     ]
 
 

@@ -79,9 +79,12 @@ def test_models_fit_in_r_with_omega_for_every_score(result):
     assert len(mood.loadings) == 9 and all(v > 0.5 for v in mood.loadings.values())
     assert set(fits[("example_mood", "child_w1", ONE_FACTOR)].omega) == {"ems_total"}
 
-    sleep = fits[("example_child_sleep", "parent_w3", SUBSCALES)]
-    assert sleep.problem.startswith("improper solution")
-    assert sleep.omega == {}
+    assert all(f.problem is None for f in fits.values())
+    sleep = next(m for m in models if m.kind == SUBSCALES and m.dataset == "parent_w3")
+    sleep.data = sleep.data.assign(**{sleep.data.columns[0]: 1.0})
+    [broken] = fit_models([sleep], rscript())
+    assert "only 1 level" in broken.problem
+    assert broken.omega == {}
 
 
 @needs_r

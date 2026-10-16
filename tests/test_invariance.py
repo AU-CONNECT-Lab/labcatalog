@@ -90,6 +90,7 @@ def test_steps_add_constraints_and_compare_with_the_step_before(result):
 
 def test_an_option_nobody_chose_in_one_wave_stops_the_model_before_r(result):
     stress = models_of(result)["example_parent_stress"]
+    stress.waves["3"]["eps_1"] = stress.waves["3"]["eps_1"].replace(5.0, 4.0)
     [test] = invariance.fit_models([stress], "C:/no/such/Rscript.exe")
     assert test.steps == []
     assert test.n == {wave: len(frame) for wave, frame in stress.waves.items()}
