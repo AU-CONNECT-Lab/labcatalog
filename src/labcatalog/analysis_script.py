@@ -562,7 +562,6 @@ def comparison_plan(
 def page_script(
     result: CatalogResult,
     sample: analysis.Sample,
-    measures: list[str],
     scores: list[str],
     xs: list[str],
     y: str | None,
@@ -572,9 +571,6 @@ def page_script(
     # Each part of the Analysis page that has enough chosen to run, in page order.
     data = AnalysisData(result, sample)
     codes = []
-    rows = measure_variables(data, measures, items=True)
-    if rows:
-        codes.append(table_one_code(sample.datasets, rows))
     if len(scores) >= 2:
         codes.append(correlation_code([data.score(k) for k in scores]))
     if y is not None:

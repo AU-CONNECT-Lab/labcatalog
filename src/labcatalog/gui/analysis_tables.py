@@ -350,7 +350,6 @@ def script_section(
         found = script.page_script(
             result,
             sample,
-            measures=view.measures,
             scores=[k for k in view.scores if k in scores],
             xs=[k for k in view.xs if k in scores],
             y=view.y if view.y in scores else None,

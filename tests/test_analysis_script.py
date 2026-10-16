@@ -138,7 +138,6 @@ def page(result, sample):
     return script.page_script(
         result,
         sample,
-        measures=script.default_measures(result, sample.datasets),
         scores=[EMS, EPS],
         xs=[EPS],
         y=EMS,
@@ -149,7 +148,7 @@ def page(result, sample):
 
 def test_the_page_script_runs_and_matches_the_page(result, sample, tmp_path, monkeypatch):
     r_text, python_text, frame = page(result, sample)
-    for title in ("# Table 1", "# Correlations", "# Regression", "# Group comparison"):
+    for title in ("# Correlations", "# Regression", "# Group comparison"):
         assert title in r_text and title in python_text
     frame.to_csv(tmp_path / script.DATA_FILE, index=False)
     monkeypatch.chdir(tmp_path)

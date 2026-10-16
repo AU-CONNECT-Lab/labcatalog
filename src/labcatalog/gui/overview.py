@@ -79,4 +79,3 @@ def wave_table(result: CatalogResult, only: str | None = None) -> tuple[list[dic
                 }
             )
     return columns, rows
-

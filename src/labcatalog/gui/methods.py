@@ -1,14 +1,15 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from nicegui import ui
 
-from labcatalog import measures
+from labcatalog import analysis, measures, participants
 from labcatalog.charts import views
-from labcatalog.gui import overview
-from labcatalog.gui.common import heading, note, section, sorted_waves, unique
+from labcatalog.gui import analysis_tables
+from labcatalog.gui.common import col, heading, note, section, sorted_waves, unique
 from labcatalog.gui.datasets import methods_of, paragraphs
 from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView, omegas
 from labcatalog.gui.paper import copy_text, paper_table, save_button
+from labcatalog.participants import wave_dates
 from labcatalog.pipeline import CatalogResult
 from labcatalog.tables import PaperTable
 
@@ -17,6 +18,7 @@ from labcatalog.tables import PaperTable
 class MethodsView:
     study: str | None = None
     wave: str | None = None
+    measures: list[str] = field(default_factory=list)
 
 
 def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
@@ -34,29 +36,103 @@ def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
 
     @ui.refreshable
     def body() -> None:
-        participants(result, view.study)
+        waves = sorted_waves(d.wave for d in config.datasets if d.study == view.study)
+        if view.wave not in waves:
+            view.wave = waves[0]
+        if len(waves) > 1:
+            with ui.row().classes("items-center gap-3"):
+                ui.toggle(
+                    {w: views.wave_name(result, view.study, w) for w in waves},
+                    value=view.wave,
+                    on_change=lambda e: choose_wave(e.value),
+                ).props("dense no-caps")
+                note("Table 1 and Measures describe this wave.")
+        participants_part(result, view)
         procedure(result, view.study)
-        measures_part(result, view, cfa)
+        section("Measures")
+        measures_body(result, view, cfa)
 
-    def choose(value: str) -> None:
+    def choose_study(value: str) -> None:
         view.study, view.wave = value, None
         body.refresh()
 
+    def choose_wave(value: str) -> None:
+        view.wave = value
+        body.refresh()
+
     if len(studies) > 1:
-        ui.toggle(studies, value=view.study, on_change=lambda e: choose(e.value)).props("no-caps")
+        ui.toggle(studies, value=view.study, on_change=lambda e: choose_study(e.value)).props(
+            "no-caps"
+        )
     body()
 
 
-def participants(result: CatalogResult, study: str) -> None:
+def participants_part(result: CatalogResult, view: MethodsView) -> None:
+    study = view.study
     section("Participants")
-    columns, rows = overview.wave_table(result, study)
+    text = participants.paragraph(result.project, result.summary, study)
+    ui.label(text).classes("max-w-4xl")
+    copy_text(text)
+    note(
+        "Change the wording with participants: in labcatalog.yaml or in the study's file in "
+        "studies/."
+    )
     group = result.summary.group_name
-    counted = "n is the number of people with data from each reporter"
+    counted = (
+        "n is the number of people with data from each reporter; returning are those also in "
+        "the previous wave, with their share of that wave's n"
+    )
     if group:
         counted += f"; {group} groups with data from any reporter, and with every reporter"
-    shown = PaperTable("Participants in Each Wave", columns, rows, f"{counted}.")
+    shown = PaperTable("Participants by Wave", *retention_table(result, study), f"{counted}.")
     paper_table(shown)
     save_button(result, f"participants_{study}", {"participants": shown})
+    datasets = [
+        d.name for d in result.project.config.datasets if (d.study, d.wave) == (study, view.wave)
+    ]
+    sample = analysis.build_sample(result, datasets, intersect=False)
+    analysis_tables.table_one_section(result, sample, view)
+
+
+def retention_table(result: CatalogResult, study: str) -> tuple[list[dict], list[dict]]:
+    summary = result.summary
+    rows = [r for r in summary.retention if r.study == study]
+    reporters = unique(r.reporter for r in rows)
+    waves = sorted_waves(r.wave for r in rows)
+    found = {(r.wave, r.reporter): r for r in rows}
+    groups = {g.wave: g for g in summary.groups if g.study == study}
+    group = summary.group_name
+    columns = [col("wave", "Wave"), col("dates", "Dates", sortable=False)]
+    for r in reporters:
+        columns += [
+            col(f"n_{r}", f"{r.capitalize()} n", numeric=True),
+            col(f"back_{r}", f"{r.capitalize()} returning", numeric=True),
+        ]
+    if group:
+        columns += [
+            col("groups", f"{group.capitalize()} groups", numeric=True),
+            col("complete", "With every reporter", numeric=True),
+        ]
+    waves_config = result.project.config.studies[study].waves
+    table_rows = []
+    for i, wave in enumerate(waves):
+        row = {
+            "wave": wave,
+            "dates": wave_dates(waves_config[wave]) if wave in waves_config else "",
+        }
+        for r in reporters:
+            now = found.get((wave, r))
+            before = found.get((waves[i - 1], r)) if i else None
+            row[f"n_{r}"] = now.n if now else ""
+            row[f"back_{r}"] = (
+                f"{now.n_from_previous} ({round(100 * now.n_from_previous / before.n)}%)"
+                if now and before and before.n and now.n_from_previous is not None
+                else ""
+            )
+        if wave in groups:
+            row["groups"], row["complete"] = groups[wave].groups, groups[wave].with_every_reporter
+        table_rows.append(row)
+    return columns, table_rows
 
 
 def procedure(result: CatalogResult, study: str) -> None:
@@ -64,32 +140,12 @@ def procedure(result: CatalogResult, study: str) -> None:
     found = methods_of(result, study)
     if not found:
         note(
-            f"Write how each modality's data were collected under methods: in studies/{study}.yaml."
+            "Write how each modality's data were collected under methods: in the study's file in studies/."
         )
     for modality, text in found.items():
         heading(modality.capitalize())
         paragraphs(text)
         copy_text(" ".join(text.split()))
-
-
-def measures_part(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
-    config = result.project.config
-    waves = sorted_waves(d.wave for d in config.datasets if d.study == view.study)
-    if view.wave not in waves:
-        view.wave = waves[0]
-    section("Measures")
-
-    def choose(value: str) -> None:
-        view.wave = value
-        measures_body.refresh()
-
-    if len(waves) > 1:
-        ui.toggle(
-            {w: views.wave_name(result, view.study, w) for w in waves},
-            value=view.wave,
-            on_change=lambda e: choose(e.value),
-        ).props("dense no-caps")
-    measures_body(result, view, cfa)
 
 
 # Module level, so a finished CFA can add ω without redrawing the page.

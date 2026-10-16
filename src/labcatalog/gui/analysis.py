@@ -25,7 +25,6 @@ class AnalysisView:
     style: str = "heatmap"
     xs: list[str] = field(default_factory=list)
     y: str | None = None
-    measures: list[str] = field(default_factory=list)
     group: str | None = None
     outcome: str | None = None
 
@@ -42,7 +41,6 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         sample = analysis.build_sample(result, view.datasets, view.intersect)
         sample_note(result, sample, view.intersect)
         choices = views.variable_choices(result, view.datasets)
-        analysis_tables.table_one_section(result, sample, view)
         if len(choices) < 2:
             note("Pick datasets with at least two scores between them for correlations.")
         else:

@@ -3,10 +3,9 @@ from collections import Counter
 from datetime import date
 from typing import Any
 
-from labcatalog import defaults
+from labcatalog import defaults, measures, participants
 from labcatalog.config import CustomFieldDef
 from labcatalog.issues import Issue, IssueLevel
-from labcatalog import measures, participants
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
 from labcatalog.schema import Administration, Instrument
 
@@ -481,7 +480,12 @@ def check_templates(project: Project) -> list[Issue]:
             for name, instrument in project.instruments.items()
         ],
         *[
-            ("participants", content.participants, project.study_files[name], participants.PLACEHOLDERS)
+            (
+                "participants",
+                content.participants,
+                project.study_files[name],
+                participants.PLACEHOLDERS,
+            )
             for name, content in project.studies.items()
         ],
     ]
