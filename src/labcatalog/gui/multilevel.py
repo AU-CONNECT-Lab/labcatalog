@@ -34,9 +34,12 @@ def render(result: CatalogResult, view) -> None:
         return
     if view.multilevel is None or view.multilevel.outcome not in outcomes:
         view.multilevel = ml.default_model(result, list(outcomes))
-    model: ml.Model = view.multilevel
     labels = {name: views.dataset_label(result, name) for name in result.datasets}
     covariates = analysis.of_instruments(ml.covariate_choices(result, labels), view.instruments)
+    # Covariates of measures no longer chosen leave the model too.
+    kept = [k for k in view.multilevel.covariates if k in covariates]
+    view.multilevel = replace(view.multilevel, covariates=kept)
+    model: ml.Model = view.multilevel
     group = ml.group_name(result)
     note(
         "Waves within people, people within groups, or both, fitted the way JASP's linear "
