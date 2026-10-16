@@ -135,7 +135,7 @@ def render(result: CatalogResult, view) -> None:
         covariates,
         multiple=True,
         value=[k for k in model.covariates if k in covariates],
-        label="Covariates (each person's value from one dataset)",
+        label="Covariates (one dataset's value, or each wave's own)",
         with_input=True,
         on_change=lambda e: change(covariates=e.value or []),
     ).props("dense outlined use-chips").classes("w-full")

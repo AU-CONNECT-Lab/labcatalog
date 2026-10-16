@@ -14,6 +14,8 @@ from labcatalog.stats.rbridge import MULTILEVEL_PACKAGES, r_status
 EMS = "example_mood.ems_total"
 CHILD = ["child_w1", "child_w2", "child_w3"]
 GENDER = "item:example_demographics.dem_gender@parent_w1"
+FAA = "item:eeg_resting.frontal_alpha_asymmetry"
+EPOCHS = "item:eeg_resting.epochs_kept"
 
 
 def rscript() -> str | None:
@@ -63,6 +65,28 @@ def test_default_model_follows_a_total_score_over_waves(result):
     assert len(model.datasets) == 3 and model.by_person and model.slope
     assert ml.occasions(result, EMS) == CHILD
     assert ml.problem(result, model) is None
+
+
+def eeg_model(covariates: list[str]) -> ml.Model:
+    return ml.Model(FAA, ["eeg_w1", "eeg_w3"], covariates=covariates, slope=False)
+
+
+def test_a_covariate_can_take_each_waves_own_value(result):
+    choices = ml.covariate_choices(result, {n: n for n in result.datasets})
+    assert choices[EPOCHS].endswith("(each wave)") and choices[EMS].endswith("(each wave)")
+    assert "item:fnirs_social.pfc_hbo_social" not in choices
+    long = ml.long_frame(result, eeg_model([EPOCHS]))
+    assert long.covariates[0].column == "epochs_kept"
+    for time, name in enumerate(["eeg_w1", "eeg_w3"]):
+        eeg = result.datasets[name].frame
+        rows = long.frame[long.frame["time"] == time].set_index("id")["epochs_kept"]
+        expected = pd.to_numeric(eeg["epochs_kept"]).astype(float).set_axis(eeg["pid"])
+        pd.testing.assert_series_equal(
+            rows, expected.reindex(rows.index), check_names=False, check_index_type=False
+        )
+    assert ml.problem(result, eeg_model(["item:eyetracking_faces.valid_trials"])) == (
+        "ET: Trials with at least one second of looking, out of 12 is not measured in wave 3."
+    )
 
 
 def test_a_number_item_is_an_outcome_and_a_covariate(result):
@@ -193,9 +217,20 @@ def test_r_and_python_agree_on_growth(result):
 @needs_r
 def test_r_and_python_agree_where_one_optimizer_fails(result):
     # On two waves of this feature, lbfgs alone stops at a zero person variance or fails.
-    model = ml.Model("item:eeg_resting.frontal_alpha_asymmetry", ["eeg_w1", "eeg_w3"], slope=False)
+    model = eeg_model([])
     long = ml.long_frame(result, model)
     close(ml.run(result, model, long, "FAA", rscript()), ml.run(result, model, long, "FAA", None))
+
+
+@needs_r
+def test_r_and_python_agree_with_a_covariate_each_wave(result):
+    model = eeg_model([EPOCHS])
+    long = ml.long_frame(result, model)
+    in_r = ml.run(result, model, long, "FAA", rscript())
+    assert [t.label for t in in_r.fixed][-1] == (
+        "EEG: Clean two-second epochs kept, out of 60 (each wave)"
+    )
+    close(in_r, ml.run(result, model, long, "FAA", None))
 
 
 @needs_r

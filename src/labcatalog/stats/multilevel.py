@@ -178,21 +178,35 @@ class Model:
 
 
 @dataclass
+class Source:
+    by_id: pd.Series
+    by_link: pd.Series
+
+
+@dataclass
 class Covariate:
     key: str
     label: str
     column: str
     # Answer options as (value, label); empty for numbers and scores.
     levels: list[tuple[float, str]]
-    by_id: pd.Series
-    by_link: pd.Series
+    # The files it comes from, by wave; one value for every wave sits under None.
+    sources: dict[str | None, list[Source]]
 
-    def lookup(self, people: np.ndarray, links: np.ndarray) -> np.ndarray:
-        # Matched by ID when this file has the person, otherwise the way stats.correlate_by says.
-        own = np.isin(people, self.by_id.index)
-        return np.where(
-            own, self.by_id.reindex(people).to_numpy(), self.by_link.reindex(links).to_numpy()
-        )
+    def lookup(self, people: np.ndarray, links: np.ndarray, wave: str) -> np.ndarray:
+        found = self.sources.get(None) or self.sources.get(wave, [])
+        values = np.full(len(people), np.nan)
+        done = np.zeros(len(people), dtype=bool)
+        # Matched by ID when a file has the person, otherwise the way stats.correlate_by says.
+        for source in found:
+            hit = ~done & np.isin(people, source.by_id.index)
+            values[hit] = source.by_id.reindex(people[hit]).to_numpy()
+            done |= hit
+        for source in found:
+            hit = ~done & (source.by_link.index.get_indexer(links) >= 0)
+            values[hit] = source.by_link.reindex(links[hit]).to_numpy()
+            done |= hit
+        return values
 
 
 @dataclass
@@ -293,17 +307,49 @@ def default_model(result: CatalogResult) -> Model | None:
     return Model(outcome, [n for n in names if configs[n].study == study])
 
 
-def covariate_choices(result: CatalogResult, labels: dict[str, str]) -> dict[str, str]:
-    instruments = result.project.instruments
+def covariate_keys(result: CatalogResult) -> list[str]:
     names = loaded_names(result)
-    found = {
-        item_key(v): f"{item_label(result, v)} ({labels[v.dataset]})"
-        for v in demographic_items(result, names) + other_numbers(result, names)
-    }
-    for s in result.catalog.scores:
-        instrument = instruments[s.instrument_id]
-        found[s.key] = f"{abbreviation(instrument)} {s.label} ({labels[s.dataset]})"
+    items = demographic_items(result, names) + other_numbers(result, names)
+    return [item_key(v) for v in items] + [s.key for s in result.catalog.scores]
+
+
+def variable_label(result: CatalogResult, key: str) -> str:
+    if key.startswith(ITEM_PREFIX):
+        return item_label(result, item_variable(result, key))
+    score = next(s for s in result.catalog.scores if s.key == key)
+    return f"{abbreviation(result.project.instruments[score.instrument_id])} {score.label}"
+
+
+def each_wave(key: str) -> bool:
+    # A covariate key without a dataset takes each wave's own value.
+    return "@" not in key
+
+
+def covariate_choices(result: CatalogResult, labels: dict[str, str]) -> dict[str, str]:
+    configs = {d.name: d for d in result.project.config.datasets}
+    keys = covariate_keys(result)
+    found = {k: f"{variable_label(result, k)} ({labels[k.rsplit('@', 1)[1]]})" for k in keys}
+    first: dict[str, str] = {}
+    waves: dict[str, set[tuple[str, str]]] = {}
+    for key in keys:
+        base, name = key.rsplit("@", 1)
+        first.setdefault(base, key)
+        waves.setdefault(base, set()).add((configs[name].study, configs[name].wave))
+    for base, held in waves.items():
+        # Offered when one study measures it in two or more waves.
+        studies = [study for study, _ in held]
+        if len(studies) > len(set(studies)):
+            found[base] = f"{variable_label(result, first[base])} (each wave)"
     return found
+
+
+def keys_of(keys: list[str], base: str) -> list[str]:
+    return [k.rsplit("@", 1)[1] for k in keys if k.rsplit("@", 1)[0] == base]
+
+
+def holders(result: CatalogResult, base: str, study: str) -> list[str]:
+    configs = {d.name: d for d in result.project.config.datasets}
+    return [n for n in keys_of(covariate_keys(result), base) if configs[n].study == study]
 
 
 def problem(result: CatalogResult, model: Model) -> str | None:
@@ -324,6 +370,17 @@ def problem(result: CatalogResult, model: Model) -> str | None:
         missing = [n for n in model.datasets if result.datasets[n].group is None]
         if missing:
             return f"{', '.join(missing)} has no group column."
+    study = configs[model.datasets[0]].study
+    for key in filter(each_wave, model.covariates):
+        held = holders(result, key, study)
+        missing = [
+            configs[n].wave
+            for n in model.datasets
+            if configs[n].wave not in {configs[h].wave for h in held}
+        ]
+        if missing:
+            label = variable_label(result, f"{key}@{held[0]}") if held else key
+            return f"{label} is not measured in wave {', '.join(missing)}."
     return None
 
 
@@ -333,7 +390,8 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
     outcome = identifier(model.outcome.split(".", 1)[1], {PERSON, TIME, WAVE})
     group = group_name(result) if model.by_group else None
     taken = {PERSON, TIME, WAVE, outcome, *([group] if group else [])}
-    covariates = [covariate(result, key, taken) for key in model.covariates]
+    study = configs[ordered[0]].study
+    covariates = [covariate(result, key, taken, study) for key in model.covariates]
     parts, left_out = [], 0
     for time, name in enumerate(ordered):
         loaded = result.datasets[name]
@@ -347,41 +405,47 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
         part[outcome] = analysis.row_values(result, f"{model.outcome}@{name}")[keep]
         links = analysis.link_keys(result, name).to_numpy()[keep]
         for c in covariates:
-            part[c.column] = c.lookup(people, links)
+            part[c.column] = c.lookup(people, links, configs[name].wave)
         parts.append(part)
     return Long(pd.concat(parts, ignore_index=True), outcome, group, covariates, left_out)
 
 
-def covariate(result: CatalogResult, key: str, taken: set[str]) -> Covariate:
-    dataset = key.rsplit("@", 1)[1]
-    values = analysis.row_values(result, key)
+def covariate(result: CatalogResult, key: str, taken: set[str], study: str) -> Covariate:
+    configs = {d.name: d for d in result.project.config.datasets}
+    timed = each_wave(key)
+    names = holders(result, key, study) if timed else [key.rsplit("@", 1)[1]]
+    first = f"{key}@{names[0]}" if timed else key
+    label = variable_label(result, first) + (" (each wave)" if timed else "")
     if key.startswith(ITEM_PREFIX):
-        variable = item_variable(result, key)
-        label = item_label(result, variable)
-        column = variable.column
+        variable = item_variable(result, first)
+        column = variable.item_id if timed else variable.column
         levels = (
             [(float(o.value), o.label) for o in variable.response_options]
             if variable.type == CHOICE
             else []
         )
     else:
-        score = next(s for s in result.catalog.scores if s.key == key)
-        instrument = result.project.instruments[score.instrument_id]
-        label = f"{abbreviation(instrument)} {score.label}"
-        column = f"{score.score_id}_{dataset}"
+        score_id = first.rsplit("@", 1)[0].split(".", 1)[1]
+        column = score_id if timed else f"{score_id}_{names[0]}"
         levels = []
     column = identifier(column, taken)
     taken.add(column)
+    sources: dict[str | None, list[Source]] = {}
+    for name in names:
+        wave = configs[name].wave if timed else None
+        sources.setdefault(wave, []).append(source(result, f"{key}@{name}" if timed else key))
+    return Covariate(key=key, label=label, column=column, levels=levels, sources=sources)
+
+
+def source(result: CatalogResult, key: str) -> Source:
+    dataset = key.rsplit("@", 1)[1]
+    values = analysis.row_values(result, key)
     loaded = result.datasets[dataset]
     ids = loaded.frame[loaded.id_column].astype("string")
     own = analysis.linkable(ids)
     links = analysis.link_keys(result, dataset)
     linked = analysis.linkable(links)
-    return Covariate(
-        key=key,
-        label=label,
-        column=column,
-        levels=levels,
+    return Source(
         by_id=pd.Series(values[own], index=ids.to_numpy()[own]),
         by_link=pd.Series(values[linked], index=links.to_numpy()[linked]),
     )
