@@ -72,7 +72,7 @@ def test_wave_groups_put_every_reporter_of_a_wave_together(result):
     datasets = ["parent_w1", "child_w1", "child_w2"]
     groups = views.wave_groups(result, datasets, views.variable_choices)
     assert list(groups) == ["Wave 1", "Wave 2"]
-    first = {views.score_of(result, k).dataset for k in groups["Wave 1"]}
+    first = {k.rsplit("@", 1)[1] for k in groups["Wave 1"]}
     assert first == {"parent_w1", "child_w1"}
     every = set(views.variable_choices(result, datasets))
     assert set(groups["Wave 1"]) | set(groups["Wave 2"]) == every

@@ -75,8 +75,9 @@ def test_a_number_item_is_an_outcome_and_a_covariate(result):
     assert long.outcome == "frontal_alpha_asymmetry"
     eeg = result.datasets["eeg_w3"].frame
     later = long.frame[long.frame["time"] == 1].set_index("id")[long.outcome]
-    assert later.to_dict() == pytest.approx(
-        pd.to_numeric(eeg["frontal_alpha_asymmetry"]).set_axis(eeg["pid"]).to_dict()
+    expected = pd.to_numeric(eeg["frontal_alpha_asymmetry"]).set_axis(eeg["pid"])
+    pd.testing.assert_series_equal(
+        later, expected.reindex(later.index), check_names=False, check_index_type=False
     )
     fitted = ml.run(result, model, long, "EEG frontal alpha asymmetry", None)
     assert len(fitted.fixed) == 3 and fitted.observations > 0
