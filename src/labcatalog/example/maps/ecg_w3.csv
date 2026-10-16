@@ -1,0 +1,8 @@
+column,instrument,item
+pid,,
+visit_date,,
+heart_rate,ecg_resting,heart_rate
+rmssd,ecg_resting,rmssd
+sdnn,ecg_resting,sdnn
+seconds,ecg_resting,seconds
+clean_beats,ecg_resting,clean_beats

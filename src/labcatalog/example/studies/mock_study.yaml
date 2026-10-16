@@ -6,9 +6,30 @@ methods:
     Parents filled in their questionnaires online in the week after each visit. Children answered theirs on a tablet during the visit, and a research assistant read the items aloud to children who asked.
 
     Each wave was exported from the survey platform and cleaned with scripts/clean_export.py, which drops preview responses and unfinished attempts and takes the visit date from the start time.
+  eeg: |
+    Resting EEG was recorded for five minutes with eyes closed from a 32-channel cap at 500 Hz, re-referenced to the average, and cut into two-second epochs; epochs with artefacts were rejected and children with fewer than 20 clean epochs left out. Band power came from Welch's method.
+  fmri: |
+    Children lay in a 3T scanner for an eight-minute resting scan after a mock-scanner session. Preprocessing followed the lab's pipeline; connectivity between seven networks was averaged from region pairs and Fisher-transformed. Scans with mean framewise displacement over 0.5 mm were left out.
+  fnirs: |
+    Children watched alternating blocks of social and non-social scenes while a 16-channel fNIRS cap covered prefrontal and temporal cortex. Channels failing the scalp-coupling check were rejected, and a GLM gave a beta per channel, condition and chromophore.
+  eyetracking: |
+    A screen-mounted eye tracker recorded looking during twelve trials that each showed a face beside an object. Children with a calibration error over 1.5 degrees were left out, and trials with less than one second of looking did not count.
+  video: |
+    Parent and child played freely for ten minutes with a standard toy set, filmed from two angles. Two trained observers coded the sessions; recordings shorter than five minutes were not scored.
+  ecg: |
+    Heart activity was recorded for five minutes of seated rest with a three-lead ECG. R peaks were detected automatically and checked by hand; recordings shorter than three minutes or with fewer than 80% clean beats were left out.
+  saliva: |
+    Families collected saliva by passive drool at waking, 30 minutes after waking and at bedtime on one school day, and froze the tubes until the visit. Samples were assayed in duplicate; results below the detection limit counted as half the limit, and duplicates differing by more than 20% were not used.
 administrations:
   - {instrument: example_parent_stress, datasets: [parent_w1, parent_w2, parent_w3], target: self}
   - {instrument: example_child_sleep, datasets: [parent_w1, parent_w2, parent_w3], target: child}
   - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self}
   - {instrument: example_screen_time, datasets: [child_w2, child_w3], target: self}
   - {instrument: example_demographics, datasets: [parent_w1, parent_w2, parent_w3]}
+  - {instrument: eeg_resting, datasets: [eeg_w1, eeg_w3], target: self}
+  - {instrument: fmri_resting, datasets: [fmri_w1, fmri_w3], target: self}
+  - {instrument: fnirs_social, datasets: [fnirs_w2], target: self}
+  - {instrument: eyetracking_faces, datasets: [eyetracking_w1, eyetracking_w2], target: self}
+  - {instrument: video_play, datasets: [video_w2], target: child}
+  - {instrument: ecg_resting, datasets: [ecg_w2, ecg_w3], target: self}
+  - {instrument: saliva_cortisol, datasets: [saliva_w1, saliva_w3], target: self}

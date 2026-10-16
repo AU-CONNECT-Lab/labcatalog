@@ -1,0 +1,7 @@
+column,instrument,item
+pid,,
+visit_date,,
+pfc_hbo_social,fnirs_social,pfc_hbo_social
+pfc_hbo_nonsocial,fnirs_social,pfc_hbo_nonsocial
+pfc_social_effect,fnirs_social,pfc_social_effect
+good_channels,fnirs_social,good_channels

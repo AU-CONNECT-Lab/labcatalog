@@ -1,0 +1,5 @@
+behavior,count,seconds
+child_positive,9,59
+child_negative,0,0
+parent_warmth,17,128
+joint_attention,5,28

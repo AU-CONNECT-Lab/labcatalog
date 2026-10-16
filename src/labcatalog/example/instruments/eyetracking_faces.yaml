@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: eyetracking_faces
+name: Eye tracking faces task
+abbreviation: ET
+kind: eyetracking
+construct_name: Attention to faces
+description: Looking at a face, an object and the background over twelve short trials; the tracker's software leaves a trials-by-areas table of fixation time for each child.
+items:
+  - {id: face_looking, text: "Share of looking time on the face, over valid trials", type: number, min: 0, max: 1}
+  - {id: looking_ms, text: "Looking time per valid trial (ms)", type: number, min: 0, max: 30000}
+  - {id: valid_trials, text: "Trials with at least one second of looking, out of 12", type: number, min: 0, max: 12}
+  - {id: calibration_error, text: "Calibration error (degrees of visual angle)", type: number, min: 0, max: 10}
+license: Fictional example measures

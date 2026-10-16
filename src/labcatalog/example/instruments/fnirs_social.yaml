@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: fnirs_social
+name: fNIRS social attention task
+abbreviation: fNIRS
+kind: fnirs
+construct_name: Prefrontal response to social scenes
+description: Prefrontal oxygenated haemoglobin while watching social and non-social scenes, from a 16-channel cap; the pipeline leaves a channels-by-condition table of GLM betas for each child, with rejected channels left empty.
+items:
+  - {id: pfc_hbo_social, text: "Prefrontal HbO beta, social scenes", type: number, min: -5, max: 5}
+  - {id: pfc_hbo_nonsocial, text: "Prefrontal HbO beta, non-social scenes", type: number, min: -5, max: 5}
+  - {id: pfc_social_effect, text: "Prefrontal HbO, social minus non-social", type: number, min: -5, max: 5}
+  - {id: good_channels, text: "Channels kept after the scalp-coupling check, out of 16", type: number, min: 0, max: 16}
+license: Fictional example measures

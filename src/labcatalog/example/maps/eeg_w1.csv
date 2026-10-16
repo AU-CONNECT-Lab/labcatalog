@@ -1,0 +1,8 @@
+column,instrument,item
+pid,,
+visit_date,,
+frontal_alpha_asymmetry,eeg_resting,frontal_alpha_asymmetry
+frontal_theta,eeg_resting,frontal_theta
+posterior_alpha,eeg_resting,posterior_alpha
+theta_beta_ratio,eeg_resting,theta_beta_ratio
+epochs_kept,eeg_resting,epochs_kept

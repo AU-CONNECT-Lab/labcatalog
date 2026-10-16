@@ -7,8 +7,8 @@ project:
 
 # Allowed words for each dataset's modality and reporter, and for each administration's target.
 vocab:
-  modalities: [questionnaire]
-  reporters: [parent, child]
+  modalities: [questionnaire, eeg, fmri, fnirs, eyetracking, video, ecg, saliva]
+  reporters: [parent, child, observer]
   targets: [self, child]
 
 # Codes in the data that mean "no answer"; they are counted, never scored. Blank cells always count as missing.
@@ -55,6 +55,18 @@ datasets:
   - {name: child_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: child, source: csv, path: data/child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w3, modality: questionnaire, study: mock_study, wave: 3, reporter: child, source: csv, path: data/child_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: eeg_w1, modality: eeg, study: mock_study, wave: 1, reporter: child, source: csv, path: data/eeg_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: eeg_w3, modality: eeg, study: mock_study, wave: 3, reporter: child, source: csv, path: data/eeg_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: fmri_w1, modality: fmri, study: mock_study, wave: 1, reporter: child, source: csv, path: data/fmri_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: fmri_w3, modality: fmri, study: mock_study, wave: 3, reporter: child, source: csv, path: data/fmri_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: fnirs_w2, modality: fnirs, study: mock_study, wave: 2, reporter: child, source: csv, path: data/fnirs_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: eyetracking_w1, modality: eyetracking, study: mock_study, wave: 1, reporter: child, source: csv, path: data/eyetracking_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: eyetracking_w2, modality: eyetracking, study: mock_study, wave: 2, reporter: child, source: csv, path: data/eyetracking_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: video_w2, modality: video, study: mock_study, wave: 2, reporter: observer, source: csv, path: data/video_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: ecg_w2, modality: ecg, study: mock_study, wave: 2, reporter: child, source: csv, path: data/ecg_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: ecg_w3, modality: ecg, study: mock_study, wave: 3, reporter: child, source: csv, path: data/ecg_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: saliva_w1, modality: saliva, study: mock_study, wave: 1, reporter: child, source: csv, path: data/saliva_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: saliva_w3, modality: saliva, study: mock_study, wave: 3, reporter: child, source: csv, path: data/saliva_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
 
 # Extra fields your lab wants on instruments, scores, administrations or datasets; choice and tags fields can be used as filters.
 custom_fields:
@@ -77,7 +89,7 @@ browse:
 references:
   root: references
 
-# Your own cleaning scripts, run in order from the Prepare page or with "labcatalog prepare". Here one script turns each survey-platform export in raw/ into the clean file the catalog reads; listing the script among the inputs marks the step outdated when the script changes.
+# Your own cleaning scripts, run in order from the Prepare page or with "labcatalog prepare". Here one script turns each survey-platform export in raw/ into the clean file the catalog reads, and one script per modality turns the per-child results its pipeline left in derivatives/ into one row per child; listing the script among the inputs marks the step outdated when the script changes.
 prepare:
   - {name: clean_parent_w1, run: python scripts/clean_export.py raw/parent_w1_export.csv data/parent_w1.csv, inputs: [raw/parent_w1_export.csv, scripts/clean_export.py], outputs: [data/parent_w1.csv]}
   - {name: clean_parent_w2, run: python scripts/clean_export.py raw/parent_w2_export.csv data/parent_w2.csv, inputs: [raw/parent_w2_export.csv, scripts/clean_export.py], outputs: [data/parent_w2.csv]}
@@ -85,3 +97,15 @@ prepare:
   - {name: clean_child_w1, run: python scripts/clean_export.py raw/child_w1_export.csv data/child_w1.csv, inputs: [raw/child_w1_export.csv, scripts/clean_export.py], outputs: [data/child_w1.csv]}
   - {name: clean_child_w2, run: python scripts/clean_export.py raw/child_w2_export.csv data/child_w2.csv, inputs: [raw/child_w2_export.csv, scripts/clean_export.py], outputs: [data/child_w2.csv]}
   - {name: clean_child_w3, run: python scripts/clean_export.py raw/child_w3_export.csv data/child_w3.csv, inputs: [raw/child_w3_export.csv, scripts/clean_export.py], outputs: [data/child_w3.csv]}
+  - {name: extract_eeg_w1, run: python scripts/extract_eeg.py derivatives/eeg/ses-1 data/eeg_w1.csv, inputs: [derivatives/eeg/ses-1/qc.csv, scripts/extract_eeg.py], outputs: [data/eeg_w1.csv]}
+  - {name: extract_eeg_w3, run: python scripts/extract_eeg.py derivatives/eeg/ses-3 data/eeg_w3.csv, inputs: [derivatives/eeg/ses-3/qc.csv, scripts/extract_eeg.py], outputs: [data/eeg_w3.csv]}
+  - {name: extract_fmri_w1, run: python scripts/extract_fmri.py derivatives/fmri/ses-1 data/fmri_w1.csv, inputs: [derivatives/fmri/ses-1/motion.csv, scripts/extract_fmri.py], outputs: [data/fmri_w1.csv]}
+  - {name: extract_fmri_w3, run: python scripts/extract_fmri.py derivatives/fmri/ses-3 data/fmri_w3.csv, inputs: [derivatives/fmri/ses-3/motion.csv, scripts/extract_fmri.py], outputs: [data/fmri_w3.csv]}
+  - {name: extract_fnirs_w2, run: python scripts/extract_fnirs.py derivatives/fnirs/ses-2 data/fnirs_w2.csv, inputs: [derivatives/fnirs/ses-2/qc.csv, scripts/extract_fnirs.py], outputs: [data/fnirs_w2.csv]}
+  - {name: extract_eyetracking_w1, run: python scripts/extract_eyetracking.py derivatives/eyetracking/ses-1 data/eyetracking_w1.csv, inputs: [derivatives/eyetracking/ses-1/sessions.csv, scripts/extract_eyetracking.py], outputs: [data/eyetracking_w1.csv]}
+  - {name: extract_eyetracking_w2, run: python scripts/extract_eyetracking.py derivatives/eyetracking/ses-2 data/eyetracking_w2.csv, inputs: [derivatives/eyetracking/ses-2/sessions.csv, scripts/extract_eyetracking.py], outputs: [data/eyetracking_w2.csv]}
+  - {name: extract_video_w2, run: python scripts/extract_video.py derivatives/video/ses-2 data/video_w2.csv, inputs: [derivatives/video/ses-2/sessions.csv, scripts/extract_video.py], outputs: [data/video_w2.csv]}
+  - {name: extract_ecg_w2, run: python scripts/extract_ecg.py derivatives/ecg/ses-2 data/ecg_w2.csv, inputs: [derivatives/ecg/ses-2/sessions.csv, scripts/extract_ecg.py], outputs: [data/ecg_w2.csv]}
+  - {name: extract_ecg_w3, run: python scripts/extract_ecg.py derivatives/ecg/ses-3 data/ecg_w3.csv, inputs: [derivatives/ecg/ses-3/sessions.csv, scripts/extract_ecg.py], outputs: [data/ecg_w3.csv]}
+  - {name: extract_saliva_w1, run: python scripts/extract_saliva.py derivatives/saliva/ses-1/assay_report.csv data/saliva_w1.csv, inputs: [derivatives/saliva/ses-1/assay_report.csv, scripts/extract_saliva.py], outputs: [data/saliva_w1.csv]}
+  - {name: extract_saliva_w3, run: python scripts/extract_saliva.py derivatives/saliva/ses-3/assay_report.csv data/saliva_w3.csv, inputs: [derivatives/saliva/ses-3/assay_report.csv, scripts/extract_saliva.py], outputs: [data/saliva_w3.csv]}

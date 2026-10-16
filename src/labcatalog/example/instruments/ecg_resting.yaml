@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: ecg_resting
+name: Resting heart rate variability
+abbreviation: HRV
+kind: ecg
+construct_name: Autonomic regulation
+description: Five minutes of seated rest with a three-lead ECG; the beat detector leaves each child's R-R intervals with an artefact flag per beat.
+items:
+  - {id: heart_rate, text: "Mean heart rate over clean beats (beats per minute)", type: number, min: 30, max: 220}
+  - {id: rmssd, text: "RMSSD of successive clean R-R intervals (ms)", type: number, min: 0, max: 400}
+  - {id: sdnn, text: "SD of clean R-R intervals (ms)", type: number, min: 0, max: 400}
+  - {id: seconds, text: "Length of the recording (seconds)", type: number, min: 0, max: 1200}
+  - {id: clean_beats, text: "Share of beats without an artefact", type: number, min: 0, max: 1}
+license: Fictional example measures

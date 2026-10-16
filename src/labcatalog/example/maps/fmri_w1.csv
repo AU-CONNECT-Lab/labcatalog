@@ -1,0 +1,8 @@
+column,instrument,item
+pid,,
+visit_date,,
+dmn_within,fmri_resting,dmn_within
+fpn_within,fmri_resting,fpn_within
+dmn_fpn,fmri_resting,dmn_fpn
+salience_dmn,fmri_resting,salience_dmn
+mean_fd,fmri_resting,mean_fd

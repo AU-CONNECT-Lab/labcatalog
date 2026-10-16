@@ -1,0 +1,7 @@
+column,instrument,item
+pid,,
+visit_date,,
+face_looking,eyetracking_faces,face_looking
+looking_ms,eyetracking_faces,looking_ms
+valid_trials,eyetracking_faces,valid_trials
+calibration_error,eyetracking_faces,calibration_error

@@ -1,0 +1,8 @@
+column,instrument,item
+pid,,
+visit_date,,
+child_positive_rate,video_play,child_positive_rate
+child_negative_rate,video_play,child_negative_rate
+parent_warmth_rate,video_play,parent_warmth_rate
+joint_attention,video_play,joint_attention
+minutes,video_play,minutes

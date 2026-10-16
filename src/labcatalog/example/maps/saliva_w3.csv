@@ -1,0 +1,7 @@
+column,instrument,item
+pid,,
+visit_date,,
+cortisol_wake,saliva_cortisol,cortisol_wake
+cortisol_awakening,saliva_cortisol,cortisol_awakening
+cortisol_slope,saliva_cortisol,cortisol_slope
+usable_samples,saliva_cortisol,usable_samples
