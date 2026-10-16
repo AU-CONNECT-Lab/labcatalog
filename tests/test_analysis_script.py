@@ -117,7 +117,7 @@ def test_student_uses_equal_variances_and_the_pooled_sd(result, sample):
 JASP_TTESTS = "C:/Program Files (x86)/JASP/Modules/module_libs/jaspTTests/jaspTTests/R/jaspTTests"
 JASP_LIMITS = """\
 env <- new.env()
-lazyLoad("{lib}", envir = env)
+invisible(lazyLoad("{lib}", envir = env))
 limits <- get(".confidenceLimitsEffectSizes", envir = env)(
   ncp = {ncp}, df = {df}, alpha.lower = 0.025, alpha.upper = 0.025)
 cat(limits$Lower.Limit, limits$Upper.Limit)
@@ -133,10 +133,11 @@ def test_the_interval_of_d_is_jasps(result, sample, tmp_path, t_test):
     n = [g.n for g in found.groups]
     scale = np.sqrt(n[0] * n[1] / sum(n))
     (tmp_path / "jasp.R").write_text(
-        JASP_LIMITS.format(lib=JASP_TTESTS, ncp=repr(found.effect * scale), df=repr(found.df1)),
+        JASP_LIMITS.format(lib=JASP_TTESTS, ncp=float(found.effect * scale), df=found.df1),
         encoding="utf-8",
     )
     done = subprocess.run([rscript(), str(tmp_path / "jasp.R")], capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
     low, high = (float(v) / scale for v in done.stdout.split())
     assert (found.effect_low, found.effect_high) == pytest.approx((low, high), abs=1e-6)
 
