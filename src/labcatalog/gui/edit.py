@@ -11,7 +11,7 @@ from labcatalog.gui.common import LINE_SUFFIX, heading, note
 from labcatalog.issues import Issue
 
 TEXT = "text"
-WIDE = {"text", "label", "path"}
+WIDE = {"text", "label", "path", "instrument", "datasets"}
 
 
 @dataclass

@@ -5,16 +5,17 @@ from labcatalog.browse import build_index, matches
 from labcatalog.cfa import ONE_FACTOR, SUBSCALES, CfaFit
 from labcatalog.charts import views
 from labcatalog.gui import datasets, instruments, overview
-from labcatalog.gui.common import location_path
+from labcatalog.gui.common import split_location
 from labcatalog.invariance import InvarianceStep, InvarianceTest
 from labcatalog.pipeline import run_catalog
 
 
-def test_location_path_drops_the_line_number():
-    root = Path("project")
-    assert location_path(root, "studies/demo_study.yaml:5") == root / "studies/demo_study.yaml"
+def test_location_splits_off_the_line_number():
+    assert split_location("studies/demo_study.yaml:5") == ("studies/demo_study.yaml", 5)
+    assert split_location("data/parent_w1.csv") == ("data/parent_w1.csv", None)
     outside = Path.cwd() / "data" / "parent_w1.csv"
-    assert location_path(root, f"{outside.as_posix()}:3") == outside
+    path, line = split_location(f"{outside.as_posix()}:3")
+    assert (Path("project") / path, line) == (outside, 3)
 
 
 def test_wave_table(mock_project):
