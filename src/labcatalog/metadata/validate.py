@@ -4,8 +4,9 @@ from datetime import date
 from typing import Any
 
 from labcatalog import defaults
-from labcatalog.config import CustomFieldDef
+from labcatalog.config import CustomFieldDef, missing_codes_for
 from labcatalog.issues import Issue, IssueLevel
+from labcatalog.metadata.varmap import MapEntry
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
 from labcatalog.reports import measures, participants
 from labcatalog.schema import Administration, Instrument
@@ -360,9 +361,7 @@ def check_missing_code_collisions(project: Project) -> list[Issue]:
                 dataset = datasets.get(dataset_name)
                 if dataset is None:
                     continue
-                codes = {
-                    str(m.code): m.label for m in dataset.missing_codes or config.missing_codes
-                }
+                codes = {str(m.code): m.label for m in missing_codes_for(config, dataset)}
                 for response_set in instrument.response_sets:
                     for option in response_set.options:
                         label = codes.get(str(option.value))
@@ -371,8 +370,12 @@ def check_missing_code_collisions(project: Project) -> list[Issue]:
                                 f"response set '{response_set.id}' uses {option.value}, which is "
                                 f"also the missing code '{label}' (dataset {dataset_name})"
                             )
-                            messages.setdefault(message, project.instrument_files[instrument.id])
-    return [problem("missing_code_collision", m, loc) for m, loc in messages.items()]
+                            where = (project.instrument_files[instrument.id], dataset_name, option)
+                            messages.setdefault(message, where)
+    return [
+        problem("missing_code_collision", m, loc, dataset=name, code=str(option.value))
+        for m, (loc, name, option) in messages.items()
+    ]
 
 
 def check_variable_maps(project: Project) -> list[Issue]:
@@ -400,7 +403,7 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 issues.append(problem("map_missing", message, CONFIG))
             continue
         seen_columns: dict[str, int] = {}
-        seen_items: dict[tuple[str, str], str] = {}
+        seen_items: dict[tuple[str, str], MapEntry] = {}
         stray_rows: dict[str, list[int]] = {}
         for entry in entries:
             where = f"{location}:{entry.line}"
@@ -408,7 +411,8 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 message = (
                     f"column {entry.column} is already listed on line {seen_columns[entry.column]}"
                 )
-                issues.append(problem("duplicate_id", message, where))
+                lines = [seen_columns[entry.column], entry.line]
+                issues.append(problem("duplicate_id", message, where, dataset=dataset.name, lines=lines))
                 continue
             seen_columns[entry.column] = entry.line
             if entry.instrument is None:
@@ -428,9 +432,11 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 continue
             key = (entry.instrument, entry.item)
             if key in seen_items:
-                message = f"{entry.instrument} {entry.item} is already mapped to {seen_items[key]}"
-                issues.append(problem("duplicate_id", message, where))
-            seen_items[key] = entry.column
+                first = seen_items[key]
+                message = f"{entry.instrument} {entry.item} is already mapped to {first.column}"
+                lines = [first.line, entry.line]
+                issues.append(problem("duplicate_id", message, where, dataset=dataset.name, lines=lines))
+            seen_items[key] = entry
         # One issue per instrument, so a single typo upstream does not flood the list.
         for name, lines in stray_rows.items():
             message = (
@@ -521,11 +527,16 @@ def check_references(project: Project) -> list[Issue]:
         return [problem("references_root_missing", message, CONFIG, "warning")]
     issues = []
     keys = [
-        (f"studies.{name}.reference", study.reference, CONFIG)
+        (f"studies.{name}.reference", study.reference, CONFIG, ["studies", name, "reference"])
         for name, study in project.config.studies.items()
         if study.reference
     ] + [
-        (f"references[{n}].key", reference.key, project.instrument_files[instrument_id])
+        (
+            f"references[{n}].key",
+            reference.key,
+            project.instrument_files[instrument_id],
+            ["references", n - 1, "key"],
+        )
         for instrument_id, instrument in project.instruments.items()
         for n, reference in enumerate(instrument.references, start=1)
     ]
@@ -534,10 +545,21 @@ def check_references(project: Project) -> list[Issue]:
             message = f"references.root: no {defaults.BIB_FILENAME} in {root}"
             issues.append(problem("bib_missing", message, CONFIG, "warning"))
     else:
-        for where, key, location in keys:
+        choices = sorted(project.bibliography)
+        for where, key, location, path in keys:
             if key not in project.bibliography:
                 message = f"{where}: '{key}' is not in {defaults.BIB_FILENAME}"
-                issues.append(problem("reference_missing", message, location, "warning"))
+                issues.append(
+                    problem(
+                        "reference_missing",
+                        message,
+                        location,
+                        "warning",
+                        path=path,
+                        value=key,
+                        choices=choices,
+                    )
+                )
     for instrument_id, instrument in project.instruments.items():
         for n, reference in enumerate(instrument.references, start=1):
             if not reference.pdf:

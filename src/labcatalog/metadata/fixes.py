@@ -33,6 +33,29 @@ def map_rows(project: Project, dataset: str, rows: list[tuple[str, str, str]]) -
     return Change(relative, text, opened)
 
 
+def map_line(project: Project, dataset: str, line: int, column: str | None) -> Change:
+    # One row of the column map given another data column, or taken out when column is None.
+    relative = f"{defaults.MAPS_DIR}/{dataset}.csv"
+    opened = editing.open_file(project.root, relative)
+    lines = opened.text.split("
+")
+    if column is None:
+        del lines[line - 1]
+    else:
+        row = next(csv.reader([lines[line - 1]]))
+        row[next(csv.reader([lines[0]])).index("column")] = column
+        out = io.StringIO()
+        csv.writer(out, lineterminator="").writerow(row)
+        lines[line - 1] = out.getvalue()
+    return Change(relative, "
+".join(lines), opened)
+
+
+def map_lines(project: Project, dataset: str) -> list[str]:
+    return editing.open_file(project.root, f"{defaults.MAPS_DIR}/{dataset}.csv").text.split("
+")
+
+
 def add_to_vocab(project: Project, kind: str, value: str) -> Change:
     opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
     data = records.load(opened.text)
@@ -143,6 +166,24 @@ def add_missing_codes(
         target = entry["missing_codes"]
     for value, label in codes:
         target.append(pair("code", value, label))
+    return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
+
+
+def drop_missing_code(project: Project, dataset: str, code: str, everywhere: bool) -> Change:
+    opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    entry = next(d for d in data["datasets"] if d["name"] == dataset)
+    if "missing_codes" in entry:
+        target = entry["missing_codes"]
+    elif everywhere:
+        target = data["missing_codes"]
+    else:
+        # The dataset's own list replaces the project's, so it starts as a copy of it.
+        known = project.config.missing_codes
+        target = entry["missing_codes"] = flow([{"code": m.code, "label": m.label} for m in known])
+    for n in reversed(range(len(target))):
+        if str(target[n]["code"]) == code:
+            del target[n]
     return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
 
 

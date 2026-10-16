@@ -5,6 +5,7 @@ from pathlib import Path
 from nicegui import run, ui
 
 from labcatalog.codebook.core import holds
+from labcatalog.config import dataset_by_name
 from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
@@ -53,7 +54,10 @@ EXPLAIN: dict[str, tuple[str, str]] = {
         "Something names an ID that does not exist, often a typo in the ID.",
         PICK,
     ),
-    "duplicate_id": ("Two things share one ID; one of them needs another.", SETTINGS),
+    "duplicate_id": (
+        "Two things share one ID, or the column map lists one thing twice.",
+        SETTINGS,
+    ),
     "invalid_value": ("A value that cannot work as written.", SETTINGS),
     "map_missing": (
         "A dataset has instruments but no column map; add the dataset again with Add a dataset "
@@ -68,13 +72,13 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     "missing_code_collision": (
         "A response option has the same value as a missing code, so labcatalog cannot tell an "
         "answer from no answer.",
-        SETTINGS,
+        PICK,
     ),
-    "reference_missing": ("The reference key is not in references.bib.", SETTINGS),
+    "reference_missing": ("The reference key is not in references.bib, often a typo.", PICK),
     "pdf_missing": ("The reference's PDF is not where the instrument says.", SETTINGS),
     "column_missing": (
         "The column map names a column the data file does not have, often a renamed column.",
-        SETTINGS,
+        PICK,
     ),
     "column_unmapped": (
         "The data file has columns the column map does not list, so labcatalog does not know "
@@ -442,8 +446,85 @@ def wrong_id(project: Project, result: CatalogResult, issue: Issue, save) -> Non
         ui.button("Use this ID", on_click=replace)
 
 
+def missing_column(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    details = issue.details
+    dataset, line = details["dataset"], details["line"]
+    loaded = result.datasets.get(dataset)
+    columns = fixes.free_columns(project, dataset, list(loaded.frame.columns) if loaded else [])
+    caption("Fix the column")
+    note(
+        "Pick the name the column has in the data file now, or take the row out of the column "
+        "map if the file does not hold it."
+    )
+    with ui.row().classes("items-center gap-3"):
+        if columns:
+            choice = ui.select(
+                columns,
+                value=fixes.closest(details["column"], columns),
+                label=f"Instead of {details['column']}",
+            ).classes("w-64")
+
+            async def rename() -> None:
+                if choice.value:
+                    await save([fixes.map_line(project, dataset, line, choice.value)])
+
+            ui.button("Use this column", on_click=rename)
+        ui.button(
+            "Take the row out",
+            icon="delete",
+            on_click=lambda: save([fixes.map_line(project, dataset, line, None)]),
+        ).props("flat")
+
+
+def repeated_row(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    details = issue.details
+    if "lines" not in details:
+        note("Give one of them another ID in the file below; other files may name it too.")
+        return
+    dataset = details["dataset"]
+    lines = fixes.map_lines(project, dataset)
+    caption("Keep one row")
+    for n in details["lines"]:
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.label(f"Line {n}").classes("w-16 lc-faint")
+            ui.label(lines[n - 1]).classes("font-mono w-72")
+            ui.button(
+                "Take this row out",
+                icon="delete",
+                on_click=lambda n=n: save([fixes.map_line(project, dataset, n, None)]),
+            ).props("flat dense")
+
+
+def clashing_code(project: Project, result: CatalogResult, issue: Issue, save) -> None:
+    details = issue.details
+    dataset, code = details["dataset"], details["code"]
+    caption("Stop counting it as missing")
+    note(
+        f"If {code} is a real answer in {dataset}, take it out of the missing codes. If it "
+        "really means no answer, the response set is wrong: open the instrument file below."
+    )
+    with ui.row().classes("items-center gap-3"):
+        scope = None
+        if dataset_by_name(project.config, dataset).missing_codes is None:
+            scope = ui.select(
+                {"dataset": f"only in {dataset}", "all": "in every dataset"},
+                value="dataset",
+                label="Take it out",
+            ).classes("w-64")
+
+        async def drop() -> None:
+            everywhere = scope is not None and scope.value == "all"
+            await save([fixes.drop_missing_code(project, dataset, code, everywhere)])
+
+        ui.button(f"{code} is an answer", icon="check", on_click=drop)
+
+
 REPAIRS = {
     "unknown_reference": wrong_id,
+    "reference_missing": wrong_id,
+    "column_missing": missing_column,
+    "duplicate_id": repeated_row,
+    "missing_code_collision": clashing_code,
     "unexpected_value": stray_values,
     "column_unmapped": unlisted_columns,
     "not_in_vocab": wrong_word,

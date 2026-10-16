@@ -44,7 +44,9 @@ def load_variable_map(path: Path, root: Path, issues: list[Issue]) -> list[MapEn
         return []
 
     entries = []
-    for line, row in enumerate(reader, start=2):
+    for row in reader:
+        # The reader's own count, since it skips blank lines.
+        line = reader.line_num
         column = (row["column"] or "").strip()
         instrument = (row["instrument"] or "").strip() or None
         item = (row["item"] or "").strip() or None

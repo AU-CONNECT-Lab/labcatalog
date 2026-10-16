@@ -62,7 +62,17 @@ def check_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[
         for entry in entries:
             if entry.column not in loaded.frame:
                 message = f"{entry.column} is listed in the map but not in the data"
-                issues.append(problem("column_missing", message, f"{map_file}:{entry.line}"))
+                where = f"{map_file}:{entry.line}"
+                issues.append(
+                    problem(
+                        "column_missing",
+                        message,
+                        where,
+                        dataset=name,
+                        column=entry.column,
+                        line=entry.line,
+                    )
+                )
         described = {entry.column for entry in entries}
         undescribed = [column for column in loaded.frame if column not in described]
         if undescribed:
