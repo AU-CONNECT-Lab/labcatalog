@@ -9,10 +9,11 @@ def edit(path, old, new):
     path.write_text(text.replace(old, new, 1), encoding="utf-8")
 
 
-def apply(root, change):
+def apply(root, found):
+    found = found if isinstance(found, list) else [found]
     project = load_project(root)
-    assert changes.check(project, [change]) == []
-    changes.write(project, [change])
+    assert changes.check(project, found) == []
+    changes.write(project, found)
 
 
 def codes(issues):
@@ -30,7 +31,9 @@ def test_an_unlisted_column_is_added_to_the_map(mock_project):
 def test_a_misspelled_word_is_replaced_or_added(mock_project):
     config = mock_project / "labcatalog.yaml"
     edit(config, "wave: 1, reporter: child", "wave: 1, reporter: chlid")
-    [issue] = [i for i in run_validate(mock_project) if i.code == "not_in_vocab"]
+    edit(config, "wave: 3, reporter: child", "wave: 3, reporter: chlid")
+    found = [i for i in run_validate(mock_project) if i.code == "not_in_vocab"]
+    issue = found[0]
     details = issue.details
     assert (details["vocab"], details["value"], details["field"]) == (
         "reporters",
@@ -40,7 +43,11 @@ def test_a_misspelled_word_is_replaced_or_added(mock_project):
     project = load_project(mock_project)
     assert fixes.closest("chlid", project.config.vocab.reporters) == "child"
     before = config.read_text(encoding="utf-8")
-    apply(mock_project, fixes.replace_word(project, details, "child"))
+    apply(mock_project, fixes.replace_word(project, [details], "child"))
+    assert len([i for i in run_validate(mock_project) if i.code == "not_in_vocab"]) == 1
+    config.write_text(before, encoding="utf-8")
+    places = [i.details for i in found]
+    apply(mock_project, fixes.replace_word(load_project(mock_project), places, "child"))
     assert "not_in_vocab" not in codes(run_validate(mock_project))
     config.write_text(before, encoding="utf-8")
     apply(mock_project, fixes.add_to_vocab(load_project(mock_project), "reporters", "chlid"))
@@ -57,7 +64,7 @@ def test_a_misspelled_target_is_fixed_in_the_study_file(mock_project):
     )
     [issue] = [i for i in run_validate(mock_project) if i.code == "not_in_vocab"]
     assert issue.details["study"] == "mock_study" and issue.details["administration"] == 2
-    apply(mock_project, fixes.replace_word(load_project(mock_project), issue.details, "self"))
+    apply(mock_project, fixes.replace_word(load_project(mock_project), [issue.details], "self"))
     assert run_validate(mock_project) == []
 
 

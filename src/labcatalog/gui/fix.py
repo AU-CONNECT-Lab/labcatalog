@@ -275,6 +275,14 @@ def wrong_word(project: Project, result: CatalogResult, issue: Issue, save) -> N
     details = issue.details
     kind, value = details["vocab"], details["value"]
     words = list(getattr(project.config.vocab, kind))
+    # The same slip copied into other entries, so one choice fixes them all.
+    places = [
+        i.details
+        for i in result.report.issues
+        if i.code == "not_in_vocab"
+        and "field" in i.details
+        and (i.details["vocab"], i.details["value"]) == (kind, value)
+    ]
     caption("Fix the word")
     with ui.row().classes("items-center gap-3"):
         if "field" in details and words:
@@ -282,11 +290,15 @@ def wrong_word(project: Project, result: CatalogResult, issue: Issue, save) -> N
                 "w-48"
             )
 
-            async def replace() -> None:
+            async def replace(where: list[dict]) -> None:
                 if choice.value:
-                    await save([fixes.replace_word(project, details, choice.value)])
+                    await save(fixes.replace_word(project, where, choice.value))
 
-            ui.button("Use this word", on_click=replace)
+            ui.button("Use this word", on_click=lambda: replace([details]))
+            if len(places) > 1:
+                ui.button(
+                    f"Use it in all {len(places)} places", on_click=lambda: replace(places)
+                ).props("flat")
         ui.button(
             f"Add '{value}' as a new word",
             on_click=lambda: save([fixes.add_to_vocab(project, kind, value)]),

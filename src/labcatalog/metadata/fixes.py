@@ -43,21 +43,25 @@ def add_to_vocab(project: Project, kind: str, value: str) -> Change:
     return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
 
 
-def replace_word(project: Project, details: dict, word: str) -> Change:
-    # The one entry that holds the word: a dataset in the settings or an administration.
-    field = details["field"]
-    if "dataset" in details:
-        relative = defaults.CONFIG_FILENAME
-        opened = editing.open_file(project.root, relative)
-        data = records.load(opened.text)
-        entry = next(d for d in data["datasets"] if d["name"] == details["dataset"])
-    else:
-        relative = project.study_files[details["study"]]
-        opened = editing.open_file(project.root, relative)
-        data = records.load(opened.text)
-        entry = data["administrations"][details["administration"]]
-    entry[field] = records.as_text(word)
-    return Change(relative, records.dumped(data), opened)
+def replace_word(project: Project, places: list[dict], word: str) -> list[Change]:
+    # Each place is one entry holding the word: a dataset in the settings or an administration.
+    files: dict[str, tuple[editing.Opened, CommentedMap]] = {}
+
+    def opened(relative: str) -> CommentedMap:
+        if relative not in files:
+            found = editing.open_file(project.root, relative)
+            files[relative] = (found, records.load(found.text))
+        return files[relative][1]
+
+    for place in places:
+        if "dataset" in place:
+            data = opened(defaults.CONFIG_FILENAME)
+            entry = next(d for d in data["datasets"] if d["name"] == place["dataset"])
+        else:
+            data = opened(project.study_files[place["study"]])
+            entry = data["administrations"][place["administration"]]
+        entry[place["field"]] = records.as_text(word)
+    return [Change(path, records.dumped(data), found) for path, (found, data) in files.items()]
 
 
 def not_asked(project: Project, dataset: str, instrument: str, items: list[str]) -> Change:
