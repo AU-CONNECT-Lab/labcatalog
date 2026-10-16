@@ -32,6 +32,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "ruff>=0.5", "pyinstaller>=6.0"]
+docs = ["jupyter-book>=2"]
 ai = [
     "anthropic>=1.0",
     "openai>=1.40",

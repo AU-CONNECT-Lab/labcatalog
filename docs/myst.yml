@@ -67,3 +67,4 @@ site:
   template: book-theme
   options:
     logo_text: labcatalog
+    folders: true
