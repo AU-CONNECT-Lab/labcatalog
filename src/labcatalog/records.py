@@ -4,8 +4,10 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
+import yaml
 from ruamel.yaml import YAML
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
+from ruamel.yaml.scalarstring import SingleQuotedScalarString
 
 from labcatalog import defaults
 from labcatalog.exceptions import EditError
@@ -106,11 +108,11 @@ def tables_for(relative: str) -> dict[str, Table]:
 
 def round_trip() -> YAML:
     # The layout labcatalog writes, so untouched lines come back as they were.
-    yaml = YAML()
-    yaml.preserve_quotes = True
-    yaml.width = 4096
-    yaml.indent(mapping=2, sequence=4, offset=2)
-    return yaml
+    loader = YAML()
+    loader.preserve_quotes = True
+    loader.width = 4096
+    loader.indent(mapping=2, sequence=4, offset=2)
+    return loader
 
 
 def read_rows(text: str, key: str, table: Table) -> list[dict[str, Any]]:
@@ -139,8 +141,8 @@ def cells(entry: CommentedMap, columns: Iterable[Column], key: str) -> dict[str,
 
 
 def write_rows(text: str, key: str, table: Table, rows: list[dict]) -> str:
-    yaml = round_trip()
-    data = yaml.load(text) or CommentedMap()
+    loader = round_trip()
+    data = loader.load(text) or CommentedMap()
     if table.inner is None:
         origins = [row.get(ORIGIN) for row in rows]
         for row, entry in zip(rows, place(data, key, origins), strict=True):
@@ -148,7 +150,7 @@ def write_rows(text: str, key: str, table: Table, rows: list[dict]) -> str:
     else:
         write_groups(data, key, table, rows)
     out = io.StringIO()
-    yaml.dump(data, out)
+    loader.dump(data, out)
     return out.getvalue()
 
 
@@ -214,8 +216,21 @@ def update(entry: CommentedMap, column: Column, cell: Any) -> None:
     value = stored(cell, column)
     if value is None or value == column.default:
         entry.pop(column.key, None)
+    elif isinstance(value, list):
+        entry[column.key] = [as_text(v) for v in value]
     else:
-        entry[column.key] = value
+        entry[column.key] = as_text(value)
+
+
+def as_text(value: Any) -> Any:
+    # Projects load as YAML 1.1, where a bare Yes or 1:30 is not text.
+    if not isinstance(value, str):
+        return value
+    try:
+        plain = yaml.safe_load(value) == value
+    except yaml.YAMLError:
+        plain = False
+    return value if plain else SingleQuotedScalarString(value)
 
 
 def shown(value: Any, column: Column) -> Any:

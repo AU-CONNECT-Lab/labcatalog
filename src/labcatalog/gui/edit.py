@@ -88,7 +88,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     async def save_table() -> None:
         rows = await shown.grid.get_client_data()
         try:
-            text = records.write_rows(shown.opened.text, view.mode, columns(), rows)
+            text = records.write_rows(shown.opened.text, view.mode, table(), rows)
         except LabCatalogError as err:
             ui.notify(str(err), type="negative")
             return
@@ -96,8 +96,12 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
 
     async def add_row() -> None:
         rows = await shown.grid.get_client_data()
-        rows.append({c.key: cell(records.shown(None, c), c) for c in columns()})
-        set_rows(rows)
+        new = {c.key: cell(records.shown(None, c), c) for c in table().columns}
+        if table().inner and rows:
+            # A new option most often joins the set above it.
+            first = table().columns[0].key
+            new[first] = rows[-1][first]
+        set_rows([*rows, new])
 
     async def delete_rows() -> None:
         selected = await shown.grid.get_selected_rows()
@@ -115,7 +119,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         shown.edited = False
         page.refresh()
 
-    def columns() -> tuple[records.Column, ...]:
+    def table() -> records.Table:
         return records.tables_for(view.path)[view.mode]
 
     def show(issues: list[Issue]) -> None:
@@ -167,9 +171,9 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
 
     def table_mode(opened: editing.Opened) -> None:
-        rows = records.read_rows(opened.text, view.mode, columns())
+        rows = records.read_rows(opened.text, view.mode, table())
         shown.grid = (
-            ui.aggrid(grid_options(columns(), rows))
+            ui.aggrid(grid_options(table().columns, rows))
             .classes("w-full")
             .style("height: 65vh")
             .on("cellValueChanged", lambda: setattr(shown, "edited", True))
@@ -185,6 +189,11 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             "Lists are written with commas, for example ems_1, ems_2. Saving changes only the "
             "cells you changed, so comments and the rest of the file stay as they were."
         )
+        if table().inner:
+            note(
+                f"Rows with the same {table().columns[0].label} make one entry. Renaming it here "
+                "does not rename it where other parts of the file use it."
+            )
 
     @ui.refreshable
     def page() -> None:
@@ -213,7 +222,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     ui.label(opened.path).classes("font-medium")
                     if tables:
                         ui.toggle(
-                            {TEXT: "Text", **{key: key.capitalize() for key in tables}},
+                            {TEXT: "Text", **{key: t.label for key, t in tables.items()}},
                             value=view.mode,
                             on_change=lambda e: switch(e.value),
                         ).props("dense no-caps")
