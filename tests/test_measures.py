@@ -20,7 +20,7 @@ def result(mock_project):
 
 
 def test_default_paragraph_reads_like_a_measures_section(result):
-    text = paragraph(result, {"ems_total": 0.912})
+    text = paragraph(result, {"ems_sadness": 0.834, "ems_total": 0.912})
     assert text.startswith(
         "We used the Example Mood Scale (EMS; Example & Sample, 2019). It asks how often"
     )
@@ -31,7 +31,7 @@ def test_default_paragraph_reads_like_a_measures_section(result):
         in text
     )
     assert "Cronbach's α was ." in text and " for Low positive affect." in text
-    assert text.endswith("Categorical ω was .91.")
+    assert text.endswith("Categorical ω was .91 for Total score and .83 for Sadness.")
 
 
 def test_instrument_template_wins_over_the_project_one(mock_project):

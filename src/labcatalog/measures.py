@@ -81,8 +81,7 @@ def placeholder_values(
         for found in summary.scores
         if found.key == s.key and found.alpha is not None
     }
-    labels = {s.score_id: s.label for s in scores}
-    omegas = {labels[k]: v for k, v in omega.items() if k in labels}
+    omegas = {s.label: omega[s.score_id] for s in scores if s.score_id in omega}
     return {
         "name": instrument.name,
         "abbreviation": instrument.abbreviation or "",
