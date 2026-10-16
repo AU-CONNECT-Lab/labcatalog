@@ -17,6 +17,7 @@ from labcatalog.metadata.browse import as_set, facet_label, facet_names, value_o
 from labcatalog.pipeline import CatalogResult
 from labcatalog.schema import Instrument, Score
 from labcatalog.stats import analysis, analysis_script
+from labcatalog.stats import multilevel as ml
 from labcatalog.stats.summary import wave_order
 
 RADAR_AXES = 3
@@ -1261,3 +1262,16 @@ def pair_scatter(
         return None
     x_title = groups[0]["name"] if len(groups) == 1 else "X (see legend)"
     return scatter.regression(x_title, labels[y], groups)
+
+
+def trajectories(long: ml.Long, fitted: ml.Fitted, label: str) -> go.Figure:
+    used = long.frame.dropna()
+    people = [
+        (str(person), rows[ml.TIME].tolist(), rows[long.outcome].tolist())
+        for person, rows in used.sort_values(ml.TIME).groupby(ml.PERSON, sort=False)
+    ]
+    by_time = used.groupby(ml.TIME)
+    means = [(float(t), float(rows[long.outcome].mean()), len(rows)) for t, rows in by_time]
+    ticks = [(float(t), f"Wave {rows[ml.WAVE].iloc[0]}") for t, rows in by_time]
+    line = list(ml.prediction(long, fitted).items())
+    return plots.trajectories(people, means, line, ticks, label, wave_color(0))

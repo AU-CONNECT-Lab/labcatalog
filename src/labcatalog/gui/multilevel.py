@@ -5,7 +5,7 @@ from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import paper
+from labcatalog.gui import charts, paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
 from labcatalog.gui.common import apa, code_tabs, col, computed, note, p_value, section
 from labcatalog.pipeline import CatalogResult
@@ -87,8 +87,11 @@ def render(result: CatalogResult, view) -> None:
                     ui.label(f"Warning: {text}").classes("text-negative")
                 for shown in papers.values():
                     paper.paper_table(shown)
+                fig = views.trajectories(long, fitted, label)
+                drawn = paper.Chart(charts.show(fig), fig)
+                note(trajectory_note(long))
                 note(engine)
-                paper.save_button(result, "multilevel", papers, None, texts)
+                paper.save_button(result, "multilevel", papers, drawn, texts)
                 with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
                     note(
                         f"Runs in a folder that holds {ml.DATA_FILE}, one row per person and "
@@ -167,6 +170,18 @@ def render(result: CatalogResult, view) -> None:
                 on_change=lambda e: change(split=e.value),
             )
     body()
+
+
+def trajectory_note(long: ml.Long) -> str:
+    text = (
+        "Thin lines: each person's values. Circles: each wave's mean. Thick line: the fixed "
+        "effects' prediction"
+    )
+    if long.covariates:
+        text += (
+            ", with number covariates at their mean and answer covariates at the reference option"
+        )
+    return text + "."
 
 
 def random_note(model: ml.Model, long: ml.Long) -> str:

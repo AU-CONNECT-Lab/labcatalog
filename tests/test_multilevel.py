@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from labcatalog.charts import views
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import multilevel as ml
 from labcatalog.stats.rbridge import MULTILEVEL_PACKAGES, r_status
@@ -278,3 +279,35 @@ def test_r_and_python_agree_on_groups_and_people():
     close(
         ml.run(result, one_wave, first, "Y", rscript()), ml.run(result, one_wave, first, "Y", None)
     )
+
+
+def test_trajectories_draw_each_person_and_the_fixed_effects(result):
+    model = growth()
+    long = ml.long_frame(result, model)
+    fitted = ml.run(result, model, long, "EMS Total score", None)
+    estimates = {t.label: t.estimate for t in fitted.fixed}
+    # Gender is an answer covariate, so the line is the reference option's.
+    line = ml.prediction(long, fitted)
+    assert list(line) == [0.0, 1.0, 2.0]
+    assert line[2.0] == pytest.approx(
+        estimates["Intercept"] + 2 * estimates["Time (waves since the first)"]
+    )
+    fig = views.trajectories(long, fitted, "EMS Total score")
+    people, fixed, means = fig.data
+    used = long.frame.dropna()
+    assert sum(x is not None for x in people.x) == len(used)
+    assert list(means.customdata) == used.groupby("time").size().tolist()
+    assert list(fig.layout.xaxis.ticktext) == ["Wave 1", "Wave 2", "Wave 3"]
+    assert list(fixed.y) == list(line.values())
+
+
+def test_a_number_covariate_sits_at_its_mean_in_the_prediction(result):
+    model = eeg_model([EPOCHS])
+    long = ml.long_frame(result, model)
+    fitted = ml.run(result, model, long, "FAA", None)
+    estimates = {t.label: t.estimate for t in fitted.fixed}
+    mean = long.frame.dropna()["epochs_kept"].mean()
+    covariate = long.covariates[0].label
+    line = ml.prediction(long, fitted)
+    assert list(line) == [0.0, 2.0]
+    assert line[0.0] == pytest.approx(estimates["Intercept"] + estimates[covariate] * mean)

@@ -126,6 +126,43 @@ def render(
                 ui.button("Cancel", on_click=dialog.close).props("flat")
         dialog.open()
 
+    def delete() -> None:
+        study = view.study
+        try:
+            found = studies.delete_study(project, study)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative")
+            return
+        mine = [d for d in config.datasets if d.study == study]
+        removed = [c.path for c in found if c.removed]
+        with frame, ui.dialog() as dialog, ui.card().classes("w-[36rem]"):
+            ui.label(f"Delete {config.studies[study].label or study}?").classes("font-medium")
+            ui.label(f"Removes the study from {defaults.CONFIG_FILENAME}, and with it:")
+            with ui.column().classes("gap-0 pl-4"):
+                if mine:
+                    names = ", ".join(d.name for d in mine)
+                    ui.label(f"{len(mine)} datasets: {names}")
+                for path in removed:
+                    ui.label(path)
+            if mine:
+                note(
+                    "The data files stay where they are, and so do any prepare steps that make "
+                    "them. To undo, restore the files from git or DataLad."
+                )
+            typed = ui.input(f"Type {study} to confirm").classes("w-72")
+
+            async def remove() -> None:
+                if await apply(found, None):
+                    dialog.close()
+                    ui.notify(f"Deleted {study}")
+
+            with ui.row():
+                button = ui.button("Delete", icon="delete", color="negative", on_click=remove)
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+            button.disable()
+            typed.on_value_change(lambda e: button.set_enabled(e.value == study))
+        dialog.open()
+
     @ui.refreshable
     def page() -> None:
         buttons.clear()
@@ -148,7 +185,14 @@ def render(
                 if view.study is None:
                     note("No studies yet; press New study to add one.")
                 else:
-                    actions = Actions(touched, go, lambda: leave(rename), on_saved, on_dataset)
+                    actions = Actions(
+                        touched,
+                        go,
+                        lambda: leave(rename),
+                        lambda: leave(delete),
+                        on_saved,
+                        on_dataset,
+                    )
                     detail(result, view, buttons, actions, on_added)
 
     buttons: list[ui.button] = []
@@ -161,6 +205,7 @@ class Actions:
     touched: Callable[[], None]
     go: Callable[[str | None], None]
     rename: Callable[[], None]
+    delete: Callable[[], None]
     on_saved: Callable[[], Awaitable[None]]
     on_dataset: Callable[[str], None]
 
@@ -220,6 +265,7 @@ def detail(
     with panel(found.label or study, study) as tools:
         with tools:
             ui.button("Rename", icon="edit", on_click=actions.rename).props("flat dense no-caps")
+            ui.button("Delete", icon="delete", on_click=actions.delete).props("flat dense no-caps")
             buttons.append(
                 ui.button("Discard", on_click=lambda: actions.go(study)).props("flat no-caps")
             )

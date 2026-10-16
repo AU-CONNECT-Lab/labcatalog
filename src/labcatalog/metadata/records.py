@@ -197,16 +197,18 @@ def dumped(data: CommentedMap) -> str:
 def take_tail(node: CommentedMap | CommentedSeq) -> str:
     # The lines after the last value under node, such as the next section's heading comment.
     holder, key = tail_slot(node)
-    if key is None:
+    text = ""
+    if isinstance(holder, CommentedSeq):
+        # Read from a file, a list keeps them at its end.
         text = "".join(token.value for token in holder.ca.end)
         holder.ca.end = []
-        return text
-    slot = holder.ca.items.get(key)
-    if not slot or slot[2] is None:
-        return ""
-    # A comment on the value's own line stays with it.
-    own, _, text = slot[2].value.partition("\n")
-    slot[2] = CommentToken(own + "\n", CommentMark(0), None) if own else None
+    slot = holder.ca.items.get(key) if key is not None else None
+    at = eol_index(holder)
+    if slot and slot[at] is not None:
+        # A comment on the value's own line stays with it.
+        own, _, rest = slot[at].value.partition("\n")
+        slot[at] = CommentToken(own + "\n", CommentMark(0), None) if own else None
+        text = rest + text
     return text
 
 
@@ -217,22 +219,26 @@ def put_tail(node: CommentedMap | CommentedSeq, text: str) -> None:
     if key is None:
         holder.ca.end = [CommentToken(text, CommentMark(0), None)]
         return
-    slot = holder.ca.items.setdefault(key, [None, None, None, None])
-    own = slot[2].value if slot[2] is not None else "\n"
-    slot[2] = CommentToken(own + text, CommentMark(0), None)
+    # After the last value's line, the one place ruamel writes back for maps and lists alike.
+    at = eol_index(holder)
+    slot = holder.ca.items.setdefault(key, [None] * (at + 2))
+    own = slot[at].value if slot[at] is not None else "\n"
+    slot[at] = CommentToken(own + text, CommentMark(0), None)
+
+
+def eol_index(holder: CommentedMap | CommentedSeq) -> int:
+    return 0 if isinstance(holder, CommentedSeq) else 2
 
 
 def tail_slot(node: CommentedMap | CommentedSeq) -> tuple[Any, Any]:
-    # Where ruamel keeps what follows a subtree: after its last scalar, or at the end of a list.
+    # The last value under node, as its holder and its key or index; no key when node is empty.
     while True:
-        last = node[-1] if isinstance(node, CommentedSeq) and node else None
+        key = (len(node) - 1 if node else None) if isinstance(node, CommentedSeq) else None
         if isinstance(node, CommentedMap) and node:
             key = list(node)[-1]
-            last = node[key]
+        last = node[key] if key is not None else None
         if not isinstance(last, (CommentedMap, CommentedSeq)) or not last or last.fa.flow_style():
-            if isinstance(node, CommentedSeq):
-                return node, None
-            return node, (key if node else None)
+            return node, key
         node = last
 
 

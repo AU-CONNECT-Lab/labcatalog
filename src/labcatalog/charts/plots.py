@@ -32,6 +32,8 @@ TITLE_ROOM = 28
 TIMELINE_PAD = timedelta(days=30)
 # Bar thickness as a share of a lane.
 TIMELINE_BAR = 0.3
+# Room beside the first and last wave, in waves.
+TRAJECTORY_PAD = 0.12
 
 
 def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date) -> go.Figure:
@@ -698,3 +700,67 @@ def small_multiples(panels: list[dict], y_range: tuple[float, float], y_title: s
         )
     fig.update_annotations(font=dict(size=12, color=TITLE_INK))
     return base_layout(fig, 60 + 250 * rows, margin=dict(l=60, r=20, t=50, b=50))
+
+
+def trajectories(
+    people: list[tuple[str, list[float], list[float]]],
+    means: list[tuple[float, float, int]],
+    line: list[tuple[float, float]],
+    ticks: list[tuple[float, str]],
+    y_title: str,
+    color: str,
+) -> go.Figure:
+    # All people in one trace, split by gaps, so hundreds of lines stay quick to draw.
+    xs, ys, ids = [], [], []
+    for person, times, values in people:
+        xs += [*times, None]
+        ys += [*values, None]
+        ids += [person] * len(times) + [None]
+    fig = go.Figure()
+    fig.add_trace(
+        go.Scatter(
+            x=xs,
+            y=ys,
+            customdata=ids,
+            mode="lines+markers",
+            name="Each person",
+            line=dict(color=rgba(MUTED_INK, 0.35), width=0.8),
+            marker=dict(size=3, color=rgba(MUTED_INK, 0.5)),
+            hovertemplate="%{customdata}: %{y:.2f}<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[t for t, _ in line],
+            y=[v for _, v in line],
+            mode="lines",
+            name="Fixed effects",
+            line=dict(color=color, width=3),
+            hovertemplate="predicted %{y:.2f}<extra></extra>",
+        )
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=[t for t, _, _ in means],
+            y=[m for _, m, _ in means],
+            customdata=[n for _, _, n in means],
+            mode="markers",
+            name="Observed mean",
+            marker=dict(size=9, color="white", line=dict(color=color, width=2)),
+            hovertemplate="mean %{y:.2f} · n %{customdata}<extra></extra>",
+        )
+    )
+    fig.update_xaxes(
+        tickvals=[t for t, _ in ticks],
+        ticktext=[text for _, text in ticks],
+        range=[ticks[0][0] - TRAJECTORY_PAD, ticks[-1][0] + TRAJECTORY_PAD],
+        showgrid=False,
+        zeroline=False,
+    )
+    fig.update_yaxes(title_text=y_title, gridcolor=GRID, zeroline=False)
+    return base_layout(
+        fig,
+        380,
+        margin=dict(l=64, r=16, t=40, b=40),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=1, xanchor="right"),
+    )

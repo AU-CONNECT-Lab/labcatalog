@@ -32,6 +32,7 @@ PERSON = "id"
 TIME = "time"
 WAVE = "wave"
 INTERCEPT = "(Intercept)"
+TIME_LABEL = "Time (waves since the first)"
 RESIDUAL = "Residual"
 SINGULAR = "singular"
 OUTPUTS = ("icc", "fixed", "random", "fit_stats", "notes")
@@ -714,7 +715,7 @@ def read(found: dict[str, pd.DataFrame], long: Long, engine: str) -> Fitted:
 
 def term_order(label: str, long: Long) -> int:
     # Formula order: intercept, time, then the covariates as chosen.
-    labels = ["Intercept", "Time (waves since the first)", *(c.label for c in long.covariates)]
+    labels = ["Intercept", TIME_LABEL, *(c.label for c in long.covariates)]
     return next(
         (n for n, name in enumerate(labels) if label == name or label.startswith(f"{name}: ")),
         len(labels),
@@ -738,7 +739,7 @@ def term_label(term: str, long: Long) -> str:
     if term in (INTERCEPT, "Intercept", "Group"):
         return "Intercept"
     if term == TIME:
-        return "Time (waves since the first)"
+        return TIME_LABEL
     for c in long.covariates:
         if term == c.column:
             return c.label
@@ -746,6 +747,17 @@ def term_label(term: str, long: Long) -> str:
             if term in (f"{c.column}{level}", f"{c.column}[T.{level}]"):
                 return f"{c.label}: {level}"
     return term
+
+
+def prediction(long: Long, fitted: Fitted) -> dict[float, float]:
+    # Number covariates at their mean, answer covariates at the reference option.
+    estimates = {t.label: t.estimate for t in fitted.fixed}
+    used = long.frame.dropna()
+    base = estimates["Intercept"] + sum(
+        estimates[c.label] * used[c.column].mean() for c in long.covariates if not c.levels
+    )
+    slope = estimates.get(TIME_LABEL, 0.0)
+    return {float(t): base + slope * t for t in sorted(used[TIME].unique())}
 
 
 def references(long: Long) -> list[tuple[str, str]]:
