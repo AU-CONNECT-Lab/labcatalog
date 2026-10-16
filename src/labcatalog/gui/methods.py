@@ -92,7 +92,7 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
         d.name for d in result.project.config.datasets if (d.study, d.wave) == (study, view.wave)
     ]
     sample = analysis.build_sample(result, datasets, intersect=False)
-    sample_note(result, sample, intersect=False)
+    sample_note(result, sample, "with data in this wave")
     analysis_tables.table_one_section(result, sample, view)
 
 

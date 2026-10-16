@@ -39,7 +39,8 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
     @ui.refreshable
     def tools() -> None:
         sample = analysis.build_sample(result, view.datasets, view.intersect)
-        sample_note(result, sample, view.intersect)
+        where = "in every selected dataset" if view.intersect else "in any selected dataset"
+        sample_note(result, sample, where)
         choices = views.variable_choices(result, view.datasets)
         if len(choices) < 2:
             note("Pick datasets with at least two scores between them for correlations.")
@@ -84,10 +85,9 @@ def first_wave(result: CatalogResult, names: list[str]) -> list[str]:
     ]
 
 
-def sample_note(result: CatalogResult, sample: analysis.Sample, intersect: bool) -> None:
+def sample_note(result: CatalogResult, sample: analysis.Sample, where: str) -> None:
     by = result.project.config.stats.correlate_by
     matched = "ID" if by in ("id", "none") else by
-    where = "in every selected dataset" if intersect else "in any selected dataset"
     text = f"{len(sample.people)} people {where}, matched across datasets by {matched}."
     if sample.ambiguous:
         text += f" {sample.ambiguous} rows are left out because their {matched} repeats in a file."
