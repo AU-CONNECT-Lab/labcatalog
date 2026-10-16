@@ -1,6 +1,6 @@
 import pandas as pd
 
-from labcatalog.ids import group_ids
+from labcatalog.data.ids import group_ids
 
 
 def test_group_from_id():

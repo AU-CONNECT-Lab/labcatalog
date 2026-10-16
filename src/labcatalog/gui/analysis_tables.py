@@ -9,10 +9,10 @@ from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, paper, preferences
 from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats.analysis_script import AnalysisData, Code, Comparison
-from labcatalog.tables import PaperTable
 
 TESTS = {"welch": "Welch's t test", "anova": "One-way ANOVA"}
 # Answer options sit under their question; plain spaces would collapse in the page.

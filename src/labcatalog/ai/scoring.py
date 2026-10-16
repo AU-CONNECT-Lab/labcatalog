@@ -2,13 +2,13 @@ from datetime import date
 from pathlib import Path
 
 from labcatalog import defaults
-from labcatalog.bibliography import citation
 from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.data.resolve import Catalog, as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LLMError
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
+from labcatalog.metadata.bibliography import citation
 from labcatalog.project import Project, reference_pdf
-from labcatalog.resolve import Catalog, as_text_dict
 from labcatalog.schema import Instrument, Item, Reference
 
 SYSTEM = """You write scoring scripts for questionnaires used in research. You are given an \

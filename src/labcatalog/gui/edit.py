@@ -5,10 +5,10 @@ from pathlib import Path
 
 from nicegui import ui
 
-from labcatalog import editing, records
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import LINE_SUFFIX, heading, note
 from labcatalog.issues import Issue
+from labcatalog.metadata import editing, records
 
 TEXT = "text"
 WIDE = {"text", "label", "path", "instrument", "datasets"}

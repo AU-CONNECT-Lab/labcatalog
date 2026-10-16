@@ -1,4 +1,4 @@
-from labcatalog.browse import build_index, counts, facet_names, matches
+from labcatalog.metadata.browse import build_index, counts, facet_names, matches
 from labcatalog.pipeline import load_validated, run_validate
 
 WAVE_1, WAVE_2, WAVE_3 = "mock_study/1", "mock_study/2", "mock_study/3"

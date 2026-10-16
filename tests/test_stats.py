@@ -1,9 +1,9 @@
 import pandas as pd
 import pytest
 
+from labcatalog.data.resolve import resolve_catalog
+from labcatalog.data.scoring import compute_scores
 from labcatalog.pipeline import load_validated
-from labcatalog.resolve import resolve_catalog
-from labcatalog.scoring import compute_scores
 from labcatalog.sources import load_datasets
 from labcatalog.stats.summary import cronbach_alpha, histogram, summarize
 

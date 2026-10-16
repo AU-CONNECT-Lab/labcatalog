@@ -3,10 +3,11 @@ from collections import Counter
 from datetime import date
 from typing import Any
 
-from labcatalog import defaults, measures, participants
+from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
 from labcatalog.issues import Issue, IssueLevel
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
+from labcatalog.reports import measures, participants
 from labcatalog.schema import Administration, Instrument
 
 CONFIG = defaults.CONFIG_FILENAME

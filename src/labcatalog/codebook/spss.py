@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pyreadstat
 
+from labcatalog.codebook.redcap import Field
 from labcatalog.exceptions import CodebookError
-from labcatalog.redcap import Field
 
 
 def read_sav(path: Path) -> dict[str, Field]:

@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-from labcatalog.history import UNCOMMITTED, file_history
+from labcatalog.metadata.history import UNCOMMITTED, file_history
 from labcatalog.project import init_project
 
 pytestmark = pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")

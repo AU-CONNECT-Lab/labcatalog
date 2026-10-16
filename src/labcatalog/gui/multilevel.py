@@ -9,8 +9,8 @@ from labcatalog.gui import paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
 from labcatalog.gui.common import apa, code_tabs, col, note, p_value, section
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import multilevel as ml
-from labcatalog.tables import PaperTable
 
 ONE_EACH = (
     "Each {group} holds one person here, so the {group} and person levels cannot be told "

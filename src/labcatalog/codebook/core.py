@@ -10,15 +10,16 @@ from typing import Any, get_args
 import pandas as pd
 import yaml
 
-from labcatalog import defaults, qualtrics, redcap, spss
+from labcatalog import defaults
+from labcatalog.codebook import qualtrics, redcap, spss
 from labcatalog.config import DatasetConfig, dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.exceptions import CodebookError
 from labcatalog.issues import Issue, IssueLevel, has_errors
+from labcatalog.metadata.varmap import MAP_COLUMNS
 from labcatalog.project import Project
 from labcatalog.schema import ItemType, Score
 from labcatalog.sources import get_source
-from labcatalog.varmap import MAP_COLUMNS
 
 ITEMS = "items.csv"
 INSTRUMENTS = "instruments.csv"

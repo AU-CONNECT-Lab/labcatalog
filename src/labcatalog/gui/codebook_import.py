@@ -4,8 +4,9 @@ from pathlib import Path
 import webview
 from nicegui import app, run, ui
 
-from labcatalog import codebook, defaults
-from labcatalog.codebook import ImportResult
+from labcatalog import defaults
+from labcatalog.codebook import core as codebook
+from labcatalog.codebook.core import ImportResult
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import problems
 from labcatalog.gui.common import col, heading, note, open_path, section, table

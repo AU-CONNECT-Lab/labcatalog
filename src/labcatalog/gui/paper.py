@@ -7,12 +7,12 @@ import plotly.graph_objects as go
 from nicegui import run, ui
 from nicegui.events import GenericEventArguments
 
-from labcatalog import outputs, tables
 from labcatalog.gui import preferences
 from labcatalog.gui.common import note, open_path
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult
-from labcatalog.tables import PaperTable
+from labcatalog.reports import outputs, tables
+from labcatalog.reports.tables import PaperTable
 
 IMAGE_WIDTH = 900
 IMAGE_KINDS = ("png", "svg")

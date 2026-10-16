@@ -1,4 +1,4 @@
-from labcatalog.completeness import gaps
+from labcatalog.metadata.completeness import gaps
 from labcatalog.schema import Instrument, Item, Reference, Score
 
 

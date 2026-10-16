@@ -1,9 +1,9 @@
 import string
 
-from labcatalog.bibliography import in_text
 from labcatalog.config import dataset_by_name
+from labcatalog.data.resolve import Catalog, ResolvedScore
+from labcatalog.metadata.bibliography import in_text
 from labcatalog.project import Project
-from labcatalog.resolve import Catalog, ResolvedScore
 from labcatalog.schema import Instrument
 from labcatalog.stats.summary import Summary
 

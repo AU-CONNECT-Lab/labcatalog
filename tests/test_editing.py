@@ -2,8 +2,8 @@ import os
 
 import pytest
 
-from labcatalog import editing
 from labcatalog.exceptions import EditError
+from labcatalog.metadata import editing
 from labcatalog.project import load_project
 
 MOOD = "instruments/example_mood.yaml"

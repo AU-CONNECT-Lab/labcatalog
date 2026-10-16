@@ -2,8 +2,8 @@ import difflib
 
 import pytest
 
-from labcatalog import editing, records
 from labcatalog.exceptions import EditError
+from labcatalog.metadata import editing, records
 
 MOOD = "instruments/example_mood.yaml"
 STUDY = "studies/mock_study.yaml"

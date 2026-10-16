@@ -3,8 +3,8 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from labcatalog.codebook.redcap import Field, plain
 from labcatalog.exceptions import CodebookError
-from labcatalog.redcap import Field, plain
 
 SINGLE = {"SAVR", "SAHR", "SACOL", "DL", "SB", "NPS"}
 MULTIPLE = {"MAVR", "MAHR", "MACOL", "MSB"}

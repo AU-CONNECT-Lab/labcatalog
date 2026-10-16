@@ -5,8 +5,8 @@ from typing import Protocol
 import pandas as pd
 
 from labcatalog.config import DatasetConfig, id_column_for
+from labcatalog.data.ids import group_ids
 from labcatalog.exceptions import DataSourceError
-from labcatalog.ids import group_ids
 from labcatalog.paths import expand_path
 from labcatalog.project import Project
 from labcatalog.sources.csv_source import CsvSource

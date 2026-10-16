@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from labcatalog.codegen import number
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports.codegen import number
 from labcatalog.stats import analysis
 from labcatalog.stats.analysis_script import (
     CHOICE,

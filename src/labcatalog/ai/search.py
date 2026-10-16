@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
-from labcatalog.browse import as_set, score_values
+from labcatalog.data.resolve import as_text_dict
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
+from labcatalog.metadata.browse import as_set, score_values
 from labcatalog.project import Project
-from labcatalog.resolve import as_text_dict
 
 SYSTEM = """You help a researcher find questions in their lab's catalog of questionnaires. You \
 are given the researcher's request and the catalog: each instrument with its name, construct and \

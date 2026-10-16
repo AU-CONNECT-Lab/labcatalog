@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 
-from labcatalog.ai_scoring import answer, pdf_text, reference_pdfs
-from labcatalog.bibliography import citation
+from labcatalog.ai.scoring import answer, pdf_text, reference_pdfs
+from labcatalog.data.resolve import as_text_dict
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
+from labcatalog.metadata.bibliography import citation
 from labcatalog.project import Project
-from labcatalog.resolve import as_text_dict
 
 SYSTEM = """You help a researcher write the Measures section of a paper. You are given a \
 questionnaire's reference (its paper or manual, converted from PDF) and the instrument's name, \

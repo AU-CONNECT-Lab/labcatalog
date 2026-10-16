@@ -9,10 +9,10 @@ import numpy as np
 import pandas as pd
 
 from labcatalog import defaults
-from labcatalog.codegen import number
+from labcatalog.data.resolve import ResolvedVariable, numbers_in_range
+from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import CatalogResult
-from labcatalog.resolve import ResolvedVariable, numbers_in_range
-from labcatalog.scoring import score_items
+from labcatalog.reports.codegen import number
 from labcatalog.stats import analysis
 from labcatalog.stats.cfa import is_total
 from labcatalog.stats.rbridge import install_command, package_check, run_r

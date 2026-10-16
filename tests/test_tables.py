@@ -3,7 +3,7 @@ import io
 from docx import Document
 
 from labcatalog.gui.common import col
-from labcatalog.tables import PaperTable, csv, docx, files, html, latex, plain, segments
+from labcatalog.reports.tables import PaperTable, csv, docx, files, html, latex, plain, segments
 
 TABLE = PaperTable(
     title="Mood by Group",

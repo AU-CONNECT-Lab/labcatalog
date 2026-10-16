@@ -4,8 +4,8 @@ from nicegui import ui
 
 from labcatalog.gui import charts
 from labcatalog.gui.common import card, col, sorted_waves, table, unique
-from labcatalog.participants import wave_dates
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports.participants import wave_dates
 
 
 def render(

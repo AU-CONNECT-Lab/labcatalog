@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 
 from nicegui import ui
 
-from labcatalog import measures, participants
 from labcatalog.charts import views
 from labcatalog.gui import analysis_tables
 from labcatalog.gui.analysis import sample_note
@@ -10,10 +9,11 @@ from labcatalog.gui.common import col, heading, note, section, sorted_waves, uni
 from labcatalog.gui.datasets import methods_of, paragraphs
 from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView, omegas
 from labcatalog.gui.paper import copy_text, paper_table, save_button
-from labcatalog.participants import wave_dates
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports import measures, participants
+from labcatalog.reports.participants import wave_dates
+from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
-from labcatalog.tables import PaperTable
 
 
 @dataclass

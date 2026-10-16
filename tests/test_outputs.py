@@ -1,9 +1,9 @@
 import json
 from datetime import datetime
 
-from labcatalog import outputs
-from labcatalog.outputs import write_output
 from labcatalog.pipeline import run_catalog
+from labcatalog.reports import outputs
+from labcatalog.reports.outputs import write_output
 
 
 def test_output_folder_holds_the_files_and_the_data_manifest(mock_project):

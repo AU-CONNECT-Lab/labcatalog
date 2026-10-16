@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.data.resolve import Catalog, ResolvedScore
+from labcatalog.data.scoring import scorable, score_items
 from labcatalog.project import Project
-from labcatalog.resolve import Catalog, ResolvedScore
 from labcatalog.schema import Instrument, Score
-from labcatalog.scoring import scorable, score_items
 from labcatalog.sources import LoadedDataset
 from labcatalog.stats.cfa import FIT, MIN_ITEMS, ONE_FACTOR, SUBSCALES, is_total
 from labcatalog.stats.rbridge import run_r

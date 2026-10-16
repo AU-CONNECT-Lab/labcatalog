@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from labcatalog.config import ProjectConfig, dataset_by_name, missing_codes_for
-from labcatalog.resolve import Catalog, ResolvedScore
+from labcatalog.data.resolve import Catalog, ResolvedScore
 
 
 def scoring_code_r(scores: list[ResolvedScore]) -> str:

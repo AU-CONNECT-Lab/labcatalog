@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig
+from labcatalog.data.prepare import step_states
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.versions import (
     DataladRecord,
@@ -15,7 +16,6 @@ from labcatalog.datalad.versions import (
     original_branch,
 )
 from labcatalog.paths import expand_path, portable_path
-from labcatalog.prepare import step_states
 from labcatalog.project import Project, bib_path, references_root
 from labcatalog.sources import LoadedDataset
 from labcatalog.version import __version__

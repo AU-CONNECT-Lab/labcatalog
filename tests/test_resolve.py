@@ -1,5 +1,5 @@
+from labcatalog.data.resolve import resolve_catalog
 from labcatalog.project import load_project
-from labcatalog.resolve import resolve_catalog
 
 
 def edit(path, old, new):

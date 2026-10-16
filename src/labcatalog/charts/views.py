@@ -9,12 +9,12 @@ from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
 
 from labcatalog import defaults
-from labcatalog.browse import as_set, facet_label, facet_names, value_order
 from labcatalog.charts import matrices, network, plots, scatter
 from labcatalog.charts.style import group_color, natural_key, pair_color, wave_color
 from labcatalog.config import dataset_by_name, missing_labels_for
+from labcatalog.data.resolve import ResolvedScore, as_text_dict
+from labcatalog.metadata.browse import as_set, facet_label, facet_names, value_order
 from labcatalog.pipeline import CatalogResult
-from labcatalog.resolve import ResolvedScore, as_text_dict
 from labcatalog.schema import Instrument, Score
 from labcatalog.stats import analysis
 from labcatalog.stats.summary import wave_order

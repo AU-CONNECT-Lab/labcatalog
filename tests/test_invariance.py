@@ -4,8 +4,8 @@ from glob import glob
 import pandas as pd
 import pytest
 
+from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import run_catalog
-from labcatalog.scoring import score_items
 from labcatalog.stats import invariance
 from labcatalog.stats.cfa import SUBSCALES
 from labcatalog.stats.rbridge import CFA_PACKAGES, r_status

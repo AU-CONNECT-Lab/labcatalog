@@ -6,11 +6,11 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from labcatalog import defaults
+from labcatalog.data.manifest import Manifest, build_manifest, used_paths
 from labcatalog.datalad.annex import group_by_dataset
 from labcatalog.datalad.bridge import run_datalad
 from labcatalog.datalad.versions import ADJUSTED, original_branch, run_git
 from labcatalog.exceptions import DataladError, FreezeError
-from labcatalog.manifest import Manifest, build_manifest, used_paths
 from labcatalog.project import Project
 from labcatalog.sources import LoadedDataset
 

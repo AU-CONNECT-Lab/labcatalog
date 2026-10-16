@@ -4,7 +4,6 @@ from pathlib import Path
 import webview
 from nicegui import app, background_tasks, run, ui
 
-from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
 from labcatalog.datalad.annex import dataset_root
 from labcatalog.datalad.bridge import use_folder
@@ -38,6 +37,7 @@ from labcatalog.gui.instruments import (
 )
 from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
+from labcatalog.metadata.browse import BrowseIndex, build_index
 from labcatalog.pipeline import (
     CatalogResult,
     run_catalog,

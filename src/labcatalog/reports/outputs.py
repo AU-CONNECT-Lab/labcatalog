@@ -2,7 +2,7 @@ from datetime import datetime
 from pathlib import Path
 
 from labcatalog import defaults
-from labcatalog.manifest import Manifest
+from labcatalog.data.manifest import Manifest
 
 
 def write_output(root: Path, name: str, files: dict[str, bytes], manifest: Manifest) -> Path:

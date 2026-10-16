@@ -1,8 +1,8 @@
 import shutil
 
+from labcatalog.data.manifest import used_paths
 from labcatalog.datalad.annex import group_by_dataset
 from labcatalog.issues import Issue
-from labcatalog.manifest import used_paths
 from labcatalog.project import Project
 
 

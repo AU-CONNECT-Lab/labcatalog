@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from labcatalog.resolve import Catalog, ResolvedScore
+from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.sources import LoadedDataset
 
 

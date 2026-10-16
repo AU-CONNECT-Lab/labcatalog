@@ -5,15 +5,15 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.config import missing_labels_for
+from labcatalog.data.ids import load_exclusions
+from labcatalog.data.prepare import step_states
+from labcatalog.data.resolve import Catalog, ResolvedVariable, numbers_in_range
+from labcatalog.data.scoring import raw_items, scorable
 from labcatalog.datalad.annex import fetch_advice
 from labcatalog.datalad.check import check_git_annex
-from labcatalog.ids import load_exclusions
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
-from labcatalog.prepare import step_states
 from labcatalog.project import Project
-from labcatalog.resolve import Catalog, ResolvedVariable, numbers_in_range
-from labcatalog.scoring import raw_items, scorable
 from labcatalog.sources import LoadedDataset
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")

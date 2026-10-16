@@ -3,9 +3,10 @@ import sys
 import pandas as pd
 import pytest
 
-from labcatalog.browse import build_index, matches
 from labcatalog.cli import main
-from labcatalog.export import (
+from labcatalog.metadata.browse import build_index, matches
+from labcatalog.pipeline import run_catalog
+from labcatalog.reports.export import (
     BY_DATASET,
     BY_GROUP,
     BY_ID,
@@ -17,7 +18,6 @@ from labcatalog.export import (
     variable_rows,
     write_export,
 )
-from labcatalog.pipeline import run_catalog
 
 
 @pytest.fixture

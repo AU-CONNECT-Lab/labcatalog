@@ -1,6 +1,6 @@
 import pytest
 
-from labcatalog import ai_scoring
+from labcatalog.ai import scoring as ai_scoring
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.pipeline import run_catalog
 

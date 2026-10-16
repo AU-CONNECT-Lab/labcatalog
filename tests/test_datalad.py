@@ -7,16 +7,17 @@ from pathlib import Path
 
 import pytest
 
-from labcatalog.ai_scoring import reference_pdfs
-from labcatalog.check import check_prepare_outputs
+from labcatalog.ai.scoring import reference_pdfs
+from labcatalog.data.check import check_prepare_outputs
+from labcatalog.data.ids import load_exclusions
+from labcatalog.data.manifest import build_manifest, git_commit
+from labcatalog.data.prepare import Session, run_steps, step_states
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.bridge import datalad_status, use_folder
 from labcatalog.datalad.check import check_git_annex
 from labcatalog.datalad.freeze import differences
 from labcatalog.exceptions import DataladError, DataSourceError, FreezeError, MetadataError
-from labcatalog.history import file_history
-from labcatalog.ids import load_exclusions
-from labcatalog.manifest import build_manifest, git_commit
+from labcatalog.metadata.history import file_history
 from labcatalog.pipeline import (
     run_catalog,
     run_freeze,
@@ -24,7 +25,6 @@ from labcatalog.pipeline import (
     run_get_missing,
     run_open_freeze,
 )
-from labcatalog.prepare import Session, run_steps, step_states
 from labcatalog.project import init_project, load_project
 from labcatalog.sources import load_datasets
 

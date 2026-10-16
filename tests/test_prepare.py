@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 
 from labcatalog.cli import main
+from labcatalog.data.prepare import Session, run_steps, step_states, stop
 from labcatalog.pipeline import run_catalog, run_check, run_validate
-from labcatalog.prepare import Session, run_steps, step_states, stop
 from labcatalog.project import init_project, load_project
 
 PYTHON = json.dumps(f'"{sys.executable}"')[1:-1]

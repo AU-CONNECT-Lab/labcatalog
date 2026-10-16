@@ -4,9 +4,9 @@ import pandas as pd
 import pytest
 
 from labcatalog.config import DatasetConfig
+from labcatalog.data.resolve import ResolvedScore, resolve_catalog
+from labcatalog.data.scoring import compute_score, compute_scores
 from labcatalog.project import load_project
-from labcatalog.resolve import ResolvedScore, resolve_catalog
-from labcatalog.scoring import compute_score, compute_scores
 from labcatalog.sources import LoadedDataset, load_datasets
 
 FRAME = pd.DataFrame(

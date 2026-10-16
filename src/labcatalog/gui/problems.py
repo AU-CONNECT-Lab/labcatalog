@@ -3,9 +3,9 @@ from pathlib import Path
 
 from nicegui import ui
 
-from labcatalog import editing
 from labcatalog.gui.common import col, keyed, note, open_path, split_location, table
 from labcatalog.issues import Issue, summarize_issues
+from labcatalog.metadata import editing
 
 COLUMNS = [
     col("level", "Level"),

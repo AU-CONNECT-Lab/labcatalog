@@ -5,23 +5,13 @@ from pathlib import Path
 
 from nicegui import app, run, ui
 
-from labcatalog import ai_scoring, measures
-from labcatalog.ai_search import Search
-from labcatalog.browse import BrowseIndex, counts, matches
+from labcatalog.ai import scoring as ai_scoring
+from labcatalog.ai.search import Search
 from labcatalog.charts import views
-from labcatalog.completeness import gaps
 from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.export import (
-    BY_DATASET,
-    BY_GROUP,
-    BY_ID,
-    VARIABLES,
-    export_plan,
-    layouts,
-    write_export,
-)
 from labcatalog.gui import charts, preferences
 from labcatalog.gui.common import (
     as_text,
@@ -39,7 +29,9 @@ from labcatalog.gui.common import (
 )
 from labcatalog.gui.datalad import get_button
 from labcatalog.gui.paper import copy_text, paper_table, save_button
-from labcatalog.history import file_history
+from labcatalog.metadata.browse import BrowseIndex, counts, matches
+from labcatalog.metadata.completeness import gaps
+from labcatalog.metadata.history import file_history
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     CatalogResult,
@@ -49,12 +41,21 @@ from labcatalog.pipeline import (
     run_search,
 )
 from labcatalog.project import Project, reference_pdf
-from labcatalog.resolve import as_text_dict
+from labcatalog.reports import measures
+from labcatalog.reports.export import (
+    BY_DATASET,
+    BY_GROUP,
+    BY_ID,
+    VARIABLES,
+    export_plan,
+    layouts,
+    write_export,
+)
+from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument, Reference, Text
 from labcatalog.stats.cfa import SUBSCALES, CfaFit
 from labcatalog.stats.invariance import STEPS, InvarianceTest
 from labcatalog.stats.summary import VariableSummary
-from labcatalog.tables import PaperTable
 
 PAGE_SIZE = 50
 CFA_UNSET = "unset"

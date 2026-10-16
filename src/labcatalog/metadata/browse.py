@@ -2,8 +2,8 @@ from dataclasses import dataclass
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, dataset_by_name
+from labcatalog.data.resolve import as_text_dict
 from labcatalog.project import Project
-from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument
 from labcatalog.stats.summary import wave_order
 

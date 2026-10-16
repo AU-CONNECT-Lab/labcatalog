@@ -1,10 +1,10 @@
 import yaml
 
-from labcatalog import participants
 from labcatalog.gui import methods
+from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
-from labcatalog.validate import validate_project
+from labcatalog.reports import participants
 
 
 def test_default_paragraph_gives_waves_counts_and_retention(mock_project):

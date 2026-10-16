@@ -10,9 +10,9 @@ from labcatalog.gui import analysis_tables, charts, multilevel
 from labcatalog.gui.common import apa, col, note, p_value, section
 from labcatalog.gui.paper import Chart, paper_table, save_button
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis, analysis_script
 from labcatalog.stats import multilevel as ml
-from labcatalog.tables import PaperTable
 
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
 STARS_NOTE = "*p < .05. **p < .01. ***p < .001."

@@ -1,6 +1,6 @@
-from labcatalog import ai_search
-from labcatalog.browse import build_index, counts, matches
+from labcatalog.ai import search as ai_search
 from labcatalog.llm import CallMetadata, LLMClient
+from labcatalog.metadata.browse import build_index, counts, matches
 from labcatalog.project import load_project
 
 

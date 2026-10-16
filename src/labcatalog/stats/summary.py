@@ -7,8 +7,8 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, missing_labels_for
-from labcatalog.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
-from labcatalog.scoring import item_values, scorable, score_items
+from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
+from labcatalog.data.scoring import item_values, scorable, score_items
 from labcatalog.sources import LoadedDataset
 
 

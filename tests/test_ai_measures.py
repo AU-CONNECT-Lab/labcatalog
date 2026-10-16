@@ -1,6 +1,6 @@
 import pytest
 
-from labcatalog import ai_measures
+from labcatalog.ai import measures as ai_measures
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.project import load_project
 

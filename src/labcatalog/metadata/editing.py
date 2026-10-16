@@ -6,13 +6,13 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.codebook import MODELINE
+from labcatalog.codebook.core import MODELINE
 from labcatalog.config import ProjectConfig
 from labcatalog.exceptions import EditError
 from labcatalog.issues import Issue
+from labcatalog.metadata.varmap import load_variable_map
 from labcatalog.project import load_model
 from labcatalog.schema import Instrument, StudyContent
-from labcatalog.varmap import load_variable_map
 
 FOLDERS: dict[str, type[BaseModel]] = {
     defaults.INSTRUMENTS_DIR: Instrument,

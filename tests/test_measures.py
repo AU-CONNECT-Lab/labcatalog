@@ -1,10 +1,10 @@
 import pytest
 import yaml
 
-from labcatalog import measures
+from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
-from labcatalog.validate import validate_project
+from labcatalog.reports import measures
 
 
 def paragraph(result, omega=None):

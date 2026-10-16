@@ -3,14 +3,14 @@ from pathlib import Path
 
 import pandas as pd
 
-from labcatalog.browse import build_index, matches
-from labcatalog.codegen import output_name
 from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
+from labcatalog.data.resolve import ResolvedScore
+from labcatalog.data.scoring import scorable
 from labcatalog.exceptions import ExportError, MetadataError
-from labcatalog.outputs import write_output
+from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import CatalogResult, run_catalog
-from labcatalog.resolve import ResolvedScore
-from labcatalog.scoring import scorable
+from labcatalog.reports.codegen import output_name
+from labcatalog.reports.outputs import write_output
 from labcatalog.stats.analysis import linkable
 
 VARIABLES = "variables.csv"

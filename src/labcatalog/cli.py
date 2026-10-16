@@ -9,7 +9,6 @@ import typer
 from labcatalog import defaults
 from labcatalog.datalad.freeze import RECORD_ONLY
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
-from labcatalog.export import BY_DATASET, run_export
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import (
     run_check,
@@ -22,6 +21,7 @@ from labcatalog.pipeline import (
     run_validate,
 )
 from labcatalog.project import init_project
+from labcatalog.reports.export import BY_DATASET, run_export
 
 app = typer.Typer(
     help="Build a browsable catalog of a lab's study data.",

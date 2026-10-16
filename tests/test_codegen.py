@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from labcatalog.codegen import output_name, scoring_code_python, scoring_code_r
+from labcatalog.data.resolve import ResolvedScore, resolve_catalog
+from labcatalog.data.scoring import compute_score
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
-from labcatalog.resolve import ResolvedScore, resolve_catalog
-from labcatalog.scoring import compute_score
+from labcatalog.reports.codegen import output_name, scoring_code_python, scoring_code_r
 from labcatalog.sources import load_datasets
 
 RULES = [(rule, method) for rule in ["complete", "prorate", "zero"] for method in ["sum", "mean"]]

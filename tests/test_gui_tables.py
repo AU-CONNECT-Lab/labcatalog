@@ -1,10 +1,10 @@
 from pathlib import Path
 
-from labcatalog.bibliography import citation
-from labcatalog.browse import build_index, matches
 from labcatalog.charts import views
 from labcatalog.gui import datasets, instruments, overview
 from labcatalog.gui.common import split_location
+from labcatalog.metadata.bibliography import citation
+from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats.cfa import ONE_FACTOR, SUBSCALES, CfaFit
 from labcatalog.stats.invariance import InvarianceStep, InvarianceTest

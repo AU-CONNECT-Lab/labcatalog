@@ -3,8 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from labcatalog import qualtrics
-from labcatalog.codebook import INSTRUMENTS, ITEMS, codebook_paths, import_codebook, write_templates
+from labcatalog.codebook import qualtrics
+from labcatalog.codebook.core import (
+    INSTRUMENTS,
+    ITEMS,
+    codebook_paths,
+    import_codebook,
+    write_templates,
+)
 from labcatalog.exceptions import CodebookError
 from labcatalog.project import init_project, load_project
 

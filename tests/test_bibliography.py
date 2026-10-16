@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from labcatalog.bibliography import citation, load_bibliography
 from labcatalog.exceptions import MetadataError
+from labcatalog.metadata.bibliography import citation, load_bibliography
 from labcatalog.project import load_project
 
 BIB = r"""

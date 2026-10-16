@@ -5,9 +5,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from labcatalog import redcap, spss
 from labcatalog.cli import main
-from labcatalog.codebook import (
+from labcatalog.codebook import redcap, spss
+from labcatalog.codebook.core import (
     INSTRUMENTS,
     ITEMS,
     SCORES,
