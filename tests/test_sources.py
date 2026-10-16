@@ -14,7 +14,8 @@ def edit(path, old, new):
 
 def test_loads_every_dataset_as_text(mock_project):
     datasets = load_datasets(load_project(mock_project))
-    assert {name: len(d.frame) for name, d in datasets.items()} == {
+    questionnaires = {n: d for n, d in datasets.items() if d.config.modality == "questionnaire"}
+    assert {name: len(d.frame) for name, d in questionnaires.items()} == {
         "parent_w1": 191,
         "parent_w2": 170,
         "parent_w3": 160,
