@@ -364,8 +364,8 @@ def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list
         col("reporters", "Reporter"),
         col("targets", "About"),
         col("items", "Items", numeric=True),
-        *[col(f"d{i}", name, numeric=True) for i, name in enumerate(datasets)],
         col("missing", "Missing"),
+        *[col(f"d{i}", name, numeric=True) for i, name in enumerate(datasets)],
     ]
     rows = []
     for instrument_id, names in found.items():
