@@ -225,7 +225,10 @@ def score_relations(result: CatalogResult) -> None:
     def shown() -> str:
         return f"{len(picked['instruments'])} of {len(instruments)} instruments"
 
-    with card("How the scores relate", "Pearson r between scores measured in one wave") as tools:
+    coefficient = result.project.config.stats.coefficient()
+    with card(
+        "How the scores relate", f"{coefficient} between scores measured in one wave"
+    ) as tools:
         with tools:
             chooser = (
                 ui.select(

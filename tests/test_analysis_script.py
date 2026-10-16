@@ -242,12 +242,40 @@ def test_test_tables_name_the_test_and_effect(result, sample):
     assert pd.notna(row["p"])
 
 
-def correlations(result, sample, rscript_path=None):
+def correlations(result, sample, rscript_path=None, method="pearson"):
     data = script.AnalysisData(result, sample)
     variables = [data.score(EMS), data.score(EPS)]
-    code = script.correlation_code(variables)
+    code = script.correlation_code(variables, method)
     found, _ = script.run_code(result, sample, data.frame(), code, rscript_path)
     return script.read_correlations(found, [v.column for v in variables])
+
+
+def test_spearman_matches_scipy_and_r(result, sample):
+    ems, eps = analysis.values(result, sample, EMS), analysis.values(result, sample, EPS)
+    both = pd.concat([ems, eps], axis=1).dropna()
+    expected = stats.spearmanr(both.iloc[:, 0], both.iloc[:, 1])
+    _, matrix = correlations(result, sample, method="spearman")
+    assert (matrix[1][0].r, matrix[1][0].p) == pytest.approx((expected.statistic, expected.pvalue))
+    if r_ready():
+        _, in_r = correlations(result, sample, rscript(), method="spearman")
+        assert in_r[1][0].r == pytest.approx(expected.statistic)
+        assert in_r[1][0].p == pytest.approx(expected.pvalue, rel=1e-3)
+
+
+def test_summary_correlations_follow_the_project_setting(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    config.write_text(
+        text.replace("  correlate_by: family", "  correlate_by: family\n  correlation: spearman"),
+        encoding="utf-8",
+    )
+    found = run_catalog(mock_project)
+    assert found.project.config.stats.coefficient() == "Spearman's ρ"
+    wave = next(c for c in found.summary.correlations if c.wave == "1")
+    i, j = wave.keys.index(EMS), wave.keys.index("example_mood.ems_sadness@child_w1")
+    scores = found.scores["child_w1"]
+    expected = scores[EMS].corr(scores["example_mood.ems_sadness@child_w1"], method="spearman")
+    assert wave.r[i][j] == pytest.approx(expected)
 
 
 def regressions(result, sample, rscript_path=None):
