@@ -5,8 +5,6 @@ from labcatalog.charts.style import (
     FONT,
     INK,
     LABEL_INK,
-    MUTED_INK,
-    TITLE_INK,
     scale_color,
 )
 
@@ -17,9 +15,7 @@ UNSET = "Not set"
 UNSET_COLOR = "#9aa5b1"
 
 
-def score_network(
-    nodes: list[dict], links: list[dict], categories: list[tuple[str, str]], title: str, note: str
-) -> dict:
+def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[str, str]]) -> dict:
     # ECharts force layout: strongly related scores pull together, colour shows the chosen grouping.
     strength = np.zeros(len(nodes))
     for link in links:
@@ -52,14 +48,6 @@ def score_network(
     return {
         "backgroundColor": "white",
         "textStyle": {"fontFamily": FONT, "color": INK},
-        "title": {
-            "text": title,
-            "subtext": note,
-            "left": 0,
-            "top": 0,
-            "textStyle": {"fontSize": 13, "fontWeight": "normal", "color": TITLE_INK},
-            "subtextStyle": {"fontSize": 10, "color": MUTED_INK},
-        },
         "tooltip": {"confine": True, "textStyle": {"fontSize": 11}},
         "legend": {
             "data": [name for name, _ in categories],
@@ -75,7 +63,7 @@ def score_network(
                 "layout": "force",
                 "roam": True,
                 "draggable": True,
-                "top": 56,
+                "top": 16,
                 "bottom": 64,
                 "data": data,
                 "links": edges,

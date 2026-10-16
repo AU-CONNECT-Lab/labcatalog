@@ -774,8 +774,7 @@ def score_network(
         }
         for i, j in pairs
     ]
-    note = f"Links: |r| ≥ {defaults.CHART_MIN_R:g}. Drag to move, scroll to zoom."
-    return network.score_network(nodes, links, categories, p["title"], note)
+    return network.score_network(nodes, links, categories)
 
 
 def network_groups(

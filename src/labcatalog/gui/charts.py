@@ -2,6 +2,7 @@ import numpy as np
 import plotly.graph_objects as go
 from nicegui import ui
 
+from labcatalog import defaults
 from labcatalog.charts import network, views
 from labcatalog.gui import theme
 from labcatalog.gui.common import apa, caption, col, heading, note, panel, table
@@ -227,7 +228,9 @@ def score_relations(result: CatalogResult) -> None:
 
     coefficient = result.project.config.stats.coefficient()
     with panel(
-        "How the scores relate", f"{coefficient} between scores measured in one wave"
+        "How the scores relate",
+        f"{coefficient} between scores measured in one wave, linked at |r| ≥ "
+        f"{defaults.CHART_MIN_R:g}. Drag to move, scroll to zoom.",
     ) as tools:
         with tools:
             chooser = (

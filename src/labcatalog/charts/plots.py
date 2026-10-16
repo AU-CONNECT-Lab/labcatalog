@@ -74,7 +74,7 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
                 y=[m["lane"] for m in marks],
                 mode="markers+text",
                 text=[m["name"] for m in marks],
-                textposition="top center",
+                textposition=label_sides(marks),
                 textfont=dict(size=10, color=TITLE_INK),
                 marker=dict(symbol="diamond", size=12, color=TITLE_INK),
                 hovertext=[f"<b>{m['name']}</b><br>{m['date']:%Y-%m-%d}" for m in marks],
@@ -124,6 +124,16 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
         barmode="overlay",
         margin=dict(l=10, r=20, t=30, b=30),
     )
+
+
+def label_sides(marks: list[dict]) -> list[str]:
+    # Alternates above and below along each lane, so names of close dates do not collide.
+    sides = {}
+    for lane in {m["lane"] for m in marks}:
+        ordered = sorted((m["date"], i) for i, m in enumerate(marks) if m["lane"] == lane)
+        for k, (_, i) in enumerate(ordered):
+            sides[i] = "top center" if k % 2 == 0 else "bottom center"
+    return [sides[i] for i in range(len(marks))]
 
 
 def score_boxes(title: str, labels: list[str], series: list[dict]) -> go.Figure:
