@@ -152,7 +152,7 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
         except LabCatalogError as err:
             columns_status.set_text(str(err))
             return
-        issues = new_dataset.check(found)
+        issues = new_dataset.check(project, found)
         if issues:
             columns_status.set_text("; ".join(str(i) for i in issues))
             return
@@ -171,6 +171,11 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
             note(
                 f"Cleaned with a new prepare step, {placement.step.name}, the same as the one "
                 f"for {template.value}: {placement.step.run}"
+            )
+        if new_dataset.is_new_wave(project, draft()):
+            note(
+                f"Wave {wave.value} is new, so it is added to the study without dates; fill in "
+                "its start and end on the Edit page."
             )
         note("Adding the dataset changes these files; each line with + is new.")
         for change in state["changes"]:

@@ -2,6 +2,7 @@ import csv
 import io
 import re
 import shutil
+import tempfile
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -12,11 +13,12 @@ from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE, read_data, template_items
 from labcatalog.config import DatasetConfig, PrepareStep, dataset_by_name
 from labcatalog.data.prepare import Session, StepRun, execute
-from labcatalog.exceptions import EditError
+from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
+from labcatalog.metadata.validate import validate_project
 from labcatalog.metadata.varmap import MAP_COLUMNS
-from labcatalog.project import Project
+from labcatalog.project import Project, load_project, references_root
 
 # Fields of the template that describe its own file, so a new dataset does not take them over.
 OWN_FILE = ("url", "table", "files")
@@ -225,6 +227,11 @@ def settings_change(project: Project, draft: Draft, placement: Placement) -> Cha
     entry["path"] = placement.data_path
     entry["snapshot_date"] = draft.snapshot_date
     datasets.insert(at + 1, entry)
+    if is_new_wave(project, draft):
+        waves = data["studies"][entry["study"]]["waves"]
+        wave = CommentedMap()
+        wave.fa.set_flow_style()
+        waves[entry["wave"]] = wave
     if placement.step is not None:
         steps = data["prepare"]
         old = dataset_by_name(project.config, draft.template).path
@@ -287,8 +294,50 @@ def dumped(data: CommentedMap) -> str:
     return out.getvalue()
 
 
-def check(found: list[Change]) -> list[Issue]:
-    return [issue for change in found for issue in editing.check_text(change.path, change.text)]
+def is_new_wave(project: Project, draft: Draft) -> bool:
+    study = dataset_by_name(project.config, draft.template).study
+    return draft.wave not in project.config.studies[study].waves
+
+
+def check(project: Project, found: list[Change]) -> list[Issue]:
+    issues = [issue for change in found for issue in editing.check_text(change.path, change.text)]
+    return issues or new_issues(project, found)
+
+
+def new_issues(project: Project, found: list[Change]) -> list[Issue]:
+    # Checks across files, on copies of the settings without the data, so only new problems count.
+    before = {same(i) for i in copy_issues(project, [])}
+    after = copy_issues(project, found)
+    return [i for i in after if i.level == "error" and same(i) not in before]
+
+
+def same(issue: Issue) -> tuple[str, str]:
+    # An inserted dataset shifts the numbers of the entries after it.
+    return issue.code, re.sub(r"\[\d+\]", "[]", issue.message)
+
+
+def copy_issues(project: Project, found: list[Change]) -> list[Issue]:
+    with tempfile.TemporaryDirectory() as temp:
+        root = Path(temp)
+        shutil.copyfile(project.root / defaults.CONFIG_FILENAME, root / defaults.CONFIG_FILENAME)
+        for folder in (defaults.INSTRUMENTS_DIR, defaults.STUDIES_DIR, defaults.MAPS_DIR):
+            if (project.root / folder).is_dir():
+                shutil.copytree(project.root / folder, root / folder)
+        bib = references_root(project.config, project.root) / defaults.BIB_FILENAME
+        if bib.is_file():
+            target = references_root(project.config, root) / defaults.BIB_FILENAME
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(bib, target)
+        for change in found:
+            path = root / change.path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(change.text, encoding="utf-8")
+        try:
+            issues = validate_project(load_project(root))
+        except MetadataError as err:
+            issues = err.issues
+        # Each copy has its own folder, which some messages name.
+        return [i.model_copy(update={"message": i.message.replace(str(root), "")}) for i in issues]
 
 
 def write(project: Project, found: list[Change]) -> None:
