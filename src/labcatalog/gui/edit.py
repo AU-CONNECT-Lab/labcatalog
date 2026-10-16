@@ -1,6 +1,7 @@
 import re
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 
 from nicegui import ui
@@ -114,7 +115,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         continue
                     heading(group)
                     for path in members:
-                        item = ui.item(Path(path).name, on_click=lambda p=path: choose(p)).props(
+                        item = ui.item(Path(path).name, on_click=partial(choose, path)).props(
                             "dense clickable"
                         )
                         if path == view.path:

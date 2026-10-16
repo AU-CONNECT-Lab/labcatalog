@@ -71,7 +71,9 @@ def save_file(root: Path, opened: Opened, text: str) -> Opened:
             f"{opened.path} changed on disk after you opened it; reload it to see the change"
         )
     newline = "\r\n" if b"\r\n" in path.read_bytes() else "\n"
-    path.write_bytes(text.replace("\r\n", "\n").replace("\n", newline).encode("utf-8"))
+    # The editor drops the last line break; every file ends with one.
+    body = text.replace("\r\n", "\n").rstrip("\n") + "\n"
+    path.write_bytes(body.replace("\n", newline).encode("utf-8"))
     return Opened(opened.path, text, path.stat().st_mtime_ns)
 
 

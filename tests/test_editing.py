@@ -35,6 +35,8 @@ def test_saving_keeps_line_endings_and_refuses_a_file_changed_meanwhile(mock_pro
     assert "\r" not in opened.text
     saved = editing.save_file(mock_project, opened, opened.text.replace("EMS", "EMS2", 1))
     assert b"abbreviation: EMS2\r\n" in path.read_bytes()
+    saved = editing.save_file(mock_project, saved, saved.text.rstrip("\n"))
+    assert path.read_bytes().endswith(b"emotion\r\n")
     stamp = saved.modified + 5_000_000_000
     os.utime(path, ns=(stamp, stamp))
     with pytest.raises(EditError, match="changed on disk"):
