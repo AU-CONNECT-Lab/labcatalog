@@ -38,6 +38,8 @@ class Field:
     choices: str = ""
     min: str = ""
     max: str = ""
+    # The instrument's name when the source gives one, such as a Qualtrics block.
+    form_label: str = ""
 
 
 def read_dictionary(path: Path) -> dict[str, Field]:

@@ -41,9 +41,9 @@ def render(result: CatalogResult, view: ImportView) -> None:
             return
         steps.refresh()
 
-    async def create_from_redcap() -> None:
+    async def create_from(file_type: str) -> None:
         selection = await app.native.main_window.create_file_dialog(
-            webview.FileDialog.OPEN, file_types=("CSV files (*.csv)",)
+            webview.FileDialog.OPEN, file_types=(file_type,)
         )
         if selection:
             await create(Path(selection[0]))
@@ -85,15 +85,21 @@ def render(result: CatalogResult, view: ImportView) -> None:
             note(
                 "labcatalog lists every column of the data file and guesses its instrument "
                 "and item from the column name. Given the data dictionary of a REDCap project "
-                "(Project Setup, Data Dictionary, Download), it also fills in each item's "
-                "wording, options and type."
+                "(Project Setup, Data Dictionary, Download) or a Qualtrics survey file (Survey, "
+                "Tools, Import/Export, Export Survey), it also fills in each item's wording, "
+                "options and type, with Qualtrics blocks as instruments."
             )
             with ui.row().classes("items-center gap-4 mt-2"):
                 ui.button("Create the three files", icon="note_add", on_click=create)
                 ui.button(
                     "Create from a REDCap data dictionary",
                     icon="description",
-                    on_click=create_from_redcap,
+                    on_click=lambda: create_from("CSV files (*.csv)"),
+                ).props("outline")
+                ui.button(
+                    "Create from a Qualtrics survey file",
+                    icon="description",
+                    on_click=lambda: create_from("Qualtrics survey files (*.qsf)"),
                 ).props("outline")
             return
         with ui.row().classes("items-center gap-4 mt-2"):

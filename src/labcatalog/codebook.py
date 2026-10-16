@@ -10,7 +10,7 @@ from typing import Any, get_args
 import pandas as pd
 import yaml
 
-from labcatalog import defaults, redcap
+from labcatalog import defaults, qualtrics, redcap
 from labcatalog.config import DatasetConfig, dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.exceptions import CodebookError
 from labcatalog.issues import Issue, IssueLevel, has_errors
@@ -143,21 +143,26 @@ def write_templates(
         folder = relative(project, paths[ITEMS].parent)
         raise CodebookError(f"{folder} already has codebook files; delete them to start over")
     dataset = dataset_by_name(project.config, dataset_name)
-    fields = redcap.read_dictionary(dictionary) if dictionary else None
+    fields = read_fields(dictionary) if dictionary else None
     items = template_items(project, dataset, read_data(project, dataset), fields)
     new = dict.fromkeys(
         row["instrument"]
         for row in items
         if row["instrument"] and row["instrument"] not in project.instruments
     )
-    forms = {field.form for field in (fields or {}).values()}
-    instruments = [
-        {"instrument": i, "name": redcap.form_name(i) if i in forms else ""} for i in new
-    ]
+    names = {f.form: f.form_label or redcap.form_name(f.form) for f in (fields or {}).values()}
+    instruments = [{"instrument": i, "name": names.get(i, "")} for i in new]
     write_table(paths[ITEMS], ITEMS, items)
     write_table(paths[INSTRUMENTS], INSTRUMENTS, instruments)
     write_table(paths[SCORES], SCORES, [])
     return list(paths.values())
+
+
+def read_fields(path: Path) -> dict[str, redcap.Field]:
+    # A Qualtrics survey file or a REDCap data dictionary, told apart by extension.
+    if path.suffix.lower() == ".qsf":
+        return qualtrics.read_survey(path)
+    return redcap.read_dictionary(path)
 
 
 def template_items(

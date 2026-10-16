@@ -124,10 +124,14 @@ def codebook_create(
             "--redcap", help="REDCap data dictionary to take wording, options and item types from."
         ),
     ] = None,
+    qualtrics: Annotated[
+        Path | None,
+        typer.Option("--qualtrics", help="Qualtrics survey file (.qsf) to take the same from."),
+    ] = None,
     project: ProjectOption = Path("."),
 ) -> None:
     """Write three CSV files that list every column of the data file, to fill in."""
-    for path in run_codebook_create(project, dataset, redcap):
+    for path in run_codebook_create(project, dataset, redcap or qualtrics):
         typer.echo(f"Wrote {path}")
     typer.echo(f"Fill them in, then run: labcatalog codebook import {dataset}")
 
