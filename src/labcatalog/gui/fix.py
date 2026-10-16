@@ -24,6 +24,7 @@ SCRIPTS = (
     "The person who looks after the cleaning scripts: labcatalog never changes data files, "
     "so the fix goes into the script that makes this file. Copy a note for them below."
 )
+PICK = "If you know the right answer, fix it below; if not, ask whoever looks after the settings."
 LOOK = "Nobody may need to: look at it, and if it is fine, record that below so it stops showing."
 
 # What each problem means in plain words, and who usually fixes it.
@@ -46,7 +47,7 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     ),
     "not_in_vocab": (
         "A modality, reporter or target that is not among the allowed words, often a typo.",
-        SETTINGS,
+        PICK,
     ),
     "unknown_reference": (
         "Something names an ID that does not exist, often a typo in the ID.",
@@ -62,7 +63,7 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     "unmapped_item": (
         "Items of an instrument given in this dataset have no column in its map. Either the "
         "column is there under another name, or the item was not asked this time.",
-        SETTINGS,
+        PICK,
     ),
     "missing_code_collision": (
         "A response option has the same value as a missing code, so labcatalog cannot tell an "
@@ -78,7 +79,7 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     "column_unmapped": (
         "The data file has columns the column map does not list, so labcatalog does not know "
         "what they are.",
-        SETTINGS,
+        PICK,
     ),
     "unexpected_value": (
         "Values that are neither response options nor missing codes. Either the data have a "
