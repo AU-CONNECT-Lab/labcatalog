@@ -11,7 +11,8 @@ from typing import Literal
 
 from labcatalog.annex import is_placeholder
 from labcatalog.config import PrepareStep
-from labcatalog.paths import expand_path
+from labcatalog.exceptions import DataladError
+from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
 
 Status = Literal["up to date", "outdated", "missing output", "missing input"]
@@ -97,7 +98,15 @@ def run_steps(
     outdated_only: bool = False,
     echo: Callable[[str], None] | None = None,
     rscript: str | None = None,
+    datalad: str | None = None,
 ) -> list[StepRun]:
+    if project.config.prepare_with != "datalad":
+        datalad = None
+    elif not datalad:
+        raise DataladError(
+            "The prepare steps run with DataLad (prepare_with: datalad); "
+            "set the path to datalad on the Settings page"
+        )
     session.stopping = False
     done = []
     for step in project.config.prepare:
@@ -113,7 +122,7 @@ def run_steps(
         done.append(run)
         if echo:
             echo(f"== {step.name}: {step.run}")
-        execute(step, project.root, run, session, echo, rscript)
+        execute(step, project.root, run, session, echo, rscript, datalad)
         if run.exit_code != 0:
             break
     session.current = None
@@ -127,11 +136,12 @@ def execute(
     session: Session,
     echo: Callable[[str], None] | None,
     rscript: str | None,
+    datalad: str | None,
 ) -> None:
     session.current = step.name
     process = subprocess.Popen(
-        step.run,
-        shell=True,
+        datalad_run(step, root, datalad) if datalad else step.run,
+        shell=not datalad,
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -148,6 +158,16 @@ def execute(
     run.exit_code = process.wait()
     run.stopped = session.stopping
     session.process = None
+
+
+def datalad_run(step: PrepareStep, root: Path, datalad: str) -> list[str]:
+    paths = [("-i", path) for path in step.inputs] + [("-o", path) for path in step.outputs]
+    args = []
+    for flag, path in paths:
+        args += [flag, portable_path(expand_path(path, root), root).as_posix()]
+    # datalad run fills {inputs} and the like into the command, so literal braces are doubled.
+    command = step.run.replace("{", "{{").replace("}", "}}")
+    return [datalad, "run", "--explicit", "-m", step.name, *args, command]
 
 
 def environment(rscript: str | None) -> dict[str, str] | None:

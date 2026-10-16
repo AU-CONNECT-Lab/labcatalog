@@ -115,6 +115,8 @@ class ProjectConfig(StrictModel):
     exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)
     prepare: list[PrepareStep] = []
+    # Runs each prepare step through datalad run, which records it in the dataset's history.
+    prepare_with: Literal["datalad"] | None = None
     # Template of each instrument's Measures paragraph, in place of the built-in one.
     measures: str | None = None
     # Template of each study's Participants paragraph, in place of the built-in one.

@@ -1,6 +1,8 @@
+import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -12,8 +14,8 @@ from labcatalog.exceptions import DataladError, DataSourceError, MetadataError
 from labcatalog.ids import load_exclusions
 from labcatalog.manifest import build_manifest, git_commit
 from labcatalog.pipeline import run_freeze
-from labcatalog.prepare import step_states
-from labcatalog.project import load_project
+from labcatalog.prepare import Session, run_steps, step_states
+from labcatalog.project import init_project, load_project
 from labcatalog.sources import load_datasets
 
 needs_git = pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
@@ -288,3 +290,77 @@ def test_a_freeze_tags_a_data_subdataset_and_the_dataset_above_it(mock_project, 
     assert not any(r.commit.endswith("-modified") for r in record.manifest.datalad)
     data_tag = git(mock_project / "data", "rev-parse", "pilot^{commit}")
     assert git(mock_project, "rev-parse", "pilot:data") == data_tag
+
+
+CLEAN = """import sys
+from pathlib import Path
+rows = Path("raw/a.csv").read_text().splitlines()
+Path("data").mkdir(exist_ok=True)
+Path("data/a.csv").write_text(f"{sys.argv[1]} {len(rows)}")
+"""
+
+
+def datalad_steps(tmp_path) -> Path:
+    root = init_project(tmp_path / "lab", example=False)
+    step = {
+        "name": "clean",
+        # Braces in the command must reach the script as they are.
+        "run": f'"{sys.executable}" scripts/clean.py {{x}}',
+        "inputs": ["raw/a.csv", "scripts/clean.py"],
+        "outputs": ["data/a.csv"],
+    }
+    with (root / "labcatalog.yaml").open("a", encoding="utf-8") as file:
+        file.write(f"prepare_with: datalad
+prepare: {json.dumps([step])}
+")
+    (root / "raw").mkdir()
+    (root / "raw" / "a.csv").write_text("id,x
+1,2
+2,3
+", encoding="utf-8")
+    (root / "scripts").mkdir()
+    (root / "scripts" / "clean.py").write_text(CLEAN, encoding="utf-8")
+    return root
+
+
+def test_steps_set_to_run_with_datalad_need_datalad(tmp_path):
+    root = datalad_steps(tmp_path)
+    session = Session()
+    with pytest.raises(DataladError, match="set the path to datalad on the Settings page"):
+        run_steps(load_project(root), ["clean"], session)
+    assert session.runs == {}
+
+
+def last_run_record(root) -> tuple[str, dict]:
+    adjusted = git(root, "rev-parse", "--abbrev-ref", "HEAD").startswith("adjusted/")
+    message = git(root, "log", "-1", "--format=%B", "HEAD^" if adjusted else "HEAD")
+    record = message.split("=== Do not change lines below ===")[1].split("^^^")[0]
+    return message.splitlines()[0], json.loads(record)
+
+
+@needs_datalad
+def test_steps_run_with_datalad_are_recorded_and_get_their_inputs(tmp_path, datalad):
+    root = datalad_steps(tmp_path)
+    datalad(root, "create", "-c", "text2git", "--force", ".")
+    with (root / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("raw/** annex.largefiles=anything
+data/** annex.largefiles=anything
+")
+    datalad(root, "save", "-m", "Add the catalog")
+
+    [run] = run_steps(load_project(root), ["clean"], Session(), datalad=datalad_exe())
+    assert run.exit_code == 0, run.log
+    assert (root / "data" / "a.csv").read_text(encoding="utf-8") == "{x} 3"
+    subject, record = last_run_record(root)
+    assert subject == "[DATALAD RUNCMD] clean"
+    assert record["inputs"] == ["raw/a.csv", "scripts/clean.py"]
+    assert record["outputs"] == ["data/a.csv"]
+    assert git(root, "status", "--porcelain", "--", "data") == ""
+
+    clone = tmp_path / "clone"
+    datalad(tmp_path, "clone", str(root), str(clone))
+    assert is_placeholder(clone / "raw" / "a.csv")
+    [run] = run_steps(load_project(clone), ["clean"], Session(), datalad=datalad_exe())
+    assert run.exit_code == 0, run.log
+    assert not is_placeholder(clone / "raw" / "a.csv")
+    assert (clone / "data" / "a.csv").read_text(encoding="utf-8") == "{x} 3"

@@ -140,10 +140,10 @@ def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze
     return freeze_project(result.project, result.datasets, participants, name, datalad)
 
 
-def run_prepare(root: Path, echo: Callable[[str], None]) -> list[StepRun]:
+def run_prepare(root: Path, echo: Callable[[str], None], datalad: str | None) -> list[StepRun]:
     project = load_project(root)
     names = [step.name for step in project.config.prepare]
-    return run_steps(project, names, Session(), echo=echo)
+    return run_steps(project, names, Session(), echo=echo, datalad=datalad)
 
 
 def run_schema(out_dir: Path) -> list[Path]:

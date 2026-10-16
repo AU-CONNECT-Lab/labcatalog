@@ -101,7 +101,7 @@ def check(project: ProjectOption = Path(".")) -> None:
 @app.command()
 def prepare(project: ProjectOption = Path(".")) -> None:
     """Run the prepare steps in labcatalog.yaml in order, stopping at the first failure."""
-    runs = run_prepare(project, typer.echo)
+    runs = run_prepare(project, typer.echo, shutil.which("datalad"))
     if not runs:
         typer.echo(f"No prepare steps in {defaults.CONFIG_FILENAME}.")
     elif runs[-1].exit_code != 0:
