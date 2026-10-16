@@ -17,6 +17,11 @@ ONE_EACH = (
     "Each {group} holds one person here, so the {group} and person levels cannot be told "
     "apart; turn one of them off."
 )
+TIME_UNITS = {
+    ml.WAVES: "Waves since the first",
+    "month": "Months, from the dates",
+    "year": "Years, from the dates",
+}
 R_FILE = "multilevel.R"
 PYTHON_FILE = "multilevel.py"
 SINGULAR = (
@@ -147,6 +152,12 @@ def render(result: CatalogResult, view) -> None:
         on_change=lambda e: change(covariates=e.value or []),
     ).props("dense outlined use-chips").classes("w-full")
     with ui.row().classes("w-full items-center gap-6"):
+        ui.select(
+            TIME_UNITS,
+            value=model.time,
+            label="Time counts",
+            on_change=lambda e: change(time=e.value),
+        ).props("dense outlined").classes("w-56")
         ui.switch(
             "Waves within people",
             value=model.by_person,

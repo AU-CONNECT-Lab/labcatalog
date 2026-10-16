@@ -1270,8 +1270,21 @@ def trajectories(long: ml.Long, fitted: ml.Fitted, label: str) -> go.Figure:
         (str(person), rows[ml.TIME].tolist(), rows[long.outcome].tolist())
         for person, rows in used.sort_values(ml.TIME).groupby(ml.PERSON, sort=False)
     ]
-    by_time = used.groupby(ml.TIME)
-    means = [(float(t), float(rows[long.outcome].mean()), len(rows)) for t, rows in by_time]
-    ticks = [(float(t), f"Wave {rows[ml.WAVE].iloc[0]}") for t, rows in by_time]
+    waves = sorted(used.groupby(ml.WAVE), key=lambda pair: wave_order(pair[0]))
+    means = [
+        (float(rows[ml.TIME].mean()), float(rows[long.outcome].mean()), len(rows))
+        for _, rows in waves
+    ]
+    # Wave names under the axis when time counts waves; with dates, the axis counts the unit.
+    ticks = [(t, f"Wave {w}") for (w, _), (t, _, _) in zip(waves, means, strict=True)]
+    by_wave = long.time_label == ml.TIME_LABEL
     line = list(ml.prediction(long, fitted).items())
-    return plots.trajectories(people, means, line, ticks, label, wave_color(0))
+    return plots.trajectories(
+        people,
+        means,
+        line,
+        ticks if by_wave else None,
+        "" if by_wave else long.time_label,
+        label,
+        wave_color(0),
+    )

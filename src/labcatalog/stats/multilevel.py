@@ -33,6 +33,9 @@ TIME = "time"
 WAVE = "wave"
 INTERCEPT = "(Intercept)"
 TIME_LABEL = "Time (waves since the first)"
+WAVES = "wave"
+# Days in each unit time can count besides waves.
+DAYS = {"month": 365.25 / 12, "year": 365.25}
 RESIDUAL = "Residual"
 SINGULAR = "singular"
 OUTPUTS = ("icc", "fixed", "random", "fit_stats", "notes")
@@ -41,17 +44,15 @@ DEVIATION = ", deviation from the person mean"
 
 R_HEADER = """\
 # Multilevel model for {project}, written by labcatalog.
-# d is the data saved beside this script: one row per person and wave, with time counting
-# the study's waves from the first one chosen (0, 1, 2, ...; a skipped wave leaves a gap) and
-# scores as labcatalog computed them.
+# d is the data saved beside this script: one row per person and wave, with time as the
+# model's title below says and scores as labcatalog computed them.
 # Needs the R packages {names}; install them once with: {install}
 d <- read.csv({path}, check.names = FALSE)
 """
 PYTHON_HEADER = """\
 # Multilevel model for {project}, written by labcatalog.
-# d is the data saved beside this script: one row per person and wave, with time counting
-# the study's waves from the first one chosen (0, 1, 2, ...; a skipped wave leaves a gap) and
-# scores as labcatalog computed them.
+# d is the data saved beside this script: one row per person and wave, with time as the
+# model's title below says and scores as labcatalog computed them.
 # Needs pandas and statsmodels (pip install statsmodels).
 import warnings
 
@@ -182,6 +183,8 @@ class Model:
     slope: bool = True
     # Each-wave number covariates as each person's mean and the wave's deviation from it.
     split: bool = False
+    # Waves, or months or years from the dates.
+    time: str = WAVES
 
 
 @dataclass
@@ -224,6 +227,7 @@ class Long:
     covariates: list[Covariate]
     # Rows whose ID is missing or repeats within its file.
     left_out: int
+    time_label: str = TIME_LABEL
 
 
 @dataclass
@@ -372,6 +376,9 @@ def problem(result: CatalogResult, model: Model) -> str | None:
         return "Choose at least one level: people or groups."
     if model.by_person and len(model.datasets) < 2:
         return "People need two or more waves; choose more waves, or groups only."
+    undated = [n for n in model.datasets if not configs[n].date_column]
+    if model.time != WAVES and undated:
+        return f"{', '.join(undated)} has no date_column, so time cannot count {model.time}s."
     if model.by_group:
         if group_name(result) is None:
             return "Name a group under ids in labcatalog.yaml to model groups."
@@ -403,14 +410,20 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
     # Time counts the study's waves, so a skipped wave leaves a gap.
     waves = sorted({d.wave for d in configs.values() if d.study == study}, key=wave_order)
     first = waves.index(configs[ordered[0]].wave)
+    origin = None if model.time == WAVES else visit_dates(result, ordered[0]).min()
     parts, left_out = [], 0
     for name in ordered:
-        time = waves.index(configs[name].wave) - first
         loaded = result.datasets[name]
         ids = loaded.frame[loaded.id_column].astype("string")
         keep = analysis.linkable(ids)
         left_out += int((~keep).sum())
         people = ids.to_numpy()[keep]
+        if origin is None:
+            time = waves.index(configs[name].wave) - first
+        else:
+            time = ((visit_dates(result, name) - origin).dt.days / DAYS[model.time]).to_numpy()[
+                keep
+            ]
         part = pd.DataFrame({PERSON: people, WAVE: configs[name].wave, TIME: time})
         if group:
             part[group] = loaded.group.astype("string").to_numpy()[keep]
@@ -422,7 +435,16 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
     frame = pd.concat(parts, ignore_index=True)
     if model.split:
         frame, covariates = split_within(frame, covariates, taken)
-    return Long(frame, outcome, group, covariates, left_out)
+    label = TIME_LABEL
+    if origin is not None:
+        label = f"Time ({model.time}s since wave {configs[ordered[0]].wave} began)"
+    return Long(frame, outcome, group, covariates, left_out, label)
+
+
+def visit_dates(result: CatalogResult, name: str) -> pd.Series:
+    loaded = result.datasets[name]
+    form = result.project.config.defaults.date_format
+    return pd.to_datetime(loaded.frame[loaded.config.date_column], format=form, errors="coerce")
 
 
 def splittable(c: Covariate) -> bool:
@@ -556,7 +578,14 @@ def title(model: Model, long: Long, label: str) -> str:
     ]
     slope = model.by_person and model.slope and len(model.datasets) > 1
     random = " with a random slope of time for each person" if slope else ""
-    return f"Multilevel model of {label}: {' and '.join(levels)}{random}."
+    heading = f"Multilevel model of {label}: {' and '.join(levels)}{random}."
+    if len(model.datasets) < 2:
+        return heading
+    if model.time == WAVES:
+        return f"{heading} Time is waves since the first chosen wave (a skipped wave leaves a gap)."
+    return (
+        f"{heading} Time is {model.time}s since the earliest visit date in the first chosen wave."
+    )
 
 
 def code(model: Model, long: Long, label: str) -> tuple[str, str]:
@@ -715,7 +744,7 @@ def read(found: dict[str, pd.DataFrame], long: Long, engine: str) -> Fitted:
 
 def term_order(label: str, long: Long) -> int:
     # Formula order: intercept, time, then the covariates as chosen.
-    labels = ["Intercept", TIME_LABEL, *(c.label for c in long.covariates)]
+    labels = ["Intercept", long.time_label, *(c.label for c in long.covariates)]
     return next(
         (n for n, name in enumerate(labels) if label == name or label.startswith(f"{name}: ")),
         len(labels),
@@ -739,7 +768,7 @@ def term_label(term: str, long: Long) -> str:
     if term in (INTERCEPT, "Intercept", "Group"):
         return "Intercept"
     if term == TIME:
-        return TIME_LABEL
+        return long.time_label
     for c in long.covariates:
         if term == c.column:
             return c.label
@@ -756,8 +785,10 @@ def prediction(long: Long, fitted: Fitted) -> dict[float, float]:
     base = estimates["Intercept"] + sum(
         estimates[c.label] * used[c.column].mean() for c in long.covariates if not c.levels
     )
-    slope = estimates.get(TIME_LABEL, 0.0)
-    return {float(t): base + slope * t for t in sorted(used[TIME].unique())}
+    slope = estimates.get(long.time_label, 0.0)
+    # One point at each wave's mean time; with dates, people within a wave differ.
+    times = sorted(used.groupby(WAVE)[TIME].mean())
+    return {float(t): base + slope * t for t in times}
 
 
 def references(long: Long) -> list[tuple[str, str]]:

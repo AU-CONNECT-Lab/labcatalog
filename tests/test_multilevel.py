@@ -311,3 +311,40 @@ def test_a_number_covariate_sits_at_its_mean_in_the_prediction(result):
     line = ml.prediction(long, fitted)
     assert list(line) == [0.0, 2.0]
     assert line[0.0] == pytest.approx(estimates["Intercept"] + estimates[covariate] * mean)
+
+
+def test_time_can_count_months_or_years_from_the_dates(result):
+    long = ml.long_frame(result, growth(time="month"))
+    assert long.time_label == "Time (months since wave 1 began)"
+    start = min(pd.to_datetime(result.datasets["child_w1"].frame["visit_date"]))
+    row = long.frame.dropna(subset=["time"]).iloc[-1]
+    frame = result.datasets[f"child_w{row['wave']}"].frame
+    visit = frame.loc[frame["pid"] == row["id"], "visit_date"].iloc[0]
+    expected = (pd.Timestamp(visit) - start).days / (365.25 / 12)
+    assert row["time"] == pytest.approx(expected)
+    assert long.frame.loc[long.frame["wave"] == "1", "time"].min() == 0
+    years = ml.long_frame(result, growth(time="year")).frame["time"]
+    assert years.to_numpy() == pytest.approx(long.frame["time"].to_numpy() / 12, nan_ok=True)
+    fitted = ml.run(result, growth(time="month"), long, "EMS Total score", None)
+    assert fitted.fixed[1].label == "Time (months since wave 1 began)"
+    fig = views.trajectories(long, fitted, "EMS Total score")
+    assert fig.layout.xaxis.title.text == long.time_label and fig.layout.xaxis.tickvals is None
+    r_text, _ = ml.scripts(result, growth(time="month"), long, "EMS")
+    assert "Time is months since the earliest visit date in the first chosen wave." in r_text
+
+
+def test_time_from_dates_needs_a_date_column(result):
+    configs = result.project.config.datasets
+    child = next(d for d in configs if d.name == "child_w2")
+    child.date_column = None
+    assert ml.problem(result, growth(time="year")) == (
+        "child_w2 has no date_column, so time cannot count years."
+    )
+    assert ml.problem(result, growth()) is None
+
+
+@needs_r
+def test_r_and_python_agree_on_time_in_years(result):
+    model = growth(time="year")
+    long = ml.long_frame(result, model)
+    close(ml.run(result, model, long, "EMS", rscript()), ml.run(result, model, long, "EMS", None))

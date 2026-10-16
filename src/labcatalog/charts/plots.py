@@ -706,7 +706,8 @@ def trajectories(
     people: list[tuple[str, list[float], list[float]]],
     means: list[tuple[float, float, int]],
     line: list[tuple[float, float]],
-    ticks: list[tuple[float, str]],
+    ticks: list[tuple[float, str]] | None,
+    x_title: str,
     y_title: str,
     color: str,
 ) -> go.Figure:
@@ -750,13 +751,13 @@ def trajectories(
             hovertemplate="mean %{y:.2f} · n %{customdata}<extra></extra>",
         )
     )
-    fig.update_xaxes(
-        tickvals=[t for t, _ in ticks],
-        ticktext=[text for _, text in ticks],
-        range=[ticks[0][0] - TRAJECTORY_PAD, ticks[-1][0] + TRAJECTORY_PAD],
-        showgrid=False,
-        zeroline=False,
-    )
+    fig.update_xaxes(title_text=x_title, showgrid=False, zeroline=False)
+    if ticks:
+        fig.update_xaxes(
+            tickvals=[t for t, _ in ticks],
+            ticktext=[text for _, text in ticks],
+            range=[ticks[0][0] - TRAJECTORY_PAD, ticks[-1][0] + TRAJECTORY_PAD],
+        )
     fig.update_yaxes(title_text=y_title, gridcolor=GRID, zeroline=False)
     return base_layout(
         fig,
