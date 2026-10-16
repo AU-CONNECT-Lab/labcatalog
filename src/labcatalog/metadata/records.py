@@ -281,7 +281,7 @@ def update(entry: CommentedMap, column: Column, cell: Any) -> None:
     if value is None or value == column.default:
         holder.pop(name, None)
         # A nested map left empty goes too, so no custom: {} stays behind.
-        for parent, part in reversed(list(zip(parents, outer, strict=True))):
+        for parent, part in reversed(list(zip(parents[:-1], outer, strict=True))):
             if not parent[part]:
                 del parent[part]
     elif isinstance(value, list):
@@ -321,7 +321,9 @@ def stored(cell: Any, column: Column) -> Any:
         parts = [part.strip() for part in text.split(",") if part.strip()]
         undeclared = [part for part in parts if column.choices and part not in column.choices]
         if undeclared:
-            raise EditError(f"{column.label}: {', '.join(undeclared)} not declared in custom_fields")
+            raise EditError(
+                f"{column.label}: {', '.join(undeclared)} not declared in custom_fields"
+            )
         return parts or None
     if not text:
         return None

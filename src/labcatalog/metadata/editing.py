@@ -7,11 +7,11 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
-from labcatalog.config import ProjectConfig
-from labcatalog.exceptions import EditError
+from labcatalog.config import CustomFieldDef, ProjectConfig
+from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.issues import Issue
 from labcatalog.metadata.varmap import load_variable_map
-from labcatalog.project import load_model
+from labcatalog.project import load_config, load_model
 from labcatalog.schema import Instrument, StudyContent
 
 FOLDERS: dict[str, type[BaseModel]] = {
@@ -42,6 +42,14 @@ def editable_files(root: Path) -> dict[str, list[str]]:
         "Studies": listed(defaults.STUDIES_DIR, defaults.YAML_SUFFIXES),
         "Column maps": listed(defaults.MAPS_DIR, (".csv",)),
     }
+
+
+def custom_fields(root: Path) -> list[CustomFieldDef]:
+    # The page still edits a project whose settings do not load, without these columns.
+    try:
+        return load_config(root).custom_fields
+    except MetadataError:
+        return []
 
 
 def open_file(root: Path, relative: str) -> Opened:

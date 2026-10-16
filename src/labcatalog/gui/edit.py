@@ -40,6 +40,7 @@ class Shown:
 
 def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) -> None:
     files = editing.editable_files(root)
+    fields = editing.custom_fields(root)
     paths = [p for group in files.values() for p in group]
     if view.path not in paths:
         view.path = paths[0]
@@ -156,7 +157,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         page.refresh()
 
     def table() -> records.Table:
-        return records.tables_for(view.path)[view.mode]
+        return records.tables_for(view.path, fields)[view.mode]
 
     def show(issues: list[Issue]) -> None:
         if shown.editor is not None:
@@ -284,15 +285,16 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         shown.grid = (
             ui.aggrid(grid_options(table().columns, rows))
             .classes("w-full")
-            .style("height: 65vh")
+            .style("height: 7rem" if table().single else "height: 65vh")
             .on("cellValueChanged", lambda: setattr(shown, "edited", True))
         )
         with ui.row().classes("items-center gap-3"):
             save_buttons()
-            ui.button("Add row", icon="add", on_click=add_row).props("flat no-caps")
-            ui.button("Delete ticked rows", icon="delete", on_click=delete_rows).props(
-                "flat no-caps"
-            )
+            if not table().single:
+                ui.button("Add row", icon="add", on_click=add_row).props("flat no-caps")
+                ui.button("Delete ticked rows", icon="delete", on_click=delete_rows).props(
+                    "flat no-caps"
+                )
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
         note(
             "Lists are written with commas, for example ems_1, ems_2. Saving changes only the "
@@ -303,12 +305,15 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 f"Rows with the same {table().columns[0].label} make one entry. Renaming it here "
                 "does not rename it where other parts of the file use it."
             )
+        for column in table().columns:
+            if column.kind == "list" and column.choices:
+                note(f"{column.label} takes one or more of: {', '.join(column.choices)}.")
 
     @ui.refreshable
     def page() -> None:
         shown.opened = opened = editing.open_file(root, view.path)
         shown.editor = shown.grid = None
-        tables = records.tables_for(view.path)
+        tables = records.tables_for(view.path, fields)
         if view.mode not in tables:
             view.mode = TEXT
         with ui.row().classes("w-full no-wrap items-start gap-6"):

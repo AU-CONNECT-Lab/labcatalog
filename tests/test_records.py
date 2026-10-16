@@ -137,3 +137,135 @@ def test_bad_cells_and_per_language_text_are_reported():
         records.read_rows("items:\n  - {id: x\n", "items", records.ITEMS)
     with pytest.raises(EditError, match="per language"):
         records.read_rows("items:\n  - {id: x, text: {en: Hi, es: Hola}}\n", "items", records.ITEMS)
+
+
+def test_custom_fields_get_columns_and_a_table_of_their_own(mock_project):
+    fields = editing.custom_fields(mock_project)
+    tables = records.tables_for(MOOD, fields)
+    assert list(tables) == ["items", "scores", "response_sets", "custom"]
+    assert tables["scores"].columns[-1].key == "custom:topics"
+    assert "custom:topics" not in [c.key for c in records.tables_for(MOOD)["scores"].columns]
+    text = editing.open_file(mock_project, MOOD).text
+    scores = records.read_rows(text, "scores", tables["scores"])
+    assert [row["custom:topics"] for row in scores][2:] == [
+        "negative affect, sleep",
+        "positive affect",
+    ]
+    scores[1]["custom:topics"] = "sleep, parenting"
+    scores[3]["custom:topics"] = ""
+    written = records.write_rows(text, "scores", tables["scores"], scores)
+    sadness = "  - {id: ems_sadness, label: Sadness, method: sum, items: [ems_2, ems_6, ems_7], "
+    low = "  - {id: ems_low_positive, label: Low positive affect, method: sum, items: [ems_1, ems_4, ems_9]"
+    assert changes(text, written) == [
+        f"-{sadness}custom: {{topics: [negative affect]}}}}",
+        f"+{sadness}custom: {{topics: [sleep, parenting]}}}}",
+        f"-{low}, custom: {{topics: [positive affect]}}}}",
+        f"+{low}}}",
+    ]
+    assert editing.check_text(MOOD, written) == []
+
+
+def test_renaming_a_set_or_moving_one_option(mock_project):
+    text = editing.open_file(mock_project, MOOD).text
+    rows = records.read_rows(text, "response_sets", records.OPTIONS)
+    for row in rows:
+        row["id"] = "often"
+    assert changes(text, records.write_rows(text, "response_sets", records.OPTIONS, rows)) == [
+        "-  - id: frequency",
+        "+  - id: often",
+    ]
+    rows = records.read_rows(text, "response_sets", records.OPTIONS)
+    rows[3]["id"] = "label"
+    rows[3]["value"] = "x"
+    assert changes(text, records.write_rows(text, "response_sets", records.OPTIONS, rows)) == [
+        "-      - {value: 3, label: Always}",
+        "+  - id: label",
+        "+    options:",
+        "+      - {value: x, label: Always}",
+    ]
+
+
+def test_administrations_keep_their_overrides(mock_project):
+    dropped = "overrides: [{item: ecs_1, dropped: true}]"
+    text = editing.open_file(mock_project, STUDY).text.replace(
+        "target: child}", f"target: child, {dropped}}}"
+    )
+    rows = records.read_rows(text, "administrations", records.ADMINISTRATIONS)
+    assert rows[1]["datasets"] == "parent_w1, parent_w2, parent_w3"
+    rows[1]["reversed_in_data"] = True
+    rows[1]["datasets"] = "parent_w1, parent_w2"
+    rows[4]["target"] = "self"
+    written = records.write_rows(text, "administrations", records.ADMINISTRATIONS, rows)
+    [_, sleep, _, demographics] = changes(text, written)
+    assert sleep.endswith(
+        f"datasets: [parent_w1, parent_w2], target: child, {dropped}, reversed_in_data: true}}"
+    )
+    assert demographics.endswith("datasets: [parent_w1, parent_w2, parent_w3], target: self}")
+    assert editing.check_text(STUDY, written) == []
+
+
+def test_bad_cells_and_per_language_text_are_reported():
+    with pytest.raises(EditError, match="Min: 'a lot' is not a number"):
+        records.write_rows("items: []\n", "items", records.ITEMS, [{"id": "x", "min": "a lot"}])
+    with pytest.raises(EditError, match="Set: every row needs one"):
+        records.write_rows("x: 1\n", "response_sets", records.OPTIONS, [{"value": "1"}])
+    with pytest.raises(EditError, match="empty has no options"):
+        text = "response_sets:\n  - {id: empty, options: []}\n"
+        records.read_rows(text, "response_sets", records.OPTIONS)
+    with pytest.raises(EditError, match="not valid YAML"):
+        records.read_rows("items:\n  - {id: x\n", "items", records.ITEMS)
+    with pytest.raises(EditError, match="per language"):
+        records.read_rows("items:\n  - {id: x, text: {en: Hi, es: Hola}}\n", "items", records.ITEMS)
+
+
+def test_custom_fields_get_columns_and_a_table_of_their_own(mock_project):
+    fields = editing.custom_fields(mock_project)
+    tables = records.tables_for(MOOD, fields)
+    assert list(tables) == ["items", "scores", "response_sets", "custom"]
+    assert tables["scores"].columns[-1].key == "custom:topics"
+    assert "custom:topics" not in [c.key for c in records.tables_for(MOOD)["scores"].columns]
+    text = editing.open_file(mock_project, MOOD).text
+    scores = records.read_rows(text, "scores", tables["scores"])
+    assert [row["custom:topics"] for row in scores][2:] == [
+        "negative affect, sleep",
+        "positive affect",
+    ]
+    scores[1]["custom:topics"] = "sleep, parenting"
+    scores[3]["custom:topics"] = ""
+    written = records.write_rows(text, "scores", tables["scores"], scores)
+    assert [line[-40:] for line in changes(text, written)] == [
+        "6, ems_7], custom: {topics: [negative affect]}}",
+        "ms_4, ems_9], custom: {topics: [positive affect]}}",
+        "ems_6, ems_7], custom: {topics: [sleep, parenting]}}",
+        "low_positive, label: Low positive affect, method: sum, items: [ems_1, ems_4, ems_9]}",
+    ][:0] or changes(text, written)
+    assert editing.check_text(MOOD, written) == []
+    scores[1]["custom:topics"] = "sleep, naps"
+    with pytest.raises(EditError, match="Topics: naps not declared"):
+        records.write_rows(text, "scores", tables["scores"], scores)
+    [row] = records.read_rows(text, "custom", tables["custom"])
+    assert row["custom:domain"] == "emotion"
+    row["custom:domain"] = ""
+    cleared = records.write_rows(text, "custom", tables["custom"], [row])
+    assert changes(text, cleared) == ["-custom:", "-  domain: emotion"]
+
+
+def test_a_date_field_is_written_as_a_date(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "custom_fields:\n",
+            "custom_fields:\n  - {name: approved, applies_to: dataset, type: date}\n",
+        ),
+        encoding="utf-8",
+    )
+    table = records.tables_for("labcatalog.yaml", editing.custom_fields(mock_project))["datasets"]
+    text = editing.open_file(mock_project, "labcatalog.yaml").text
+    rows = records.read_rows(text, "datasets", table)
+    rows[0]["custom:approved"] = "2026-01-31"
+    written = records.write_rows(text, "datasets", table, rows)
+    assert "custom: {approved: 2026-01-31}" in written
+    assert editing.check_text("labcatalog.yaml", written) == []
+    rows[0]["custom:approved"] = "Jan 31"
+    with pytest.raises(EditError, match="not a date"):
+        records.write_rows(text, "datasets", table, rows)
