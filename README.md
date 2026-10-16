@@ -29,10 +29,12 @@ labcatalog gui -p my_example
 
 ## Documentation
 
-The handbook is in [docs/](docs/). To read it locally:
+The handbook is at <https://au-connect-lab.github.io/labcatalog/>, built from [docs/](docs/). To build it locally:
 
 ```bash
-pip install "labcatalog[docs] @ git+https://github.com/AU-CONNECT-Lab/labcatalog"
+git clone https://github.com/AU-CONNECT-Lab/labcatalog
+cd labcatalog
+pip install -e ".[docs]"
 cd docs
 jupyter-book start
 ```
