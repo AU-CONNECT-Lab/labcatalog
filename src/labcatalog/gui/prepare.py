@@ -148,7 +148,7 @@ def step_row(
 ) -> None:
     step = state.step
     last = view.session.runs.get(step.name)
-    with ui.card().props("flat bordered").classes("w-full gap-1 mt-3"):
+    with ui.column().classes("lc-group w-full gap-1"):
         with ui.row().classes("w-full items-center gap-3"):
             ui.label(step.name).classes("text-base font-medium")
             ui.badge(state.status, color=STATUS_COLORS[state.status]).props("outline")

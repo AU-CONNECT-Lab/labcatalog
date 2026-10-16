@@ -46,8 +46,8 @@ def studies(
         names = [d.name for d in config.datasets if d.study == study and d.name in summaries]
         if not names:
             continue
-        with ui.card().props("flat bordered").classes("w-full mb-4 gap-1"):
-            ui.label(study_config.label or study).classes("text-xl font-medium")
+        with ui.column().classes("lc-group w-full gap-1"):
+            ui.label(study_config.label or study).classes("lc-group-title")
             if study_config.description:
                 ui.label(study_config.description)
             if study_config.reference:

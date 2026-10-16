@@ -51,16 +51,16 @@ from labcatalog.version import __version__
 
 WINDOW_SIZE = (1280, 820)
 PAGES = (
-    ("overview", "Overview", "dashboard"),
-    ("instruments", "Instruments", "list_alt"),
-    ("datasets", "Datasets", "table_chart"),
-    ("analysis", "Analysis", "query_stats"),
-    ("methods", "Methods", "description"),
-    ("prepare", "Prepare", "play_circle"),
-    ("import", "Import", "upload_file"),
-    ("edit", "Edit", "edit_note"),
-    ("problems", "Problems", "report_problem"),
-    ("settings", "Settings", "settings"),
+    ("overview", "Overview"),
+    ("instruments", "Instruments"),
+    ("datasets", "Datasets"),
+    ("analysis", "Analysis"),
+    ("methods", "Methods"),
+    ("prepare", "Prepare"),
+    ("import", "Import"),
+    ("edit", "Edit"),
+    ("problems", "Problems"),
+    ("settings", "Settings"),
 )
 
 
@@ -115,68 +115,61 @@ class Window:
         self.home: Path | None = None
 
     def build(self) -> None:
-        with ui.header().classes("lc-header items-center gap-4 px-5 py-3"):
-            self.title = ui.label("No project open").classes("lc-project")
-            with self.title:
-                self.path_tip = ui.tooltip("")
-            self.as_of = ui.label().classes("lc-as-of")
-            with ui.row().classes("items-center gap-2") as self.frozen_bar:
-                self.frozen_label = ui.label().classes("lc-as-of")
-                ui.button("Back to the project", on_click=self.leave_freeze).props(
-                    "flat no-caps"
-                ).classes("lc-quiet-btn")
-            self.frozen_bar.visible = False
-            ui.space()
-            self.spinner = ui.spinner(size="sm")
-            self.spinner.visible = False
-            self.refresh_button = (
-                ui.button("Refresh", icon="refresh", on_click=lambda: self.load(self.root))
-                .props("flat")
-                .classes("lc-quiet-btn")
-            )
-            self.refresh_button.disable()
-            self.open_button = ui.button(
-                "Open project", icon="folder_open", on_click=self.choose_folder
-            )
-
-        with ui.left_drawer(value=True, fixed=True).props("width=220").classes("p-0"):
-            ui.label("labcatalog").classes("lc-wordmark")
+        with ui.header().classes("lc-header block px-6 pt-3 pb-0"):
+            with ui.row().classes("w-full items-center gap-4"):
+                self.title = ui.label("No project open").classes("lc-project")
+                with self.title:
+                    self.path_tip = ui.tooltip("")
+                self.as_of = ui.label().classes("lc-as-of")
+                with ui.row().classes("items-center gap-2") as self.frozen_bar:
+                    self.frozen_label = ui.label().classes("lc-as-of")
+                    ui.button("Back to the project", on_click=self.leave_freeze).props(
+                        "flat no-caps"
+                    ).classes("lc-quiet-btn")
+                self.frozen_bar.visible = False
+                ui.space()
+                self.spinner = ui.spinner(size="sm")
+                self.spinner.visible = False
+                self.refresh_button = (
+                    ui.button("Refresh", icon="refresh", on_click=lambda: self.load(self.root))
+                    .props("flat")
+                    .classes("lc-quiet-btn")
+                )
+                self.refresh_button.disable()
+                self.open_button = ui.button(
+                    "Open project", icon="folder_open", on_click=self.choose_folder
+                )
             with (
                 ui.tabs(value="overview")
-                .props("vertical inline-label no-caps")
-                .classes("lc-nav w-full") as tabs
+                .props("dense no-caps inline-label align=left active-color=primary")
+                .classes("lc-nav mt-2") as tabs
             ):
-                nav = {
-                    name: ui.tab(name, label=label, icon=icon).props(
-                        'content-class="w-full justify-start pl-2"'
-                    )
-                    for name, label, icon in PAGES
-                }
+                nav = {name: ui.tab(name, label=label) for name, label in PAGES}
                 with nav["problems"]:
-                    self.badge = ui.badge().classes("ml-2")
+                    self.badge = ui.label().classes("lc-pill ml-2")
                     self.badge.visible = False
         self.tabs = tabs
 
         with ui.tab_panels(tabs, value="overview").classes("w-full bg-transparent"):
-            with ui.tab_panel("overview").classes("lc-board"):
+            with ui.tab_panel("overview").classes("lc-page"):
                 self.overview_panel()
-            with ui.tab_panel("instruments").classes("lc-paper"):
+            with ui.tab_panel("instruments").classes("lc-page"):
                 self.instruments_panel()
-            with ui.tab_panel("datasets").classes("lc-paper"):
+            with ui.tab_panel("datasets").classes("lc-page"):
                 self.datasets_panel()
-            with ui.tab_panel("analysis").classes("lc-paper"):
+            with ui.tab_panel("analysis").classes("lc-page"):
                 self.analysis_panel()
-            with ui.tab_panel("methods").classes("lc-paper"):
+            with ui.tab_panel("methods").classes("lc-page"):
                 self.methods_panel()
-            with ui.tab_panel("prepare").classes("lc-paper"):
+            with ui.tab_panel("prepare").classes("lc-page"):
                 self.prepare_panel()
-            with ui.tab_panel("import").classes("lc-paper"):
+            with ui.tab_panel("import").classes("lc-page"):
                 self.import_panel()
-            with ui.tab_panel("edit").classes("lc-paper"):
+            with ui.tab_panel("edit").classes("lc-page"):
                 self.edit_panel()
-            with ui.tab_panel("problems").classes("lc-paper"):
+            with ui.tab_panel("problems").classes("lc-page"):
                 self.problems_panel()
-            with ui.tab_panel("settings").classes("lc-paper"):
+            with ui.tab_panel("settings").classes("lc-page"):
                 settings.render(
                     self.set_palette,
                     self.start_cfa,
@@ -307,7 +300,7 @@ class Window:
         issues = result.report.issues if result else []
         failed = result is not None and result.report.has_errors()
         self.badge.set_text(str(len(issues)))
-        self.badge.props(f"color={'negative' if failed else 'primary'}")
+        self.badge.classes(replace=f"lc-pill ml-2 {'lc-bad' if failed else 'lc-warn'}")
         self.badge.visible = bool(issues)
         if result is not None and project is None:
             self.tabs.set_value("problems")

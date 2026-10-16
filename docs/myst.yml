@@ -46,15 +46,7 @@ project:
         - file: how-to/write-methods.md
         - file: how-to/datalad.md
         - file: how-to/r-and-models.md
-    - title: Statistics
-      children:
-        - file: statistics/index.md
-        - file: statistics/reliability.md
-        - file: statistics/factor-structure.md
-        - file: statistics/correlation-regression.md
-        - file: statistics/group-comparisons.md
-        - file: statistics/multilevel.md
-        - file: statistics/attrition.md
+    - file: statistics/index.md
     - title: Reference
       children:
         - file: reference/project-file.md

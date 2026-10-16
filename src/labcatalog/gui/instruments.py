@@ -147,6 +147,7 @@ def browser(
         shown.set_selection("multiple")
         shown.selected = [row for row in shown.rows if row["id"] in view.chosen]
         shown.on_select(lambda e: choose(e.selection))
+        shown.add_slot("body-cell-missing", MISSING_CELL)
         shown.classes("cursor-pointer")
         shown.on("rowClick", lambda e: on_open(e.args[1]["id"]))
 
@@ -353,6 +354,14 @@ def facet_panel(index: BrowseIndex, view: BrowseView, changed: Callable[[], None
                 ).props("dense")
 
 
+MISSING_CELL = r"""
+<q-td :props="props">
+  <span v-for="gap in props.value ? props.value.split(', ') : []" :key="gap"
+        class="lc-pill lc-warn q-mr-xs">{{ gap }}</span>
+</q-td>
+"""
+
+
 def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list[dict], list[dict]]:
     config = result.project.config
     hit = {name for names in found.values() for name in names}
@@ -365,8 +374,8 @@ def list_table(result: CatalogResult, found: dict[str, list[str]]) -> tuple[list
     who = {(v.instrument_id, v.dataset): (v.reporter, v.target) for v in result.catalog.variables}
     columns = [
         col("abbreviation", "Abbr."),
-        col("name", "Name"),
-        col("construct", "Construct"),
+        {**col("name", "Name"), "style": "min-width: 13rem"},
+        {**col("construct", "Construct"), "style": "min-width: 10rem"},
         col("reporters", "Reporter"),
         col("targets", "About"),
         col("items", "Items", numeric=True),

@@ -17,15 +17,14 @@ LEVEL_FILTERS = {"all": "All", "error": "Errors", "warning": "Warnings"}
 
 LEVEL_CELL = r"""
 <q-td :props="props" class="whitespace-nowrap">
-  <q-icon :name="{error: 'error', warning: 'warning', info: 'info'}[props.value]"
-          :color="{error: 'negative', warning: 'orange-8', info: 'info'}[props.value]"
-          size="xs" class="q-mr-xs" />
-  {{ props.value }}
+  <span :class="'lc-pill lc-' + {error: 'bad', warning: 'warn', info: 'info'}[props.value]">
+    {{ props.value }}
+  </span>
 </q-td>
 """
 # The click is emitted back to Python, which opens the file on the Edit page or in its own app.
 LOCATION_CELL = r"""
-<q-td :props="props">
+<q-td :props="props" class="whitespace-nowrap">
   <a v-if="props.value" class="text-primary cursor-pointer"
      :title="props.row.in_editor ? 'Open on the Edit page' : 'Open in its own app'"
      @click="$parent.$emit('open_location', props.row)">

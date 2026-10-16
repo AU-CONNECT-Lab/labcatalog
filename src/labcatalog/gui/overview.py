@@ -3,38 +3,43 @@ from collections.abc import Callable
 from nicegui import ui
 
 from labcatalog.gui import charts
+from labcatalog.gui.common import block, sorted_waves, unique
 from labcatalog.pipeline import CatalogResult
 
 
 def render(
     result: CatalogResult, on_instruments: Callable[[], None], on_problems: Callable[[], None]
 ) -> None:
+    config = result.project.config
     issues = result.report.issues
     errors = sum(i.level == "error" for i in issues)
     warnings = sum(i.level == "warning" for i in issues)
-    with ui.grid(columns=4).classes("w-full gap-4"):
-        kpi("Instruments", len(result.project.instruments), on_click=on_instruments)
-        kpi("Datasets", len(result.project.config.datasets))
-        kpi("Errors", errors, "bad" if errors else None, on_problems)
-        kpi("Warnings", warnings, "warn" if warnings else None, on_problems)
+    with block("Summary"), ui.grid(columns=2).classes("w-full gap-x-14 gap-y-0"):
+        with facts():
+            fact("Instruments", str(len(result.project.instruments)), on_click=on_instruments)
+            fact("Datasets", str(len(config.datasets)))
+            fact("Studies", ", ".join(s.label or name for name, s in config.studies.items()))
+        with facts():
+            fact("Waves", ", ".join(sorted_waves(d.wave for d in config.datasets)))
+            fact("Reporters", ", ".join(unique(d.reporter for d in config.datasets)))
+            fact("Errors", str(errors), "bad" if errors else "ok", on_problems)
+            fact("Warnings", str(warnings), "warn" if warnings else "ok", on_problems)
 
     charts.overview_section(result)
 
 
-def kpi(
+def facts() -> ui.grid:
+    return ui.grid(columns="11rem 1fr").classes("lc-facts gap-0")
+
+
+def fact(
     label: str,
-    value: int,
+    value: str,
     status: str | None = None,
     on_click: Callable[[], None] | None = None,
 ) -> None:
-    box = ui.card().props("flat").classes("lc-card lc-kpi")
-    if on_click is not None:
-        box.classes("cursor-pointer").on("click", on_click)
-    with box:
-        with ui.row().classes("items-center gap-2"):
-            if status is not None:
-                ui.element("span").classes(f"lc-dot lc-dot-{status}")
-            ui.label(label).classes("lc-kpi-label")
+    ui.label(label).classes("lc-fact-key")
+    with ui.element("div"):
+        shown = ui.label(value).classes(f"lc-pill lc-{status}" if status else "inline")
         if on_click is not None:
-            ui.icon("north_east").classes("lc-kpi-arrow")
-        ui.label(str(value)).classes("lc-kpi-value")
+            shown.classes("lc-link").on("click", on_click)

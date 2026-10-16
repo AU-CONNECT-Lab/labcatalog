@@ -54,7 +54,7 @@ def copy_button(label: str, what: str, kinds: dict[str, str]) -> None:
         f"() => navigator.clipboard.write([new ClipboardItem({{{blobs}}})])"
         ".then(() => emit('copied'), (error) => emit(String(error)))"
     )
-    ui.button(label, icon="content_copy").props("flat dense no-caps").on(
+    ui.button(label, icon="content_copy").props("flat dense no-caps").classes("lc-quiet-btn").on(
         "click", lambda event: copied(event, what), js_handler=copy
     )
 
