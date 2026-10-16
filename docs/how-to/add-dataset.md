@@ -4,7 +4,7 @@ Every new data file is a new dataset: a new wave of a study you already have, a 
 
 ## Add a wave
 
-Add the wave to its study in `labcatalog.yaml`:
+Add the wave on the [Studies](../app/studies.md) page with **Add wave**, or to its study in `labcatalog.yaml`:
 
 ```yaml
 studies:
@@ -14,9 +14,14 @@ studies:
       2: {start: 2026-01-15}
 ```
 
-## Repeat a dataset from the window
+## Add a dataset from the window
 
-For a file that repeats one you already have, such as the same questionnaire in the next wave, press **Add a dataset** on the Datasets page. The window copies the file in, runs its cleaning step, matches its columns to the catalogued items, and shows the changes to `labcatalog.yaml`, the column map and the study file before writing them. A new wave is added to the study without dates, to fill in afterwards. See [Datasets](../app/datasets.md#add-a-dataset). For a new reporter or modality, a folder dataset, or a dataset made by a more involved prepare step, follow the steps below.
+Press **Add a dataset** on the Datasets page, or on a study's Datasets tab on the Studies page. The window copies the file in, matches its columns to the catalogued items, and shows the changes to `labcatalog.yaml`, the column map and the study file before writing them. A new wave is added to the study without dates, to fill in afterwards on the Studies page. It starts in one of two ways:
+
+- **Repeat a dataset**: for a file like one you already have, such as the same questionnaire in the next wave. The new dataset takes that one's study, modality, reporter and columns, and its cleaning step runs on the new file.
+- **A new kind of file**: for the first dataset of a study, or a new reporter or modality. You choose the study, wave, modality and reporter, and after the file, its ID and date columns. The file is copied into `data/` as it is.
+
+See [Datasets](../app/datasets.md#add-a-dataset). For a folder dataset, a file that needs a cleaning step of its own, or a dataset made by a more involved prepare step, follow the steps below.
 
 ## Add a CSV dataset
 
