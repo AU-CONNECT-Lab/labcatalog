@@ -83,6 +83,14 @@ class WaveRetention(BaseModel):
     n_new: int | None = None
 
 
+class ModalityCount(BaseModel):
+    study: str
+    reporter: str
+    wave: str
+    modality: str
+    n: int
+
+
 class WaveGroups(BaseModel):
     study: str
     wave: str
@@ -126,6 +134,7 @@ class Summary(BaseModel):
     scores: list[ScoreSummary]
     datasets: list[DatasetSummary]
     retention: list[WaveRetention]
+    modalities: list[ModalityCount] = []
     group_name: str | None = None
     groups: list[WaveGroups] = []
     correlations: list[Correlation]
@@ -155,6 +164,7 @@ def summarize(
             summarize_dataset(loaded, catalog, variables, config) for loaded in datasets.values()
         ],
         retention=retention(datasets),
+        modalities=modality_counts(datasets),
         group_name=config.ids.group.name if config.ids.group else None,
         groups=wave_groups(datasets),
         correlations=correlations(catalog, datasets, scores, config.stats.correlate_by),
@@ -404,6 +414,19 @@ def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
             )
             previous = ids
     return rows
+
+
+def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
+    # Counted the way retention counts a wave, within each modality's files.
+    found: dict[tuple[str, str, str, str], set] = {}
+    for loaded in datasets.values():
+        c = loaded.config
+        key = (c.study, c.reporter, c.wave, c.modality)
+        found.setdefault(key, set()).update(loaded.frame[loaded.id_column])
+    return [
+        ModalityCount(study=study, reporter=reporter, wave=wave, modality=modality, n=len(ids))
+        for (study, reporter, wave, modality), ids in found.items()
+    ]
 
 
 def wave_groups(datasets: dict[str, LoadedDataset]) -> list[WaveGroups]:

@@ -86,15 +86,46 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
     )
     if group:
         counted += f"; {group} groups with data from any reporter, and with every reporter"
-    shown = PaperTable("Participants by Wave", *retention_table(result, study), f"{counted}.")
-    paper_table(shown)
-    save_button(result, f"participants_{study}", {"participants": shown})
+    shown = {
+        "participants": PaperTable(
+            "Participants by Wave", *retention_table(result, study), f"{counted}."
+        )
+    }
+    if participants.modality_rows(result.summary, study):
+        shown["modalities"] = PaperTable(
+            "Participants by Modality",
+            *modality_table(result, study),
+            "n is the number of people in each modality's files at each wave, with their "
+            "share of that wave's n for the same reporter.",
+        )
+    for table in shown.values():
+        paper_table(table)
+    save_button(result, f"participants_{study}", shown)
     datasets = [
         d.name for d in result.project.config.datasets if (d.study, d.wave) == (study, view.wave)
     ]
     sample = analysis.build_sample(result, datasets, intersect=False)
     sample_note(result, sample, "with data in this wave")
     analysis_tables.table_one_section(result, sample, view)
+
+
+def modality_table(result: CatalogResult, study: str) -> tuple[list[dict], list[dict]]:
+    found = participants.modality_rows(result.summary, study)
+    totals = participants.wave_totals(result.summary, study)
+    several = len({reporter for _, reporter, _ in found}) > 1
+    waves = sorted_waves(m.wave for _, _, counted in found for m in counted)
+    columns = [col("modality", "Modality")]
+    if several:
+        columns.append(col("reporter", "Reporter"))
+    columns += [col(f"w{i}", f"Wave {w}", numeric=True) for i, w in enumerate(waves)]
+    rows = []
+    for modality, reporter, counted in found:
+        row = {"modality": modality, "reporter": reporter}
+        for m in counted:
+            total = totals[(m.wave, reporter)]
+            row[f"w{waves.index(m.wave)}"] = f"{m.n}{participants.share(m.n, total)}"
+        rows.append(row)
+    return columns, rows
 
 
 def retention_table(result: CatalogResult, study: str) -> tuple[list[dict], list[dict]]:

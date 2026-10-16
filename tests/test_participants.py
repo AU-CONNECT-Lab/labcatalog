@@ -16,7 +16,27 @@ def test_default_paragraph_gives_waves_counts_and_retention(mock_project):
     assert "Wave 3 (since 2026-03-01)." in text
     assert "At Wave 1, 191 parent and 182 child respondents from 191 family groups" in text
     assert "At Wave 2, 155 of 191 parent respondents (81%) and 143 of 182 child" in text
-    assert text.endswith("12 parent and 15 child respondents were new.")
+    assert "12 parent and 15 child respondents were new. Data from eeg" in text
+    assert "Data from questionnaire" not in text
+    assert text.endswith(
+        "Data from saliva were available for 131 of 182 child respondents at Wave 1 (72%) and "
+        "101 of 148 at Wave 3 (68%)."
+    )
+
+
+def test_modality_table_counts_each_modality_against_its_wave(mock_project):
+    result = run_catalog(mock_project)
+    columns, rows = methods.modality_table(result, "mock_study")
+    assert [c["label"] for c in columns] == ["Modality", "Reporter", "Wave 1", "Wave 2", "Wave 3"]
+    eeg = next(r for r in rows if r["modality"] == "eeg")
+    assert (eeg["w0"], eeg["w2"]) == ("141 (77%)", "125 (84%)") and "w1" not in eeg
+    assert rows[0] == {
+        "modality": "questionnaire",
+        "reporter": "parent",
+        "w0": "191 (100%)",
+        "w1": "170 (100%)",
+        "w2": "159 (100%)",
+    }
 
 
 def test_study_template_wins_over_the_project_one(mock_project):

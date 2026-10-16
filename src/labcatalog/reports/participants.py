@@ -1,10 +1,10 @@
 from labcatalog.config import WaveConfig
 from labcatalog.project import Project
 from labcatalog.reports.measures import number, series
-from labcatalog.stats.summary import Summary, WaveRetention, wave_order
+from labcatalog.stats.summary import ModalityCount, Summary, WaveRetention, wave_order
 
-DEFAULT_TEMPLATE = "{waves} {counts} {retention}"
-PLACEHOLDERS = ("study", "n_waves", "waves", "counts", "retention")
+DEFAULT_TEMPLATE = "{waves} {counts} {retention} {modalities}"
+PLACEHOLDERS = ("study", "n_waves", "waves", "counts", "retention", "modalities")
 
 
 def template_for(project: Project, study: str) -> str:
@@ -41,7 +41,48 @@ def placeholder_values(project: Project, summary: Summary, study: str) -> dict[s
         "retention": " ".join(
             returned(waves[i - 1], wave, rows) for i, wave in enumerate(waves) if i
         ),
+        "modalities": modalities(summary, study),
     }
+
+
+def modality_rows(summary: Summary, study: str) -> list[tuple[str, str, list[ModalityCount]]]:
+    # Each modality and reporter of a study with its waves in order; none when it has one modality.
+    found = [m for m in summary.modalities if m.study == study]
+    if len({m.modality for m in found}) < 2:
+        return []
+    return [
+        (
+            modality,
+            reporter,
+            sorted(
+                (m for m in found if (m.modality, m.reporter) == (modality, reporter)),
+                key=lambda m: wave_order(m.wave),
+            ),
+        )
+        for modality, reporter in dict.fromkeys((m.modality, m.reporter) for m in found)
+    ]
+
+
+def wave_totals(summary: Summary, study: str) -> dict[tuple[str, str], int]:
+    return {(r.wave, r.reporter): r.n for r in summary.retention if r.study == study}
+
+
+def modalities(summary: Summary, study: str) -> str:
+    totals = wave_totals(summary, study)
+    sentences = []
+    for modality, reporter, counted in modality_rows(summary, study):
+        # A modality everyone has at every wave adds nothing to the counts.
+        if all(m.n == totals[(m.wave, reporter)] for m in counted):
+            continue
+        parts = []
+        for i, m in enumerate(counted):
+            total = totals[(m.wave, reporter)]
+            who = f" {reporter} respondents" if i == 0 else ""
+            parts.append(
+                f"{number(m.n)} of {number(total)}{who} at Wave {m.wave}{share(m.n, total)}"
+            )
+        sentences.append(f"Data from {modality} were available for {series(parts)}.")
+    return " ".join(sentences)
 
 
 def counts(wave: str, rows: list[WaveRetention], groups, group_name: str | None) -> str:
@@ -69,6 +110,11 @@ def returned(previous: str, wave: str, rows: list[WaveRetention]) -> str:
         f"At Wave {wave}, {series(again)} from Wave {previous} took part again; "
         f"{series(new)} respondents were new."
     )
+
+
+def share(n: int, total: int) -> str:
+    # A wave whose files are still empty has no share to give.
+    return f" ({round(100 * n / total)}%)" if total else ""
 
 
 def wave_dates(wave: WaveConfig) -> str:
