@@ -236,7 +236,7 @@ def detail(
             label = ui.input("Label", value=found.label or "", on_change=touched).classes("w-full")
             description = (
                 ui.textarea("Description", value=found.description or "", on_change=touched)
-                .props("autogrow")
+                .classes("lc-grow")
                 .classes("w-full")
             )
             keys = sorted({*project.bibliography, *([found.reference] if found.reference else [])})
@@ -339,7 +339,7 @@ def text_panels(
                     value=written.get(modality, "").strip(),
                     on_change=touched,
                 )
-                .props("autogrow")
+                .classes("lc-grow")
                 .classes("w-full")
             )
         note("Leave a blank line between paragraphs.")
@@ -353,7 +353,7 @@ def text_panels(
         own = (content.participants or "").strip() if content else ""
         template = (
             ui.textarea("Template", value=own, on_change=touched)
-            .props("autogrow")
+            .classes("lc-grow")
             .classes("w-full")
         )
         names = ", ".join(f"{{{p}}}" for p in participants.PLACEHOLDERS)
