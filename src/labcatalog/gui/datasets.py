@@ -94,7 +94,7 @@ def dataset_table(
                 "name": summary.dataset,
                 "wave": dataset.wave,
                 "reporter": dataset.reporter,
-                "modality": dataset.modality,
+                "modality": config.vocab.modality_label(dataset.modality),
                 "n_rows": summary.n_rows,
                 "n_ids": summary.n_ids,
                 "collected": f"{summary.first_date} to {summary.last_date}"
@@ -167,7 +167,7 @@ def facts(result: CatalogResult, summary: DatasetSummary) -> None:
         ("Study", config.studies[dataset.study].label or dataset.study),
         ("Wave", dataset.wave),
         ("Reporter", dataset.reporter),
-        ("Modality", dataset.modality),
+        ("Modality", config.vocab.modality_label(dataset.modality)),
         ("Rows", summary.n_rows),
         ("IDs", summary.n_ids),
     ]

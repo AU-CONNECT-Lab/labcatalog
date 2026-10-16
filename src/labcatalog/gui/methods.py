@@ -118,9 +118,10 @@ def modality_table(result: CatalogResult, study: str) -> tuple[list[dict], list[
     if several:
         columns.append(col("reporter", "Reporter"))
     columns += [col(f"w{i}", f"Wave {w}", numeric=True) for i, w in enumerate(waves)]
+    vocab = result.project.config.vocab
     rows = []
     for modality, reporter, counted in found:
-        row = {"modality": modality, "reporter": reporter}
+        row = {"modality": vocab.modality_label(modality), "reporter": reporter}
         for m in counted:
             total = totals[(m.wave, reporter)]
             row[f"w{waves.index(m.wave)}"] = f"{m.n}{participants.share(m.n, total)}"
@@ -176,8 +177,9 @@ def procedure(result: CatalogResult, study: str) -> None:
         note(
             "Write how each modality's data were collected under methods: in the study's file in studies/."
         )
+    labels = result.project.config.vocab.modality_labels
     for modality, text in found.items():
-        heading(modality.capitalize())
+        heading(labels.get(modality, modality.capitalize()))
         paragraphs(text)
         copy_text(" ".join(text.split()))
 

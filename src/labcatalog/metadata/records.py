@@ -1,6 +1,7 @@
 import io
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
@@ -10,11 +11,22 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.scalarstring import SingleQuotedScalarString
 
 from labcatalog import defaults
+from labcatalog.config import CustomFieldDef
 from labcatalog.exceptions import EditError
 
-Kind = Literal["text", "bool", "number", "list", "choice", "value"]
+Kind = Literal["text", "bool", "number", "list", "choice", "value", "date"]
 # Where each list's rows came from in the file; new rows have none.
 ORIGIN = "_row"
+# Joins the keys of a value nested in each entry, as custom:topics for custom: {topics: ...}.
+NESTED = ":"
+CUSTOM = "custom"
+FIELD_KINDS: dict[str, Kind] = {
+    "text": "text",
+    "number": "number",
+    "date": "date",
+    "choice": "choice",
+    "tags": "list",
+}
 
 
 @dataclass(frozen=True)
@@ -33,6 +45,8 @@ class Table:
     columns: tuple[Column, ...]
     # Set when rows come from a list inside each entry; the first column is then the entry's key.
     inner: str | None = None
+    # One row for the whole file rather than one per entry of a list.
+    single: bool = False
 
 
 ITEMS = Table(
@@ -99,13 +113,39 @@ TABLES = {
 }
 
 
-def tables_for(relative: str) -> dict[str, Table]:
+# The custom fields that apply to each table's rows.
+OWNERS = {"scores": "score", "administrations": "administration", "datasets": "dataset"}
+
+
+def tables_for(relative: str, fields: Iterable[CustomFieldDef] = ()) -> dict[str, Table]:
     path = PurePosixPath(relative)
     if path.suffix not in defaults.YAML_SUFFIXES:
         return {}
-    if path.name == defaults.CONFIG_FILENAME:
-        return TABLES[""]
-    return TABLES.get(path.parent.name, {})
+    base = TABLES[""] if path.name == defaults.CONFIG_FILENAME else TABLES.get(path.parent.name, {})
+    columns = {owner: [] for owner in [*OWNERS.values(), "instrument"]}
+    for field in fields:
+        columns[field.applies_to].append(custom_column(field))
+    tables = {
+        key: replace(table, columns=table.columns + tuple(columns[OWNERS[key]]))
+        if key in OWNERS
+        else table
+        for key, table in base.items()
+    }
+    if base is INSTRUMENT_TABLES and columns["instrument"]:
+        tables[CUSTOM] = Table("Custom fields", tuple(columns["instrument"]), single=True)
+    return tables
+
+
+def custom_column(field: CustomFieldDef) -> Column:
+    kind = FIELD_KINDS[field.type]
+    choices = tuple(field.choices or ())
+    # An empty choice clears the field.
+    return Column(
+        f"{CUSTOM}{NESTED}{field.name}",
+        field.label or field.name,
+        kind,
+        ("", *choices) if kind == "choice" else choices,
+    )
 
 
 def round_trip() -> YAML:
@@ -122,6 +162,8 @@ def read_rows(text: str, key: str, table: Table) -> list[dict[str, Any]]:
         data = round_trip().load(text) or {}
     except YAMLError as err:
         raise EditError(f"The file is not valid YAML; fix it as text first. {err}") from None
+    if table.single:
+        return [{ORIGIN: 0} | cells(data, table.columns, key)]
     entries = data.get(key) or []
     if table.inner is None:
         return [{ORIGIN: n} | cells(entry, table.columns, key) for n, entry in enumerate(entries)]
@@ -139,7 +181,7 @@ def read_rows(text: str, key: str, table: Table) -> list[dict[str, Any]]:
 def cells(entry: CommentedMap, columns: Iterable[Column], key: str) -> dict[str, Any]:
     row = {}
     for column in columns:
-        value = entry.get(column.key)
+        value = lookup(entry, column)
         if isinstance(value, dict):
             raise EditError(f"{key} has {column.key} written per language; edit this file as text")
         row[column.key] = shown(value, column)
@@ -149,7 +191,9 @@ def cells(entry: CommentedMap, columns: Iterable[Column], key: str) -> dict[str,
 def write_rows(text: str, key: str, table: Table, rows: list[dict]) -> str:
     loader = round_trip()
     data = loader.load(text) or CommentedMap()
-    if table.inner is None:
+    if table.single:
+        fill(data, table.columns, rows[0])
+    elif table.inner is None:
         origins = [row.get(ORIGIN) for row in rows]
         for row, entry in zip(rows, place(data, key, origins), strict=True):
             fill(entry, table.columns, row)
@@ -215,17 +259,35 @@ def fill(entry: CommentedMap, columns: Iterable[Column], row: dict) -> None:
         update(entry, column, row.get(column.key))
 
 
+def lookup(entry: CommentedMap, column: Column) -> Any:
+    *outer, name = column.key.split(NESTED)
+    for part in outer:
+        entry = entry.get(part) or {}
+    return entry.get(name)
+
+
 def update(entry: CommentedMap, column: Column, cell: Any) -> None:
     # Unchanged cells leave the file alone, so 1 stays 1 rather than becoming '1'.
-    if shown(entry.get(column.key), column) == shown(stored(cell, column), column):
+    if shown(lookup(entry, column), column) == shown(stored(cell, column), column):
         return
     value = stored(cell, column)
+    *outer, name = column.key.split(NESTED)
+    parents = [entry]
+    for part in outer:
+        if not isinstance(parents[-1].get(part), dict):
+            parents[-1][part] = CommentedMap()
+        parents.append(parents[-1][part])
+    holder = parents[-1]
     if value is None or value == column.default:
-        entry.pop(column.key, None)
+        holder.pop(name, None)
+        # A nested map left empty goes too, so no custom: {} stays behind.
+        for parent, part in reversed(list(zip(parents, outer, strict=True))):
+            if not parent[part]:
+                del parent[part]
     elif isinstance(value, list):
-        entry[column.key] = [as_text(v) for v in value]
+        holder[name] = [as_text(v) for v in value]
     else:
-        entry[column.key] = as_text(value)
+        holder[name] = as_text(value)
 
 
 def as_text(value: Any) -> Any:
@@ -244,7 +306,7 @@ def shown(value: Any, column: Column) -> Any:
         return bool(value) if value is not None else bool(column.default)
     if column.kind == "list":
         return ", ".join(str(v) for v in value or [])
-    if column.kind == "value":
+    if column.kind in ("value", "date"):
         return "" if value is None else str(value)
     if value is None:
         return "" if column.default is None else column.default
@@ -256,9 +318,18 @@ def stored(cell: Any, column: Column) -> Any:
         return bool(cell)
     text = "" if cell is None else str(cell).strip()
     if column.kind == "list":
-        return [part.strip() for part in text.split(",") if part.strip()] or None
+        parts = [part.strip() for part in text.split(",") if part.strip()]
+        undeclared = [part for part in parts if column.choices and part not in column.choices]
+        if undeclared:
+            raise EditError(f"{column.label}: {', '.join(undeclared)} not declared in custom_fields")
+        return parts or None
     if not text:
         return None
+    if column.kind == "date":
+        try:
+            return date.fromisoformat(text)
+        except ValueError:
+            raise EditError(f"{column.label}: '{text}' is not a date such as 2026-01-31") from None
     if column.kind == "number":
         try:
             number = float(text)

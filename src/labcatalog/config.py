@@ -13,8 +13,13 @@ class ProjectInfo(StrictModel):
 
 class Vocab(StrictModel):
     modalities: list[str] = list(defaults.DEFAULT_MODALITIES)
+    # How a modality reads in tables and prose; the plain word when not given.
+    modality_labels: dict[str, str] = {}
     reporters: list[str] = []
     targets: list[str] = []
+
+    def modality_label(self, modality: str) -> str:
+        return self.modality_labels.get(modality, modality)
 
 
 class MissingCode(StrictModel):

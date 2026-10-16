@@ -8,6 +8,8 @@ project:
 # Allowed words for each dataset's modality and reporter, and for each administration's target.
 vocab:
   modalities: [questionnaire]
+  # Optional: how a modality reads in tables and in the Methods text, for example {eeg: EEG}.
+  modality_labels: {}
   reporters: []
   targets: []
 

@@ -8,6 +8,8 @@ project:
 # Allowed words for each dataset's modality and reporter, and for each administration's target.
 vocab:
   modalities: [questionnaire, eeg, fmri, fnirs, eyetracking, video, ecg, saliva]
+  # How each modality reads in tables and in the Methods text; the plain word when left out.
+  modality_labels: {questionnaire: questionnaires, eeg: EEG, fmri: fMRI, fnirs: fNIRS, eyetracking: eye tracking, video: video coding, ecg: ECG, saliva: salivary cortisol}
   reporters: [parent, child]
   targets: [self, child]
 

@@ -31,7 +31,11 @@ def validate_project(project: Project) -> list[Issue]:
 def check_vocab(project: Project) -> list[Issue]:
     config = project.config
     vocab = config.vocab
-    issues = []
+    issues = [
+        not_in_vocab(f"vocab.modality_labels.{modality}", modality, "vocab.modalities")
+        for modality in vocab.modality_labels
+        if modality not in vocab.modalities
+    ]
     for n, dataset in enumerate(config.datasets, start=1):
         where = f"datasets[{n}] ({dataset.name})"
         if dataset.modality not in vocab.modalities:

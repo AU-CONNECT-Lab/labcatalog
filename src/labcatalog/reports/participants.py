@@ -1,4 +1,4 @@
-from labcatalog.config import WaveConfig
+from labcatalog.config import Vocab, WaveConfig
 from labcatalog.project import Project
 from labcatalog.reports.measures import number, series
 from labcatalog.stats.summary import ModalityCount, Summary, WaveRetention, wave_order
@@ -41,7 +41,7 @@ def placeholder_values(project: Project, summary: Summary, study: str) -> dict[s
         "retention": " ".join(
             returned(waves[i - 1], wave, rows) for i, wave in enumerate(waves) if i
         ),
-        "modalities": modalities(summary, study),
+        "modalities": modalities(summary, study, project.config.vocab),
     }
 
 
@@ -67,7 +67,7 @@ def wave_totals(summary: Summary, study: str) -> dict[tuple[str, str], int]:
     return {(r.wave, r.reporter): r.n for r in summary.retention if r.study == study}
 
 
-def modalities(summary: Summary, study: str) -> str:
+def modalities(summary: Summary, study: str, vocab: Vocab) -> str:
     totals = wave_totals(summary, study)
     sentences = []
     for modality, reporter, counted in modality_rows(summary, study):
@@ -81,7 +81,8 @@ def modalities(summary: Summary, study: str) -> str:
             parts.append(
                 f"{number(m.n)} of {number(total)}{who} at Wave {m.wave}{share(m.n, total)}"
             )
-        sentences.append(f"Data from {modality} were available for {series(parts)}.")
+        label = vocab.modality_label(modality)
+        sentences.append(f"Data from {label} were available for {series(parts)}.")
     return " ".join(sentences)
 
 

@@ -16,11 +16,11 @@ def test_default_paragraph_gives_waves_counts_and_retention(mock_project):
     assert "Wave 3 (since 2026-03-01)." in text
     assert "At Wave 1, 191 parent and 182 child respondents from 191 family groups" in text
     assert "At Wave 2, 155 of 191 parent respondents (81%) and 143 of 182 child" in text
-    assert "12 parent and 15 child respondents were new. Data from eeg" in text
-    assert "Data from questionnaire" not in text
+    assert "12 parent and 15 child respondents were new. Data from EEG" in text
+    assert "Data from questionnaires" not in text
     assert text.endswith(
-        "Data from saliva were available for 131 of 182 child respondents at Wave 1 (72%) and "
-        "101 of 148 at Wave 3 (68%)."
+        "Data from salivary cortisol were available for 131 of 182 child respondents at Wave 1 "
+        "(72%) and 101 of 148 at Wave 3 (68%)."
     )
 
 
@@ -28,15 +28,26 @@ def test_modality_table_counts_each_modality_against_its_wave(mock_project):
     result = run_catalog(mock_project)
     columns, rows = methods.modality_table(result, "mock_study")
     assert [c["label"] for c in columns] == ["Modality", "Reporter", "Wave 1", "Wave 2", "Wave 3"]
-    eeg = next(r for r in rows if r["modality"] == "eeg")
+    eeg = next(r for r in rows if r["modality"] == "EEG")
     assert (eeg["w0"], eeg["w2"]) == ("141 (77%)", "125 (84%)") and "w1" not in eeg
     assert rows[0] == {
-        "modality": "questionnaire",
+        "modality": "questionnaires",
         "reporter": "parent",
         "w0": "191 (100%)",
         "w1": "170 (100%)",
         "w2": "159 (100%)",
     }
+
+
+def test_a_modality_label_must_name_a_modality(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    data = yaml.safe_load(config.read_text(encoding="utf-8"))
+    data["vocab"]["modality_labels"]["meg"] = "MEG"
+    config.write_text(yaml.safe_dump(data), encoding="utf-8")
+    issues = validate_project(load_project(mock_project))
+    assert [i.message for i in issues if i.code == "not_in_vocab"] == [
+        "vocab.modality_labels.meg: 'meg' is not in vocab.modalities"
+    ]
 
 
 def test_study_template_wins_over_the_project_one(mock_project):
