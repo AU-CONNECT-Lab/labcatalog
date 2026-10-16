@@ -37,10 +37,24 @@ TEST_COLUMNS = ["variable", "test", "statistic", "df", "p", "effect", "small"]
 
 ABOUT = """\
 # Attrition: the {unit} at Wave {first} who took part again at Wave {second} against those who
-# did not, on their Wave {first} values. Numbers and scores: n, M and SD, Welch's t test and
-# Cohen's d with the mean of the two group variances. Answer options: n (%) and Pearson's
-# chi-squared test without continuity correction, as JASP's contingency tables give it.
+# did not, on their Wave {first} values. Numbers and scores: n, M and SD, {t_test}.
+# Answer options: n (%) and Pearson's chi-squared test without continuity correction, as
+# JASP's contingency tables give it.
 """
+T_TESTS = {
+    "welch": "Welch's t test and Cohen's d with the mean of the two group variances",
+    "student": "Student's t test and Cohen's d with the pooled SD",
+}
+# R's t.test and effectsize, then pingouin's ttest and d, for each test.
+T_CODE = {
+    "welch": (
+        "FALSE",
+        "FALSE",
+        "True",
+        "(stay.mean() - left.mean()) / np.sqrt((stay.var() + left.var()) / 2)",
+    ),
+    "student": ("TRUE", "TRUE", "False", 'pg.compute_effsize(stay, left, eftype="cohen")'),
+}
 R_ATTRITION = """\
 returned <- factor(d[[{returned}]], levels = c(1, 0), labels = c({stayed}, {left}))
 groups <- NULL
@@ -57,8 +71,8 @@ number_rows <- function(variable, x, test) {{
     returned_sd = sd(stay), left_n = length(left), left_mean = mean(left), left_sd = sd(left),
     returned_percent = NA, left_percent = NA))
   if (test) {{
-    t_test <- t.test(y ~ g)
-    effect <- effectsize::cohens_d(y ~ g, pooled_sd = FALSE)
+    t_test <- t.test(y ~ g, var.equal = {var_equal})
+    effect <- effectsize::cohens_d(y ~ g, pooled_sd = {pooled})
     tests <<- rbind(tests, data.frame(
       variable = variable, test = "t", statistic = unname(t_test$statistic),
       df = unname(t_test$parameter), p = t_test$p.value, effect = effect$Cohens_d, small = FALSE))
@@ -98,8 +112,8 @@ def number_rows(variable, x, test):
                        returned_mean=stay.mean(), returned_sd=stay.std(), left_n=len(left),
                        left_mean=left.mean(), left_sd=left.std()))
     if test:
-        t_test = pg.ttest(stay, left, correction=True)
-        effect = (stay.mean() - left.mean()) / np.sqrt((stay.var() + left.var()) / 2)
+        t_test = pg.ttest(stay, left, correction={correction})
+        effect = {effect}
         tests.append(dict(variable=variable, test="t", statistic=t_test["T"].iloc[0],
                           df=t_test["dof"].iloc[0], p=t_test["p_val"].iloc[0], effect=effect,
                           small=False))
@@ -213,17 +227,21 @@ def plan(result: CatalogResult, study: str, wave: str, keys: list[str]) -> Plan 
         return None
     lines = [call(frame, label, v) for label, v in variables]
     fields = dict(returned=r_string(RETURNED), stayed=r_string(STAYED), left=r_string(LEFT))
-    about = ABOUT.format(unit=unit(result), first=wave, second=second)
+    t_test = result.project.config.stats.t_test
+    var_equal, pooled, correction, effect = T_CODE[t_test]
+    about = ABOUT.format(unit=unit(result), first=wave, second=second, t_test=T_TESTS[t_test])
     r_rows = "\n".join(r for r, _ in lines)
     python_rows = "\n".join(p for _, p in lines)
     code = Code(
         title="Attrition",
-        r=about + R_ATTRITION.format(rows=r_rows, **fields),
+        r=about + R_ATTRITION.format(rows=r_rows, var_equal=var_equal, pooled=pooled, **fields),
         python=about
         + PYTHON_ATTRITION.format(
             rows=python_rows,
             group_columns=GROUP_COLUMNS,
             test_columns=TEST_COLUMNS,
+            correction=correction,
+            effect=effect,
             **fields,
         ),
         outputs=("groups", "tests"),

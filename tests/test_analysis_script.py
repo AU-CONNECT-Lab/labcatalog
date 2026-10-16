@@ -6,6 +6,7 @@ from glob import glob
 import numpy as np
 import pandas as pd
 import pytest
+from scipy import stats
 
 from labcatalog.charts import views
 from labcatalog.gui import analysis_tables
@@ -51,13 +52,13 @@ def table_one(result, sample, rscript_path=None):
     return frame, script.run_code(result, sample, frame, code, rscript_path)
 
 
-def comparison(result, sample, two_groups, rscript_path=None):
+def comparison(result, sample, two_groups, rscript_path=None, t_test=script.WELCH):
     data = script.AnalysisData(result, sample)
     group, outcome = data.item(GENDER), data.score(EMS)
     if two_groups:
         group = replace(group, options=group.options[:2])
     frame = data.frame()
-    plan = script.comparison_plan(frame, group, outcome)
+    plan = script.comparison_plan(frame, group, outcome, t_test)
     found, engine = script.run_code(result, sample, frame, plan.code, rscript_path)
     return script.read_comparison(found, plan), engine
 
@@ -92,6 +93,33 @@ def test_two_groups_get_welch_and_more_get_anova(result, sample):
     assert anova.test == "anova" and len(anova.groups) == 3
     assert (anova.df1, anova.df2) == (2, sum(g.n for g in anova.groups) - 3)
     assert 0 <= anova.effect < 1
+
+
+def test_student_uses_equal_variances_and_the_pooled_sd(result, sample):
+    found, _ = comparison(result, sample, two_groups=True, t_test=script.STUDENT)
+    assert found.test == script.STUDENT
+    data = script.AnalysisData(result, sample)
+    group, outcome = data.item(GENDER), data.score(EMS)
+    frame = data.frame()
+    girls = frame.loc[frame[group.column] == 1, outcome.column].dropna()
+    boys = frame.loc[frame[group.column] == 2, outcome.column].dropna()
+    student = stats.ttest_ind(girls, boys, equal_var=True)
+    assert (found.statistic, found.p, found.df1) == pytest.approx(
+        (student.statistic, student.pvalue, len(girls) + len(boys) - 2)
+    )
+    pooled = np.sqrt(
+        ((len(girls) - 1) * girls.var() + (len(boys) - 1) * boys.var())
+        / (len(girls) + len(boys) - 2)
+    )
+    assert found.effect == pytest.approx((girls.mean() - boys.mean()) / pooled)
+
+
+@needs_r
+def test_student_agrees_in_r_and_python(result, sample):
+    in_python, _ = comparison(result, sample, True, t_test=script.STUDENT)
+    in_r, _ = comparison(result, sample, True, rscript(), t_test=script.STUDENT)
+    for field in ("statistic", "df1", "p", "effect"):
+        assert getattr(in_r, field) == pytest.approx(getattr(in_python, field), rel=1e-9)
 
 
 def test_small_groups_are_left_out(result, sample):

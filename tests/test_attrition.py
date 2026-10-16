@@ -101,3 +101,18 @@ def test_r_and_python_agree(result):
             assert a.test.effect == pytest.approx(b.test.effect)
         for x, y in zip(a.rows, b.rows, strict=True):
             assert (x.level, x.returned_n, x.left_n) == (y.level, y.returned_n, y.left_n)
+
+
+def test_student_follows_the_project_setting(result):
+    result.project.config.stats.t_test = "student"
+    found_plan, compared, _ = run(result, [EMS])
+    assert "Student's t test" in found_plan.code.r and "var.equal = TRUE" in found_plan.code.r
+    frame = found_plan.frame
+    ems = next(c for c in frame.columns if c.startswith("ems_total"))
+    stay = frame.loc[frame[attrition.RETURNED] == 1, ems].dropna()
+    left = frame.loc[frame[attrition.RETURNED] == 0, ems].dropna()
+    student = stats.ttest_ind(stay, left, equal_var=True)
+    [mood] = compared
+    assert (mood.test.statistic, mood.test.p) == pytest.approx((student.statistic, student.pvalue))
+    assert mood.test.df == len(stay) + len(left) - 2
+    assert page.statistic(mood.test).startswith(f"t({len(stay) + len(left) - 2}) = ")

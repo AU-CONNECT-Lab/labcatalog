@@ -98,6 +98,9 @@ class StatsConfig(StrictModel):
     correlate_by: str = defaults.CORRELATE_BY
     # Factor models: items as ordered categories (WLSMV) or as continuous (ML).
     cfa_estimator: Literal["wlsmv", "ml"] = "wlsmv"
+    # Two groups: Welch's t test with d from the mean of the two variances, or Student's with
+    # the pooled SD, as JASP gives it by default.
+    t_test: Literal["welch", "student"] = "welch"
 
 
 class PrepareStep(StrictModel):

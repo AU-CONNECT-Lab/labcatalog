@@ -15,9 +15,8 @@ from labcatalog.stats import attrition
 
 SMALL = "†"
 NOTE = (
-    "M (SD) or n (%) on everyone with a value. Welch's t test with Cohen's d using the mean of "
-    "the two group variances; Pearson's χ² without continuity correction, as in JASP. "
-    f"{SMALL}Some expected counts are below 5."
+    "M (SD) or n (%) on everyone with a value. {t_test}; Pearson's χ² without continuity "
+    f"correction, as in JASP. {SMALL}Some expected counts are below 5."
 )
 
 
@@ -56,7 +55,7 @@ def render(result: CatalogResult, view, study: str, wave: str) -> None:
             shown = PaperTable(
                 f"Wave {wave} Characteristics of Those Who Did and Did Not Return at Wave {second}",
                 *attrition_table(found_plan, compared),
-                NOTE,
+                NOTE.format(t_test=attrition.T_TESTS[result.project.config.stats.t_test]),
             )
 
             def content() -> None:
@@ -101,7 +100,9 @@ def render(result: CatalogResult, view, study: str, wave: str) -> None:
 
 def statistic(test: attrition.Test) -> str:
     if test.test == "t":
-        return f"t({test.df:.1f}) = {test.statistic:.2f}"
+        # Welch's df is fractional, Student's whole.
+        df = f"{test.df:g}" if test.df.is_integer() else f"{test.df:.1f}"
+        return f"t({df}) = {test.statistic:.2f}"
     return f"χ²({test.df:g}) = {test.statistic:.2f}" + (SMALL if test.small else "")
 
 

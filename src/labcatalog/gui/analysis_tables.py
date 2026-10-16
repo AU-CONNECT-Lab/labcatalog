@@ -14,7 +14,7 @@ from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats.analysis_script import AnalysisData, Code, Comparison
 
-TESTS = {"welch": "Welch's t test", "anova": "One-way ANOVA"}
+TESTS = {"welch": "Welch's t test", "student": "Student's t test", "anova": "One-way ANOVA"}
 # Answer options sit under their question; plain spaces would collapse in the page.
 INDENT = " " * 4
 GROUP_WIDTH = 110
@@ -208,7 +208,7 @@ def group_section(
             group = data.item(view.group)
             outcome = data.variable(view.outcome)
             frame = data.frame()
-            plan = script.comparison_plan(frame, group, outcome)
+            plan = script.comparison_plan(frame, group, outcome, result.project.config.stats.t_test)
             if plan is None:
                 return lambda: note("Fewer than two groups have two or more people with a value.")
             found, engine = await compute(result, sample, frame, plan.code)
@@ -297,32 +297,46 @@ def group_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
 
 
 def test_note(comparison: Comparison) -> str:
-    if comparison.test == "welch":
+    if comparison.test != script.ANOVA:
         first, second = comparison.groups[0], comparison.groups[1]
-        return (
+        d = (
             "d is Cohen's d with the mean of the two group variances, as JASP gives it with "
-            "Welch's test; its confidence interval is computed differently from JASP's, so it "
-            f"can differ a little. The difference is {first.label} minus {second.label}, with "
-            "its 95% confidence interval."
+            "Welch's test"
+            if comparison.test == script.WELCH
+            else "d is Cohen's d with the pooled SD, as JASP gives it with Student's test"
+        )
+        return (
+            f"{d}; its confidence interval is computed differently from JASP's, so it can "
+            f"differ a little. The difference is {first.label} minus {second.label}, with its "
+            "95% confidence interval."
         )
     omega = "" if comparison.omega is not None else " ω² is computed only in R."
     return f"η² and ω² (JASP's default) with their 95% confidence intervals.{omega}"
 
 
+def df_text(comparison: Comparison) -> str:
+    # Welch's df is fractional; Student's and the ANOVA's are whole.
+    if comparison.test == script.WELCH:
+        return f"{comparison.df1:.1f}"
+    if comparison.test == script.STUDENT:
+        return f"{comparison.df1:g}"
+    return f"{comparison.df1:g}, {comparison.df2:g}"
+
+
 def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
-    welch = comparison.test == "welch"
+    two = comparison.test != script.ANOVA
     columns = [
         col("test", "Test", sortable=False),
-        col("statistic", "t" if welch else "F", numeric=True),
+        col("statistic", "t" if two else "F", numeric=True),
         col("df", "df", numeric=True),
         col("p", "p", numeric=True),
-        col("effect", "d [95% CI]" if welch else "η² [95% CI]", numeric=True, sortable=False),
+        col("effect", "d [95% CI]" if two else "η² [95% CI]", numeric=True, sortable=False),
     ]
-    if welch:
+    if two:
         columns.append(col("ci", "Difference [95% CI]", numeric=True, sortable=False))
     else:
         columns.append(col("omega", "ω² [95% CI]", numeric=True, sortable=False))
-    shown = decimal if welch else apa
+    shown = decimal if two else apa
 
     def with_interval(value, low, high) -> str:
         if value is None:
@@ -332,13 +346,13 @@ def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
     row = {
         "test": TESTS[comparison.test],
         "statistic": decimal(comparison.statistic),
-        "df": f"{comparison.df1:.1f}" if welch else f"{comparison.df1:g}, {comparison.df2:g}",
+        "df": df_text(comparison),
         "p": p_value(comparison.p),
         "effect": with_interval(comparison.effect, comparison.effect_low, comparison.effect_high),
     }
-    if not welch:
+    if not two:
         row["omega"] = with_interval(comparison.omega, comparison.omega_low, comparison.omega_high)
-    if welch:
+    if two:
         first, second = comparison.groups[0], comparison.groups[1]
         row["ci"] = (
             f"{decimal(first.mean - second.mean)} "

@@ -28,6 +28,11 @@ from labcatalog.stats.rbridge import install_command, package_check, run_r
 
 DATA_FILE = "analysis_data.csv"
 SCORE = "score"
+WELCH = "welch"
+STUDENT = "student"
+ANOVA = "anova"
+# Welch's and Student's tests read back the same way.
+TWO = "two groups"
 MIN_GROUP = 2
 R = "R"
 PYTHON = "Python"
@@ -180,6 +185,13 @@ print(test)
 effect <- effectsize::cohens_d(y ~ group, pooled_sd = FALSE)
 print(effect)
 """
+R_STUDENT = """\
+# Student's t test (equal variances); Cohen's d with the pooled SD and its 95% CI (effectsize).
+test <- t.test(y ~ group, var.equal = TRUE)
+print(test)
+effect <- effectsize::cohens_d(y ~ group, pooled_sd = TRUE)
+print(effect)
+"""
 R_ANOVA = """\
 # One-way analysis of variance; eta squared and omega squared with their 95% CIs (effectsize).
 fit <- aov(y ~ group)
@@ -208,13 +220,23 @@ cohens_d = (first.mean() - second.mean()) / np.sqrt((first.var() + second.var())
 d_low, d_high = pg.compute_esci(cohens_d, len(first), len(second), eftype="cohen", decimals=4)
 print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
 """
+PYTHON_STUDENT = """\
+# Student's t test (equal variances) and Cohen's d with the pooled SD, with its 95% CI
+# (pingouin).
+first, second = (data.loc[data["group"] == g, "y"] for g in levels)
+test = pg.ttest(first, second, correction=False)
+print(test)
+cohens_d = pg.compute_effsize(first, second, eftype="cohen")
+d_low, d_high = pg.compute_esci(cohens_d, len(first), len(second), eftype="cohen", decimals=4)
+print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
+"""
 PYTHON_ANOVA = """\
 # One-way analysis of variance and eta squared (pingouin, which has no omega squared).
 test = pg.anova(data=data, dv="y", between="group", detailed=True, effsize="n2")
 print(test)
 """
 R_TEST_OUT = {
-    "welch": "test_result <- data.frame(statistic = unname(test$statistic), "
+    TWO: "test_result <- data.frame(statistic = unname(test$statistic), "
     "df1 = unname(test$parameter), df2 = NA, p = test$p.value, low = test$conf.int[1], "
     "high = test$conf.int[2], effect = effect$Cohens_d, effect_low = effect$CI_low, "
     "effect_high = effect$CI_high, omega = NA, omega_low = NA, omega_high = NA)",
@@ -225,7 +247,7 @@ R_TEST_OUT = {
     "omega_low = omega$CI_low, omega_high = omega$CI_high)",
 }
 PYTHON_TEST_OUT = {
-    "welch": "test_result = pd.DataFrame([dict(statistic=test['T'].iloc[0], "
+    TWO: "test_result = pd.DataFrame([dict(statistic=test['T'].iloc[0], "
     "df1=test['dof'].iloc[0], df2=np.nan, p=test['p_val'].iloc[0], "
     "low=test['CI95'].iloc[0][0], high=test['CI95'].iloc[0][1], effect=cohens_d, "
     "effect_low=d_low, effect_high=d_high, omega=np.nan, omega_low=np.nan, "
@@ -548,7 +570,7 @@ def group_sizes(
 
 
 def comparison_plan(
-    frame: pd.DataFrame, group: Variable, outcome: Variable
+    frame: pd.DataFrame, group: Variable, outcome: Variable, t_test: str = WELCH
 ) -> ComparisonPlan | None:
     sizes = group_sizes(frame, group, outcome)
     kept = [(value, text) for value, text, n in sizes if n >= MIN_GROUP]
@@ -557,7 +579,7 @@ def comparison_plan(
     left = [(text, n) for _, text, n in sizes if n < MIN_GROUP]
     shown = ", ".join(f"{text} ({n})" for text, n in left)
     left_out = f"\n# Left out, fewer than {MIN_GROUP} people: {shown}." if left else ""
-    kind = "welch" if len(kept) == 2 else "anova"
+    kind = t_test if len(kept) == 2 else ANOVA
     labels = ", ".join(r_string(text) for _, text in kept)
     fields = dict(
         group=r_string(group.column),
@@ -571,13 +593,19 @@ def comparison_plan(
     python = PYTHON_GROUPS.format(
         mapping=", ".join(f"{number(v)}: {r_string(t)}" for v, t in kept), **fields
     )
+    tests = {
+        WELCH: (R_WELCH, PYTHON_WELCH),
+        STUDENT: (R_STUDENT, PYTHON_STUDENT),
+        ANOVA: (R_ANOVA, PYTHON_ANOVA),
+    }
+    out = ANOVA if kind == ANOVA else TWO
     code = Code(
         title="Group comparison",
-        r=r + (R_WELCH if kind == "welch" else R_ANOVA),
-        python=python + (PYTHON_WELCH if kind == "welch" else PYTHON_ANOVA),
+        r=r + tests[kind][0],
+        python=python + tests[kind][1],
         outputs=("groups", "test_result"),
-        r_footer=R_TEST_OUT[kind],
-        python_footer=PYTHON_TEST_OUT[kind],
+        r_footer=R_TEST_OUT[out],
+        python_footer=PYTHON_TEST_OUT[out],
         packages=("effectsize",),
     )
     return ComparisonPlan(kind, code, left)
@@ -607,7 +635,8 @@ def page_script(
     if group is not None and outcome is not None:
         # The frame holds only the variables asked for so far, so ask first.
         grouping, measured = data.item(group), data.variable(outcome)
-        plan = comparison_plan(data.frame(), grouping, measured)
+        t_test = result.project.config.stats.t_test
+        plan = comparison_plan(data.frame(), grouping, measured, t_test)
         if plan is not None:
             codes.append(plan.code)
     if not codes:
