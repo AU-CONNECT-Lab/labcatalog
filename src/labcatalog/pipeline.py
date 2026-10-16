@@ -11,14 +11,15 @@ from labcatalog.cfa import CfaFit, build_models, fit_models
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codebook import ImportResult
 from labcatalog.codegen import label_snippets, scoring_snippets
+from labcatalog.dataladbridge import get_content
 from labcatalog.exceptions import CodebookError, MetadataError
 from labcatalog.freeze import Freeze, freeze_project
 from labcatalog.invariance import InvarianceTest
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
-from labcatalog.manifest import Manifest, build_manifest
+from labcatalog.manifest import Manifest, build_manifest, metadata_paths, used_paths
 from labcatalog.prepare import Session, StepRun, run_steps
-from labcatalog.project import Project, load_project, write_schemas
+from labcatalog.project import Project, load_config, load_project, references_root, write_schemas
 from labcatalog.resolve import Catalog, resolve_catalog
 from labcatalog.scoring import compute_scores
 from labcatalog.sources import LoadedDataset, load_datasets
@@ -144,6 +145,20 @@ def run_prepare(root: Path, echo: Callable[[str], None], datalad: str | None) ->
     project = load_project(root)
     names = [step.name for step in project.config.prepare]
     return run_steps(project, names, Session(), echo=echo, datalad=datalad)
+
+
+def run_get(paths: list[Path], datalad: str) -> None:
+    get_content(datalad, paths)
+
+
+def run_get_missing(root: Path, datalad: str) -> None:
+    root = root.resolve()
+    # The metadata first: until they are here the project cannot say which data it reads.
+    get_content(datalad, metadata_paths(root))
+    config = load_config(root)
+    # Reference PDFs come one at a time, when someone opens them.
+    pdfs = references_root(config, root) if config.references.root else None
+    get_content(datalad, [p for p in used_paths(config, root) if p != pdfs])
 
 
 def run_schema(out_dir: Path) -> list[Path]:

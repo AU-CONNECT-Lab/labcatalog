@@ -1,13 +1,15 @@
 import re
+import shutil
 
 import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.annex import fetch_advice
+from labcatalog.annex import fetch_advice, group_by_dataset
 from labcatalog.config import missing_labels_for
 from labcatalog.ids import load_exclusions
 from labcatalog.issues import Issue, IssueLevel, has_errors
+from labcatalog.manifest import used_paths
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.prepare import step_states
 from labcatalog.project import Project
@@ -43,6 +45,7 @@ def check_project(
             *check_same_answers(project, catalog, datasets),
             *check_score_agreement(project, catalog, datasets, scores),
             *check_prepare_outputs(project),
+            *check_git_annex(project),
         ]
     )
 
@@ -324,3 +327,14 @@ def check_prepare_outputs(project: Project) -> list[Issue]:
 
 def problem(code: str, message: str, where: str, level: IssueLevel = "error") -> Issue:
     return Issue(level=level, code=code, message=message, location=where)
+
+
+def check_git_annex(project: Project) -> list[Issue]:
+    if shutil.which("git-annex") or not group_by_dataset(used_paths(project.config, project.root)):
+        return []
+    message = (
+        "The project's files are in DataLad datasets, but git-annex is not on PATH, so the "
+        "manifest leaves out their versions and History cannot show uncommitted changes; "
+        "set the path to datalad on the Settings page or put git-annex on PATH"
+    )
+    return [Issue(level="warning", code="git_annex_not_found", message=message)]

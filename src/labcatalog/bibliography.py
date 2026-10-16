@@ -8,6 +8,7 @@ from bibtexparser.middlewares.names import (
 )
 from bibtexparser.model import Block, DuplicateBlockKeyBlock
 
+from labcatalog.annex import fetch_advice, is_placeholder
 from labcatalog.issues import Issue
 from labcatalog.paths import portable_path
 
@@ -15,9 +16,15 @@ Bibliography = dict[str, dict[str, str]]
 
 
 def load_bibliography(path: Path, root: Path, issues: list[Issue]) -> Bibliography:
+    location = portable_path(path, root).as_posix()
+    if is_placeholder(path):
+        message = fetch_advice(path)
+        issues.append(
+            Issue(level="error", code="not_downloaded", message=message, location=location)
+        )
+        return {}
     if not path.is_file():
         return {}
-    location = portable_path(path, root).as_posix()
     # No parse stack: @string macros and # joins are evaluated below, the way BibTeX does.
     library = bibtexparser.parse_string(path.read_text(encoding="utf-8-sig"), parse_stack=[])
     issues.extend(block_issue(block, location) for block in library.failed_blocks)

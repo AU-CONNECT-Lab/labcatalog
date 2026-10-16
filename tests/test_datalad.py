@@ -7,13 +7,15 @@ from pathlib import Path
 
 import pytest
 
+from labcatalog.ai_scoring import reference_pdfs
 from labcatalog.annex import is_placeholder
-from labcatalog.check import check_prepare_outputs
+from labcatalog.check import check_git_annex, check_prepare_outputs
 from labcatalog.dataladbridge import datalad_status, use_folder
 from labcatalog.exceptions import DataladError, DataSourceError, MetadataError
+from labcatalog.history import file_history
 from labcatalog.ids import load_exclusions
 from labcatalog.manifest import build_manifest, git_commit
-from labcatalog.pipeline import run_freeze
+from labcatalog.pipeline import run_catalog, run_freeze, run_get, run_get_missing
 from labcatalog.prepare import Session, run_steps, step_states
 from labcatalog.project import init_project, load_project
 from labcatalog.sources import load_datasets
@@ -358,3 +360,60 @@ def test_steps_run_with_datalad_are_recorded_and_get_their_inputs(tmp_path, data
     assert run.exit_code == 0, run.log
     assert not is_placeholder(clone / "raw" / "a.csv")
     assert (clone / "data" / "a.csv").read_text(encoding="utf-8") == "{x} 3"
+
+
+def test_a_missing_git_annex_is_reported_only_for_datalad_projects(mock_project, monkeypatch):
+    monkeypatch.setattr("labcatalog.check.shutil.which", lambda name: None)
+    assert check_git_annex(load_project(mock_project)) == []
+    (mock_project / ".datalad").mkdir()
+    (mock_project / ".datalad" / "config").write_text("", encoding="utf-8")
+    [issue] = check_git_annex(load_project(mock_project))
+    assert issue.code == "git_annex_not_found"
+
+
+def test_references_without_their_content_say_how_to_get_them(mock_project):
+    pdf = mock_project / "references" / "example_mood.pdf"
+    pdf.write_text(POINTER, encoding="utf-8")
+    project = load_project(mock_project)
+    assert reference_pdfs(project, project.instruments["example_mood"]) == []
+
+    (mock_project / "references" / "references.bib").write_text(POINTER, encoding="utf-8")
+    with pytest.raises(MetadataError) as caught:
+        load_project(mock_project)
+    [issue] = [i for i in caught.value.issues if i.code == "not_downloaded"]
+    assert issue.location == "references/references.bib"
+
+
+@needs_datalad
+def test_get_missing_content_fetches_what_a_clone_lacks(mock_project, datalad):
+    # Without text2git even the metadata are in the annex.
+    datalad(mock_project, "create", "--force", ".")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    clone = mock_project.parent / "clone"
+    datalad(mock_project.parent, "clone", str(mock_project), str(clone))
+    with pytest.raises(MetadataError):
+        load_project(clone)
+
+    run_get_missing(clone, datalad_exe())
+    result = run_catalog(clone)
+    assert result.project is not None
+    assert result.datasets
+    # Reference PDFs wait until someone opens them.
+    pdf = clone / "references" / "example_mood.pdf"
+    assert is_placeholder(pdf)
+    run_get([pdf], datalad_exe())
+    assert not is_placeholder(pdf)
+
+
+@needs_datalad
+def test_history_works_in_a_real_dataset(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    path = "instruments/example_mood.yaml"
+    with (mock_project / path).open("a", encoding="utf-8") as handle:
+        handle.write("# checked\n")
+
+    uncommitted, committed = file_history(mock_project, path)
+    assert uncommitted.message == "Uncommitted changes"
+    assert "+# checked" in uncommitted.diff
+    assert committed.message == "Add the catalog"

@@ -7,6 +7,7 @@ import webview
 from nicegui import app, run, ui
 
 from labcatalog import ai_scoring, measures
+from labcatalog.annex import is_placeholder
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
@@ -28,10 +29,16 @@ from labcatalog.gui.common import (
     table,
     unique,
 )
+from labcatalog.gui.content import get_button
 from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.history import file_history
 from labcatalog.invariance import STEPS, InvarianceTest
-from labcatalog.pipeline import CatalogResult, run_description_draft, run_scoring_script
+from labcatalog.pipeline import (
+    CatalogResult,
+    run_description_draft,
+    run_get,
+    run_scoring_script,
+)
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument, Reference, Text
@@ -405,13 +412,24 @@ def about(result: CatalogResult, instrument: Instrument) -> None:
 
 def reference_row(project: Project, reference: Reference) -> None:
     pdf = reference_pdf(project, reference.pdf) if reference.pdf else None
-    with ui.row().classes("items-baseline gap-2"):
-        cited(project.bibliography, reference.key)
-        if pdf and pdf.is_file():
-            ui.button("View PDF", on_click=lambda: toggle_viewer()).props("flat dense no-caps")
-            ui.button("Open", on_click=lambda: open_path(pdf)).props("flat dense no-caps")
-        elif pdf:
-            note("PDF not found")
+
+    @ui.refreshable
+    def links() -> None:
+        with ui.row().classes("items-baseline gap-2"):
+            cited(project.bibliography, reference.key)
+            if pdf and is_placeholder(pdf):
+                note("PDF not downloaded")
+                get_button("Get", run_get, [[pdf]], got)
+            elif pdf and pdf.is_file():
+                ui.button("View PDF", on_click=lambda: toggle_viewer()).props("flat dense no-caps")
+                ui.button("Open", on_click=lambda: open_path(pdf)).props("flat dense no-caps")
+            elif pdf:
+                note("PDF not found")
+
+    async def got() -> None:
+        links.refresh()
+
+    links()
     viewer = ui.column().classes("w-full")
 
     # The PDF loads only when someone asks to see it.

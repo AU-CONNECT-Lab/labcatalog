@@ -43,7 +43,7 @@ class Project:
 def load_project(root: Path) -> Project:
     root = root.resolve()
     config_path = root / defaults.CONFIG_FILENAME
-    if not config_path.is_file():
+    if not config_path.is_file() and not is_placeholder(config_path):
         raise ProjectNotFoundError(f"No {defaults.CONFIG_FILENAME} found in {root}")
 
     issues: list[Issue] = []
@@ -71,6 +71,14 @@ def load_project(root: Path) -> Project:
         study_files=study_files,
         bibliography=bibliography,
     )
+
+
+def load_config(root: Path) -> ProjectConfig:
+    issues: list[Issue] = []
+    config = load_model(root / defaults.CONFIG_FILENAME, ProjectConfig, root, issues)
+    if issues:
+        raise MetadataError(issues)
+    return config
 
 
 def references_root(config: ProjectConfig, root: Path) -> Path:

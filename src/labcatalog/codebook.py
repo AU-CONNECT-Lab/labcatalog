@@ -11,6 +11,7 @@ import pandas as pd
 import yaml
 
 from labcatalog import defaults, qualtrics, redcap
+from labcatalog.annex import fetch_advice, is_placeholder
 from labcatalog.config import DatasetConfig, dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.exceptions import CodebookError
 from labcatalog.issues import Issue, IssueLevel, has_errors
@@ -370,6 +371,9 @@ class Importer:
         self.issues.append(Issue(level=level, code="codebook", message=message, location=location))
 
     def read_table(self, name: str, path: Path) -> list[tuple[int, dict[str, str]]]:
+        if is_placeholder(path):
+            self.report(name, None, fetch_advice(path))
+            return []
         if not path.is_file():
             self.report(name, None, "file not found; create the codebook files first")
             return []

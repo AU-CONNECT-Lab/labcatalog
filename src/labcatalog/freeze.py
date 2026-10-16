@@ -37,7 +37,7 @@ def freeze_project(
 ) -> tuple[Path, Freeze]:
     folder = project.root / defaults.FREEZES_DIR
     check_name(folder, name)
-    groups = datalad_datasets(project, datasets)
+    groups = datalad_datasets(project)
     if groups and not datalad:
         raise DataladError(
             "The data are in DataLad datasets, which a freeze saves and tags; "
@@ -72,8 +72,8 @@ def freeze_project(
     return path, record
 
 
-def datalad_datasets(project: Project, datasets: dict[str, LoadedDataset]) -> dict[Path, list[str]]:
-    return group_by_dataset(used_paths(project, datasets))
+def datalad_datasets(project: Project) -> dict[Path, list[str]]:
+    return group_by_dataset(used_paths(project.config, project.root))
 
 
 def check_name(folder: Path, name: str) -> None:

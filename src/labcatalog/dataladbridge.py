@@ -3,6 +3,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from labcatalog.annex import group_by_dataset
 from labcatalog.exceptions import DataladError
 
 INSTALL = "uv tool install git-annex and uv tool install datalad"
@@ -54,3 +55,8 @@ def run_datalad(datalad: str, args: list[str], cwd: Path | None = None) -> str:
         output = (done.stderr or done.stdout).strip()
         raise DataladError(f"datalad {args[0]} failed: {output[-500:]}")
     return done.stdout
+
+
+def get_content(datalad: str, paths: list[Path]) -> None:
+    for root, inside in group_by_dataset(paths).items():
+        run_datalad(datalad, ["get", *inside], cwd=root)

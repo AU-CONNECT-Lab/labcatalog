@@ -64,7 +64,7 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
     root = result.project.root
     tagged = [
         "the project folder" if p == root else portable_path(p, root).as_posix()
-        for p in datalad_datasets(result.project, result.datasets)
+        for p in datalad_datasets(result.project)
     ]
 
     def open_dialog() -> None:

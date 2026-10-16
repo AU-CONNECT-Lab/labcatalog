@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 from labcatalog import defaults
+from labcatalog.annex import is_placeholder
 from labcatalog.bibliography import citation
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.exceptions import LLMError
@@ -59,7 +60,7 @@ def script_paths(project: Project, instrument_id: str, dataset: str) -> dict[str
 
 def reference_pdfs(project: Project, instrument: Instrument) -> list[tuple[Reference, Path]]:
     found = [(r, reference_pdf(project, r.pdf)) for r in instrument.references if r.pdf]
-    return [(r, path) for r, path in found if path.is_file()]
+    return [(r, path) for r, path in found if path.is_file() and not is_placeholder(path)]
 
 
 def pdf_text(path: Path) -> str:

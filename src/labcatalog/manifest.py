@@ -7,6 +7,7 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.annex import DATALAD_CONFIG, group_by_dataset, is_placeholder
+from labcatalog.config import ProjectConfig
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.prepare import step_states
 from labcatalog.project import Project, bib_path, references_root
@@ -92,29 +93,30 @@ def original_branch(root: Path) -> str:
     return "HEAD"
 
 
-def used_paths(project: Project, datasets: dict[str, LoadedDataset]) -> list[Path]:
-    config, root = project.config, project.root
-    metadata = [
-        root / name
-        for name in (
-            defaults.CONFIG_FILENAME,
-            defaults.INSTRUMENTS_DIR,
-            defaults.STUDIES_DIR,
-            defaults.MAPS_DIR,
-            defaults.SCORING_DIR,
-        )
-    ]
-    metadata.append(bib_path(config, root))
+def metadata_paths(root: Path) -> list[Path]:
+    names = (
+        defaults.CONFIG_FILENAME,
+        defaults.INSTRUMENTS_DIR,
+        defaults.STUDIES_DIR,
+        defaults.MAPS_DIR,
+        defaults.SCORING_DIR,
+    )
+    return present([root / name for name in names])
+
+
+def used_paths(config: ProjectConfig, root: Path) -> list[Path]:
+    metadata = [*metadata_paths(root), bib_path(config, root)]
     if config.references.root:
         metadata.append(references_root(config, root))
     if config.exclusions:
         metadata.append(expand_path(config.exclusions, root))
-    sources = [d.source_path for d in datasets.values() if d.source_path is not None]
-    inputs = [f.resolved for state in step_states(project) for f in state.inputs]
-    found = dict.fromkeys(
-        p for p in [*metadata, *sources, *inputs] if p.exists() or is_placeholder(p)
-    )
-    return list(found)
+    sources = [expand_path(d.path, root) for d in config.datasets if d.path]
+    inputs = [expand_path(path, root) for step in config.prepare for path in step.inputs]
+    return present(list(dict.fromkeys([*metadata, *sources, *inputs])))
+
+
+def present(paths: list[Path]) -> list[Path]:
+    return [p for p in paths if p.exists() or is_placeholder(p)]
 
 
 def datalad_records(project_root: Path, used: list[Path]) -> list[DataladRecord]:
@@ -167,5 +169,5 @@ def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Mani
             for f in state.inputs
             if f.resolved.is_file() and not f.placeholder
         ],
-        datalad=datalad_records(project.root, used_paths(project, datasets)),
+        datalad=datalad_records(project.root, used_paths(project.config, project.root)),
     )

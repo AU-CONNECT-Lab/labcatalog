@@ -4,6 +4,7 @@ from pathlib import Path
 import webview
 from nicegui import app, background_tasks, run, ui
 
+from labcatalog.annex import dataset_root
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
 from labcatalog.dataladbridge import use_folder
@@ -24,6 +25,7 @@ from labcatalog.gui import (
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
+from labcatalog.gui.content import get_button
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.instruments import (
     CFA_DONE,
@@ -35,7 +37,13 @@ from labcatalog.gui.instruments import (
 )
 from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
-from labcatalog.pipeline import CatalogResult, run_catalog, run_cfa, run_invariance
+from labcatalog.pipeline import (
+    CatalogResult,
+    run_catalog,
+    run_cfa,
+    run_get_missing,
+    run_invariance,
+)
 from labcatalog.version import __version__
 
 WINDOW_SIZE = (1280, 820)
@@ -326,6 +334,7 @@ class Window:
             ui.label(self.error or "Open a project folder to check it.").classes("lc-note")
         else:
             problems.render(self.result.report.issues, self.root, self.edit_location)
+        self.get_missing_button()
 
     def has_catalog(self) -> bool:
         if self.result is None:
@@ -334,7 +343,14 @@ class Window:
             ui.label("The project files have errors. Fix them, then press Refresh.").classes(
                 "lc-note"
             )
+        self.get_missing_button()
         return self.result is not None and self.result.project is not None
+
+    def get_missing_button(self) -> None:
+        # Files a clone has not downloaded yet stop the catalog from loading.
+        failed = self.result is None or self.result.project is None
+        if self.root is not None and failed and dataset_root(self.root):
+            get_button("Get missing content", run_get_missing, [self.root], self.reload)
 
 
 def cfa_changed() -> None:

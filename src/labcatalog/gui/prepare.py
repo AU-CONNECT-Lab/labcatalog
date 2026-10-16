@@ -8,6 +8,8 @@ from labcatalog import defaults
 from labcatalog.exceptions import DataladError, LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import note, open_path
+from labcatalog.gui.content import get_button
+from labcatalog.pipeline import run_get
 from labcatalog.prepare import FileState, Session, StepState, run_steps, step_states, stop
 from labcatalog.project import load_project
 
@@ -120,7 +122,7 @@ def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[Non
                 f"Open {defaults.CONFIG_FILENAME}", on_click=lambda: open_path(config_path)
             ).props("flat no-caps")
         for state in step_states(project):
-            step_row(state, view, start, show_log)
+            step_row(state, view, start, show_log, on_success)
         log_panel(view)
 
     note(
@@ -142,6 +144,7 @@ def step_row(
     view: PrepareView,
     start: Callable[[list[str]], Awaitable[None]],
     show_log: Callable[[str], None],
+    on_got: Callable[[], Awaitable[None]],
 ) -> None:
     step = state.step
     last = view.session.runs.get(step.name)
@@ -164,19 +167,22 @@ def step_row(
                     ui.label(label).classes("text-grey-7")
                     with ui.row().classes("gap-x-4 gap-y-0"):
                         for f in files:
-                            file_label(f)
+                            file_label(f, on_got)
 
 
-def file_label(f: FileState) -> None:
+def file_label(f: FileState, on_got: Callable[[], Awaitable[None]]) -> None:
     if f.modified:
         when = f.modified.strftime("%Y-%m-%d %H:%M")
     else:
         when = "not downloaded" if f.placeholder else "missing"
-    shown = ui.label(f"{f.path} ({when})")
-    if f.modified:
-        shown.classes("cursor-pointer").on("click", lambda: open_path(f.resolved))
-    else:
-        shown.classes("text-negative")
+    with ui.row().classes("items-center gap-1 no-wrap"):
+        shown = ui.label(f"{f.path} ({when})")
+        if f.modified:
+            shown.classes("cursor-pointer").on("click", lambda: open_path(f.resolved))
+        else:
+            shown.classes("text-negative")
+        if f.placeholder:
+            get_button("Get", run_get, [[f.resolved]], on_got)
 
 
 def log_panel(view: PrepareView) -> None:
