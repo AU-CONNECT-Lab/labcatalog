@@ -95,7 +95,9 @@ def load_model(path: Path, model: type[ModelT], root: Path, issues: list[Issue])
     location = path.relative_to(root).as_posix()
     if is_placeholder(path):
         issues.append(
-            Issue(level="error", code="not_downloaded", message=fetch_advice(path), location=location)
+            Issue(
+                level="error", code="not_downloaded", message=fetch_advice(path), location=location
+            )
         )
         return None
     try:
