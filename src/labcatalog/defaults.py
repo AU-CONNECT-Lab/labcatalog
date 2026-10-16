@@ -1,6 +1,7 @@
 SCHEMA_VERSION = 1
 
 CONFIG_FILENAME = "labcatalog.yaml"
+ACCEPTED_FILENAME = "accepted_warnings.yaml"
 YAML_SUFFIXES = (".yaml", ".yml")
 INSTRUMENTS_DIR = "instruments"
 STUDIES_DIR = "studies"

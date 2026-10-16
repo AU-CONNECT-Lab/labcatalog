@@ -15,6 +15,8 @@ class Issue(BaseModel):
     code: str
     message: str
     location: str | None = None
+    # What the problem is about, such as the dataset and column, for the Fix panel.
+    details: dict[str, Any] = {}
 
 
 def has_errors(issues: list[Issue]) -> bool:

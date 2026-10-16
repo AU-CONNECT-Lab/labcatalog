@@ -95,6 +95,11 @@ def check(project: ProjectOption = Path(".")) -> None:
     """Read the data and report mismatches with the metadata."""
     report = run_check(project)
     print_issues(report.issues)
+    if report.accepted:
+        typer.echo(
+            f"{len(report.accepted)} warning(s) accepted in {defaults.ACCEPTED_FILENAME} "
+            "are not shown."
+        )
     raise typer.Exit(EXIT_ISSUES if report.has_errors() else EXIT_OK)
 
 

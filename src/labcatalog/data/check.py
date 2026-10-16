@@ -1,4 +1,5 @@
 import re
+from typing import Any
 
 import pandas as pd
 from pydantic import BaseModel
@@ -22,6 +23,8 @@ PHONE = re.compile(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
 
 class CheckReport(BaseModel):
     issues: list[Issue] = []
+    # Warnings someone looked at and recorded as fine; they are not in issues.
+    accepted: list[Issue] = []
 
     def has_errors(self) -> bool:
         return has_errors(self.issues)
@@ -314,15 +317,26 @@ def check_prepare_outputs(project: Project) -> list[Issue]:
                         f"{where}: {missing}",
                         defaults.CONFIG_FILENAME,
                         "warning",
+                        step=state.step.name,
                     )
                 )
         if state.status == "outdated":
             newest = max(state.inputs, key=lambda f: f.modified)
             oldest = min(state.outputs, key=lambda f: f.modified)
             message = f"{where}: {oldest.path} is older than {newest.path}; run the step again"
-            issues.append(problem("prepare_outdated", message, defaults.CONFIG_FILENAME, "warning"))
+            issues.append(
+                problem(
+                    "prepare_outdated",
+                    message,
+                    defaults.CONFIG_FILENAME,
+                    "warning",
+                    step=state.step.name,
+                )
+            )
     return issues
 
 
-def problem(code: str, message: str, where: str, level: IssueLevel = "error") -> Issue:
-    return Issue(level=level, code=code, message=message, location=where)
+def problem(
+    code: str, message: str, where: str, level: IssueLevel = "error", **details: Any
+) -> Issue:
+    return Issue(level=level, code=code, message=message, location=where, details=details)

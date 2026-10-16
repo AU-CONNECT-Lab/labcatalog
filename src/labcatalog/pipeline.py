@@ -21,6 +21,7 @@ from labcatalog.datalad.freeze import Freeze, freeze_project, list_freezes, open
 from labcatalog.exceptions import CodebookError, MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
+from labcatalog.metadata import accepted
 from labcatalog.metadata.validate import validate_project
 from labcatalog.paths import expand_path
 from labcatalog.project import Project, load_config, load_project, references_root, write_schemas
@@ -48,29 +49,36 @@ class CatalogResult:
 
 
 def run_validate(root: Path) -> list[Issue]:
-    return load_validated(root)[1]
+    return reported(root, load_validated(root)[1]).issues
 
 
 def run_check(root: Path) -> CheckReport:
     project, issues = load_validated(root)
     if project is None:
-        return CheckReport(issues=issues)
+        return reported(root, issues)
     catalog = resolve_catalog(project)
     datasets = load_datasets(project)
     report = check_project(project, catalog, datasets, compute_scores(catalog, datasets))
-    return CheckReport(issues=[*issues, *report.issues])
+    return reported(root, [*issues, *report.issues])
+
+
+def reported(root: Path, issues: list[Issue]) -> CheckReport:
+    # Problems in the accepted-warnings file itself are reported like any other.
+    entries = accepted.load(root.resolve(), issues)
+    shown, hidden = accepted.split(issues, entries)
+    return CheckReport(issues=shown, accepted=hidden)
 
 
 def run_catalog(root: Path) -> CatalogResult:
     project, issues = load_validated(root)
     if project is None:
-        return CatalogResult(report=CheckReport(issues=issues))
+        return CatalogResult(report=reported(root, issues))
     catalog = resolve_catalog(project)
     datasets = load_datasets(project)
     scores = compute_scores(catalog, datasets)
     report = check_project(project, catalog, datasets, scores)
     return CatalogResult(
-        report=CheckReport(issues=[*issues, *report.issues]),
+        report=reported(root, [*issues, *report.issues]),
         project=project,
         catalog=catalog,
         summary=summarize(catalog, datasets, scores, project.config),
