@@ -5,6 +5,7 @@ from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.metadata.bibliography import in_text
 from labcatalog.project import Project
 from labcatalog.schema import Instrument
+from labcatalog.stats.cfa import WLSMV, CfaFit
 from labcatalog.stats.summary import Summary
 
 DEFAULT_TEMPLATE = "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}"
@@ -49,9 +50,9 @@ def paragraph(
     summary: Summary,
     instrument: Instrument,
     dataset: str,
-    omega: dict[str, float],
+    fits: list[CfaFit],
 ) -> str:
-    values = placeholder_values(project, catalog, summary, instrument, dataset, omega)
+    values = placeholder_values(project, catalog, summary, instrument, dataset, fits)
     text = template_for(project, instrument).format_map(values)
     return " ".join(text.split())
 
@@ -62,7 +63,7 @@ def placeholder_values(
     summary: Summary,
     instrument: Instrument,
     dataset: str,
-    omega: dict[str, float],
+    fits: list[CfaFit],
 ) -> dict[str, str]:
     cite = "; ".join(in_text(project.bibliography, r.key) for r in instrument.references)
     inside = "; ".join(p for p in (instrument.abbreviation, cite) if p)
@@ -81,7 +82,9 @@ def placeholder_values(
         for found in summary.scores
         if found.key == s.key and found.alpha is not None
     }
+    omega = {score: value for f in fits for score, value in f.omega.items()}
     omegas = {s.label: omega[s.score_id] for s in scores if s.score_id in omega}
+    ordinal = any(f.estimator == WLSMV for f in fits)
     return {
         "name": instrument.name,
         "abbreviation": instrument.abbreviation or "",
@@ -96,7 +99,7 @@ def placeholder_values(
         "reverse": reversed_items(instrument, administered),
         "scoring": scoring(scores),
         "alpha": reliability("Cronbach's α", alphas),
-        "omega": reliability("Categorical ω", omegas),
+        "omega": reliability("Categorical ω" if ordinal else "McDonald's ω", omegas),
     }
 
 

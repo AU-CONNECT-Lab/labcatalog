@@ -182,7 +182,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 ui.label(f"{line}{issue.message}").classes("text-negative")
 
     def create() -> None:
-        with ui.dialog() as dialog, ui.card():
+        with frame, ui.dialog() as dialog, ui.card():
             ui.label("New instrument")
             name = ui.input("ID", placeholder="for example parent_stress").classes("w-72")
 
@@ -344,7 +344,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         )
                         if path == view.path:
                             item.classes("bg-blue-1 font-medium")
-                ui.button("New instrument", icon="add", on_click=create).props(
+                ui.button("New instrument", icon="add", on_click=lambda: leave(create)).props(
                     "flat dense no-caps"
                 ).classes("mt-2")
                 ui.button("New instrument from a PDF", icon="picture_as_pdf", on_click=draft).props(

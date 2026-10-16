@@ -173,7 +173,7 @@ def overview_section(result: CatalogResult) -> None:
     timeline(result)
     pace = views.collection_pace(result)
     if pace is not None:
-        with panel("Collection pace", "People with data, by week since each wave started"):
+        with panel("Collection pace", "Rows with a date, by week since each wave started"):
             show(pace)
     levels = views.score_levels(result)
     if levels is not None:

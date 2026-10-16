@@ -889,7 +889,7 @@ def measures_section(
 ) -> None:
     fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
     text = measures.paragraph(
-        result.project, result.catalog, result.summary, instrument, dataset, omegas(fits)
+        result.project, result.catalog, result.summary, instrument, dataset, fits
     )
     heading(f"Measures paragraph for {dataset}")
     ui.label(text).classes("lc-prose")

@@ -7,7 +7,7 @@ from labcatalog.gui import analysis_tables, attrition
 from labcatalog.gui.analysis import sample_note
 from labcatalog.gui.common import col, heading, note, section, sorted_waves, unique
 from labcatalog.gui.datasets import methods_of, paragraphs
-from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView, omegas
+from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView
 from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import measures, participants
@@ -215,7 +215,7 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
             result.summary,
             instrument,
             dataset,
-            omegas(fits) if cfa.status == CFA_DONE else {},
+            fits if cfa.status == CFA_DONE else [],
         )
         texts.append(text)
         heading(f"{instrument.name} ({dataset})")

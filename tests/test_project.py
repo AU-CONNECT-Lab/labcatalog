@@ -35,6 +35,13 @@ def test_misspelled_key_is_reported_with_one_based_item_position(demo_project):
     assert issue.message.startswith("items[3].revrse:")
 
 
+def test_numbered_keys_are_not_reported_as_list_positions(demo_project):
+    config = demo_project / "labcatalog.yaml"
+    config.write_text(config.read_text().replace("start: 2025-09-01", "strat: 2025-09-01"))
+    [issue] = load_issues(demo_project)
+    assert issue.message.startswith("studies.demo_study.waves.1.strat:")
+
+
 def test_problems_from_all_files_are_collected(demo_project):
     config = demo_project / "labcatalog.yaml"
     config.write_text(config.read_text().replace("project:", "projct:"))

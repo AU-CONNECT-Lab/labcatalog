@@ -113,10 +113,11 @@ def load_model(path: Path, model: type[ModelT], root: Path, issues: list[Issue])
     except yaml.YAMLError as err:
         issues.append(yaml_issue(err, location))
         return None
+    data = data if data is not None else {}
     try:
-        return model.model_validate(data if data is not None else {})
+        return model.model_validate(data)
     except ValidationError as err:
-        issues.extend(issues_from_validation_error(err, location))
+        issues.extend(issues_from_validation_error(err, location, data))
         return None
 
 

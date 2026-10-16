@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
@@ -29,22 +29,28 @@ def summarize_issues(issues: list[Issue]) -> str:
     return f"{n_errors} error(s), {n_warnings} warning(s)"
 
 
-def issues_from_validation_error(error: ValidationError, location: str) -> list[Issue]:
+def issues_from_validation_error(error: ValidationError, location: str, data: Any) -> list[Issue]:
     issues = []
     for detail in error.errors():
-        path = field_path(detail["loc"])
+        path = field_path(detail["loc"], data)
         text = PLAIN_MESSAGES.get(detail["type"], detail["msg"])
         message = f"{path}: {text}" if path else text
         issues.append(Issue(level="error", code=detail["type"], message=message, location=location))
     return issues
 
 
-def field_path(loc: tuple[int | str, ...]) -> str:
-    # List positions are 1-based so they match how people count items in a file.
+def field_path(loc: tuple[int | str, ...], data: Any) -> str:
+    # The data tells list positions from integer keys such as wave 1; positions are 1-based.
     path = ""
+    node = data
     for part in loc:
-        if isinstance(part, int):
+        if isinstance(node, list) and isinstance(part, int):
             path += f"[{part + 1}]"
         else:
-            path += f".{part}" if path else part
+            path += f".{part}" if path else str(part)
+        node = node[part] if isinstance(node, (dict, list)) and part in index(node) else None
     return path
+
+
+def index(node: dict | list) -> Any:
+    return node if isinstance(node, dict) else range(len(node))

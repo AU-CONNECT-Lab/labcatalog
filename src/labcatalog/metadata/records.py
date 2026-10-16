@@ -56,6 +56,7 @@ ITEMS = Table(
     (
         Column("id", "ID"),
         Column("text", "Text"),
+        Column("label", "Label"),
         Column("type", "Type", "choice", ("choice", "number", "text"), "choice"),
         Column("response_set", "Response set"),
         Column("reverse", "Reverse", "bool", default=False),

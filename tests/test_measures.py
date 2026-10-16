@@ -5,12 +5,16 @@ from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
 from labcatalog.reports import measures
+from labcatalog.stats.cfa import ML, WLSMV, CfaFit
 
 
-def paragraph(result, omega=None):
+def paragraph(result, omega=None, estimator=WLSMV):
     mood = result.project.instruments["example_mood"]
+    fit = CfaFit(
+        "example_mood", "child_w1", "total", {}, 100, omega=omega or {}, estimator=estimator
+    )
     return measures.paragraph(
-        result.project, result.catalog, result.summary, mood, "child_w1", omega or {}
+        result.project, result.catalog, result.summary, mood, "child_w1", [fit]
     )
 
 
@@ -32,6 +36,8 @@ def test_default_paragraph_reads_like_a_measures_section(result):
     )
     assert "Cronbach's α was ." in text and " for Low positive affect." in text
     assert text.endswith("Categorical ω was .91 for Total score and .83 for Sadness.")
+    text = paragraph(result, {"ems_total": 0.912}, ML)
+    assert text.endswith("McDonald's ω was .91.")
 
 
 def test_instrument_template_wins_over_the_project_one(mock_project):

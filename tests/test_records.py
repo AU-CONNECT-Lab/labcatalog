@@ -28,13 +28,16 @@ def test_only_changed_cells_change(mock_project):
     assert (rows[0]["reverse"], rows[0]["type"], rows[0]["subscales"]) == (True, "choice", "")
     rows[0]["reverse"] = False
     rows[1]["text"] = "I felt very sad."
+    rows[2]["label"] = "Worry"
     del rows[8]
     rows.append({"id": "ems_10", "text": "I slept badly.", "type": "choice", "reverse": False})
     assert changes(text, records.write_rows(text, "items", records.ITEMS, rows)) == [
         "-  - {id: ems_1, text: I felt happy., reverse: true}",
         "-  - {id: ems_2, text: I felt sad.}",
+        "-  - {id: ems_3, text: I worried about things.}",
         "+  - {id: ems_1, text: I felt happy.}",
         "+  - {id: ems_2, text: I felt very sad.}",
+        "+  - {id: ems_3, text: I worried about things., label: Worry}",
         "-  - {id: ems_9, text: I had fun with my friends., reverse: true}",
         "+  - {id: ems_10, text: I slept badly.}",
     ]
