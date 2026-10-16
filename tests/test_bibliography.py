@@ -69,7 +69,7 @@ def test_broken_and_repeated_entries_are_errors_with_lines(tmp_path):
 
 def test_project_loads_the_bib_from_the_references_root(mock_project):
     project = load_project(mock_project)
-    assert set(project.bibliography) == {"example2019", "sample2017", "demo2021"}
+    assert set(project.bibliography) == {"mockstudy2026", "example2019", "sample2017", "demo2021"}
 
 
 def test_a_broken_bib_stops_the_project_from_loading(mock_project):
