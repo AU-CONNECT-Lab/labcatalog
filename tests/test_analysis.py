@@ -3,6 +3,7 @@ import pytest
 from labcatalog import analysis, analysis_script
 from labcatalog.charts import views
 from labcatalog.gui import analysis as page
+from labcatalog.gui.common import p_value
 from labcatalog.pipeline import run_catalog
 
 EMS = "example_mood.ems_total@child_w1"

@@ -22,6 +22,7 @@ from labcatalog.gui.common import (
     heading,
     note,
     open_path,
+    p_value,
     section,
     table,
     unique,
@@ -727,7 +728,7 @@ def fit_table(instrument: Instrument, fits: list[CfaFit]) -> tuple[list[dict], l
                 "chisq": f"{fmt(values['chisq'])} ({values['df']:g})"
                 if values.get("chisq") is not None
                 else "",
-                "p": fmt(values.get("p"), 3),
+                "p": p_value(values.get("p")),
                 **{key: fmt(values.get(key)) for key in ("cfi", "tli", "rmsea", "srmr")},
                 "problem": f.problem
                 or ("3 items: the model fits exactly, so it has no fit indices" if exact else ""),
@@ -841,7 +842,7 @@ def invariance_table(test: InvarianceTest) -> tuple[list[dict], list[dict]]:
                 "diff": f"{fmt(step.chisq_diff)} ({step.df_diff:g})"
                 if step.chisq_diff is not None
                 else "",
-                "p": fmt(step.p_diff, 3),
+                "p": p_value(step.p_diff),
                 **{
                     f"d{key}": fmt(values[key] - before[key], 3)
                     if values.get(key) is not None and before.get(key) is not None

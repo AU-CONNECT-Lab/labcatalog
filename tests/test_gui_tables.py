@@ -161,7 +161,7 @@ def test_factor_tables_show_fit_loadings_and_omega(mock_project):
     ]
     _, rows = instruments.fit_table(mood, fits)
     assert rows[0]["model"] == "Subscales: Sadness, Worry and fatigue, Low positive affect"
-    assert (rows[0]["chisq"], rows[0]["p"], rows[0]["cfi"]) == ("23.45 (24)", "0.493", "1.00")
+    assert (rows[0]["chisq"], rows[0]["p"], rows[0]["cfi"]) == ("23.45 (24)", ".493", "1.00")
     assert rows[1]["problem"] == "improper solution"
     assert rows[2]["problem"].startswith("3 items")
     columns, rows = instruments.loading_table(result, mood, "child_w1", fits)
@@ -199,7 +199,7 @@ def test_invariance_table_shows_each_step_against_the_one_before():
     ]
     assert (rows[0]["chisq"], rows[0]["diff"], rows[0]["dcfi"]) == ("211.00 (111)", "", "")
     second = rows[1]
-    assert (second["diff"], second["p"]) == ("12.79 (9)", "0.172")
+    assert (second["diff"], second["p"]) == ("12.79 (9)", ".172")
     assert (second["dcfi"], second["drmsea"]) == ("-0.004", "0.010")
     assert (rows[2]["chisq"], rows[2]["problem"]) == ("", "improper solution")
     assert (rows[3]["dcfi"], rows[3]["diff"]) == ("", "")
