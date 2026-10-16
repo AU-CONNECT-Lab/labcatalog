@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from labcatalog.exceptions import EditError
-from labcatalog.metadata import changes, new_dataset
+from labcatalog.metadata import changes, new_dataset, studies
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
 
@@ -75,6 +75,50 @@ def test_a_new_wave_follows_its_template_into_every_file(project_root, export):
     # Untouched lines stay as they were.
     before = (project_root / "studies/mock_study.yaml").read_text(encoding="utf-8")
     assert "{instrument: eeg_resting, datasets: [eeg_w1, eeg_w3], target: self}" in before
+
+
+def test_a_dataset_that_repeats_none_starts_a_new_study(project_root, tmp_path):
+    changes.write(
+        load_project(project_root), studies.new_study(load_project(project_root), "pilot", "Pilot")
+    )
+    project = load_project(project_root)
+    source = tmp_path / "pilot.csv"
+    items = [f"ems_{n}" for n in range(1, 10)]
+    rows = [
+        ",".join(["pid", "visit_date", *items]),
+        ",".join(["9001C", "2027-01-20", *"123412341"]),
+    ]
+    source.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    draft = new_dataset.suggest_blank(project, "pilot")
+    assert (draft.wave, draft.blank.modality, draft.blank.reporter) == (
+        "1",
+        "questionnaire",
+        "parent",
+    )
+    draft.name, draft.blank.reporter = "pilot_child_w1", "child"
+    new_dataset.check_draft(project, draft)
+    placement = new_dataset.place(project, draft, source)
+    assert (placement.copy_to, placement.step) == ("data/pilot_child_w1.csv", None)
+    new_dataset.bring_in(project, source, placement)
+    dataset = new_dataset.dataset_config(project, draft, placement)
+    assert new_dataset.file_columns(project, dataset)[:2] == ["pid", "visit_date"]
+    draft.blank.id_column, draft.blank.date_column = "pid", "visit_date"
+    matched = new_dataset.match_columns(
+        project, new_dataset.dataset_config(project, draft, placement)
+    )
+    assert new_dataset.coverage(project, "", matched) == {"example_mood": (9, 9)}
+    found = new_dataset.changes(project, draft, placement, matched)
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    config = (project_root / "labcatalog.yaml").read_text(encoding="utf-8")
+    # The usual ID column is left out, and the study's new wave goes before the next section.
+    assert (
+        "  - {name: pilot_child_w1, modality: questionnaire, study: pilot, wave: 1, reporter: child, "
+        "source: csv, path: data/pilot_child_w1.csv, date_column: visit_date, snapshot_date: "
+    ) in config
+    assert "    label: Pilot\n    waves:\n      1: {}\n\n# One entry per data file" in config
+    after = load_project(project_root)
+    assert after.studies["pilot"].administrations[0].datasets == ["pilot_child_w1"]
 
 
 def test_cancelling_removes_only_what_the_wizard_made(project_root, export):

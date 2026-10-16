@@ -13,13 +13,33 @@ from labcatalog.metadata import changes, new_dataset
 from labcatalog.pipeline import CatalogResult
 
 DATA_FILES = "Data files (*.csv)"
+REPEAT = "repeat"
+BLANK = "blank"
 
 
-def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]) -> None:
+def open_wizard(
+    result: CatalogResult, on_done: Callable[[str], Awaitable[None]], study: str | None = None
+) -> None:
     project = result.project
+    config = project.config
     names = new_dataset.templates(project)
-    first = new_dataset.suggest(project, names[-1])
-    state: dict = {"source": None, "placement": None, "created": [], "rows": [], "changes": []}
+    # A study with nothing to repeat yet starts from nothing.
+    if study is not None or not names:
+        start = BLANK
+        first = new_dataset.suggest_blank(project, study or next(iter(config.studies)))
+    else:
+        start = REPEAT
+        first = new_dataset.suggest(project, names[-1])
+    state: dict = {
+        "source": None,
+        "placement": None,
+        "created": [],
+        "rows": [],
+        "changes": [],
+        "columns": [],
+        "id_column": None,
+        "date_column": None,
+    }
 
     def cleanup() -> None:
         new_dataset.remove(project, state["created"])
@@ -33,12 +53,32 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
         draft = new_dataset.suggest(project, template)
         name.value, wave.value = draft.name, draft.wave
 
+    def switch(mode: str) -> None:
+        repeating.visible, describing.visible = mode == REPEAT, mode == BLANK
+        if mode == REPEAT:
+            suggest(template.value)
+        else:
+            name.value, wave.value = "", new_dataset.suggest_blank(project, own_study.value).wave
+
+    def blank() -> bool:
+        return mode.value == BLANK
+
     def draft() -> new_dataset.Draft:
+        described = None
+        if blank():
+            described = new_dataset.Blank(
+                own_study.value,
+                modality.value,
+                reporter.value,
+                state["id_column"],
+                state["date_column"] or None,
+            )
         return new_dataset.Draft(
-            template.value,
+            "" if blank() else template.value,
             (name.value or "").strip(),
             (wave.value or "").strip(),
             date.fromisoformat((as_of.value or "").strip()),
+            described,
         )
 
     def start_next() -> None:
@@ -89,6 +129,12 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
             return
         try:
             dataset = new_dataset.dataset_config(project, draft(), placement)
+            if blank():
+                found = await run.io_bound(new_dataset.file_columns, project, dataset)
+                usual = config.defaults.id_column
+                state["columns"] = found
+                state["id_column"] = usual if usual in found else found[0]
+                state["date_column"] = next((c for c in found if "date" in c.lower()), "")
             state["rows"] = await run.io_bound(new_dataset.match_columns, project, dataset)
         except LabCatalogError as err:
             file_status.set_text(str(err))
@@ -102,7 +148,21 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
         rows = state["rows"]
         if not rows:
             return
-        found = new_dataset.coverage(project, template.value, rows)
+        if blank():
+            with ui.row().classes("gap-3"):
+                ui.select(
+                    state["columns"],
+                    value=state["id_column"],
+                    label="ID column",
+                    on_change=lambda e: state.update(id_column=e.value),
+                ).classes("w-56")
+                ui.select(
+                    ["", *state["columns"]],
+                    value=state["date_column"],
+                    label="Date column (optional)",
+                    on_change=lambda e: state.update(date_column=e.value),
+                ).classes("w-56")
+        found = new_dataset.coverage(project, draft().template, rows)
         labels = views.instrument_names(result)
         with ui.row().classes("gap-2"):
             for instrument_id, (n, total) in found.items():
@@ -175,7 +235,7 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
         if new_dataset.is_new_wave(project, draft()):
             note(
                 f"Wave {wave.value} is new, so it is added to the study without dates; fill in "
-                "its start and end on the Edit page."
+                "its start and end on the Studies page."
             )
         note("Adding the dataset changes these files; each line with + is new.")
         for change in state["changes"]:
@@ -202,17 +262,51 @@ def open_wizard(result: CatalogResult, on_done: Callable[[str], Awaitable[None]]
         ui.label("Add a dataset").classes("text-lg font-medium")
         with ui.stepper().props("flat animated").classes("w-full") as stepper:
             with ui.step("Start from"):
-                note(
-                    "Pick the dataset this one repeats, usually the same file from the last "
-                    "wave. The new one takes its modality, study, reporter, ID and date columns, "
-                    "and its cleaning step if it has one."
-                )
-                template = ui.select(
-                    {n: views.dataset_label(result, n) for n in names},
-                    value=first.template,
-                    label="Same as",
-                    on_change=lambda e: suggest(e.value),
-                ).classes("w-96")
+                mode = ui.toggle(
+                    {REPEAT: "Repeat a dataset", BLANK: "A new kind of file"},
+                    value=start,
+                    on_change=lambda e: switch(e.value),
+                ).props("dense no-caps")
+                mode.visible = bool(names)
+                with ui.column().classes("gap-2") as repeating:
+                    note(
+                        "Pick the dataset this one repeats, usually the same file from the last "
+                        "wave. The new one takes its modality, study, reporter, ID and date "
+                        "columns, and its cleaning step if it has one."
+                    )
+                    template = ui.select(
+                        {n: views.dataset_label(result, n) for n in names},
+                        value=names[-1] if names else None,
+                        label="Same as",
+                        on_change=lambda e: suggest(e.value),
+                    ).classes("w-96")
+                with ui.column().classes("gap-2") as describing:
+                    note(
+                        "Say what the file is: the first dataset of a study, or a kind of file "
+                        "the project has not had before. The ID and date columns are chosen "
+                        "after the file. The file is copied into data/ as it is, with no "
+                        "cleaning step."
+                    )
+                    with ui.row().classes("gap-3"):
+                        own_study = ui.select(
+                            {s: c.label or s for s, c in config.studies.items()},
+                            value=first.blank.study if first.blank else next(iter(config.studies)),
+                            label="Study",
+                            on_change=lambda e: wave.set_value(
+                                new_dataset.suggest_blank(project, e.value).wave
+                            ),
+                        ).classes("w-64")
+                        modality = ui.select(
+                            {m: config.vocab.modality_label(m) for m in config.vocab.modalities},
+                            value=config.vocab.modalities[0],
+                            label="Modality",
+                        ).classes("w-48")
+                        reporter = ui.select(
+                            config.vocab.reporters,
+                            value=(config.vocab.reporters or [None])[0],
+                            label="Reporter",
+                        ).classes("w-48")
+                repeating.visible, describing.visible = start == REPEAT, start == BLANK
                 with ui.row().classes("gap-3"):
                     name = ui.input("Name", value=first.name).classes("w-56")
                     wave = ui.input("Wave", value=first.wave).classes("w-24")

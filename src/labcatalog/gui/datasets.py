@@ -8,7 +8,6 @@ from labcatalog.config import dataset_by_name
 from labcatalog.gui import datalad, new_dataset, problems
 from labcatalog.gui.common import col, heading, note, open_path, table, without_line
 from labcatalog.issues import Issue
-from labcatalog.metadata.new_dataset import templates
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats.summary import DatasetSummary
 
@@ -24,18 +23,19 @@ def render(
     on_added: Callable[[str], Awaitable[None]],
 ) -> None:
     summaries = {d.dataset: d for d in result.summary.datasets}
-    if not summaries:
-        note(f"No datasets yet; add them under datasets in {defaults.CONFIG_FILENAME}.")
-        return
     if selected not in summaries:
         with ui.row().classes("w-full items-center justify-end gap-2"):
-            if templates(result.project):
+            if result.project.config.studies:
                 ui.button(
                     "Add a dataset",
                     icon="add",
                     on_click=lambda: new_dataset.open_wizard(result, on_added),
                 ).props("flat no-caps").classes("lc-quiet-btn")
-            datalad.freeze_button(result, on_frozen)
+            if summaries:
+                datalad.freeze_button(result, on_frozen)
+        if not summaries:
+            note("No datasets yet; press Add a dataset, after adding a study on the Studies page.")
+            return
         studies(result, summaries, on_select)
         datalad.freezes_table(result.project.root, on_open_freeze)
         return

@@ -163,7 +163,7 @@ def init_project(target: Path, example: bool = True) -> Path:
     if example:
         shutil.copytree(EXAMPLE_DIR, target, dirs_exist_ok=True)
     else:
-        for name in (defaults.INSTRUMENTS_DIR, defaults.STUDIES_DIR, defaults.MAPS_DIR, "data"):
+        for name in (defaults.INSTRUMENTS_DIR, defaults.STUDIES_DIR, defaults.MAPS_DIR, defaults.DATA_DIR):
             (target / name).mkdir(parents=True, exist_ok=True)
         # A JSON string is valid YAML, so any folder name is quoted safely.
         config = BLANK_CONFIG.read_text(encoding="utf-8").replace(

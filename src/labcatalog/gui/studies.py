@@ -7,18 +7,23 @@ from nicegui import run, ui
 
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui import new_dataset
 from labcatalog.gui.common import cited, note, panel, table
 from labcatalog.gui.datasets import dataset_table
 from labcatalog.issues import Issue
 from labcatalog.metadata import changes, records, studies
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports import participants
+from labcatalog.reports.measures import placeholder_problem
 
 NO_REFERENCE = "(none)"
+TABS = {"study": "Study", "text": "Text", "datasets": "Datasets"}
 
 
 @dataclass
 class StudiesView:
     study: str | None = None
+    tab: str = "study"
 
 
 def render(
@@ -26,6 +31,7 @@ def render(
     view: StudiesView,
     on_saved: Callable[[], Awaitable[None]],
     on_dataset: Callable[[str], None],
+    on_added: Callable[[str], Awaitable[None]],
 ) -> None:
     project = result.project
     config = project.config
@@ -56,6 +62,21 @@ def render(
         if study != view.study:
             leave(partial(go, study))
 
+    async def apply(found: list, then: str) -> bool:
+        # Checks the project with the changes in place, writes them, and reloads the catalog.
+        try:
+            issues = await run.io_bound(changes.check, project, found)
+            if issues:
+                ui.notify(issues[0].message, type="warning", multi_line=True)
+                return False
+            changes.write(project, found)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative", multi_line=True)
+            return False
+        view.study = then
+        await on_saved()
+        return True
+
     def create() -> None:
         with frame, ui.dialog() as dialog, ui.card():
             ui.label("New study")
@@ -66,21 +87,42 @@ def render(
                 study = (name.value or "").strip()
                 try:
                     found = studies.new_study(project, study, (label.value or "").strip())
-                    issues = await run.io_bound(changes.check, project, found)
-                    if issues:
-                        ui.notify(issues[0].message, type="warning", multi_line=True)
-                        return
-                    changes.write(project, found)
                 except LabCatalogError as err:
-                    ui.notify(str(err), type="negative", multi_line=True)
+                    ui.notify(str(err), type="negative")
                     return
-                dialog.close()
-                view.study = study
-                ui.notify(f"Added {study}")
-                await on_saved()
+                if await apply(found, study):
+                    dialog.close()
+                    ui.notify(f"Added {study}")
 
             with ui.row():
                 ui.button("Create", on_click=make)
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+        dialog.open()
+
+    def rename() -> None:
+        old = view.study
+        with frame, ui.dialog() as dialog, ui.card().classes("w-[32rem]"):
+            ui.label(f"Rename {old}")
+            name = ui.input("New ID", value=old).classes("w-72")
+            note(
+                f"The ID changes under studies in {defaults.CONFIG_FILENAME}, in each of the "
+                "study's datasets and in its study file, which takes the new name. Warnings you "
+                "marked as fine that name the old ID show again."
+            )
+
+            async def make() -> None:
+                new = (name.value or "").strip()
+                try:
+                    found = studies.rename_study(project, old, new)
+                except LabCatalogError as err:
+                    ui.notify(str(err), type="negative")
+                    return
+                if await apply(found, new):
+                    dialog.close()
+                    ui.notify(f"Renamed {old} to {new}")
+
+            with ui.row():
+                ui.button("Rename", on_click=make)
                 ui.button("Cancel", on_click=dialog.close).props("flat")
         dialog.open()
 
@@ -106,24 +148,34 @@ def render(
                 if view.study is None:
                     note("No studies yet; press New study to add one.")
                 else:
-                    detail(result, view.study, touched, buttons, on_saved, on_dataset, go)
+                    actions = Actions(touched, go, lambda: leave(rename), on_saved, on_dataset)
+                    detail(result, view, buttons, actions, on_added)
 
     buttons: list[ui.button] = []
     with ui.element("div").classes("w-full") as frame:
         page()
 
 
+@dataclass
+class Actions:
+    touched: Callable[[], None]
+    go: Callable[[str | None], None]
+    rename: Callable[[], None]
+    on_saved: Callable[[], Awaitable[None]]
+    on_dataset: Callable[[str], None]
+
+
 def detail(
     result: CatalogResult,
-    study: str,
-    touched: Callable[[], None],
+    view: StudiesView,
     buttons: list[ui.button],
-    on_saved: Callable[[], Awaitable[None]],
-    on_dataset: Callable[[str], None],
-    go: Callable[[str | None], None],
+    actions: Actions,
+    on_added: Callable[[str], Awaitable[None]],
 ) -> None:
     project = result.project
+    study = view.study
     found = project.config.studies[study]
+    touched = actions.touched
 
     async def save() -> None:
         edited = studies.Edited(
@@ -135,19 +187,24 @@ def detail(
             await waves.get_client_data(method="filtered_sorted"),
             await milestones.get_client_data(method="filtered_sorted"),
         )
+        texts = {modality: box.value or "" for modality, box in boxes.items()}
         try:
-            change = studies.edit_change(project, study, edited)
-            issues = await run.io_bound(changes.check, project, [change])
+            pending = [
+                studies.edit_change(project, study, edited),
+                studies.text_change(project, study, texts, template.value or ""),
+            ]
+            pending = [c for c in pending if c and (c.opened is None or c.text != c.opened.text)]
+            issues = await run.io_bound(changes.check, project, pending)
             show(issues)
             if issues:
-                ui.notify("Not saved: fix the problems listed below", type="warning")
+                ui.notify("Not saved: fix the problems listed above", type="warning")
                 return
-            changes.write(project, [change])
+            changes.write(project, pending)
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
             return
         ui.notify(f"Saved {study}")
-        await on_saved()
+        await actions.on_saved()
 
     def show(issues: list[Issue]) -> None:
         problems.clear()
@@ -155,40 +212,66 @@ def detail(
             for issue in issues:
                 ui.label(issue.message).classes("text-negative")
 
+    def switch(tab: str) -> None:
+        view.tab = tab
+        for name, shown in parts.items():
+            shown.visible = name == tab
+
     with panel(found.label or study, study) as tools:
         with tools:
-            buttons.append(ui.button("Discard", on_click=lambda: go(study)).props("flat no-caps"))
+            ui.button("Rename", icon="edit", on_click=actions.rename).props("flat dense no-caps")
+            buttons.append(
+                ui.button("Discard", on_click=lambda: actions.go(study)).props("flat no-caps")
+            )
             buttons.append(ui.button("Save", icon="save", on_click=save))
         for button in buttons:
             button.disable()
-        label = ui.input("Label", value=found.label or "", on_change=touched).classes("w-full")
-        description = (
-            ui.textarea("Description", value=found.description or "", on_change=touched)
-            .props("autogrow")
-            .classes("w-full")
-        )
-        keys = sorted({*project.bibliography, *([found.reference] if found.reference else [])})
-        with ui.row().classes("w-full items-center gap-4"):
-            reference = ui.select(
-                [NO_REFERENCE, *keys],
-                value=found.reference or NO_REFERENCE,
-                label="Reference",
-                with_input=True,
-                on_change=touched,
-            ).classes("w-72")
-            if found.reference:
-                with ui.row().classes("items-baseline gap-2"):
-                    ui.label("How to cite").classes("lc-note")
-                    cited(project.bibliography, found.reference)
-        note(f"Reference is the key in {defaults.BIB_FILENAME} of how to cite the study's data.")
+        # Hidden rather than unmounted, so Save can read the tables on every tab.
+        ui.toggle(TABS, value=view.tab, on_change=lambda e: switch(e.value)).props("dense no-caps")
         problems = ui.column().classes("gap-1")
 
+    parts = {name: ui.column().classes("w-full gap-4") for name in TABS}
+    with parts["study"]:
+        with panel("About"):
+            label = ui.input("Label", value=found.label or "", on_change=touched).classes("w-full")
+            description = (
+                ui.textarea("Description", value=found.description or "", on_change=touched)
+                .props("autogrow")
+                .classes("w-full")
+            )
+            keys = sorted({*project.bibliography, *([found.reference] if found.reference else [])})
+            with ui.row().classes("w-full items-center gap-4"):
+                reference = ui.select(
+                    [NO_REFERENCE, *keys],
+                    value=found.reference or NO_REFERENCE,
+                    label="Reference",
+                    with_input=True,
+                    on_change=touched,
+                ).classes("w-72")
+                if found.reference:
+                    with ui.row().classes("items-baseline gap-2"):
+                        ui.label("How to cite").classes("lc-note")
+                        cited(project.bibliography, found.reference)
+            note(
+                f"Reference is the key in {defaults.BIB_FILENAME} of how to cite the study's data."
+            )
+        waves = waves_panel(project, study, touched)
+        milestones = milestones_panel(found, touched)
+    with parts["text"]:
+        boxes, template = text_panels(result, study, touched)
+    with parts["datasets"]:
+        datasets_panel(result, study, actions.on_dataset, on_added)
+    switch(view.tab)
+
+
+def waves_panel(project, study: str, touched: Callable[[], None]) -> ui.aggrid:
+    found = project.config.studies[study]
     today = date.today()
-    holding = {}
+    holding: dict[str, int] = {}
     for dataset in project.config.datasets:
         if dataset.study == study:
             holding[dataset.wave] = holding.get(dataset.wave, 0) + 1
-    wave_rows = [
+    rows = [
         row
         | {
             "status": studies.wave_status(found.waves[row["wave"]], today),
@@ -205,7 +288,7 @@ def detail(
                 column("status", "Status", editable=False),
                 column("datasets", "Datasets", editable=False),
             ],
-            wave_rows,
+            rows,
             touched,
         )
         with tools:
@@ -214,7 +297,10 @@ def detail(
             )
             delete_button(waves, touched)
         note("Dates are written as 2026-03-01. A wave that holds datasets cannot be removed.")
+    return waves
 
+
+def milestones_panel(found, touched: Callable[[], None]) -> ui.aggrid:
     with panel("Milestones", "Dates shown on the Overview timeline.") as tools:
         milestones = grid(
             [column("name", "Name", flex=3), column("date", "Date")],
@@ -228,18 +314,76 @@ def detail(
                 on_click=partial(add_row, milestones, {"name": "", "date": ""}, touched),
             ).props("flat dense no-caps")
             delete_button(milestones, touched)
+    return milestones
 
-    summaries = [
-        s
-        for s in result.summary.datasets
-        if any(d.name == s.dataset and d.study == study for d in project.config.datasets)
-    ]
-    with panel("Datasets", "Click a row to open the dataset."):
-        if not summaries:
-            note(
-                "No datasets yet. Add the first one to the Datasets table of labcatalog.yaml "
-                "on the Edit page; later waves can then come in through Add a dataset."
+
+def text_panels(
+    result: CatalogResult, study: str, touched: Callable[[], None]
+) -> tuple[dict[str, ui.textarea], ui.textarea]:
+    project = result.project
+    vocab = project.config.vocab
+    content = next((c for c in project.studies.values() if c.study == study), None)
+    written = content.methods if content else {}
+    used = {d.modality for d in project.config.datasets if d.study == study} | set(written)
+    modalities = [m for m in vocab.modalities if m in used] + sorted(used - set(vocab.modalities))
+    boxes = {}
+    with panel(
+        "Methods", "How each modality's data were collected and processed, for the Methods page."
+    ):
+        if not modalities:
+            note("The study has no datasets yet; each modality it uses gets a box here.")
+        for modality in modalities:
+            boxes[modality] = (
+                ui.textarea(
+                    vocab.modality_label(modality),
+                    value=written.get(modality, "").strip(),
+                    on_change=touched,
+                )
+                .props("autogrow")
+                .classes("w-full")
             )
+        note("Leave a blank line between paragraphs.")
+
+    def preview() -> None:
+        text = template.value or project.config.participants or participants.DEFAULT_TEMPLATE
+        problem = placeholder_problem(text, participants.PLACEHOLDERS)
+        shown.set_text(problem or participants.paragraph(project, result.summary, study, text))
+
+    with panel("Participants", "The template of the Participants paragraph on the Methods page."):
+        own = (content.participants or "").strip() if content else ""
+        template = (
+            ui.textarea("Template", value=own, on_change=touched)
+            .props("autogrow")
+            .classes("w-full")
+        )
+        names = ", ".join(f"{{{p}}}" for p in participants.PLACEHOLDERS)
+        note(f"Placeholders: {names}. Leave it empty to use the project's template.")
+        ui.button("Preview", icon="visibility", on_click=preview).props("flat dense no-caps")
+        shown = ui.label().classes("lc-prose")
+    return boxes, template
+
+
+def datasets_panel(
+    result: CatalogResult,
+    study: str,
+    on_dataset: Callable[[str], None],
+    on_added: Callable[[str], Awaitable[None]],
+) -> None:
+    config = result.project.config
+    mine = {d.name for d in config.datasets if d.study == study}
+    summaries = [s for s in result.summary.datasets if s.dataset in mine]
+    with panel("Datasets", "Click a row to open the dataset.") as tools:
+        with tools:
+            ui.button(
+                "Add a dataset" if summaries else "Add the first dataset",
+                icon="add",
+                # A study with datasets usually repeats one; a new one starts from nothing.
+                on_click=lambda: new_dataset.open_wizard(
+                    result, on_added, None if summaries else study
+                ),
+            ).props("flat dense no-caps")
+        if not summaries:
+            note("No datasets yet.")
         else:
             shown = table(*dataset_table(result, summaries)).classes("cursor-pointer")
             shown.on("rowClick", lambda e: on_dataset(e.args[1]["name"]))

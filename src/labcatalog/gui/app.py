@@ -390,7 +390,9 @@ class Window:
     @ui.refreshable_method
     def studies_panel(self) -> None:
         if self.has_catalog():
-            studies.render(self.result, self.studying, self.reload, self.open_dataset)
+            studies.render(
+                self.result, self.studying, self.reload, self.open_dataset, self.dataset_added
+            )
 
     def open_dataset(self, dataset: str) -> None:
         self.show_dataset(dataset)

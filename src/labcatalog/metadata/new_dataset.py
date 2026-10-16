@@ -20,14 +20,39 @@ from labcatalog.project import Project
 
 # Fields of the template that describe its own file, so a new dataset does not take them over.
 OWN_FILE = ("url", "table", "files")
+# The order a dataset that repeats none is written in, as in the example project.
+BLANK_KEYS = (
+    "name",
+    "modality",
+    "study",
+    "wave",
+    "reporter",
+    "source",
+    "path",
+    "id_column",
+    "date_column",
+    "snapshot_date",
+)
+
+
+@dataclass
+class Blank:
+    # What a dataset that repeats none is, filled in by hand.
+    study: str
+    modality: str
+    reporter: str
+    id_column: str | None = None
+    date_column: str | None = None
 
 
 @dataclass
 class Draft:
+    # Empty when the dataset repeats none and `blank` says what it is.
     template: str
     name: str
     wave: str
     snapshot_date: date
+    blank: Blank | None = None
 
 
 @dataclass
@@ -65,6 +90,19 @@ def suggest(project: Project, template: str) -> Draft:
     return Draft(template, name, wave, date.today())
 
 
+def suggest_blank(project: Project, study: str) -> Draft:
+    config = project.config
+    waves = list(config.studies[study].waves) if study in config.studies else []
+    blank = Blank(study, config.vocab.modalities[0], (config.vocab.reporters or [""])[0])
+    return Draft("", "", waves[0] if waves else "1", date.today(), blank)
+
+
+def study_of(project: Project, draft: Draft) -> str:
+    if draft.blank is not None:
+        return draft.blank.study
+    return dataset_by_name(project.config, draft.template).study
+
+
 def check_draft(project: Project, draft: Draft) -> None:
     if not editing.NEW_ID.fullmatch(draft.name):
         raise EditError(
@@ -77,7 +115,11 @@ def check_draft(project: Project, draft: Draft) -> None:
 
 
 def place(project: Project, draft: Draft, source: Path) -> Placement:
-    placement = placement_for(project, draft.template, draft.name, source.suffix)
+    if draft.blank is not None:
+        path = f"{defaults.DATA_DIR}/{draft.name}{source.suffix}"
+        placement = Placement(path, path)
+    else:
+        placement = placement_for(project, draft.template, draft.name, source.suffix)
     for path in {placement.copy_to, placement.data_path}:
         if (project.root / path).exists():
             raise EditError(f"{path} already exists; move it away or choose another name")
@@ -137,11 +179,34 @@ def remove(project: Project, created: list[str]) -> None:
 
 
 def dataset_config(project: Project, draft: Draft, placement: Placement) -> DatasetConfig:
+    if draft.blank is not None:
+        return DatasetConfig(
+            name=draft.name,
+            modality=draft.blank.modality,
+            study=draft.blank.study,
+            wave=draft.wave,
+            reporter=draft.blank.reporter,
+            source="csv",
+            path=placement.data_path,
+            id_column=own_id_column(project, draft.blank),
+            date_column=draft.blank.date_column,
+            snapshot_date=draft.snapshot_date,
+        )
     old = dataset_by_name(project.config, draft.template)
     fields = old.model_dump(exclude=set(OWN_FILE))
     fields.update(name=draft.name, wave=draft.wave, path=placement.data_path)
     fields.update(snapshot_date=draft.snapshot_date)
     return DatasetConfig(**fields)
+
+
+def own_id_column(project: Project, blank: Blank) -> str | None:
+    # Written only when it is not the project's usual ID column.
+    usual = project.config.defaults.id_column
+    return blank.id_column if blank.id_column and blank.id_column != usual else None
+
+
+def file_columns(project: Project, dataset: DatasetConfig) -> list[str]:
+    return [str(c) for c in read_data(project, dataset).columns]
 
 
 def match_columns(project: Project, dataset: DatasetConfig) -> list[dict[str, str]]:
@@ -204,25 +269,44 @@ def changes(
 def settings_change(project: Project, draft: Draft, placement: Placement) -> Change:
     opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
     data = records.load(opened.text)
+    if not data.get("datasets"):
+        data["datasets"] = CommentedSeq()
     datasets = data["datasets"]
-    at = next(n for n, d in enumerate(datasets) if d["name"] == draft.template)
+    study = data["studies"][study_of(project, draft)]
     entry = CommentedMap()
     entry.fa.set_flow_style()
-    for key, value in datasets[at].items():
-        if key not in OWN_FILE:
-            entry[key] = value
+    if draft.blank is None:
+        at = next(n for n, d in enumerate(datasets) if d["name"] == draft.template)
+        for key, value in datasets[at].items():
+            if key not in OWN_FILE:
+                entry[key] = value
+        numeric = isinstance(entry.get("wave"), int)
+    else:
+        # After the study's other datasets, or last when it has none yet.
+        mine = [n for n, d in enumerate(datasets) if str(d.get("study")) == draft.blank.study]
+        at = mine[-1] if mine else len(datasets) - 1
+        fields = dataset_config(project, draft, placement).model_dump(exclude_none=True)
+        for key in BLANK_KEYS:
+            if key in fields:
+                entry[key] = records.as_text(fields[key])
+        numeric = all(isinstance(key, int) for key in study.get("waves") or {})
     entry["name"] = draft.name
-    numeric = isinstance(entry.get("wave"), int) and draft.wave.isdigit()
     # A wave written as a number stays a number.
-    entry["wave"] = int(draft.wave) if numeric else records.as_text(draft.wave)
+    entry["wave"] = (
+        int(draft.wave) if numeric and draft.wave.isdigit() else records.as_text(draft.wave)
+    )
     entry["path"] = placement.data_path
     entry["snapshot_date"] = draft.snapshot_date
     datasets.insert(at + 1, entry)
     if is_new_wave(project, draft):
-        waves = data["studies"][entry["study"]]["waves"]
+        # Whatever follows the study, such as the next section's comment, stays after it.
+        tail = records.take_tail(study)
+        if not study.get("waves"):
+            study["waves"] = CommentedMap()
         wave = CommentedMap()
         wave.fa.set_flow_style()
-        waves[entry["wave"]] = wave
+        study["waves"][entry["wave"]] = wave
+        records.put_tail(study, tail)
     if placement.step is not None:
         steps = data["prepare"]
         old = dataset_by_name(project.config, draft.template).path
@@ -246,7 +330,7 @@ def map_change(draft: Draft, rows: list[dict[str, str]]) -> Change:
 
 
 def study_change(project: Project, draft: Draft, instruments: list[str]) -> Change:
-    study = dataset_by_name(project.config, draft.template).study
+    study = study_of(project, draft)
     relative = project.study_files.get(study, f"{defaults.STUDIES_DIR}/{study}.yaml")
     if (project.root / relative).exists():
         opened = editing.open_file(project.root, relative)
@@ -280,5 +364,4 @@ def flow_list(values: list[str]) -> CommentedSeq:
 
 
 def is_new_wave(project: Project, draft: Draft) -> bool:
-    study = dataset_by_name(project.config, draft.template).study
-    return draft.wave not in project.config.studies[study].waves
+    return draft.wave not in project.config.studies[study_of(project, draft)].waves

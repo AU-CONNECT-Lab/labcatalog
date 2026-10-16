@@ -113,7 +113,7 @@ def test_methods_and_participants_are_written_as_blocks(mock_project):
     assert "  saliva:" not in change.text
     assert "\nparticipants: |\n  {waves} {counts}\nadministrations:" in change.text
     # Only the changed modalities and the new template differ from the file as it was.
-    assert len(changed_lines(change.opened.text, change.text)) == 9
+    assert len(changed_lines(change.opened.text, change.text)) == 8
     assert changes.check(project, [change]) == []
     changes.write(project, [change])
     after = load_project(mock_project).studies["mock_study"]
