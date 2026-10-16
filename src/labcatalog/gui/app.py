@@ -6,6 +6,7 @@ from nicegui import app, background_tasks, run, ui
 
 from labcatalog.browse import BrowseIndex, build_index
 from labcatalog.charts import style
+from labcatalog.dataladbridge import use_folder
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import (
     analysis,
@@ -190,6 +191,10 @@ class Window:
         self.show_result()
         # R is slow, so the factor models fill in after the rest of the catalog shows.
         background_tasks.create(self.start_cfa())
+
+    async def reload(self) -> None:
+        if self.root is not None:
+            await self.load(self.root)
 
     async def start_cfa(self) -> None:
         result, cfa = self.result, self.cfa

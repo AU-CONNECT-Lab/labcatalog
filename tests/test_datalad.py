@@ -7,7 +7,8 @@ import pytest
 
 from labcatalog.annex import is_placeholder
 from labcatalog.check import check_prepare_outputs
-from labcatalog.exceptions import DataSourceError, MetadataError
+from labcatalog.dataladbridge import datalad_status, use_folder
+from labcatalog.exceptions import DataladError, DataSourceError, MetadataError
 from labcatalog.ids import load_exclusions
 from labcatalog.manifest import build_manifest, git_commit
 from labcatalog.prepare import step_states
@@ -212,3 +213,23 @@ def test_a_plain_git_commit_in_a_real_dataset(mock_project, datalad):
         assert record.commit == f"{commit}-modified"
     else:
         assert record.commit == git(mock_project, "rev-parse", "--short", "HEAD")
+
+
+def test_using_datalad_puts_its_folder_first_on_path_once(monkeypatch, tmp_path):
+    monkeypatch.setenv("PATH", "elsewhere")
+    datalad = str(tmp_path / "bin" / "datalad.exe")
+    use_folder(datalad)
+    use_folder(datalad)
+    assert os.environ["PATH"] == os.pathsep.join([str(tmp_path / "bin"), "elsewhere"])
+
+
+def test_a_wrong_datalad_path_is_explained(tmp_path):
+    with pytest.raises(DataladError, match="DataLad not found at .*Settings page"):
+        datalad_status(str(tmp_path / "datalad.exe"))
+
+
+@needs_datalad
+def test_the_status_names_datalad_and_git_annex(datalad):
+    found = datalad_status(datalad_exe())
+    assert found.datalad.startswith("datalad ")
+    assert found.annex[0].isdigit()
