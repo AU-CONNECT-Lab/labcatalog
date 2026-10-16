@@ -26,6 +26,7 @@ from labcatalog.gui.common import (
     table,
     unique,
 )
+from labcatalog.gui.paper import paper_table, save_button
 from labcatalog.history import file_history
 from labcatalog.invariance import STEPS, InvarianceTest
 from labcatalog.pipeline import CatalogResult, run_scoring_script
@@ -33,6 +34,7 @@ from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
 from labcatalog.schema import Instrument, Reference, Text
 from labcatalog.stats import VariableSummary
+from labcatalog.tables import PaperTable
 
 PAGE_SIZE = 50
 CFA_UNSET = "unset"
@@ -667,12 +669,32 @@ def factor_structure(
     elif not fits:
         note("No factor model: no score here has three or more items.")
     else:
-        note(
-            "lavaan, WLSMV with the items as ordered categories, people who answered every "
-            "item; standardized loadings; ω is semTools' categorical omega."
+        method = (
+            "lavaan, WLSMV with the items as ordered categories, people who answered every item."
         )
-        table(*fit_table(instrument, fits))
-        table(*loading_table(result, instrument, dataset, fits)).classes(remove="w-full")
+        papers = {
+            "cfa_fit": PaperTable(
+                f"Fit of Factor Models for {instrument.name}",
+                *without_empty(*fit_table(instrument, fits), "problem"),
+                method,
+            ),
+            "cfa_loadings": PaperTable(
+                f"Standardized Loadings and ω for {instrument.name}",
+                *loading_table(result, instrument, dataset, fits),
+                f"{method} ω is semTools' categorical omega.",
+            ),
+        }
+        for shown in papers.values():
+            paper_table(shown)
+        save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
+
+
+def without_empty(
+    columns: list[dict], rows: list[dict], name: str
+) -> tuple[list[dict], list[dict]]:
+    if any(row.get(name) for row in rows):
+        return columns, rows
+    return [c for c in columns if c["name"] != name], rows
 
 
 def omegas(fits: list[CfaFit]) -> dict[str, float]:
@@ -757,16 +779,16 @@ def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaVi
     elif not tests:
         note("No model: no score here has three or more items in two or more waves.")
     else:
-        note(
+        method = (
             "lavaan and semTools: each wave's items load on their own factors, the same people "
             "are linked by ID, and each item's residuals correlate across waves; WLSMV with the "
             "items as ordered categories, people who answered every item at a wave. Each step "
             "holds one more set of parameters equal across waves; Δχ² is the scaled difference "
-            "test against the step before. A drop in CFI of more than 0.01 is a common sign "
-            "that a step does not hold."
+            "test against the step before."
         )
+        note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
         labels = {s.id: s.label for s in instrument.scores}
-        for test in tests:
+        for i, test in enumerate(tests, start=1):
             names = ", ".join(labels[s] for s in test.factors)
             kind = "Subscales" if test.kind == SUBSCALES else "One factor"
             waves = ", ".join(
@@ -778,7 +800,13 @@ def invariance_section(result: CatalogResult, instrument: Instrument, cfa: CfaVi
             if test.problem:
                 note(test.problem)
             else:
-                table(*invariance_table(test)).classes(remove="w-full")
+                shown = PaperTable(
+                    f"Invariance of {instrument.name} Across Waves ({kind}: {names})",
+                    *without_empty(*invariance_table(test), "problem"),
+                    f"{method} n per wave: {waves}.",
+                )
+                paper_table(shown)
+                save_button(result, f"invariance_{instrument.id}_{i}", {"invariance": shown})
 
 
 def invariance_table(test: InvarianceTest) -> tuple[list[dict], list[dict]]:

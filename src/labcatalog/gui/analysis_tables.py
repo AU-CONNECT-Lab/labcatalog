@@ -9,8 +9,8 @@ from labcatalog.analysis_script import AnalysisData, Code, Comparison
 from labcatalog.charts import plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
-from labcatalog.gui import charts, preferences
-from labcatalog.gui.common import apa, col, note, section
+from labcatalog.gui import charts, paper, preferences
+from labcatalog.gui.common import apa, col, note, p_value, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.tables import PaperTable
 
@@ -89,9 +89,9 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
             )
 
             def content() -> None:
-                page.paper_table(shown)
+                paper.paper_table(shown)
                 note(engine)
-                page.save_button(result, "table1", {"table1": shown})
+                paper.save_button(result, "table1", {"table1": shown})
 
             return content
 
@@ -207,12 +207,12 @@ def group_section(
             def content() -> None:
                 with ui.row().classes("w-full gap-6 items-start"):
                     with charts.figure_column(fig):
-                        drawn = page.Chart(charts.show(fig), fig)
+                        drawn = paper.Chart(charts.show(fig), fig)
                     with charts.rest_column():
                         for shown in papers.values():
-                            page.paper_table(shown)
+                            paper.paper_table(shown)
                         note(engine)
-                        page.save_button(result, "groups", papers, drawn)
+                        paper.save_button(result, "groups", papers, drawn)
 
             return content
 
@@ -301,7 +301,7 @@ def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
         "test": TESTS[comparison.test],
         "statistic": decimal(comparison.statistic),
         "df": f"{comparison.df1:.1f}" if welch else f"{comparison.df1:g}, {comparison.df2:g}",
-        "p": page.p_value(comparison.p),
+        "p": p_value(comparison.p),
         "effect": f"{shown(comparison.effect)}{interval}",
     }
     if welch:
@@ -345,7 +345,7 @@ def script_section(
                 "analysis.R": r_text,
                 "analysis.py": python_text,
             }
-            page.save_button(result, "script", texts=texts)
+            paper.save_button(result, "script", texts=texts)
             with ui.tabs().props("dense no-caps align=left") as tabs:
                 ui.tab("r", label="R")
                 ui.tab("python", label="Python")

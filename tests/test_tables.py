@@ -63,6 +63,13 @@ def test_latex_uses_booktabs_and_escapes():
     assert r"\textit{Note.} *\textit{p} $<$ .05. $\alpha$ on everyone" in text
 
 
+def test_latex_writes_the_greek_of_fit_tables():
+    shown = PaperTable("Fit", [{"name": "d", "label": "Δχ² (Δdf)"}], [{"d": "ω"}])
+    text = latex(shown)
+    assert r"$\Delta$$\chi$\textsuperscript{2} ($\Delta$df) \\" in text
+    assert r"$\omega$ \\" in text
+
+
 def test_docx_holds_the_label_title_table_and_note():
     document = Document(io.BytesIO(docx(TABLE)))
     texts = [p.text for p in document.paragraphs]

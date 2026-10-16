@@ -82,7 +82,7 @@ def test_wave_groups_put_every_reporter_of_a_wave_together(result):
 def test_apa_numbers():
     assert page.apa(0.4512) == ".45"
     assert page.apa(-0.1234) == "-.12"
-    assert page.p_value(0.0004) == "< .001"
-    assert page.p_value(0.0234) == ".023"
+    assert p_value(0.0004) == "< .001"
+    assert p_value(0.0234) == ".023"
     assert page.starred(analysis.Correlation(50, 0.3, 0.02)) == ".30*"
     assert page.starred(analysis.Correlation(2)) == ""

@@ -73,6 +73,12 @@ def fmt(value: float | None, digits: int = 2) -> str:
     return "" if value is None else f"{value:.{digits}f}"
 
 
+def p_value(p: float | None) -> str:
+    if p is None:
+        return ""
+    return "< .001" if p < 0.001 else f"{p:.3f}".replace("0.", ".", 1)
+
+
 def apa(value: float | None) -> str:
     # Values bounded by 1 drop the leading zero.
     if value is None:
