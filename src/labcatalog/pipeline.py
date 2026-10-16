@@ -12,6 +12,7 @@ from labcatalog.check import CheckReport, check_project
 from labcatalog.codebook import ImportResult
 from labcatalog.codegen import label_snippets, scoring_snippets
 from labcatalog.exceptions import CodebookError, MetadataError
+from labcatalog.freeze import Freeze, freeze_project
 from labcatalog.invariance import InvarianceTest
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
@@ -128,6 +129,15 @@ def run_description_draft(
 ) -> Draft:
     client = make_llm_client(provider, model, url)
     return draft_description(result.project, instrument_id, client)
+
+
+def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze]:
+    # Reloads first, so the freeze is of the files as they are now.
+    result = run_catalog(root)
+    if result.project is None:
+        raise MetadataError(result.report.issues)
+    participants = {d.dataset: d.n_ids for d in result.summary.datasets}
+    return freeze_project(result.project, result.datasets, participants, name, datalad)
 
 
 def run_prepare(root: Path, echo: Callable[[str], None]) -> list[StepRun]:

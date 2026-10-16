@@ -1,3 +1,4 @@
+import shutil
 import sys
 import traceback
 from pathlib import Path
@@ -8,12 +9,14 @@ import typer
 from labcatalog import defaults
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.export import run_export
+from labcatalog.freeze import RECORD_ONLY
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import (
     run_check,
     run_codebook_create,
     run_codebook_import,
     run_codebook_prompt,
+    run_freeze,
     run_prepare,
     run_schema,
     run_validate,
@@ -106,6 +109,20 @@ def prepare(project: ProjectOption = Path(".")) -> None:
         raise typer.Exit(EXIT_ISSUES)
     else:
         typer.echo(f"{len(runs)} step(s) succeeded.")
+
+
+@app.command()
+def freeze(
+    name: Annotated[str, typer.Argument(help="Name of the freeze, for example 2026-06-submission.")],
+    project: ProjectOption = Path("."),
+) -> None:
+    """Record the data as they are now; DataLad datasets are also saved and tagged."""
+    path, record = run_freeze(project, name, shutil.which("datalad"))
+    typer.echo(f"Wrote {path}")
+    if record.tag:
+        typer.echo(f"Tagged {record.tag} in {len(record.manifest.datalad)} DataLad dataset(s).")
+    else:
+        typer.echo(RECORD_ONLY)
 
 
 codebook_app = typer.Typer(

@@ -38,6 +38,10 @@ class ExportError(LabCatalogError):
     exit_code = EXIT_ISSUES
 
 
+class FreezeError(LabCatalogError):
+    exit_code = EXIT_ISSUES
+
+
 class EditError(LabCatalogError):
     exit_code = EXIT_ISSUES
 

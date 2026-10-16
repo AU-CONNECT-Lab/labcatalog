@@ -10,6 +10,7 @@ CODEBOOK_DIR = "codebook"
 SCORING_DIR = "scoring"
 BIB_FILENAME = "references.bib"
 OUTPUTS_DIR = "outputs"
+FREEZES_DIR = "freezes"
 MANIFEST_FILENAME = "manifest.json"
 SCORE_PREFIX = "score:"
 
