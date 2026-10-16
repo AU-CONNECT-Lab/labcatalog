@@ -17,7 +17,7 @@ def changes(before: str, after: str) -> list[str]:
 def test_tables_belong_to_their_files():
     assert list(records.tables_for(MOOD)) == ["items", "scores", "response_sets"]
     assert list(records.tables_for("labcatalog.yaml")) == ["datasets"]
-    assert list(records.tables_for(STUDY)) == ["administrations"]
+    assert list(records.tables_for(STUDY)) == ["administrations", "overrides"]
     assert records.tables_for("maps/child_w1.csv") == {}
 
 
@@ -192,3 +192,34 @@ def test_a_date_field_is_written_as_a_date(mock_project):
     rows[0]["custom:approved"] = "Jan 31"
     with pytest.raises(EditError, match="not a date"):
         records.write_rows(text, "datasets", table, rows)
+
+
+def test_overrides_point_to_their_administration(mock_project):
+    text = editing.open_file(mock_project, STUDY).text
+    table = records.with_entries(records.OVERRIDES, text)
+    assert table.columns[0].choices[:2] == ("1: example_parent_stress", "2: example_child_sleep")
+    assert records.read_rows(text, "overrides", table) == []
+    row = {"administration": "2: example_child_sleep", "item": "ecs_1", "dropped": True}
+    written = records.write_rows(text, "overrides", table, [row])
+    [line] = changes(text, written)[1:]
+    assert line.endswith("target: child, overrides: [{item: ecs_1, dropped: true}]}")
+    assert editing.check_text(STUDY, written) == []
+    [moved] = records.read_rows(written, "overrides", table)
+    moved["administration"] = "3: example_mood"
+    again = records.write_rows(written, "overrides", table, [moved])
+    [line] = changes(text, again)[1:]
+    assert line.startswith("+  - {instrument: example_mood,")
+    assert line.endswith("target: self, overrides: [{item: ecs_1, dropped: true}]}")
+    assert records.write_rows(again, "overrides", table, []) == text
+    with pytest.raises(EditError, match="Administration: choose one"):
+        records.write_rows(text, "overrides", table, [{"item": "ecs_1"}])
+
+
+def test_dragged_rows_move_their_entries(mock_project):
+    text = editing.open_file(mock_project, MOOD).text
+    rows = records.read_rows(text, "items", records.ITEMS)
+    rows.insert(0, rows.pop(8))
+    written = records.write_rows(text, "items", records.ITEMS, rows)
+    ids = [line.split(",")[0] for line in written.splitlines() if line.startswith("  - {id: ems_")]
+    assert ids[:2] == ["  - {id: ems_9", "  - {id: ems_1"] and len(ids) == 9
+    assert editing.check_text(MOOD, written) == []

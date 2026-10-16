@@ -306,9 +306,10 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 )
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
         note(
-            "Lists are written with commas, for example ems_1, ems_2. Drag a row by its handle "
-            "to move it. Saving changes only the cells you changed, so comments and the rest of "
-            "the file stay as they were."
+            "Lists are written with commas, for example ems_1, ems_2."
+            + ("" if table().single else " Drag a row by its handle to move it.")
+            + " Saving changes only the cells you changed, so comments and the rest of the file "
+            "stay as they were."
         )
         if table().parent:
             note(

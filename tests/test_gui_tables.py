@@ -1,8 +1,9 @@
 from pathlib import Path
 
 from labcatalog.charts import views
-from labcatalog.gui import datasets, instruments, overview
+from labcatalog.gui import datasets, instruments, overview, problems
 from labcatalog.gui.common import split_location
+from labcatalog.issues import Issue
 from labcatalog.metadata.bibliography import citation
 from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import run_catalog
@@ -241,3 +242,12 @@ def test_score_table_lists_every_wave_under_its_score(mock_project):
     columns, rows = instruments.score_table(result, mood, [fit])
     assert "ω" in [c["label"] for c in columns]
     assert [r["omega"] for r in rows[:3]] == ["", "0.90", ""]
+
+
+def test_problem_rows_say_whether_the_file_opens_on_the_edit_page(mock_project):
+    issues = [
+        Issue(level="error", code="x", message="m", location="instruments/example_mood.yaml:3"),
+        Issue(level="error", code="x", message="m", location="data/child_w1.csv:4"),
+    ]
+    rows = problems.issue_rows(issues, None, problems.editable_paths(mock_project))
+    assert [row["in_editor"] for row in rows] == [True, False]
