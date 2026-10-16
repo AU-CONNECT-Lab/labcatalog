@@ -30,11 +30,11 @@ On the Problems page, **Fix** at the end of a row opens a panel for that problem
 | YAML errors, unknown keys | A file cannot be read, or a key is misspelled. | Fix the file at the line shown. Every key labcatalog does not know is an error, so typos never pass silently. |
 | `not_in_vocab` | A modality, reporter or target is not in `vocab`. | In the Fix panel, pick the word it should be, or add the new word to `vocab`. |
 | `unknown_reference` | Something names an ID that does not exist: an instrument, item, response set, dataset or study. | In the Fix panel, pick the ID it should be; or add what it names. |
-| `duplicate_id` | Two things share an ID. | Rename one. |
+| `duplicate_id` | Two things share an ID. | Rename one. For a column map that lists a row twice, the Fix panel takes one out. |
 | `map_missing` | A dataset has administrations but no column map. | Create `maps/<dataset>.csv`, for example with a codebook import. |
 | `unmapped_item` | An administered instrument has items with no column in the map. | In the Fix panel, pick each item's column, or record that the dataset did not ask it (a dropped override). |
-| `missing_code_collision` | A missing code is also a response option. | Change the missing code, or use dataset-specific `missing_codes`. |
-| `reference_missing`, `bib_missing`, `pdf_missing` | A reference key is not in `references.bib`, or a file is not where it should be. | Export `references.bib` again, or fix `references.root` or the `pdf` path. |
+| `missing_code_collision` | A missing code is also a response option. | If the value is an answer, take it out of the missing codes in the Fix panel (for one dataset or all). Otherwise change the response set. |
+| `reference_missing`, `bib_missing`, `pdf_missing` | A reference key is not in `references.bib`, or a file is not where it should be. | Export `references.bib` again, or fix `references.root` or the `pdf` path. A mistyped key can be swapped in the Fix panel. |
 
 ## Problems in the data
 
@@ -42,7 +42,7 @@ On the Problems page, **Fix** at the end of a row opens a panel for that problem
 |---|---|---|
 | `unexpected_value` | A value is neither a response option nor a missing code, or a number is outside `min` and `max`. | The Fix panel lists the rows. A typo is fixed in the cleaning script; a real value is added in the panel as a missing code or a new answer option. |
 | `id_whitespace`, `id_missing`, `id_duplicate`, `id_pattern` | An ID has stray spaces, is empty, appears twice in one file, or does not match `ids.pattern`. | Fix the IDs in your cleaning script. |
-| `column_missing` | The map names a column the data file does not have. | Fix the map, or the column name in the data. |
+| `column_missing` | The map names a column the data file does not have. | Pick the column's new name in the Fix panel, or take the row out of the map. |
 | `column_unmapped` | The data file has a column the map does not list. | In the Fix panel, add it to the map as not an item, or as the item it holds. |
 | `score_mismatch` | A score in the data differs from the score labcatalog computes. | Check the scoring rule: reversed items, `missing_rule`, `min_valid`. |
 | `same_answer` | People gave the same answer to every item of a score. | Look at them; they may have answered without reading. If their answers are real, record the warning as fine. |

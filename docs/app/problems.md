@@ -20,6 +20,10 @@ Where the fix is a change to the project files, the panel makes it for you:
 |---|---|
 | `not_in_vocab` | A list of the allowed words with the closest one chosen, and **Use this word**. When the same slip is in several entries, **Use it in all N places** fixes them together. **Add '...' as a new word** adds it to `vocab` instead. |
 | `unknown_reference` | Where one value holds the wrong ID (a study, an instrument or a dataset of an administration, an override's item, a response set), a list of the IDs it could be with the closest chosen, and **Use this ID**. |
+| `reference_missing` | A list of the keys in `references.bib` with the closest chosen, and **Use this ID**. |
+| `column_missing` | The data columns the map does not list yet, with the closest to the missing name chosen, and **Use this column**; or **Take the row out** when the data file does not hold that column. |
+| `duplicate_id` | For a column map that lists one column twice, or maps one item to two columns: both lines, each with **Take this row out**. Other shared IDs only open the file, since renaming one may need changes elsewhere. |
+| `missing_code_collision` | **... is an answer**, which takes the value out of the missing codes: in this dataset only (it gets its own `missing_codes`) or in every dataset. If the value really means no answer, the response set is wrong; open the instrument file. |
 | `column_unmapped` | Each column the map does not list, to add to the map as not an item or as an item of an instrument given in that dataset. |
 | `unmapped_item` | Each item without a column, with the data columns the map does not list yet (the likely one chosen), or **not asked in** the dataset, which records the item as dropped there. |
 | `unexpected_value` | Each value, marked as a typo, a missing code (in this dataset only or in every dataset) or a new answer option. A new option changes the instrument, so it counts in every dataset. A typo stays in the data: labcatalog never changes data files. |

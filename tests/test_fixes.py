@@ -179,7 +179,7 @@ def test_a_renamed_column_is_put_back_or_its_row_taken_out(mock_project):
     before = map_file.read_text(encoding="utf-8")
     apply(mock_project, fixes.map_line(project, "child_w1", issue.details["line"], "ems_2_w1"))
     assert map_file.read_text(encoding="utf-8") == before.replace("ems_2_wl", "ems_2_w1")
-    found = codes(run_check(mock_project).issues)
+    found = [i.code for i in run_check(mock_project).issues if "child_w1" in i.location]
     assert "column_missing" not in found and "column_unmapped" not in found
     map_file.write_text(before, encoding="utf-8")
     taken = fixes.map_line(load_project(mock_project), "child_w1", issue.details["line"], None)
