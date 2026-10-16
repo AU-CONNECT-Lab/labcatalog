@@ -133,5 +133,7 @@ def test_bad_cells_and_per_language_text_are_reported():
     with pytest.raises(EditError, match="empty has no options"):
         text = "response_sets:\n  - {id: empty, options: []}\n"
         records.read_rows(text, "response_sets", records.OPTIONS)
+    with pytest.raises(EditError, match="not valid YAML"):
+        records.read_rows("items:\n  - {id: x\n", "items", records.ITEMS)
     with pytest.raises(EditError, match="per language"):
         records.read_rows("items:\n  - {id: x, text: {en: Hi, es: Hola}}\n", "items", records.ITEMS)

@@ -11,6 +11,7 @@ from labcatalog.dataladbridge import datalad_status, use_folder
 from labcatalog.exceptions import DataladError, DataSourceError, MetadataError
 from labcatalog.ids import load_exclusions
 from labcatalog.manifest import build_manifest, git_commit
+from labcatalog.pipeline import run_freeze
 from labcatalog.prepare import step_states
 from labcatalog.project import load_project
 from labcatalog.sources import load_datasets
@@ -233,3 +234,54 @@ def test_the_status_names_datalad_and_git_annex(datalad):
     found = datalad_status(datalad_exe())
     assert found.datalad.startswith("datalad ")
     assert found.annex[0].isdigit()
+
+
+@needs_git
+def test_freezing_data_in_datalad_needs_datalad(mock_project):
+    make_dataset(mock_project)
+    with pytest.raises(DataladError, match="set the path to datalad on the Settings page"):
+        run_freeze(mock_project, "pilot", None)
+    assert not (mock_project / "freezes").exists()
+
+
+def in_tag(root, tag: str, path: str) -> bool:
+    done = subprocess.run(["git", "-C", str(root), "cat-file", "-e", f"{tag}:{path}"])
+    return done.returncode == 0
+
+
+@needs_datalad
+def test_a_freeze_saves_and_tags_the_commit_clones_share(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    path = mock_project / "data" / "child_w2.csv"
+    path.write_text(path.read_text(encoding="utf-8").replace(",2,", ",3,", 1), encoding="utf-8")
+    (mock_project / "outputs").mkdir()
+    (mock_project / "outputs" / "rows.csv").write_text("id\n1\n", encoding="utf-8")
+
+    record_path, record = run_freeze(mock_project, "pilot", datalad_exe())
+    assert record.tag == "pilot"
+    [frozen] = record.manifest.datalad
+    assert not frozen.commit.endswith("-modified")
+    assert in_tag(mock_project, "pilot", record_path.relative_to(mock_project).as_posix())
+    tagged = git(mock_project, "rev-parse", "--short", "pilot^{commit}")
+    assert tagged == shared_commit(mock_project)
+    # Exports can hold row-level data, so a freeze leaves them out of the dataset.
+    assert git(mock_project, "status", "--porcelain", "--", "outputs") == "?? outputs/"
+    assert manifest_for(mock_project).datalad[0].tags == ["pilot"]
+
+
+@needs_datalad
+def test_a_freeze_tags_a_data_subdataset_and_the_dataset_above_it(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    datalad(mock_project, "create", "-d", ".", "--force", "data")
+    datalad(mock_project, "save", "-r", "-m", "Add the catalog")
+    path = mock_project / "data" / "child_w2.csv"
+    path.write_text(path.read_text(encoding="utf-8").replace(",2,", ",3,", 1), encoding="utf-8")
+
+    _, record = run_freeze(mock_project, "pilot", datalad_exe())
+    assert {r.path for r in record.manifest.datalad} == {".", "data"}
+    assert not any(r.commit.endswith("-modified") for r in record.manifest.datalad)
+    data_tag = git(mock_project / "data", "rev-parse", "pilot^{commit}")
+    assert git(mock_project, "rev-parse", "pilot:data") == data_tag

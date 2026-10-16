@@ -5,7 +5,7 @@ from pathlib import PurePosixPath
 from typing import Any, Literal
 
 import yaml
-from ruamel.yaml import YAML
+from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.scalarstring import SingleQuotedScalarString
 
@@ -116,7 +116,11 @@ def round_trip() -> YAML:
 
 
 def read_rows(text: str, key: str, table: Table) -> list[dict[str, Any]]:
-    entries = (round_trip().load(text) or {}).get(key) or []
+    try:
+        data = round_trip().load(text) or {}
+    except YAMLError as err:
+        raise EditError(f"The file is not valid YAML; fix it as text first. {err}") from None
+    entries = data.get(key) or []
     if table.inner is None:
         return [{ORIGIN: n} | cells(entry, table.columns, key) for n, entry in enumerate(entries)]
     group, *columns = table.columns
