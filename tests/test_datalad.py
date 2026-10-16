@@ -292,7 +292,8 @@ def test_a_freeze_tags_a_data_subdataset_and_the_dataset_above_it(mock_project, 
     assert git(mock_project, "rev-parse", "pilot:data") == data_tag
 
 
-CLEAN = """import sys
+CLEAN = """\
+import sys
 from pathlib import Path
 rows = Path("raw/a.csv").read_text().splitlines()
 Path("data").mkdir(exist_ok=True)
@@ -310,14 +311,9 @@ def datalad_steps(tmp_path) -> Path:
         "outputs": ["data/a.csv"],
     }
     with (root / "labcatalog.yaml").open("a", encoding="utf-8") as file:
-        file.write(f"prepare_with: datalad
-prepare: {json.dumps([step])}
-")
+        file.write(f"prepare_with: datalad\nprepare: {json.dumps([step])}\n")
     (root / "raw").mkdir()
-    (root / "raw" / "a.csv").write_text("id,x
-1,2
-2,3
-", encoding="utf-8")
+    (root / "raw" / "a.csv").write_text("id,x\n1,2\n2,3\n", encoding="utf-8")
     (root / "scripts").mkdir()
     (root / "scripts" / "clean.py").write_text(CLEAN, encoding="utf-8")
     return root
@@ -343,9 +339,7 @@ def test_steps_run_with_datalad_are_recorded_and_get_their_inputs(tmp_path, data
     root = datalad_steps(tmp_path)
     datalad(root, "create", "-c", "text2git", "--force", ".")
     with (root / ".gitattributes").open("a", encoding="utf-8") as handle:
-        handle.write("raw/** annex.largefiles=anything
-data/** annex.largefiles=anything
-")
+        handle.write("raw/** annex.largefiles=anything\ndata/** annex.largefiles=anything\n")
     datalad(root, "save", "-m", "Add the catalog")
 
     [run] = run_steps(load_project(root), ["clean"], Session(), datalad=datalad_exe())
