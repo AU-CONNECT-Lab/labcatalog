@@ -8,6 +8,8 @@ from pathlib import Path
 
 from nicegui import ui
 
+from labcatalog import defaults
+from labcatalog.bibliography import Bibliography, citation
 from labcatalog.stats import wave_order
 
 LINE_SUFFIX = re.compile(r":\d+$")
@@ -54,6 +56,17 @@ def heading(text: str) -> None:
 
 def note(text: str) -> None:
     ui.label(text).classes("lc-note")
+
+
+def cited(bibliography: Bibliography, key: str) -> None:
+    entry = bibliography.get(key, {})
+    ui.label(citation(bibliography, key))
+    if not entry:
+        note(f"not in {defaults.BIB_FILENAME}")
+    if entry.get("doi"):
+        ui.link("DOI", f"https://doi.org/{entry['doi']}", new_tab=True)
+    if entry.get("url"):
+        ui.link("Link", entry["url"], new_tab=True)
 
 
 def fmt(value: float | None, digits: int = 2) -> str:

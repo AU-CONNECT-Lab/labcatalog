@@ -6,8 +6,7 @@ from pathlib import Path
 import webview
 from nicegui import app, run, ui
 
-from labcatalog import ai_scoring, defaults
-from labcatalog.bibliography import citation
+from labcatalog import ai_scoring
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
@@ -17,6 +16,7 @@ from labcatalog.export import VARIABLES, export_plan, write_export
 from labcatalog.gui import charts, preferences
 from labcatalog.gui.common import (
     as_text,
+    cited,
     col,
     fmt,
     heading,
@@ -396,15 +396,8 @@ def about(result: CatalogResult, instrument: Instrument) -> None:
 
 def reference_row(project: Project, reference: Reference) -> None:
     pdf = reference_pdf(project, reference.pdf) if reference.pdf else None
-    entry = project.bibliography.get(reference.key, {})
     with ui.row().classes("items-baseline gap-2"):
-        ui.label(citation(project.bibliography, reference.key))
-        if not entry:
-            note(f"not in {defaults.BIB_FILENAME}")
-        if entry.get("doi"):
-            ui.link("DOI", f"https://doi.org/{entry['doi']}", new_tab=True)
-        if entry.get("url"):
-            ui.link("Link", entry["url"], new_tab=True)
+        cited(project.bibliography, reference.key)
         if pdf and pdf.is_file():
             ui.button("View PDF", on_click=lambda: toggle_viewer()).props("flat dense no-caps")
             ui.button("Open", on_click=lambda: open_path(pdf)).props("flat dense no-caps")

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from labcatalog.bibliography import citation
 from labcatalog.browse import build_index, matches
 from labcatalog.cfa import ONE_FACTOR, SUBSCALES, CfaFit
 from labcatalog.charts import views
@@ -53,20 +54,11 @@ def test_dataset_issues_cover_its_data_file_only(mock_project):
 
 
 def test_dataset_page_lists_each_file_with_the_study_citation(mock_project):
-    config = mock_project / "labcatalog.yaml"
-    text = config.read_text(encoding="utf-8")
-    config.write_text(
-        text.replace(
-            "    label: Mock Family Study\n",
-            "    label: Mock Family Study\n"
-            "    citation: Example, A. (2026). Mock Family Study.\n"
-            "    doi: 10.0000/mock\n",
-        ),
-        encoding="utf-8",
-    )
     result = run_catalog(mock_project)
-    study = result.project.config.studies["mock_study"]
-    assert (study.citation, study.doi) == ("Example, A. (2026). Mock Family Study.", "10.0000/mock")
+    key = result.project.config.studies["mock_study"].reference
+    assert citation(result.project.bibliography, key) == (
+        "Mock Family Study Team (2026). Mock Family Study: Waves 1 to 3. Example Data Archive."
+    )
     _, rows = datasets.dataset_table(result, result.summary.datasets[:3])
     assert [(r["name"], r["wave"], r["reporter"]) for r in rows] == [
         ("parent_w1", "1", "parent"),

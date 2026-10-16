@@ -37,6 +37,7 @@ stats:
 studies:
   mock_study:
     label: Mock Family Study
+    reference: mockstudy2026
     waves:
       1: {start: 2024-09-01, end: 2025-05-31}
       2: {start: 2025-09-01, end: 2026-05-31}

@@ -6,7 +6,7 @@ from nicegui import ui
 from labcatalog import defaults
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import problems
-from labcatalog.gui.common import col, heading, note, open_path, table, without_line
+from labcatalog.gui.common import cited, col, heading, note, open_path, table, without_line
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import DatasetSummary
@@ -45,17 +45,10 @@ def studies(
             ui.label(study_config.label or study).classes("text-xl font-medium")
             if study_config.description:
                 ui.label(study_config.description)
-            if study_config.citation or study_config.doi:
+            if study_config.reference:
                 with ui.row().classes("items-baseline gap-2"):
                     ui.label("How to cite").classes("text-grey-7")
-                    if study_config.citation:
-                        ui.label(study_config.citation)
-                    if study_config.doi:
-                        ui.link(
-                            f"doi:{study_config.doi}",
-                            f"https://doi.org/{study_config.doi}",
-                            new_tab=True,
-                        )
+                    cited(result.project.bibliography, study_config.reference)
             shown = table(*dataset_table(result, [summaries[n] for n in names])).classes("mt-2")
             shown.classes("cursor-pointer")
             shown.on("rowClick", lambda e: on_select(e.args[1]["name"]))

@@ -15,7 +15,7 @@ vocab:
 missing_codes: []
 
 # Each study and its waves, for example:  my_study: {label: My Study, waves: {1: {start: 2026-01-01}}}
-# A study can also have a description, a citation (how to cite its data) and a doi; the Datasets page shows them.
+# A study can also have a description and a reference (the key in references.bib of how to cite its data); the Datasets page shows them.
 # Deadlines and other dates go in milestones, for example: milestones: [{name: Interim report, date: 2026-12-15}]; the Overview timeline shows them.
 studies: {}
 

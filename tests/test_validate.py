@@ -196,6 +196,17 @@ def test_reference_key_missing_from_the_bib_is_a_warning(mock_project):
     assert "nobody2020" in issue.message
 
 
+def test_study_reference_missing_from_the_bib_is_a_warning(mock_project):
+    edit(mock_project / "labcatalog.yaml", "reference: mockstudy2026", "reference: gone2026")
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level, issue.location) == (
+        "reference_missing",
+        "warning",
+        "labcatalog.yaml",
+    )
+    assert issue.message.startswith("studies.mock_study.reference:")
+
+
 def test_missing_bib_is_reported_once(mock_project):
     (mock_project / "references" / "references.bib").unlink()
     [issue] = run_validate(mock_project)
