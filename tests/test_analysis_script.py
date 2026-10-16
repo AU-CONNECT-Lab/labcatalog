@@ -265,9 +265,9 @@ def test_spearman_matches_scipy_and_r(result, sample):
 def test_summary_correlations_follow_the_project_setting(mock_project):
     config = mock_project / "labcatalog.yaml"
     text = config.read_text(encoding="utf-8")
+    assert "  correlation: pearson" in text
     config.write_text(
-        text.replace("  correlate_by: family", "  correlate_by: family\n  correlation: spearman"),
-        encoding="utf-8",
+        text.replace("  correlation: pearson", "  correlation: spearman"), encoding="utf-8"
     )
     found = run_catalog(mock_project)
     assert found.project.config.stats.coefficient() == "Spearman's ρ"
