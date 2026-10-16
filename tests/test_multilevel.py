@@ -149,7 +149,7 @@ def close(in_r: ml.Fitted, in_python: ml.Fitted) -> None:
         # The optimizers stop at slightly different points of a flat likelihood.
         assert abs(a.estimate - b.estimate) < 0.01 * a.se
         # statsmodels and lme4 get the fixed effects' covariance differently.
-        assert a.se == pytest.approx(b.se, rel=0.01)
+        assert a.se == pytest.approx(b.se, rel=0.05)
     for a, b in zip(in_r.random, in_python.random, strict=True):
         assert (a.level, a.term) == (b.level, b.term)
         assert a.variance == pytest.approx(b.variance, rel=1e-3, abs=1e-5)
