@@ -246,7 +246,7 @@ def ask_panel(
         changed()
 
     with ui.expansion("Ask the language model", icon="manage_search", value=bool(view.asked)):
-        if not model_set():
+        if not preferences.model_set():
             note("Set a language model on the Settings page to search the catalog with it.")
             return
         note(
@@ -716,7 +716,7 @@ def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str)
             button.enable()
 
     heading(f"Scoring script from the reference PDF for {dataset}")
-    if model_set():
+    if preferences.model_set():
         with ui.row().classes("items-center gap-3"):
             button = ui.button("Write with the language model", on_click=write)
             status = ui.label().classes("lc-note")
@@ -862,7 +862,7 @@ def measures_section(
 def description_draft(result: CatalogResult, instrument: Instrument) -> None:
     if not ai_scoring.reference_pdfs(result.project, instrument):
         return
-    if not model_set():
+    if not preferences.model_set():
         note("Set a language model on the Settings page to draft the description from the PDF.")
         return
     path = result.project.instrument_files[instrument.id]
@@ -902,10 +902,6 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
         button = ui.button("Draft the description from the reference PDF", on_click=write)
         status = ui.label().classes("lc-note")
     shown = ui.column().classes("gap-1")
-
-
-def model_set() -> bool:
-    return bool(preferences.load().get(preferences.LLM_MODEL))
 
 
 def without_empty(

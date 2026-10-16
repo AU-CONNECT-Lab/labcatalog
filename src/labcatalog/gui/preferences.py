@@ -29,6 +29,10 @@ def load() -> dict:
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
 
+def model_set() -> bool:
+    return bool(load().get(LLM_MODEL))
+
+
 def save(changes: dict) -> None:
     path = folder() / FILENAME
     path.parent.mkdir(parents=True, exist_ok=True)

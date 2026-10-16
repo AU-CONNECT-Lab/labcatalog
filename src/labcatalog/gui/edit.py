@@ -3,12 +3,15 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
-from nicegui import ui
+import webview
+from nicegui import app, run, ui
 
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui import preferences
 from labcatalog.gui.common import LINE_SUFFIX, heading, note
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
+from labcatalog.pipeline import run_instrument_draft
 
 TEXT = "text"
 WIDE = {"text", "label", "path", "instrument", "datasets"}
@@ -83,23 +86,39 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         # The editor mounts after the Edit tab shows.
         ui.timer(0.3, partial(shown.editor.reveal_line, line), once=True)
 
-    async def write(text: str) -> None:
+    def write(text: str) -> bool:
         issues = editing.check_text(view.path, text)
         show(issues)
         if issues:
             ui.notify("Not saved: fix the problems listed below", type="warning")
-            return
+            return False
         try:
             shown.opened = editing.save_file(root, shown.opened, text)
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
-            return
+            return False
         shown.edited = False
-        ui.notify(f"Saved {view.path}")
-        await on_saved()
+        return True
+
+    async def save(text: str) -> None:
+        if write(text):
+            ui.notify(f"Saved {view.path}")
+            await on_saved()
 
     async def save_text() -> None:
-        await write(shown.editor.value)
+        await save(shown.editor.value)
+
+    async def move() -> None:
+        if not write(shown.editor.value):
+            return
+        try:
+            path = editing.move_draft(root, view.path)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative")
+            return
+        ui.notify(f"Moved to {path}")
+        go(path, TEXT)
+        await on_saved()
 
     async def save_table() -> None:
         rows = await shown.grid.get_client_data()
@@ -108,7 +127,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         except LabCatalogError as err:
             ui.notify(str(err), type="negative")
             return
-        await write(text)
+        await save(text)
 
     async def add_row() -> None:
         rows = await shown.grid.get_client_data()

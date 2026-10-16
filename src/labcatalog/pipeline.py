@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.ai.instrument import InstrumentDraft, draft_instrument
 from labcatalog.ai.measures import Draft, draft_description
 from labcatalog.ai.scoring import write_scoring_scripts
 from labcatalog.ai.search import Search, search_catalog
@@ -133,6 +134,13 @@ def run_description_draft(
 ) -> Draft:
     client = make_llm_client(provider, model, url)
     return draft_description(result.project, instrument_id, client)
+
+
+def run_instrument_draft(
+    root: Path, instrument_id: str, pdf: Path, provider: str, model: str, url: str
+) -> InstrumentDraft:
+    client = make_llm_client(provider, model, url)
+    return draft_instrument(root, instrument_id, pdf, client)
 
 
 def run_search(result: CatalogResult, query: str, provider: str, model: str, url: str) -> Search:
