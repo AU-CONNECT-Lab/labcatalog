@@ -18,7 +18,7 @@ Below them, **Table 1** describes the sample on the variables you choose, such a
 
 ## Attrition
 
-To compare those who stayed with those who left, pick a wave other than the last at the top of the page and choose the variables to compare. The **Attrition** section tests whether the people in that wave who returned at the next wave differed from those who did not: a *t* test for numbers and scores, a χ² test for choices. It writes a sentence for the paper and a table, both with a copy button. [Attrition](../statistics/attrition.md) explains the tests.
+To compare those who stayed with those who left, pick a wave other than the last at the top of the page and choose the variables to compare. The **Attrition** section tests whether the people in that wave who returned at the next wave differed from those who did not: a *t* test for numbers and scores, a χ² test for choices. It writes a sentence for the paper and a table, both with a copy button.
 
 ## Procedure
 
