@@ -465,3 +465,26 @@ def test_an_opened_freeze_installs_its_subdatasets_at_the_tag(mock_project, data
 
     copy = run_open_freeze(mock_project, "pilot", datalad_exe())
     assert differences(record, run_catalog(copy).manifest) == []
+
+
+@needs_datalad
+def test_a_pushed_freeze_opens_from_another_clone(mock_project, datalad, tmp_path):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    subprocess.run(["git", "init", "-q", "--bare", str(tmp_path / "store.git")], check=True)
+    datalad(mock_project, "siblings", "add", "-s", "store", "--url", "../store.git")
+    datalad(mock_project, "push", "--to", "store")
+    _, record = run_freeze(mock_project, "pilot", datalad_exe())
+    # datalad push sends neither tags nor the content of older versions.
+    datalad(mock_project, "push", "--to", "store", "--data", "anything")
+    git(mock_project, "push", "store", "pilot")
+    change_child_w2(mock_project, datalad)
+    datalad(mock_project, "save", "-m", "Later change")
+    datalad(mock_project, "push", "--to", "store")
+
+    (tmp_path / "elsewhere").mkdir()
+    datalad(tmp_path / "elsewhere", "clone", "../store.git", "lab")
+    copy = run_open_freeze(tmp_path / "elsewhere" / "lab", "pilot", datalad_exe())
+    assert differences(record, run_catalog(copy).manifest) == []
