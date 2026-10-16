@@ -4,6 +4,7 @@ import csv
 import math
 import statistics
 import sys
+from itertools import pairwise
 from pathlib import Path
 
 MIN_SECONDS = 180
@@ -23,7 +24,7 @@ for person in people:
     features = ["", "", ""]
     # Short or noisy recordings give unstable variability, so only their length and quality are kept.
     if seconds >= MIN_SECONDS and share >= MIN_CLEAN:
-        successive = [b - a for a, b in zip(good, good[1:])]
+        successive = [b - a for a, b in pairwise(good)]
         features = [
             round(60000 / statistics.mean(good), 1),
             round(math.sqrt(statistics.mean(d * d for d in successive)), 1),
