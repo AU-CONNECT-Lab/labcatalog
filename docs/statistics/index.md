@@ -4,7 +4,7 @@ labcatalog computes the statistics most papers report: reliability (Cronbach's Î
 
 ## R first, Python second
 
-When R is set up on the Settings page (see [Set Up R and Language Models](../how-to/r-and-models.md)), every analysis runs in R. Without R, or when R fails, the same analysis runs in Python. Each result says which one computed it.
+When R is set up on the Settings page (see [Set Up R and Language Models](../how-to/r-and-models.md)), the analyses on the Analysis and Methods pages and the factor models run in R. Without R, or when R fails, the same analyses run in Python, and each result says which one computed it. The descriptive statistics and reliability on the instrument pages are always computed in Python.
 
 | | R | Python |
 |---|---|---|

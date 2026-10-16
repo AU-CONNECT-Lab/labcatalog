@@ -45,11 +45,11 @@ For a pipeline's features, every item is a `number` and its text says what it is
 
 ```yaml
 items:
-  - {id: frontal_alpha_asymmetry, text: "Frontal alpha asymmetry: log alpha power at F4 minus F3", type: number, min: -3, max: 3}
-  - {id: epochs_kept, text: "Clean two-second epochs kept, out of 60", type: number, min: 0, max: 60}
+  - {id: frontal_alpha_asymmetry, label: Frontal alpha asymmetry, text: "Frontal alpha asymmetry: log alpha power at F4 minus F3", type: number, min: -3, max: 3}
+  - {id: epochs_kept, label: Clean epochs, text: "Clean two-second epochs kept, out of 60", type: number, min: 0, max: 60}
 ```
 
-Number items can be used directly in correlations, regressions and multilevel models, without a score.
+Number items can be used directly in correlations, regressions and multilevel models, without a score. A `label` gives an item a short name for those tables and the text written from them; without one, the item's full text is used.
 
 ## Response sets
 

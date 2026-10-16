@@ -31,7 +31,7 @@ A step is **outdated** when one of its inputs is newer than one of its outputs. 
 
 ## Run the steps
 
-The **Prepare** page lists every step with its status and the dates of its files. Press **Run** on one step, or **Run all** to run every step in order; a step that fails stops the rest. **Stop** ends the running step, and **Log** shows what the command printed. Press **Refresh** afterwards to read the new data.
+The **Prepare** page lists every step with its status and the dates of its files. Press **Run** on one step, **Run outdated** to run only the steps that are not up to date, or **Run all** to run every step in order; a step that fails stops the rest. **Stop** ends the running step, and **Log** shows what the command printed. Press **Refresh** afterwards to read the new data.
 
 On the command line, this runs every step in order and stops at the first failure:
 

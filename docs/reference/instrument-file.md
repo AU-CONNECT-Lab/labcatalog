@@ -40,6 +40,7 @@ name: Example Mood Scale
 | Key | Type | Default | Meaning |
 |---|---|---|---|
 | `id` | text | | The item's ID, unique within the instrument. Required. |
+| `label` | text | the text | A short name for tables and text, such as "Child age". |
 | `text` | text | | The wording. Required. |
 | `type` | `choice`, `number` or `text` | `choice` | Answered with an option, an amount, or an open answer. |
 | `response_set` | text | | Its response set, when not the default. |
