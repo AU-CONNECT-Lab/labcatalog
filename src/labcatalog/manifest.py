@@ -71,7 +71,7 @@ def commit_of(root: Path, branch: str, paths: list[str]) -> str:
 
 
 def original_branch(root: Path) -> str:
-    # git-annex on Windows works on adjusted/main(unlocked), whose commits never leave this computer.
+    # git-annex on Windows works on adjusted/main(unlocked), a local branch that is never pushed.
     branch = run_git(root, "rev-parse", "--abbrev-ref", "HEAD")
     if branch.startswith(ADJUSTED):
         return branch[len(ADJUSTED) : branch.index("(")]
