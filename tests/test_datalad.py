@@ -255,6 +255,8 @@ def test_a_freeze_saves_and_tags_the_commit_clones_share(mock_project, datalad):
     with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
         handle.write("data/** annex.largefiles=anything\n")
     datalad(mock_project, "save", "-m", "Add the catalog")
+    # Annexed files are locked on Linux until unlocked.
+    datalad(mock_project, "unlock", "data/child_w2.csv")
     path = mock_project / "data" / "child_w2.csv"
     path.write_text(path.read_text(encoding="utf-8").replace(",2,", ",3,", 1), encoding="utf-8")
     (mock_project / "outputs").mkdir()
@@ -277,6 +279,7 @@ def test_a_freeze_tags_a_data_subdataset_and_the_dataset_above_it(mock_project, 
     datalad(mock_project, "create", "-c", "text2git", "--force", ".")
     datalad(mock_project, "create", "-d", ".", "--force", "data")
     datalad(mock_project, "save", "-r", "-m", "Add the catalog")
+    datalad(mock_project / "data", "unlock", "child_w2.csv")
     path = mock_project / "data" / "child_w2.csv"
     path.write_text(path.read_text(encoding="utf-8").replace(",2,", ",3,", 1), encoding="utf-8")
 
