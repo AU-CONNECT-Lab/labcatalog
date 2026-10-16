@@ -6,6 +6,7 @@ from pathlib import Path
 from nicegui import app, run, ui
 
 from labcatalog import ai_scoring, measures
+from labcatalog.ai_search import Search
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, missing_codes_for
@@ -44,6 +45,7 @@ from labcatalog.pipeline import (
     run_description_draft,
     run_get,
     run_scoring_script,
+    run_search,
 )
 from labcatalog.project import Project, reference_pdf
 from labcatalog.resolve import as_text_dict
@@ -68,6 +70,11 @@ class BrowseView:
     instrument: str | None = None
     # Instruments ticked for export, kept across filters and refreshes.
     chosen: set[str] = field(default_factory=set)
+    asked: Search | None = None
+
+    @property
+    def only(self) -> set[str] | None:
+        return self.asked.instruments if self.asked else None
 
 
 @dataclass
@@ -92,7 +99,7 @@ def render(
     if view.instrument not in result.project.instruments:
         browser(result, index, view, on_open)
         return
-    found = matches(index, view.selected, view.query, view.items)
+    found = matches(index, view.selected, view.query, view.items, view.only)
     ui.button("All instruments", icon="arrow_back", on_click=lambda: on_open(None)).props(
         "flat dense no-caps"
     )
@@ -112,7 +119,7 @@ def browser(
 
     @ui.refreshable
     def results() -> None:
-        found = matches(index, view.selected, view.query, view.items)
+        found = matches(index, view.selected, view.query, view.items, view.only)
 
         @ui.refreshable
         def chosen_bar() -> None:
@@ -165,7 +172,99 @@ def browser(
             facets()
             ui.button("Clear filters", on_click=clear).props("flat dense no-caps")
         with ui.column().classes("grow min-w-0"):
+            ask_panel(result, view, changed, on_open)
             results()
+
+
+def ask_panel(
+    result: CatalogResult,
+    view: BrowseView,
+    changed: Callable[[], None],
+    on_open: Callable[[str | None], None],
+) -> None:
+    @ui.refreshable
+    def answer() -> None:
+        if view.asked is None:
+            return
+        asked = view.asked
+        if not asked.matches:
+            note("The model found nothing that fits.")
+        for instrument_id in unique(m.instrument_id for m in asked.matches):
+            instrument = result.project.instruments[instrument_id]
+            items = {item.id: item for item in instrument.items}
+            ui.button(instrument.name, on_click=lambda i=instrument_id: on_open(i)).props(
+                "flat dense no-caps"
+            ).classes("font-medium -ml-2")
+            for found in asked.matches:
+                if found.instrument_id != instrument_id:
+                    continue
+                with ui.column().classes("gap-0 ml-4 mb-1"):
+                    if found.item_id:
+                        ui.label(f"{found.item_id}: {as_text(items[found.item_id].text)}")
+                    note(found.reason)
+        if asked.dropped:
+            note(f"Left out {asked.dropped} matches naming items the catalog does not have.")
+
+    async def ask() -> None:
+        query = (box.value or "").strip()
+        if not query:
+            return
+        button.disable()
+        status.set_text("Asking the language model.")
+        chosen = preferences.load()
+        try:
+            asked = await run.io_bound(
+                run_search,
+                result,
+                query,
+                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
+                chosen.get(preferences.LLM_MODEL, ""),
+                chosen.get(preferences.LLM_URL, ""),
+            )
+        except LabCatalogError as err:
+            status.set_text(str(err))
+        else:
+            meta = asked.meta
+            status.set_text(
+                f"{len(asked.matches)} matches in {len(asked.instruments)} instruments, from "
+                f"{meta.model} in {meta.latency_ms / 1000:.0f} s, {meta.input_tokens} tokens in "
+                f"and {meta.output_tokens} out. The list below shows only these instruments."
+            )
+            view.asked = asked
+            answer.refresh()
+            changed()
+        finally:
+            button.enable()
+
+    def clear() -> None:
+        view.asked = None
+        box.value = ""
+        status.set_text("")
+        answer.refresh()
+        changed()
+
+    with ui.expansion("Ask the language model", icon="manage_search", value=bool(view.asked)):
+        if not model_set():
+            note("Set a language model on the Settings page to search the catalog with it.")
+            return
+        note(
+            "Describe what you are looking for in your own words. Sends the instruments' names, "
+            "labels and item texts, never any data, to the model set on the Settings page."
+        )
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            box = (
+                ui.input(
+                    placeholder="e.g. trouble falling asleep",
+                    value=view.asked.query if view.asked else "",
+                )
+                .props("dense outlined")
+                .classes("grow")
+            )
+            box.on("keydown.enter", ask)
+            button = ui.button("Ask", on_click=ask).props("no-caps")
+            ui.button("Clear", on_click=clear).props("flat no-caps")
+        status = ui.label().classes("lc-note")
+        answer()
 
 
 def export_dialog(result: CatalogResult, found: dict[str, list[str]], view: BrowseView) -> None:
@@ -230,7 +329,7 @@ def facet_panel(index: BrowseIndex, view: BrowseView, changed: Callable[[], None
             chosen.discard(value)
         changed()
 
-    found = counts(index, view.selected, view.query, view.items)
+    found = counts(index, view.selected, view.query, view.items, view.only)
     for facet in index.facets:
         # A facet with one value cannot narrow anything.
         if len(facet.values) < 2:

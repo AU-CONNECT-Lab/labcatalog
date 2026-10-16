@@ -88,9 +88,13 @@ def build_index(project: Project) -> BrowseIndex:
 
 
 def matches(
-    index: BrowseIndex, selected: dict[str, set[str]], query: str = "", items: bool = False
+    index: BrowseIndex,
+    selected: dict[str, set[str]],
+    query: str = "",
+    items: bool = False,
+    only: set[str] | None = None,
 ) -> dict[str, list[str]]:
-    allowed = text_matches(index, query, items)
+    allowed = text_matches(index, query, items, only)
     found: dict[str, list[str]] = {}
     for row in index.rows:
         if row.instrument_id in allowed and row_selected(row, selected):
@@ -101,10 +105,14 @@ def matches(
 
 
 def counts(
-    index: BrowseIndex, selected: dict[str, set[str]], query: str = "", items: bool = False
+    index: BrowseIndex,
+    selected: dict[str, set[str]],
+    query: str = "",
+    items: bool = False,
+    only: set[str] | None = None,
 ) -> dict[str, dict[str, int]]:
     # Each facet is counted with the other facets applied, so its own values stay alternatives.
-    allowed = text_matches(index, query, items)
+    allowed = text_matches(index, query, items, only)
     result = {}
     for facet in index.facets:
         others = {name: chosen for name, chosen in selected.items() if name != facet.name}
@@ -121,12 +129,16 @@ def row_selected(row: Administered, selected: dict[str, set[str]]) -> bool:
     return all(not chosen or row.values[name] & chosen for name, chosen in selected.items())
 
 
-def text_matches(index: BrowseIndex, query: str, items: bool) -> set[str]:
+def text_matches(
+    index: BrowseIndex, query: str, items: bool, only: set[str] | None = None
+) -> set[str]:
+    # only: the instruments a language-model search found, applied on top of the words.
     terms = query.lower().split()
     return {
         i
         for i in index.instruments
-        if all(term in index.text[i] or (items and term in index.item_text[i]) for term in terms)
+        if (only is None or i in only)
+        and all(term in index.text[i] or (items and term in index.item_text[i]) for term in terms)
     }
 
 

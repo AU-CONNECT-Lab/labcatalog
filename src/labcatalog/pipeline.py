@@ -8,6 +8,7 @@ import pandas as pd
 from labcatalog import codebook
 from labcatalog.ai_measures import Draft, draft_description
 from labcatalog.ai_scoring import write_scoring_scripts
+from labcatalog.ai_search import Search, search_catalog
 from labcatalog.check import CheckReport, check_project
 from labcatalog.codebook import ImportResult
 from labcatalog.codegen import label_snippets, scoring_snippets
@@ -132,6 +133,11 @@ def run_description_draft(
 ) -> Draft:
     client = make_llm_client(provider, model, url)
     return draft_description(result.project, instrument_id, client)
+
+
+def run_search(result: CatalogResult, query: str, provider: str, model: str, url: str) -> Search:
+    client = make_llm_client(provider, model, url)
+    return search_catalog(result.project, query, client)
 
 
 def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze]:
