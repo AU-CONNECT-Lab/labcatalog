@@ -6,7 +6,7 @@ from pathlib import Path
 import webview
 from nicegui import app, run, ui
 
-from labcatalog import ai_scoring
+from labcatalog import ai_scoring, measures
 from labcatalog.browse import BrowseIndex, counts, matches
 from labcatalog.cfa import SUBSCALES, CfaFit
 from labcatalog.charts import views
@@ -27,7 +27,7 @@ from labcatalog.gui.common import (
     table,
     unique,
 )
-from labcatalog.gui.paper import paper_table, save_button
+from labcatalog.gui.paper import copy_text, paper_table, save_button
 from labcatalog.history import file_history
 from labcatalog.invariance import STEPS, InvarianceTest
 from labcatalog.pipeline import CatalogResult, run_scoring_script
@@ -322,6 +322,7 @@ def dataset_part(
         heading(f"Items in {dataset}")
         table(*variable_table(result, instrument, dataset))
         factor_structure(result, instrument, dataset, cfa)
+        measures_section(result, instrument, dataset, cfa)
         charts.instrument_dataset_section(result, instrument.id, dataset)
         scoring_code(result, instrument, dataset)
 
@@ -503,6 +504,7 @@ def score_summaries(result: CatalogResult, instrument: Instrument, dataset: str)
 def cfa_changed() -> None:
     score_statistics.refresh()
     factor_structure.refresh()
+    measures_section.refresh()
     invariance_section.refresh()
 
 
@@ -688,6 +690,24 @@ def factor_structure(
         for shown in papers.values():
             paper_table(shown)
         save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
+
+
+@ui.refreshable
+def measures_section(
+    result: CatalogResult, instrument: Instrument, dataset: str, cfa: CfaView
+) -> None:
+    fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
+    text = measures.paragraph(
+        result.project, result.catalog, result.summary, instrument, dataset, omegas(fits)
+    )
+    heading(f"Measures paragraph for {dataset}")
+    ui.label(text).classes("max-w-4xl")
+    copy_text(text)
+    note(
+        "A draft for the paper's Measures section, with α and ω from this dataset. Add "
+        "description: to the instrument's YAML for what it measures; change the wording with "
+        "measures: in labcatalog.yaml or in the instrument's YAML."
+    )
 
 
 def without_empty(

@@ -106,10 +106,11 @@ def plain(table: PaperTable) -> str:
     return "\n".join(lines)
 
 
-def latex(table: PaperTable) -> str:
-    def tex(text: str) -> str:
-        return "".join(TEX.get(ch, ch) for ch in text)
+def tex(text: str) -> str:
+    return "".join(TEX.get(ch, ch) for ch in text)
 
+
+def latex(table: PaperTable) -> str:
     def rich(text: str) -> str:
         return "".join(
             rf"\textit{{{tex(part)}}}" if italic else tex(part) for part, italic in segments(text)

@@ -26,12 +26,25 @@ class Chart:
 
 def paper_table(shown: PaperTable) -> None:
     ui.html(tables.html(shown, page=True), sanitize=False).classes("max-w-full overflow-x-auto")
-    latex = preferences.load().get(preferences.TABLE_FORMAT) == preferences.LATEX
-    kinds = (
-        {"text/plain": tables.latex(shown)}
-        if latex
-        else {"text/html": tables.html(shown), "text/plain": tables.plain(shown)}
-    )
+    if wants_latex():
+        copy_button("Copy as LaTeX", "Table", {"text/plain": tables.latex(shown)})
+    else:
+        kinds = {"text/html": tables.html(shown), "text/plain": tables.plain(shown)}
+        copy_button("Copy table", "Table", kinds)
+
+
+def copy_text(text: str) -> None:
+    if wants_latex():
+        copy_button("Copy as LaTeX", "Text", {"text/plain": tables.tex(text)})
+    else:
+        copy_button("Copy text", "Text", {"text/plain": text})
+
+
+def wants_latex() -> bool:
+    return preferences.load().get(preferences.TABLE_FORMAT) == preferences.LATEX
+
+
+def copy_button(label: str, what: str, kinds: dict[str, str]) -> None:
     blobs = ", ".join(
         f"{json.dumps(kind)}: new Blob([{json.dumps(text)}], {{type: {json.dumps(kind)}}})"
         for kind, text in kinds.items()
@@ -41,16 +54,16 @@ def paper_table(shown: PaperTable) -> None:
         f"() => navigator.clipboard.write([new ClipboardItem({{{blobs}}})])"
         ".then(() => emit('copied'), (error) => emit(String(error)))"
     )
-    ui.button("Copy as LaTeX" if latex else "Copy table", icon="content_copy").props(
-        "flat dense no-caps"
-    ).on("click", copied, js_handler=copy)
+    ui.button(label, icon="content_copy").props("flat dense no-caps").on(
+        "click", lambda event: copied(event, what), js_handler=copy
+    )
 
 
-def copied(event: GenericEventArguments) -> None:
+def copied(event: GenericEventArguments, what: str) -> None:
     if event.args == "copied":
-        ui.notify("Table copied")
+        ui.notify(f"{what} copied")
     else:
-        ui.notify(f"Could not copy the table: {event.args}", type="warning")
+        ui.notify(f"Could not copy: {event.args}", type="warning")
 
 
 def save_button(
