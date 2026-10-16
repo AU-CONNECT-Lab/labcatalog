@@ -100,4 +100,4 @@ scores:
   - {id: ems_sadness, label: Sadness, method: sum, items: [ems_2, ems_6, ems_7], custom: {topics: [negative affect]}}
 ```
 
-A field can apply to an `instrument`, a `score`, an `administration` or a `dataset`, and be `text`, `number`, `date`, `choice` or `tags`. Choice and tags fields can be added to the filters on the Instruments page with `browse.facets`.
+A field can apply to an `instrument`, a `score`, an `administration` or a `dataset`, and be `text`, `number`, `date`, `choice` or `tags`. Choice and tags fields can be added to the filters on the Instruments page with `browse.facets`. [Tag Scores with RDoC](../how-to/tag-rdoc.md) gives two ready-made fields.

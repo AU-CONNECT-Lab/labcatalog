@@ -39,6 +39,7 @@ project:
     - title: How-To Guides
       children:
         - file: how-to/add-instrument.md
+        - file: how-to/tag-rdoc.md
         - file: how-to/add-dataset.md
         - file: how-to/prepare-steps.md
         - file: how-to/fix-problems.md
