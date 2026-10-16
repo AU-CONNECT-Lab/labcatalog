@@ -25,7 +25,7 @@ The **Problems** tab shows how many problems the project has, in red when any is
 |---|---|
 | [Overview](overview.md) | The project at a glance: waves, collection, scores. |
 | [Instruments](instruments.md) | Browse, search and export instruments; each instrument's items, scores, reliability and factor structure. |
-| [Studies](studies.md) | Each study's label, reference, waves, milestones and methods text; new and renamed studies. |
+| [Studies](studies.md) | Each study's label, reference, waves, milestones and methods text; new, renamed and deleted studies. |
 | [Datasets](datasets.md) | Each data file: who is in it, completeness, missing values; freezes. |
 | [Analysis](analysis.md) | Correlations, regression, group comparisons and multilevel models. |
 | [Methods](methods.md) | Draft text and tables for a methods section. |

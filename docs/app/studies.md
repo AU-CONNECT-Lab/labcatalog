@@ -2,7 +2,7 @@
 
 The Studies page shows and edits each study: its label, description and reference, its waves and milestones from `studies` in `labcatalog.yaml`, and the methods text and Participants template from its study file. The studies are listed on the left; click one to open it. See [Studies, Waves and Datasets](../concepts/studies-waves-datasets.md).
 
-A study opens with its label and ID on top, the buttons **Rename**, **Discard** and **Save**, and three tabs: Study, Text and Datasets.
+A study opens with its label and ID on top, the buttons **Rename**, **Delete**, **Discard** and **Save**, and three tabs: Study, Text and Datasets.
 
 ## Study
 
@@ -37,3 +37,7 @@ The study's datasets, as on the [Datasets](datasets.md) page. Click a row to ope
 ## Rename
 
 **Rename** changes the study's ID everywhere it is used: under `studies` in `labcatalog.yaml`, in the `study` of each of its datasets, and in its study file, which is renamed to the new ID when it was named after the old one. Warnings you marked as fine on the [Problems](problems.md) page that name the old ID show again.
+
+## Delete
+
+**Delete** removes the study from `labcatalog.yaml`, together with its datasets, their column maps in `maps/` and its study file. The window lists everything it will remove, and **Delete** works only after you type the study's ID. The data files stay where they are, and so do any prepare steps that make them; remove those on the [Edit](edit.md) page if they are no longer needed. labcatalog keeps no copy of what it removes, so to undo a deletion, restore the files from git or DataLad.

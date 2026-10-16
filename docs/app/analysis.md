@@ -50,7 +50,9 @@ A linear mixed model of one outcome across waves. This section picks its own wav
 
 The results are three tables: **Fixed Effects** (*b*, *SE*, *df*, *t*, *p* and 95% CI; with Satterthwaite's *df* in R), **Random Effects** (variances, SDs and the slope-intercept correlation) and **Model Summary** (the ICC of each level, the numbers of observations, people and groups, and fit statistics). A warning appears when the fit is singular, that is, when a random effect cannot be estimated from these data; a simpler model, such as one without the random slope, may then fit.
 
-**Save to outputs** writes the tables, the R and Python code, and `multilevel_data.csv`, with one row per person and wave.
+Below the tables, a chart of the trajectories draws each person's values across the waves as thin lines, each wave's mean as a circle, and the fixed effects' prediction (intercept plus time) as a thick line. With covariates in the model, the line is the prediction for the mean of each number covariate and the reference option of each answer covariate.
+
+**Save to outputs** writes the tables, the chart, the R and Python code, and `multilevel_data.csv`, with one row per person and wave.
 
 ## Saved files
 
