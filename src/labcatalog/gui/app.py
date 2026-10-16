@@ -115,6 +115,13 @@ class Window:
         self.home: Path | None = None
 
     def build(self) -> None:
+        appearance = preferences.load().get(preferences.APPEARANCE, theme.DEFAULT_APPEARANCE)
+        # A value saved by another version may no longer exist.
+        appearance = appearance if appearance in theme.APPEARANCES else theme.DEFAULT_APPEARANCE
+        self.dark_mode = ui.dark_mode(theme.mode_value(appearance))
+        theme.set_dark(appearance == theme.DARK)
+        if appearance == theme.SYSTEM:
+            ui.timer(0, self.follow_system, once=True)
         with ui.header().classes("lc-header block px-6 pt-3 pb-0"):
             with ui.row().classes("w-full items-center gap-4"):
                 self.title = ui.label("No project open").classes("lc-project")
@@ -171,6 +178,7 @@ class Window:
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-page"):
                 settings.render(
+                    self.set_appearance,
                     self.set_palette,
                     self.start_cfa,
                     self.instruments_panel.refresh,
@@ -272,6 +280,23 @@ class Window:
             return
         cfa.invariance, cfa.invariance_message, cfa.invariance_status = found
         cfa_changed()
+
+    async def set_appearance(self, name: str) -> None:
+        preferences.save({preferences.APPEARANCE: name})
+        self.dark_mode.set_value(theme.mode_value(name))
+        if name == theme.SYSTEM:
+            await self.follow_system()
+            return
+        theme.set_dark(name == theme.DARK)
+        if self.result is not None:
+            self.show_result()
+
+    async def follow_system(self) -> None:
+        # Figures are drawn on the server, which cannot see the system setting.
+        on = await ui.run_javascript("window.matchMedia('(prefers-color-scheme: dark)').matches")
+        theme.set_dark(bool(on))
+        if self.result is not None:
+            self.show_result()
 
     def set_palette(self, name: str) -> None:
         style.use_palette(name)

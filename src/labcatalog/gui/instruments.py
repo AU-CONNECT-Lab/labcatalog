@@ -650,7 +650,7 @@ def reference_row(project: Project, reference: Reference) -> None:
             return
         with viewer:
             ui.element("iframe").props(f'src="{pdf_url(pdf)}"').classes("w-full").style(
-                "height: 80vh; border: 1px solid #e0e0e0"
+                "height: 80vh; border: 1px solid var(--lc-border)"
             )
 
 

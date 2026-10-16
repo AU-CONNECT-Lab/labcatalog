@@ -91,7 +91,7 @@ def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[Non
             for step in project.config.prepare:
                 with ui.row().classes("items-baseline gap-2 no-wrap"):
                     ui.label(step.name).classes("font-medium")
-                    ui.label(step.run).classes("font-mono text-grey-7")
+                    ui.label(step.run).classes("font-mono lc-note")
 
             async def go() -> None:
                 dialog.close()
@@ -153,18 +153,18 @@ def step_row(
             ui.label(step.name).classes("text-base font-medium")
             ui.badge(state.status, color=STATUS_COLORS[state.status]).props("outline")
             if last:
-                ui.label(f"Last run: {last.outcome}").classes("text-grey-7")
+                ui.label(f"Last run: {last.outcome}").classes("lc-note")
             ui.space()
             if last:
                 ui.button("Log", on_click=lambda: show_log(step.name)).props("flat dense no-caps")
             ui.button("Run", icon="play_arrow", on_click=lambda: start([step.name])).props(
                 "dense outline no-caps"
             ).set_enabled(not view.running)
-        ui.label(step.run).classes("font-mono text-grey-8")
+        ui.label(step.run).classes("font-mono lc-note")
         with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0 items-baseline"):
             for label, files in (("Inputs", state.inputs), ("Outputs", state.outputs)):
                 if files:
-                    ui.label(label).classes("text-grey-7")
+                    ui.label(label).classes("lc-note")
                     with ui.row().classes("gap-x-4 gap-y-0"):
                         for f in files:
                             file_label(f, on_got)

@@ -9,17 +9,63 @@
   --lc-accent: #1d4e89;
   --lc-accent-soft: #e8eef5;
   --lc-ok: #1a7f37;
+  --lc-ok-soft: #e9f5ec;
   --lc-warn: #9a6700;
+  --lc-warn-soft: #fbf3dc;
   --lc-bad: #cf222e;
+  --lc-bad-soft: #fdecec;
+  --lc-page: #fff;
+  --lc-panel: #fff;
+  --lc-header: rgba(255, 255, 255, 0.92);
+  --lc-scroll: rgba(31, 35, 40, 0.16);
+  --lc-scroll-hover: rgba(31, 35, 40, 0.28);
+  --lc-shadow: rgba(31, 35, 40, 0.12);
+  --lc-tooltip: #1f2328;
+  --lc-tooltip-ink: #fff;
+  --lc-mark: #fff8c5;
   --lc-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
     "Microsoft YaHei", sans-serif;
   --lc-serif: "Bitstream Charter", Charter, Georgia, Times, serif;
   --lc-mono: "Cascadia Mono", Consolas, Menlo, monospace;
 }
 
+/* Quasar marks the body when dark mode is on; the tokens above change, the rules below stay. */
+body.body--dark {
+  --lc-ink: #e6edf3;
+  --lc-muted: #9198a1;
+  --lc-faint: #6e7681;
+  --lc-rule: #30363d;
+  --lc-rule-soft: #262c33;
+  --lc-border: #3d444d;
+  --lc-surface: #0d1117;
+  --lc-accent: #4493f8;
+  --lc-accent-soft: rgba(56, 139, 253, 0.15);
+  --lc-ok: #3fb950;
+  --lc-ok-soft: rgba(46, 160, 67, 0.15);
+  --lc-warn: #d29922;
+  --lc-warn-soft: rgba(187, 128, 9, 0.15);
+  --lc-bad: #f85149;
+  --lc-bad-soft: rgba(248, 81, 73, 0.15);
+  --lc-page: #0d1117;
+  --lc-panel: #161b22;
+  --lc-header: rgba(13, 17, 23, 0.92);
+  --lc-scroll: rgba(230, 237, 243, 0.16);
+  --lc-scroll-hover: rgba(230, 237, 243, 0.28);
+  --lc-shadow: rgba(1, 4, 9, 0.5);
+  --lc-tooltip: #e6edf3;
+  --lc-tooltip-ink: #0d1117;
+  --lc-mark: rgba(187, 128, 9, 0.3);
+  --q-dark: #161b22;
+  --q-dark-page: #0d1117;
+}
+/* Lighter primary text on dark; only an !important in the first layer beats Quasar's. */
+@layer theme {
+  body.body--dark .text-primary { color: var(--lc-accent) !important; }
+}
+
 /* ---- Base ---- */
-html body {
-  background: #fff;
+html body, html body.body--dark {
+  background: var(--lc-page);
   color: var(--lc-ink);
   font-family: var(--lc-sans);
   font-size: 14px;
@@ -38,17 +84,17 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(31, 35, 40, 0.16);
+  background: var(--lc-scroll);
   border: 2px solid transparent;
   border-radius: 6px;
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover { background-color: rgba(31, 35, 40, 0.28); }
+::-webkit-scrollbar-thumb:hover { background-color: var(--lc-scroll-hover); }
 ::-webkit-scrollbar-track { background: transparent; }
 
 /* ---- Header ---- */
 .q-header.lc-header {
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--lc-header);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--lc-rule);
   color: var(--lc-ink);
@@ -82,9 +128,9 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
-.lc-ok { color: var(--lc-ok); background: #e9f5ec; }
-.lc-warn { color: var(--lc-warn); background: #fbf3dc; }
-.lc-bad { color: var(--lc-bad); background: #fdecec; }
+.lc-ok { color: var(--lc-ok); background: var(--lc-ok-soft); }
+.lc-warn { color: var(--lc-warn); background: var(--lc-warn-soft); }
+.lc-bad { color: var(--lc-bad); background: var(--lc-bad-soft); }
 .lc-info { color: var(--lc-accent); background: var(--lc-accent-soft); }
 
 /* ---- Pages ---- */
@@ -119,11 +165,13 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
   color: var(--lc-faint);
 }
 .lc-note { color: var(--lc-muted); }
+.lc-faint { color: var(--lc-faint); }
+.lc-mark { background: var(--lc-mark); }
 .lc-prose { width: 100%; font-family: var(--lc-serif); font-size: 0.98rem; line-height: 1.7; }
 
 /* ---- Dashboard ---- */
 .lc-tile, .lc-panel {
-  background: #fff;
+  background: var(--lc-panel);
   border: 1px solid var(--lc-border);
   border-radius: 8px;
 }
@@ -132,7 +180,7 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.lc-tile:hover { border-color: var(--lc-accent); box-shadow: 0 1px 6px rgba(29, 78, 137, 0.12); }
+.lc-tile:hover { border-color: var(--lc-accent); box-shadow: 0 1px 6px var(--lc-shadow); }
 .lc-tile-icon {
   width: 32px;
   height: 32px;
@@ -168,10 +216,10 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
 }
 .lc-panel-body > .lc-facet:first-of-type { margin-top: 0.9rem; }
 
-/* A side column that stays in view and scrolls on its own; 112px clears the header. */
 /* Quasar makes tab panels their own scroll boxes, which stops sticky; the window scrolls instead. */
 .q-tab-panels.q-panel-parent { overflow: clip; }
 .q-tab-panels > .q-panel.scroll { overflow: visible; }
+/* A side column that stays in view and scrolls on its own; 112px clears the header. */
 .lc-sticky { position: sticky; top: 112px; max-height: calc(100vh - 128px); overflow-y: auto; }
 
 /* An expansion drawn as a panel whose header is the title bar. */
@@ -202,20 +250,21 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
 .q-menu {
   border: 1px solid var(--lc-rule);
   border-radius: 6px;
-  box-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
+  box-shadow: 0 8px 24px var(--lc-shadow);
 }
 .q-tooltip {
   padding: 5px 9px;
-  background: var(--lc-ink);
+  background: var(--lc-tooltip);
+  color: var(--lc-tooltip-ink);
   border-radius: 6px;
   font-size: 0.8rem;
 }
-.q-dialog .q-card { border-radius: 8px; box-shadow: 0 8px 24px rgba(31, 35, 40, 0.18); }
+.q-dialog .q-card { border-radius: 8px; box-shadow: 0 8px 24px var(--lc-shadow); }
 
 /* ---- Controls ---- */
 .q-btn { font-weight: 600; letter-spacing: 0; border-radius: 6px; }
 .q-btn.lc-quiet-btn {
-  background: #fff;
+  background: var(--lc-panel);
   border: 1px solid var(--lc-rule);
   color: var(--lc-muted);
   font-weight: 500;
@@ -223,7 +272,7 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
 .q-btn.lc-quiet-btn:hover { border-color: var(--lc-faint); color: var(--lc-ink); }
 .q-btn.lc-quiet-btn .q-focus-helper { display: none; }
 
-.q-field--outlined .q-field__control { border-radius: 6px; background: #fff; }
+.q-field--outlined .q-field__control { border-radius: 6px; background: var(--lc-panel); }
 .q-field--outlined .q-field__control:before { border-color: var(--lc-rule); }
 .q-field--outlined .q-field__control:hover:before { border-color: var(--lc-faint); }
 .q-field .q-chip {
@@ -247,6 +296,7 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
   border-radius: 0 !important;
   font-weight: 400;
 }
+.q-btn-toggle .q-btn:not(.text-primary) { color: var(--lc-muted); }
 .q-btn-toggle .q-btn.text-primary { border-bottom-color: var(--lc-accent); font-weight: 600; }
 .q-btn-toggle .q-btn .q-focus-helper { display: none; }
 

@@ -8,7 +8,7 @@ from nicegui import app, run, ui
 
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import preferences
+from labcatalog.gui import preferences, theme
 from labcatalog.gui.common import LINE_SUFFIX, heading, note
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
@@ -84,7 +84,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     def mark(line: int | None) -> None:
         if line is None:
             return
-        shown.editor.decorations = [{"kind": "line", "line": line, "class": "bg-yellow-2"}]
+        shown.editor.decorations = [{"kind": "line", "line": line, "class": "lc-mark"}]
         # The editor mounts after the Edit tab shows.
         ui.timer(0.3, partial(shown.editor.reveal_line, line), once=True)
 
@@ -278,6 +278,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 language=None if opened.path.endswith(".csv") else "YAML",
                 indent="  ",
                 line_wrapping=True,
+                theme=theme.codemirror_theme(),
             )
             .classes("w-full")
             .style("height: 65vh")
@@ -343,7 +344,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                             "dense clickable"
                         )
                         if path == view.path:
-                            item.classes("bg-blue-1 font-medium")
+                            item.classes("lc-info font-medium")
                 ui.button("New instrument", icon="add", on_click=lambda: leave(create)).props(
                     "flat dense no-caps"
                 ).classes("mt-2")

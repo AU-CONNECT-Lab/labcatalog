@@ -5,7 +5,7 @@ from nicegui import run, ui
 
 from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import common, datalad, preferences
+from labcatalog.gui import common, datalad, preferences, theme
 from labcatalog.gui.common import note, section
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
@@ -14,6 +14,7 @@ RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
 
 
 def render(
+    on_appearance: Callable[[str], Awaitable[None]],
     on_palette: Callable[[str], None],
     on_rscript: Callable[[], Awaitable[None]],
     on_model: Callable[[], None],
@@ -65,7 +66,12 @@ def render(
     datalad.datalad_section(on_datalad)
     models_section(on_model)
 
-    section("Charts")
+    section("Appearance")
+    ui.toggle(
+        theme.APPEARANCES,
+        value=preferences.load().get(preferences.APPEARANCE, theme.DEFAULT_APPEARANCE),
+        on_change=lambda e: on_appearance(e.value),
+    ).props("no-caps").classes("mt-2")
     ui.select(
         {name: p.label for name, p in style.PALETTES.items()},
         value=style.palette,

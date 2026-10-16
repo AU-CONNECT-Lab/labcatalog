@@ -5,6 +5,7 @@ from pathlib import Path
 
 FILENAME = "gui.json"
 PALETTE = "palette"
+APPEARANCE = "appearance"
 RSCRIPT = "rscript"
 DATALAD = "datalad"
 LLM_PROVIDER = "llm_provider"

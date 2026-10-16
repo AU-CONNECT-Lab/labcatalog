@@ -34,7 +34,7 @@ LOCATION_CELL = r"""
 </q-td>
 """
 CODE_CELL = r"""
-<q-td :props="props" class="text-grey-6 font-mono">{{ props.value }}</q-td>
+<q-td :props="props" class="lc-faint font-mono">{{ props.value }}</q-td>
 """
 
 

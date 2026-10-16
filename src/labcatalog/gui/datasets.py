@@ -52,7 +52,7 @@ def studies(
                 ui.label(study_config.description)
             if study_config.reference:
                 with ui.row().classes("items-baseline gap-2"):
-                    ui.label("How to cite").classes("text-grey-7")
+                    ui.label("How to cite").classes("lc-note")
                     cited(result.project.bibliography, study_config.reference)
             shown = table(*dataset_table(result, [summaries[n] for n in names])).classes("mt-2")
             shown.classes("cursor-pointer")
@@ -191,11 +191,11 @@ def facts(result: CatalogResult, summary: DatasetSummary) -> None:
         rows.append(("Data as of", summary.snapshot_date))
     with ui.grid(columns="auto 1fr").classes("gap-x-6 gap-y-1 mt-4 items-baseline"):
         for name, value in rows:
-            ui.label(name).classes("text-grey-7")
+            ui.label(name).classes("lc-note")
             ui.label(str(value))
         path = data_path(result, summary.dataset)
         if path:
-            ui.label("File").classes("text-grey-7")
+            ui.label("File").classes("lc-note")
             ui.label(path).classes("text-primary cursor-pointer").on(
                 "click", lambda: open_path(result.project.root / path)
             )
