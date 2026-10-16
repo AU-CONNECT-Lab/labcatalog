@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+from dataclasses import replace
 from glob import glob
 from types import SimpleNamespace
 
@@ -230,6 +231,35 @@ def test_r_and_python_agree_with_a_covariate_each_wave(result):
     assert [t.label for t in in_r.fixed][-1] == (
         "EEG: Clean two-second epochs kept, out of 60 (each wave)"
     )
+    close(in_r, ml.run(result, model, long, "FAA", None))
+
+
+def test_split_gives_each_persons_mean_and_the_deviation_from_it(result):
+    long = ml.long_frame(result, replace(eeg_model([EPOCHS, GENDER]), split=True))
+    frame = long.frame
+    assert [c.column for c in long.covariates] == [
+        "epochs_kept_mean",
+        "epochs_kept_within",
+        "dem_gender_w1",
+    ]
+    assert "epochs_kept" not in frame.columns
+    whole = ml.long_frame(result, eeg_model([EPOCHS])).frame["epochs_kept"]
+    assert (frame["epochs_kept_mean"] + frame["epochs_kept_within"]).equals(whole.astype(float))
+    by_person = frame.dropna(subset=["epochs_kept_mean"]).groupby("id")
+    assert (by_person["epochs_kept_mean"].nunique() == 1).all()
+    assert by_person["epochs_kept_within"].sum().abs().max() < 1e-9
+    assert long.covariates[0].label.endswith(ml.PERSON_MEAN)
+
+
+@needs_r
+def test_r_and_python_agree_on_a_split_covariate(result):
+    model = replace(eeg_model([EPOCHS]), split=True)
+    long = ml.long_frame(result, model)
+    in_r = ml.run(result, model, long, "FAA", rscript())
+    assert [t.label for t in in_r.fixed][-2:] == [
+        f"EEG: Clean two-second epochs kept, out of 60 (each wave){ml.PERSON_MEAN}",
+        f"EEG: Clean two-second epochs kept, out of 60 (each wave){ml.DEVIATION}",
+    ]
     close(in_r, ml.run(result, model, long, "FAA", None))
 
 

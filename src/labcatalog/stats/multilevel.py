@@ -2,7 +2,7 @@ import contextlib
 import io
 import re
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 import numpy as np
@@ -35,6 +35,8 @@ INTERCEPT = "(Intercept)"
 RESIDUAL = "Residual"
 SINGULAR = "singular"
 OUTPUTS = ("icc", "fixed", "random", "fit_stats", "notes")
+PERSON_MEAN = ", person mean"
+DEVIATION = ", deviation from the person mean"
 
 R_HEADER = """\
 # Multilevel model for {project}, written by labcatalog.
@@ -175,6 +177,8 @@ class Model:
     by_person: bool = True
     by_group: bool = False
     slope: bool = True
+    # Each-wave number covariates as each person's mean and the wave's deviation from it.
+    split: bool = False
 
 
 @dataclass
@@ -408,7 +412,40 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
         for c in covariates:
             part[c.column] = c.lookup(people, links, configs[name].wave)
         parts.append(part)
-    return Long(pd.concat(parts, ignore_index=True), outcome, group, covariates, left_out)
+    frame = pd.concat(parts, ignore_index=True)
+    if model.split:
+        frame, covariates = split_within(frame, covariates, taken)
+    return Long(frame, outcome, group, covariates, left_out)
+
+
+def splittable(c: Covariate) -> bool:
+    return None not in c.sources and not c.levels
+
+
+def split_within(
+    frame: pd.DataFrame, covariates: list[Covariate], taken: set[str]
+) -> tuple[pd.DataFrame, list[Covariate]]:
+    # Between people: the person's mean over the waves; within: each wave minus that mean.
+    found = []
+    for c in covariates:
+        if not splittable(c):
+            found.append(c)
+            continue
+        mean = frame.groupby(PERSON)[c.column].transform("mean")
+        between = replace(
+            c, column=identifier(f"{c.column}_mean", taken), label=f"{c.label}{PERSON_MEAN}"
+        )
+        taken.add(between.column)
+        within = replace(
+            c, column=identifier(f"{c.column}_within", taken), label=f"{c.label}{DEVIATION}"
+        )
+        taken.add(within.column)
+        position = frame.columns.get_loc(c.column)
+        values = frame.pop(c.column)
+        frame.insert(position, within.column, values - mean)
+        frame.insert(position, between.column, mean)
+        found += [between, within]
+    return frame, found
 
 
 def covariate(result: CatalogResult, key: str, taken: set[str], study: str) -> Covariate:

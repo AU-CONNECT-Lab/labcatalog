@@ -160,6 +160,12 @@ def render(result: CatalogResult, view) -> None:
             value=model.slope,
             on_change=lambda e: change(slope=e.value),
         )
+        if any(ml.each_wave(k) for k in model.covariates):
+            ui.switch(
+                "Split each-wave covariates into person mean and deviation",
+                value=model.split,
+                on_change=lambda e: change(split=e.value),
+            )
     body()
 
 
@@ -226,6 +232,12 @@ def fixed_note(fitted: ml.Fitted, long: ml.Long) -> str:
         "from R's by a few percent"
     )
     parts = [f"Fitted by REML; {tested}; Wald 95% CIs."]
+    if any(c.label.endswith(ml.PERSON_MEAN) for c in long.covariates):
+        parts.append(
+            "Each-wave number covariates are split into each person's mean over the chosen "
+            "waves (the effect between people) and each wave's deviation from it (the effect "
+            "within a person); JASP does not split them by itself."
+        )
     parts += [f"{name}: compared with {level}." for name, level in ml.references(long)]
     return " ".join(parts)
 
