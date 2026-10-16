@@ -10,6 +10,9 @@ LLM_PROVIDER = "llm_provider"
 LLM_MODEL = "llm_model"
 LLM_URL = "llm_url"
 DEFAULT_LLM_PROVIDER = "anthropic"
+TABLE_FORMAT = "table_format"
+RICH = "rich"
+LATEX = "latex"
 
 
 def folder() -> Path:

@@ -64,6 +64,18 @@ def render(on_palette: Callable[[str], None], on_rscript: Callable[[], Awaitable
         on_change=lambda e: on_palette(e.value),
     ).props("outlined dense").classes("w-56 mt-2")
 
+    section("Tables")
+    note(
+        "The Copy button under each table on the Analysis page copies it as a three-line table, "
+        "as rich text for Word or Google Docs or as LaTeX (booktabs). Saving to outputs always "
+        "writes each table as .csv, .docx and .tex."
+    )
+    ui.toggle(
+        {preferences.RICH: "Word or Google Docs", preferences.LATEX: "LaTeX"},
+        value=preferences.load().get(preferences.TABLE_FORMAT, preferences.RICH),
+        on_change=lambda e: preferences.save({preferences.TABLE_FORMAT: e.value}),
+    ).props("no-caps").classes("mt-2")
+
 
 def models_section() -> None:
     section("Language model")

@@ -7,16 +7,19 @@ from functools import partial
 
 import plotly.graph_objects as go
 from nicegui import run, ui
+from nicegui.events import GenericEventArguments
 
-from labcatalog import analysis, analysis_script, outputs
+from labcatalog import analysis, analysis_script, outputs, tables
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import analysis_tables, charts
-from labcatalog.gui.common import apa, col, heading, note, open_path, section, table
+from labcatalog.gui import analysis_tables, charts, preferences
+from labcatalog.gui.common import apa, col, note, open_path, section
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult
+from labcatalog.tables import PaperTable
 
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
+STARS_NOTE = "*p < .05. **p < .01. ***p < .001."
 IMAGE_WIDTH = 900
 IMAGE_KINDS = ("png", "svg")
 
@@ -152,18 +155,20 @@ def correlation_section(
                 view.style = value
                 chart.refresh()
 
+            shown = PaperTable(
+                "Correlations Among Scores",
+                columns,
+                rows,
+                f"Pearson r, each pair on everyone with both scores ({n}). {STARS_NOTE}",
+            )
+
             def content() -> None:
                 with ui.row().classes("w-full gap-6 items-start"):
                     chart()
                     with charts.rest_column():
-                        table(columns, rows)
-                        note(
-                            f"Pearson r, each pair on everyone with both scores ({n}); "
-                            f"* p < .05, ** p < .01, *** p < .001. {engine}"
-                        )
-                        save_button(
-                            result, "correlations", {"correlations": (columns, rows)}, drawn
-                        )
+                        paper_table(shown)
+                        note(engine)
+                        save_button(result, "correlations", {"correlations": shown}, drawn)
 
             return content
 
@@ -256,13 +261,19 @@ def pair_section(
             fits = analysis_script.read_regressions(found, {v.column: x for x, v in usable.items()})
             fig = views.pair_scatter(result, sample, list(fits), y_key)
             columns, rows = fit_table(fits, choices)
+            shown = PaperTable(
+                f"Simple Regressions Predicting {choices[y_key]}",
+                columns,
+                rows,
+                "Each row is a separate regression of the outcome on one predictor, on everyone "
+                "with both scores; r with its 95% confidence interval.",
+            )
 
             def content() -> None:
                 drawn = Chart(charts.show(fig), fig)
-                heading("Statistics")
-                table(columns, rows)
+                paper_table(shown)
                 note(engine)
-                save_button(result, "regression", {"regression": (columns, rows)}, drawn)
+                save_button(result, "regression", {"regression": shown}, drawn)
 
             return content
 
@@ -343,15 +354,46 @@ def starred(found: analysis.Correlation) -> str:
     return apa(found.r) + next((stars for cut, stars in STARS if found.p < cut), "")
 
 
+def paper_table(shown: PaperTable) -> None:
+    ui.html(tables.html(shown, page=True), sanitize=False).classes("max-w-full overflow-x-auto")
+    latex = preferences.load().get(preferences.TABLE_FORMAT) == preferences.LATEX
+    kinds = (
+        {"text/plain": tables.latex(shown)}
+        if latex
+        else {"text/html": tables.html(shown), "text/plain": tables.plain(shown)}
+    )
+    blobs = ", ".join(
+        f"{json.dumps(kind)}: new Blob([{json.dumps(text)}], {{type: {json.dumps(kind)}}})"
+        for kind, text in kinds.items()
+    )
+    # The browser lets a page write the clipboard only inside the click itself.
+    copy = (
+        f"() => navigator.clipboard.write([new ClipboardItem({{{blobs}}})])"
+        ".then(() => emit('copied'), (error) => emit(String(error)))"
+    )
+    ui.button("Copy as LaTeX" if latex else "Copy table", icon="content_copy").props(
+        "flat dense no-caps"
+    ).on("click", copied, js_handler=copy)
+
+
+def copied(event: GenericEventArguments) -> None:
+    if event.args == "copied":
+        ui.notify("Table copied")
+    else:
+        ui.notify(f"Could not copy the table: {event.args}", type="warning")
+
+
 def save_button(
     result: CatalogResult,
     name: str,
-    tables: dict[str, tuple[list[dict], list[dict]]] | None = None,
+    papers: dict[str, PaperTable] | None = None,
     chart: Chart | None = None,
     texts: dict[str, str] | None = None,
 ) -> None:
     async def save() -> None:
-        files = {f"{n}.csv": outputs.table_csv(*shown) for n, shown in (tables or {}).items()}
+        files = {}
+        for paper_name, shown in (papers or {}).items():
+            files |= tables.files(paper_name, shown)
         files |= {n: text.encode("utf-8") for n, text in (texts or {}).items()}
         if chart is not None and chart.plot is not None:
             for kind in IMAGE_KINDS:

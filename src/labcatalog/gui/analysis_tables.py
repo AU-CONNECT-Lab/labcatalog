@@ -10,8 +10,9 @@ from labcatalog.charts import plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, preferences
-from labcatalog.gui.common import apa, col, note, section, table
+from labcatalog.gui.common import apa, col, note, section
 from labcatalog.pipeline import CatalogResult
+from labcatalog.tables import PaperTable
 
 TESTS = {"welch": "Welch's t test", "anova": "One-way ANOVA"}
 # Answer options sit under their question; plain spaces would collapse in the page.
@@ -78,15 +79,19 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
             rows = script.measure_variables(data, view.measures, items=True)
             code = script.table_one_code(sample.datasets, rows)
             found, engine = await compute(result, sample, data.frame(), code)
-            columns, shown = table_one_table(found["table1"], sample.datasets, labels)
+            columns, rows = table_one_table(found["table1"], sample.datasets, labels)
+            shown = PaperTable(
+                "Descriptive Statistics",
+                columns,
+                rows,
+                "M (SD) for numbers and scores on everyone with a value, α on everyone who "
+                "answered every item, n (%) of those who answered.",
+            )
 
             def content() -> None:
-                table(columns, shown)
-                note(
-                    f"M (SD) for numbers and scores on everyone with a value, α on everyone "
-                    f"who answered every item, n (%) of those who answered. {engine}"
-                )
-                page.save_button(result, "table1", {"table1": (columns, shown)})
+                page.paper_table(shown)
+                note(engine)
+                page.save_button(result, "table1", {"table1": shown})
 
             return content
 
@@ -185,24 +190,29 @@ def group_section(
             found, engine = await compute(result, sample, frame, plan.code)
             comparison = script.read_comparison(found, plan)
             fig = group_figure(frame, group, outcome, comparison, script.link_name(result))
-            group_columns, group_rows = group_table(comparison)
-            test_columns, test_rows = test_table(comparison)
+            left = ", ".join(f"{text} ({n})" for text, n in comparison.left_out)
+            papers = {
+                "groups": PaperTable(
+                    f"{outcome.label} by {groups[view.group]}",
+                    *group_table(comparison),
+                    f"Left out, fewer than two people: {left}." if left else "",
+                ),
+                "group_test": PaperTable(
+                    f"{TESTS[comparison.test]} of {outcome.label}",
+                    *test_table(comparison),
+                    test_note(comparison),
+                ),
+            }
 
             def content() -> None:
                 with ui.row().classes("w-full gap-6 items-start"):
                     with charts.figure_column(fig):
                         drawn = page.Chart(charts.show(fig), fig)
                     with charts.rest_column():
-                        table(group_columns, group_rows)
-                        table(test_columns, test_rows)
-                        left = ", ".join(f"{text} ({n})" for text, n in comparison.left_out)
-                        text = f"Left out, fewer than two people: {left}. " if left else ""
-                        note(f"{text}{engine}")
-                        tables = {
-                            "groups": (group_columns, group_rows),
-                            "group_test": (test_columns, test_rows),
-                        }
-                        page.save_button(result, "groups", tables, drawn)
+                        for shown in papers.values():
+                            page.paper_table(shown)
+                        note(engine)
+                        page.save_button(result, "groups", papers, drawn)
 
             return content
 
@@ -258,6 +268,16 @@ def group_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
         for g in comparison.groups
     ]
     return columns, rows
+
+
+def test_note(comparison: Comparison) -> str:
+    if comparison.test == "welch":
+        first, second = comparison.groups[0], comparison.groups[1]
+        return (
+            "d is Cohen's d with the pooled SD; the difference is "
+            f"{first.label} minus {second.label}, with its 95% confidence interval."
+        )
+    return "η² with its 95% confidence interval."
 
 
 def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:

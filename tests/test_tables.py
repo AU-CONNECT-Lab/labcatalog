@@ -74,15 +74,21 @@ def test_docx_holds_the_label_title_table_and_note():
     header = grid.rows[0].cells[1]._tc.tcPr.xml
     assert "w:top" in header and "w:bottom" in header
     assert "w:bottom" in grid.rows[2].cells[0]._tc.tcPr.xml
-    assert grid.rows[1].cells[0]._tc.tcPr.find(
-        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tcBorders"
-    ) is None
+    assert (
+        grid.rows[1]
+        .cells[0]
+        ._tc.tcPr.find("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}tcBorders")
+        is None
+    )
 
 
 def test_csv_uses_the_column_labels_and_opens_in_excel():
     content = csv(TABLE)
     assert content.startswith(b"\xef\xbb\xbf")
-    assert content.decode("utf-8-sig").splitlines()[:2] == ["Group,n,M (SD)", "Girls & boys,61,8.71 (5.62)"]
+    assert content.decode("utf-8-sig").splitlines()[:2] == [
+        "Group,n,M (SD)",
+        "Girls & boys,61,8.71 (5.62)",
+    ]
 
 
 def test_each_table_is_saved_in_three_formats():
