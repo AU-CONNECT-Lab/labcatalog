@@ -55,19 +55,19 @@ from labcatalog.pipeline import (
 from labcatalog.version import __version__
 
 WINDOW_SIZE = (1280, 820)
+# Groups of pages, drawn with a line between them; Settings is the gear in the header.
 PAGES = (
-    ("overview", "Overview"),
-    ("instruments", "Instruments"),
-    ("studies", "Studies"),
-    ("datasets", "Datasets"),
-    ("analysis", "Analysis"),
-    ("methods", "Methods"),
-    ("prepare", "Prepare"),
-    ("import", "Import"),
-    ("edit", "Edit"),
-    ("problems", "Problems"),
-    ("settings", "Settings"),
+    (
+        ("overview", "Overview"),
+        ("instruments", "Instruments"),
+        ("studies", "Studies"),
+        ("datasets", "Datasets"),
+    ),
+    (("analysis", "Analysis"), ("methods", "Methods")),
+    (("prepare", "Prepare"), ("import", "Import"), ("edit", "Edit")),
+    (("problems", "Problems"),),
 )
+SETTINGS = "settings"
 
 
 def launch(project: Path | None = None) -> None:
@@ -152,27 +152,43 @@ class Window:
                     .classes("lc-quiet-btn")
                 )
                 self.refresh_button.disable()
-                ui.button("Open example", icon="school", on_click=self.open_example).props(
-                    "flat"
-                ).classes("lc-quiet-btn")
-                self.open_button = ui.button(
-                    "Open project", icon="folder_open", on_click=self.choose_folder
+                with (
+                    ui.button("Open", icon="folder_open")
+                    .props("flat")
+                    .classes("lc-quiet-btn") as self.open_button
+                ):
+                    with ui.menu().props("anchor='bottom right' self='top right'"):
+                        ui.menu_item("Open project", on_click=self.choose_folder)
+                        ui.menu_item("Open example", on_click=self.open_example)
+                gear = (
+                    ui.button(icon="settings", on_click=lambda: self.tabs.set_value(SETTINGS))
+                    .props("flat round")
+                    .classes("lc-gear")
+                    .tooltip("Settings")
                 )
             with (
                 ui.tabs(value="overview")
                 .props("dense no-caps inline-label align=left active-color=primary")
                 .classes("lc-nav mt-2") as tabs
             ):
-                nav = {name: ui.tab(name, label=label) for name, label in PAGES}
+                nav = {}
+                for i, group in enumerate(PAGES):
+                    if i:
+                        ui.separator().props("vertical")
+                    nav |= {name: ui.tab(name, label=label) for name, label in group}
+                ui.tab(SETTINGS).classes("hidden")
                 with nav["problems"]:
                     self.badge = ui.label().classes("lc-pill ml-2")
                     self.badge.visible = False
         self.tabs = tabs
+        tabs.on_value_change(
+            lambda e: gear.classes(**{"add" if e.value == SETTINGS else "remove": "lc-active"})
+        )
 
         with ui.tab_panels(tabs, value="overview").classes("w-full bg-transparent"):
-            with ui.tab_panel("overview").classes("lc-page lc-board"):
+            with ui.tab_panel("overview").classes("lc-page"):
                 self.overview_panel()
-            with ui.tab_panel("instruments").classes("lc-page lc-board"):
+            with ui.tab_panel("instruments").classes("lc-page"):
                 self.instruments_panel()
             with ui.tab_panel("studies").classes("lc-page"):
                 self.studies_panel()
@@ -446,14 +462,14 @@ class Window:
     @ui.refreshable_method
     def prepare_panel(self) -> None:
         if self.root is None:
-            ui.label("Open a project folder to run its prepare steps.").classes("lc-note")
+            common.empty("Open a project folder to run its prepare steps.", "folder_open")
         else:
             prepare.render(self.root, self.preparing, lambda: self.load(self.root))
 
     @ui.refreshable_method
     def edit_panel(self) -> None:
         if self.root is None:
-            ui.label("Open a project folder to edit its files.").classes("lc-note")
+            common.empty("Open a project folder to edit its files.", "folder_open")
         else:
             edit.render(self.root, self.editing, lambda: self.load(self.root))
 
@@ -465,7 +481,7 @@ class Window:
     @ui.refreshable_method
     def problems_panel(self) -> None:
         if self.result is None:
-            ui.label(self.error or "Open a project folder to check it.").classes("lc-note")
+            common.empty(self.error or "Open a project folder to check it.", "folder_open")
         else:
             problems.render(
                 self.result.report, self.root, self.edit_location, self.open_fix, self.reload
@@ -482,11 +498,9 @@ class Window:
 
     def has_catalog(self) -> bool:
         if self.result is None:
-            ui.label(self.error or "Open a project folder to see its catalog.").classes("lc-note")
+            common.empty(self.error or "Open a project folder to see its catalog.", "folder_open")
         elif self.result.project is None:
-            ui.label("The project files have errors. Fix them, then press Refresh.").classes(
-                "lc-note"
-            )
+            common.empty("The project files have errors. Fix them, then press Refresh.", "error")
         self.get_missing_button()
         return self.result is not None and self.result.project is not None
 

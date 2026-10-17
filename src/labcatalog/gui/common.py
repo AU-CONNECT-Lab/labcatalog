@@ -56,12 +56,29 @@ def panel(title: str, subtitle: str = "") -> Iterator[ui.row]:
             yield tools
 
 
-def section(text: str) -> None:
-    ui.label(text).classes("lc-section")
+def page_head(title: str, summary: str = "", help_text: str = "") -> ui.row:
+    # Returns the right-hand row, for the page's own actions.
+    with ui.row().classes("lc-page-head w-full items-center no-wrap gap-4"):
+        with ui.column().classes("grow gap-0 min-w-0"):
+            with ui.row().classes("items-center no-wrap gap-1"):
+                ui.label(title).classes("lc-page-title")
+                if help_text:
+                    help_button(help_text)
+            if summary:
+                ui.label(summary).classes("lc-page-summary")
+        return ui.row().classes("items-center gap-2")
 
 
-def heading(text: str) -> None:
-    ui.label(text).classes("lc-heading")
+def help_button(text: str) -> None:
+    with ui.button(icon="help_outline").props("flat round dense size=sm").classes("lc-help-btn"):
+        with ui.menu().props("anchor='bottom left' self='top left'"):
+            ui.label(text).classes("lc-help")
+
+
+def empty(text: str, icon: str = "inbox") -> None:
+    with ui.column().classes("lc-empty w-full items-center gap-2"):
+        ui.icon(icon).classes("lc-empty-icon")
+        ui.label(text).classes("lc-empty-text")
 
 
 def caption(text: str) -> None:
@@ -140,6 +157,20 @@ def open_path(path: Path) -> None:
         subprocess.run(["open", str(path)], check=True)
     else:
         subprocess.run(["xdg-open", str(path)], check=True)
+
+
+def command(text: str) -> None:
+    # A command to type somewhere else, with a button that copies it.
+    with ui.row().classes("lc-command w-full items-center no-wrap gap-2"):
+        ui.label(text).classes("grow min-w-0 font-mono")
+        ui.button(icon="content_copy", on_click=lambda: copy_command(text)).props(
+            "flat round dense size=sm"
+        ).tooltip("Copy")
+
+
+def copy_command(text: str) -> None:
+    ui.clipboard.write(text)
+    ui.notify("Copied")
 
 
 def code_tabs(code: dict[str, str]) -> None:

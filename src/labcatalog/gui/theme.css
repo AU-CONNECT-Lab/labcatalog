@@ -14,7 +14,6 @@
   --lc-warn-soft: #fbf3dc;
   --lc-bad: #cf222e;
   --lc-bad-soft: #fdecec;
-  --lc-page: #fff;
   --lc-panel: #fff;
   --lc-header: rgba(255, 255, 255, 0.92);
   --lc-scroll: rgba(31, 35, 40, 0.16);
@@ -46,7 +45,6 @@ body.body--dark {
   --lc-warn-soft: rgba(187, 128, 9, 0.15);
   --lc-bad: #f85149;
   --lc-bad-soft: rgba(248, 81, 73, 0.15);
-  --lc-page: #0d1117;
   --lc-panel: #161b22;
   --lc-header: rgba(13, 17, 23, 0.92);
   --lc-scroll: rgba(230, 237, 243, 0.16);
@@ -65,7 +63,7 @@ body.body--dark {
 
 /* ---- Base ---- */
 html body, html body.body--dark {
-  background: var(--lc-page);
+  background: var(--lc-surface);
   color: var(--lc-ink);
   font-family: var(--lc-sans);
   font-size: 14px;
@@ -117,6 +115,10 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-nav .q-tab .q-focus-helper { display: none; }
 .lc-nav .q-tab__indicator { height: 2px; background: var(--lc-accent); }
 
+.lc-nav .q-separator--vertical { align-self: center; height: 18px; margin: 0 0.35rem; background: var(--lc-rule); }
+.q-btn.lc-gear { color: var(--lc-muted); }
+.q-btn.lc-gear:hover, .q-btn.lc-gear.lc-active { color: var(--lc-accent); background: var(--lc-accent-soft); }
+
 /* ---- Pills ---- */
 .q-badge, .lc-pill {
   display: inline-block;
@@ -134,27 +136,30 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-info { color: var(--lc-accent); background: var(--lc-accent-soft); }
 
 /* ---- Pages ---- */
-.q-tab-panel.lc-page { padding: 1.5rem 1.5rem 4rem; }
-.q-tab-panel.lc-board { gap: 16px; }
-/* Only the active panel is in the page, so this greys the window behind board pages alone. */
-body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
+.q-tab-panel.lc-page { padding: 1.5rem 1.5rem 4rem; gap: 16px; }
 
-.lc-section {
-  width: 100%;
-  margin-top: 2.5rem;
-  padding-bottom: 0.45rem;
-  border-bottom: 1px solid var(--lc-rule);
-}
-.lc-section { font-size: 1.1rem; font-weight: 600; color: var(--lc-ink); }
-.lc-page > .lc-section:first-child { margin-top: 0.5rem; }
-.lc-heading {
-  width: 100%;
-  margin-top: 1.5rem;
-  padding: 0.3rem 0 0.4rem;
-  border-bottom: 1px solid var(--lc-rule-soft);
-  font-size: 0.98rem;
-  font-weight: 600;
-  color: var(--lc-ink);
+.lc-page-head { padding: 0 2px 2px; }
+.lc-page-title { font-size: 1.15rem; font-weight: 600; line-height: 1.3; color: var(--lc-ink); }
+.lc-page-summary { font-size: 0.85rem; color: var(--lc-muted); }
+.q-btn.lc-help-btn { color: var(--lc-faint); }
+.q-btn.lc-help-btn:hover { color: var(--lc-accent); }
+.lc-help { width: 28rem; max-width: 90vw; padding: 12px 14px; color: var(--lc-ink); font-size: 0.85rem; line-height: 1.55; white-space: pre-line; }
+
+.lc-empty { padding: 3rem 1rem; text-align: center; }
+.lc-empty-icon { font-size: 2.4rem; color: var(--lc-faint); }
+.lc-empty-text { color: var(--lc-muted); }
+
+/* A row of actions under a result: buttons on the left, how it was computed on the right. */
+.lc-actions { padding-top: 4px; }
+.lc-engine { font-size: 0.78rem; color: var(--lc-faint); }
+
+.lc-command {
+  padding: 2px 4px 2px 10px;
+  background: var(--lc-surface);
+  border: 1px solid var(--lc-rule-soft);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
 }
 .lc-caption {
   margin: 1.2rem 0 0.3rem;
@@ -244,8 +249,30 @@ body:has(.q-tab-panel.lc-board) { background: var(--lc-surface); }
 .q-tabs.lc-subnav .q-tab__indicator { height: 2px; background: var(--lc-accent); }
 .q-tab-panel.lc-part { padding: 0; gap: 16px; }
 
-.lc-group { margin-top: 1.25rem; padding-bottom: 1.25rem; border-bottom: 1px solid var(--lc-rule); }
-.lc-group-title { font-size: 1.02rem; font-weight: 600; color: var(--lc-ink); }
+.lc-subhead {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--lc-rule-soft);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--lc-ink);
+}
+.lc-panel-body > .lc-subhead:first-child { margin-top: 0.25rem; }
+
+/* Rows of a list inside a panel, such as prepare steps and accepted warnings. */
+.lc-item { padding: 10px 16px; border-bottom: 1px solid var(--lc-rule-soft); }
+.lc-item:last-child { border-bottom: none; }
+.lc-item:hover { background: var(--lc-surface); }
+.lc-item-title { font-weight: 600; color: var(--lc-ink); }
+.lc-panel-body.lc-flush { padding: 0; }
+.lc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.lc-dot.lc-ok { background: var(--lc-ok); }
+.lc-dot.lc-warn { background: var(--lc-warn); }
+.lc-dot.lc-bad { background: var(--lc-bad); }
+
+/* A list of things to pick, like the Edit page's files and the Studies page's studies. */
+.q-item.lc-pick { min-height: 32px; padding: 4px 10px; border-radius: 6px; color: var(--lc-ink); }
 
 /* ---- Floating layers ---- */
 .q-menu {
