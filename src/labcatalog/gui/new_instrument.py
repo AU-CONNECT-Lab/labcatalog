@@ -224,7 +224,7 @@ def open_wizard(
     title = (
         f"Complete {draft.about.get('name', instrument_id)}" if completing else "Add an instrument"
     )
-    with ui.dialog().props("persistent") as dialog, ui.card().classes("w-[64rem] max-w-full"):
+    with ui.dialog().props("persistent") as dialog, ui.card().classes("w-[76rem] max-w-full"):
         ui.label(title).classes("text-lg font-medium")
         with ui.stepper(value=TITLES[first]).props("flat animated").classes("w-full") as stepper:
             with ui.step(TITLES["about"]):

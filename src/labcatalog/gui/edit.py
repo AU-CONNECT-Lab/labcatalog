@@ -404,8 +404,9 @@ def grid_options(table: records.Table, rows: list[dict]) -> dict:
             "cellDataType": {"bool": "boolean", "number": "number"}.get(column.kind, "text"),
         }
         if column is columns[0] and not table.single:
-            # A handle to drag the row up or down.
+            # A handle to drag the row up or down, which takes room from the ID.
             definition["rowDrag"] = True
+            definition["minWidth"] = 150
         if column.kind == "choice":
             definition["cellEditor"] = "agSelectCellEditor"
             definition["cellEditorParams"] = {"values": list(column.choices)}

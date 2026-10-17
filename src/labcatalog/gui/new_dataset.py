@@ -10,6 +10,7 @@ from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note, path_input
 from labcatalog.metadata import changes, new_dataset
+from labcatalog.paths import expand_path, stored_path
 from labcatalog.pipeline import CatalogResult
 
 DATA_FILES = "Data files (*.csv)"
@@ -117,20 +118,26 @@ def open_wizard(
             folder_path.set_value(selection[0])
             await scan_folder()
 
+    def typed_folder() -> Path | None:
+        text = (folder_path.value or "").strip()
+        return expand_path(text, project.root) if text else None
+
     async def scan_folder() -> None:
         state["paths"] = []
+        found = typed_folder()
+        if found and found.is_dir():
+            state["paths"] = await computed(new_dataset.folder_files, found)
+        # As typed, so ~ and environment variables stay in labcatalog.yaml.
         text = (folder_path.value or "").strip()
-        if text and Path(text).is_dir():
-            state["paths"] = await computed(new_dataset.folder_files, Path(text))
-        state["source"] = Path(text) if text else None
+        state["source"] = stored_path(text) if text else None
         preview.refresh()
 
     @ui.refreshable
     def preview() -> None:
-        text = (folder_path.value or "").strip()
-        if not text:
+        found = typed_folder()
+        if found is None:
             return
-        if not Path(text).is_dir():
+        if not found.is_dir():
             ui.label("No folder there.").classes("lc-bad-text")
             return
         rule = (files.value or "").strip()
@@ -150,7 +157,8 @@ def open_wizard(
             note(f"Not counted ({len(seen.unmatched)}): {shown}{more}")
 
     async def folder_next() -> None:
-        if state["source"] is None or not state["source"].is_dir():
+        found = typed_folder()
+        if found is None or not found.is_dir():
             file_status.set_text("Choose the folder first.")
             return
         try:

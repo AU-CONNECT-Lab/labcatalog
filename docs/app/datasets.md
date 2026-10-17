@@ -35,6 +35,8 @@ Click a row to open the dataset.
 
 **Cancel**, or closing the window, removes the copied file. A wave the study does not have yet is added to it without dates; fill in its start and end dates on the [Studies](studies.md) page afterwards. Before it writes anything, the window checks the project with the changes in place and stops if they would cause a new error. Only datasets that are one CSV file, made by no prepare step or by one that reads a single file named after the dataset, can be repeated. For a file that needs a cleaning step of its own, see [Add a Wave or Dataset](../how-to/add-dataset.md).
 
+![Adding a folder of scans: the files rule and how many files and people it matches](../images/app/add-dataset-folder.png)
+
 ## A dataset
 
 The top of a dataset's page lists its study, wave, reporter and modality; its rows and IDs; with a group, the number of groups; how many people were also in the previous wave and how many are new; when it was collected; and the data file, which opens in its own application when clicked. **All datasets** goes back to the list.

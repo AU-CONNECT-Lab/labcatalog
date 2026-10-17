@@ -21,11 +21,15 @@ With a language model set up (see [Set Up R and Language Models](../how-to/r-and
 
 **Add an instrument** walks through a new instrument in six steps: what it is (ID, name, abbreviation, kind, construct, description, references from `references.bib`, license); its answer options, copied from an instrument with the same answers or typed in; its items, pasted one per line, with `(R)` at the end of a reverse-keyed item; its scores, starting from **Add a total score**; the datasets it was given in, where **Find the columns** guesses each item's column from the column names; and a last step that shows the lines each file gains before **Save**. It writes `instruments/<id>.yaml`, the rows of each dataset's column map and the administrations in the study files.
 
+![The Items step of Add an instrument, with three pasted items, one of them reverse-keyed](../images/app/instrument-wizard.png)
+
 On an instrument's page, **Complete this instrument** beside what is missing opens the same steps on that instrument, starting at the first step with something missing. Lines of the file that are not changed stay as they were, comments included.
 
 ### Export
 
 Tick instruments in the table and press **Export** to write their variables, data and statistics to `outputs/`. The dialog asks for the instruments, then the datasets by wave and reporter, then the layout. See [Export Variables and Data](../how-to/export-data.md).
+
+![The Datasets step of Export, with datasets ticked by wave and reporter](../images/app/export.png)
 
 ## An instrument's page
 

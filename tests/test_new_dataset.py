@@ -148,6 +148,7 @@ def test_a_folder_of_files_is_read_in_place(project_root):
     new_dataset.check_draft(project, draft)
     placement = new_dataset.place(project, draft, project_root / "bids")
     assert (placement.copy_to, placement.data_path) == (None, "bids")
+    assert new_dataset.place(project, draft, Path("~/scans")).data_path == "~/scans"
     found = new_dataset.changes(project, draft, placement, [])
     assert [c.path for c in found] == ["labcatalog.yaml"]
     assert changes.check(project, found) == []

@@ -152,7 +152,9 @@ def check_draft(project: Project, draft: Draft) -> None:
 
 def place(project: Project, draft: Draft, source: Path) -> Placement:
     if is_folder(draft):
-        return Placement(None, portable_path(source, project.root).as_posix())
+        # A path typed relative, or with ~ or a variable, is kept as typed.
+        path = portable_path(source, project.root) if source.is_absolute() else source
+        return Placement(None, path.as_posix())
     if draft.blank is not None:
         path = f"{defaults.DATA_DIR}/{draft.name}{source.suffix}"
         placement = Placement(path, path)
