@@ -27,6 +27,8 @@ class LoadedDataset:
     id_column: str
     group: pd.Series | None
     source_path: Path | None
+    # Every wave named in a file that holds several, before this dataset's rows were taken.
+    file_waves: set[str] | None = None
     numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
 
     def numbers(self, column: str) -> pd.Series:
@@ -44,6 +46,13 @@ def load_dataset(project: Project, dataset: DatasetConfig) -> LoadedDataset:
     config = project.config
     id_column = id_column_for(config, dataset)
     frame = get_source(dataset.source).read(dataset, project.root, id_column)
+    file_waves = None
+    if dataset.wave_column:
+        if dataset.wave_column not in frame:
+            raise DataSourceError(f"{dataset.name}: no wave column '{dataset.wave_column}'")
+        file_waves = set(frame[dataset.wave_column])
+        # The index keeps each row's place in the file, so problems point at the right line.
+        frame = frame[frame[dataset.wave_column] == dataset.wave]
     if id_column not in frame:
         raise DataSourceError(f"{dataset.name}: no ID column '{id_column}'")
     ids = frame[id_column]
@@ -62,6 +71,7 @@ def load_dataset(project: Project, dataset: DatasetConfig) -> LoadedDataset:
         id_column=id_column,
         group=group,
         source_path=expand_path(dataset.path, project.root) if dataset.path else None,
+        file_waves=file_waves,
     )
 
 

@@ -75,6 +75,8 @@ class DatasetConfig(StrictModel):
     id_column: str | None = None
     group_column: str | None = None
     date_column: str | None = None
+    # In a file holding several waves, the column that names each row's wave.
+    wave_column: str | None = None
     snapshot_date: date | None = None
     missing_codes: list[MissingCode] | None = None
     custom: dict[str, Any] = {}

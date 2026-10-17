@@ -39,6 +39,7 @@ def check_project(
     return CheckReport(
         issues=[
             *check_columns(project, datasets),
+            *check_waves(project, datasets),
             *check_values(project, catalog, datasets),
             *check_ids(project, datasets),
             *check_exclusions(project, datasets),
@@ -87,6 +88,23 @@ def check_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[
                     columns=undescribed,
                 )
             )
+    return issues
+
+
+def check_waves(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
+    # A file holding several waves may have rows for a wave no dataset takes.
+    files: dict[tuple, list[LoadedDataset]] = {}
+    for loaded in datasets.values():
+        if loaded.file_waves is not None:
+            files.setdefault((loaded.source_path, loaded.config.wave_column), []).append(loaded)
+    issues = []
+    for (_, column), readers in files.items():
+        left = readers[0].file_waves - {loaded.config.wave for loaded in readers}
+        if left:
+            waves = examples(sorted(repr(wave) if not wave.strip() else wave for wave in left))
+            message = f"{column} has rows for wave(s) that no dataset reads: {waves}"
+            where = location(project, readers[0])
+            issues.append(problem("wave_unclaimed", message, where, "warning", column=column))
     return issues
 
 

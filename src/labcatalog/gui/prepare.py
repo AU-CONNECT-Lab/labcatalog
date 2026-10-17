@@ -27,6 +27,7 @@ STATUS_KINDS = {
     "missing input": "bad",
 }
 POLL_SECONDS = 0.3
+NO_LOG = "Run a step to see its output here"
 
 
 @dataclass
@@ -205,7 +206,7 @@ def log_panel(view: PrepareView) -> None:
     with panel("Log") as tools:
         log = ui.log().classes("lc-log w-full h-72")
     with tools:
-        title = ui.label().classes("lc-note")
+        title = ui.label(NO_LOG).classes("lc-note")
         copy = (
             ui.button(
                 "Copy log",
@@ -215,13 +216,14 @@ def log_panel(view: PrepareView) -> None:
             .props("flat dense no-caps")
             .classes("lc-quiet-btn")
         )
+        copy.visible = False
 
     def poll() -> None:
         name = current()
         if name != tracked["name"]:
             log.clear()
             tracked.update(name=name, lines=0)
-            title.set_text(name or "Run a step to see its output here")
+            title.set_text(name or NO_LOG)
             copy.visible = name is not None
         found = session.runs.get(name) if name else None
         if found is None:

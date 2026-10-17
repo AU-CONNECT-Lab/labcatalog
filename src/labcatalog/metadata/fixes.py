@@ -136,10 +136,10 @@ def evidence(loaded: LoadedDataset, issue: Issue) -> list[dict[str, str]]:
     column = issue.details.get("column")
     shown = []
     for n in issue.details.get("rows", [])[:EVIDENCE_ROWS]:
-        person = loaded.frame[loaded.id_column].iloc[n]
+        person = loaded.frame[loaded.id_column].loc[n]
         row = {"row": str(n + 1), "id": repr(person) if person != person.strip() else person}
         if column in loaded.frame:
-            row["value"] = loaded.frame[column].iloc[n]
+            row["value"] = loaded.frame[column].loc[n]
         shown.append(row)
     return shown
 

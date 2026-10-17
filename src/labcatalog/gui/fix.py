@@ -85,6 +85,11 @@ EXPLAIN: dict[str, tuple[str, str]] = {
         "what they are.",
         PICK,
     ),
+    "wave_unclaimed": (
+        "The file holds rows for a wave that no dataset reads, often a wave written another way "
+        "in the data than in the dataset's settings.",
+        PICK,
+    ),
     "unexpected_value": (
         "Values that are neither response options nor missing codes. Either the data have a "
         "typo, or the value is real and the instrument or the missing codes leave it out.",
