@@ -2,6 +2,8 @@
 
 The Edit page edits the project's files: `labcatalog.yaml`, the instrument files, the drafts, the study files and the column maps. The files are listed on the left; click one to open it.
 
+![The Edit page with labcatalog.yaml open](../images/app/edit.png)
+
 ## Text mode
 
 Every file opens as text. **Save** checks the file the same way loading the project does. If something is wrong, nothing is written, and each problem is listed under the editor with its line, which is also marked in the text. When the file is right, it is saved and the catalog reloads. **Reload from disk** throws away your changes.

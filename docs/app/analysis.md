@@ -2,6 +2,8 @@
 
 The Analysis page runs the analyses most papers need on the datasets you choose: a correlation table, regressions, a group comparison and a multilevel model. Each result is a table ready for a manuscript, with a chart, a **Copy table** button, **Save to outputs**, and a **Code** section with the R and Python code that reproduces it. A note under each result says whether it was computed in R or in Python.
 
+![The Analysis page with a correlation table](../images/app/analysis.png)
+
 ## Sample
 
 The choices here apply to every section of the page except the multilevel model.

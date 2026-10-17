@@ -2,6 +2,8 @@
 
 The Overview page shows the project at a glance.
 
+![The Overview page of the example project](../images/app/overview.png)
+
 ## Summary
 
 The number of instruments and datasets, the studies, waves and reporters, and the number of errors and warnings. Click the instruments to open the Instruments page, or the errors and warnings to open the Problems page.

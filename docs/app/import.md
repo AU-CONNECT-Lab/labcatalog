@@ -2,6 +2,8 @@
 
 The Import page creates instrument files and a column map for a data file that has no column map yet. [Add an Instrument](../how-to/add-instrument.md) walks through it. If every dataset already has a map, the page says so: add the new data file under `datasets` in `labcatalog.yaml` and press **Refresh**.
 
+![The Import page for a dataset without a column map](../images/app/import.png)
+
 Pick the **Dataset**, then:
 
 ## 1. Codebook files

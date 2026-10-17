@@ -2,6 +2,8 @@
 
 The Problems page lists every problem `labcatalog check` finds: mismatches between the metadata and the data, and mistakes in the metadata itself. The count on the Problems tab is red when any problem is an error.
 
+![The Problems page listing the example's problems](../images/app/problems.png)
+
 At the top are the number of errors and warnings, a toggle to show **All**, **Errors** or **Warnings**, and a **Search** box that filters the table.
 
 ## The table

@@ -2,6 +2,8 @@
 
 The Studies page shows and edits each study: its label, description and reference, its waves and milestones from `studies` in `labcatalog.yaml`, and the methods text and Participants template from its study file. The studies are listed on the left; click one to open it. See [Studies, Waves and Datasets](../concepts/studies-waves-datasets.md).
 
+![The Studies page with the example study open](../images/app/studies.png)
+
 A study opens with its label and ID on top, the buttons **Rename**, **Delete**, **Discard** and **Save**, and three tabs: Study, Text and Datasets.
 
 ## Study

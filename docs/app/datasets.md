@@ -2,6 +2,8 @@
 
 The Datasets page shows each study and its data files: who is in each file, how complete their answers are, which values are missing and why, and the freezes made of the data.
 
+![The Datasets page listing the example's data files](../images/app/datasets.png)
+
 ## Studies
 
 The datasets are grouped by study, under the study's label; its description and citation are on the [Studies](studies.md) page. Each study's table lists its datasets:

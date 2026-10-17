@@ -2,6 +2,8 @@
 
 The Methods page drafts the parts of a methods section that the catalog already knows. Pick the study and the wave at the top: the Participants part covers every wave of the study, while Table 1, Attrition and Measures describe the wave you pick. Every paragraph has a **Copy text** button and every table a **Copy table** button. See [Write the Methods Section](../how-to/write-methods.md) for how to use it in a paper and how to change the wording.
 
+![The Methods page with the Participants paragraph](../images/app/methods.png)
+
 ## Participants
 
 - A paragraph on the waves, how many people took part in each, how many returned, and how many have data from each modality.

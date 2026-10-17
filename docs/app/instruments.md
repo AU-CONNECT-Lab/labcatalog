@@ -2,6 +2,8 @@
 
 The Instruments page lists every instrument. Click one to open its page: items and options, scores and their reliability, how they change across waves, factor structure, and code to score them.
 
+![The Instruments page listing the example's instruments](../images/app/instruments.png)
+
 ## The list
 
 On the left:
@@ -21,7 +23,9 @@ Tick instruments in the table and press **Export** to write their variables, dat
 
 ## An instrument's page
 
-The top shows the instrument's name, abbreviation, construct, who reported on whom, its instructions, references with their PDF (**View PDF** shows it in the page, **Open** in your PDF viewer), its license, and what is missing from the catalog. **All instruments** goes back to the list.
+The top shows the instrument's name, abbreviation, construct, who reported on whom, its instructions, references with their PDF (**View PDF** shows it in the page, **Open** in your PDF viewer), its license, and what is missing from the catalog. **Instruments** at the top goes back to the list.
+
+![The page of the Example Mood Scale](../images/app/instrument.png)
 
 ### Items
 

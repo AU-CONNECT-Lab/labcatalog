@@ -2,6 +2,8 @@
 
 The Prepare page runs the prepare steps in `labcatalog.yaml`, the scripts that turn raw exports and pipeline outputs into the data the catalog reads. See [Register Prepare Steps](../how-to/prepare-steps.md) for how to write them. A project with no steps yet shows an example to copy.
 
+![The Prepare page listing the prepare steps](../images/app/prepare.png)
+
 ## The steps
 
 Each step shows its name, its status, its command, and its inputs and outputs with their dates. Click a file to open it. The status is one of:

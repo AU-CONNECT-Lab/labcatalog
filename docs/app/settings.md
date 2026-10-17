@@ -2,6 +2,8 @@
 
 The Settings page holds the settings of your computer, not of the project: they apply to every project you open and are not shared with anyone else who opens one. Settings that change the numbers are in `labcatalog.yaml` instead (see [Statistics](../statistics/index.md)).
 
+![The Settings page](../images/app/settings.png)
+
 ## R
 
 The path to `Rscript`. **Save and check** runs R once and reports its version and any missing packages, with the command to install them. See [Set Up R and Language Models](../how-to/r-and-models.md).
