@@ -59,7 +59,7 @@ def derive(project: Project, request: Request) -> Derived:
     if not measures:
         raise CodebookError(f"No numeric columns to take from {request.table.name}")
     sidecar = read_sidecar(request.table)
-    groups = sorted({tuple(row) for row in keys[request.split].itertuples(index=False)})
+    groups = sorted({tuple(row[e] for e in request.split) for _, row in keys.iterrows()})
     done = Derived(left_out=left_out)
     instruments = {}
     for group in groups:

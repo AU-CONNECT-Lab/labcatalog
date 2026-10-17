@@ -123,6 +123,10 @@ def test_a_table_without_sessions_needs_a_wave(demo_project):
         "sub-01,30",
         "sub-02,41",
     ]
+    assert (demo_project / "maps" / "qc_w1.csv").read_text().splitlines()[2] == "age,qc,age"
+    assert yaml.safe_load((demo_project / "instruments" / "qc.yaml").read_text())["items"] == [
+        {"id": "age", "text": "age", "type": "number"}
+    ]
 
 
 def test_command_prints_what_to_add(demo_project, monkeypatch, capsys):
