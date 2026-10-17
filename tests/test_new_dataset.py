@@ -254,6 +254,7 @@ def test_a_file_of_every_wave_is_read_again_for_the_next_wave(project_root):
     assert "parent_w3" in new_dataset.templates(project)
     draft = new_dataset.suggest(project, "parent_w3")
     assert (draft.name, draft.wave) == ("parent_w4", "4")
+    assert new_dataset.suggest(project, "parent_w3", "6").name == "parent_w6"
     placement = new_dataset.place(project, draft, None)
     assert (placement.copy_to, placement.data_path, placement.step) == (
         None,

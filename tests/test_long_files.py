@@ -106,6 +106,8 @@ def test_a_wave_no_dataset_reads_is_reported(long_project):
     assert found.level == "warning"
     assert found.location == "data/parent_long.csv"
     assert found.message == "wave has rows for wave(s) that no dataset reads: '', T3"
+    # What the Fix offers to add: the blank wave cannot be one.
+    assert (found.details["dataset"], found.details["waves"]) == ("parent_w3", ["T3"])
 
 
 def test_a_missing_wave_column_stops_loading(long_project):
