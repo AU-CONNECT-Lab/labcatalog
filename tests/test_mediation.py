@@ -9,6 +9,7 @@ from labcatalog.reports import results
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import mediation as med
+from labcatalog.stats.mediation_r import mediation_code
 from labcatalog.stats.rbridge import r_status
 
 STRESS = "example_parent_stress.eps_mean@parent_w1"
@@ -45,28 +46,28 @@ def model_of(data, paths=(), **options) -> med.MediationModel:
 
 def test_each_moderated_path_adds_its_terms_and_effects(setup):
     _, _, data = setup
-    plain = med.mediation_code(model_of(data)).r
+    plain = mediation_code(model_of(data)).r
     assert '"m ~ a*x"' in plain and '"y ~ c*x + b*m"' in plain
     assert '"indirect := a*b"' in plain and '"total := c + a*b"' in plain
     assert "w_mean" not in plain
-    first = med.mediation_code(model_of(data, ("a",))).r
+    first = mediation_code(model_of(data, ("a",))).r
     assert '"m ~ a*x + a_w*w + a_xw*xw"' in first and '"y ~ c*x + b*m"' in first
     assert 'at("indirect_%1$d := (a + a_xw*%2$s)*b")' in first and '"index := a_xw*b"' in first
-    second = med.mediation_code(model_of(data, ("b", "c"))).r
+    second = mediation_code(model_of(data, ("b", "c"))).r
     assert '"y ~ c*x + b*m + y_w*w + b_mw*mw + c_xw*xw"' in second
     assert 'at("direct_%1$d := c + c_xw*%2$s")' in second and '"index := a*b_mw"' in second
-    both = med.mediation_code(model_of(data, ("a", "b"))).r
+    both = mediation_code(model_of(data, ("a", "b"))).r
     assert "index" not in both
-    direct = med.mediation_code(model_of(data, ("c",))).r
+    direct = mediation_code(model_of(data, ("c",))).r
     assert '"indirect := a*b"' in direct and "indirect_" not in direct
     assert "ncpus = 4" in plain
-    assert "parallel" not in med.mediation_code(model_of(data), workers=1).r
+    assert "parallel" not in mediation_code(model_of(data), workers=1).r
 
 
 def test_covariates_enter_both_equations(setup):
     _, _, data = setup
     model = model_of(data, covariates=[data.score(CHILD)])
-    code = med.mediation_code(model).r
+    code = mediation_code(model).r
     assert '"m ~ a*x + cov1"' in code and '"y ~ c*x + b*m + cov1"' in code
 
 
@@ -75,7 +76,7 @@ def test_mediation_runs_in_r_with_bootstrap_intervals(setup):
     result, sample, data = setup
     model = model_of(data, bootstrap=200)
     found, engine = script.run_code(
-        result, sample, data.frame(), med.mediation_code(model, workers=1), rscript()
+        result, sample, data.frame(), mediation_code(model, workers=1), rscript()
     )
     fit = med.read_fit(found, model)
     e = fit.effects
@@ -92,7 +93,7 @@ def test_mlr_keeps_the_estimates_and_gives_robust_fit(setup):
     fits = {}
     for estimator in (med.ML, med.MLR):
         model = model_of(data, ("a",), estimator=estimator, bootstrap=200)
-        code = med.mediation_code(model, workers=1)
+        code = mediation_code(model, workers=1)
         found, _ = script.run_code(result, sample, data.frame(), code, rscript())
         fits[estimator] = med.read_fit(found, model)
     ml, mlr = fits[med.ML], fits[med.MLR]
@@ -185,7 +186,7 @@ def test_the_table_names_each_effect_and_the_diagram_draws_the_moderator(setup):
 def test_without_bootstrap_mlr_gives_wald_intervals_from_one_fit(setup):
     result, sample, data = setup
     model = model_of(data, ("a",), estimator=med.MLR, bootstrap=0)
-    code = med.mediation_code(model)
+    code = mediation_code(model)
     assert "bootstrap" not in code.r.split("model <- paste")[1] and 'estimator = "MLR"' in code.r
     found, _ = script.run_code(result, sample, data.frame(), code, rscript())
     fit = med.read_fit(found, model)
@@ -196,3 +197,85 @@ def test_without_bootstrap_mlr_gives_wald_intervals_from_one_fit(setup):
     assert med.intervals_text(fit) == "Wald intervals, by the delta method for the defined effects"
     assert med.method_text(fit) == "robust maximum likelihood (MLR)"
     assert "Confidence intervals are Wald intervals" in results.mediation_text(model, fit)
+
+
+STRAIN = "example_parent_stress.eps_strain@parent_w1"
+
+
+def items_of(data, paths=(), latent_w=True, **options) -> med.MediationModel:
+    w = data.score(CHILD, items=latent_w) if paths else None
+    return med.MediationModel(
+        data.score(STRAIN, items=True),
+        data.score(SLEEP, items=True),
+        data.score(MOOD, items=True),
+        moderators=[med.Moderator(w, paths)] if paths else [],
+        items=True,
+        **options,
+    )
+
+
+def test_items_become_factors_and_moderation_goes_to_modsem(setup):
+    _, _, data = setup
+    wlsmv = mediation_code(items_of(data, estimator="wlsmv")).r
+    assert '"X =~ x_1 + x_2 + x_3"' in wlsmv and '"M ~ a*X"' in wlsmv
+    assert 'estimator = "DWLS", ordered = ordered' in wlsmv
+    assert (
+        'robust <- lavaan::sem(model, data = med, estimator = "WLSMV", ordered = ordered)' in wlsmv
+    )
+    latent = mediation_code(items_of(data, ("a",)))
+    assert latent.packages == ("lavaan", "modsem")
+    assert '"M ~ a*X + a_w*W + a_xw*X:W"' in latent.r and 'method = "lms"' in latent.r
+    assert "first <- modsem::modsem(base" in latent.r
+    observed = mediation_code(items_of(data, ("b",), latent_w=False)).r
+    assert '"Y ~ c*X + b*M + y_w*w + b_mw*M:w"' in observed and 'method = "qml"' in observed
+    assert "med$w <- med$w - w_mean" in observed
+
+
+def test_items_mode_needs_items_of_their_own(setup):
+    _, _, data = setup
+    assert mediation_view.item_problem(items_of(data)) is None
+    overlap = items_of(data)
+    overlap.x = data.score(STRESS, items=True)
+    overlap.moderators = [med.Moderator(data.score(CHILD, items=True), ("a",))]
+    assert mediation_view.item_problem(overlap).startswith("X and W share items")
+    overlap.x = data.score(STRAIN)
+    assert mediation_view.item_problem(overlap) == (
+        "In Items mode, X need a score with two or more items."
+    )
+
+
+@needs_r
+def test_item_mediation_runs_in_lavaan_with_standardized_paths(setup):
+    result, sample, data = setup
+    model = items_of(data, bootstrap=0)
+    found, _ = script.run_code(result, sample, data.frame(), mediation_code(model), rscript())
+    fit = med.read_fit(found, model)
+    e = fit.effects
+    assert fit.package == med.LAVAAN and fit.fit["df"] > 0 and fit.resamples == 0
+    assert e["indirect"].estimate == pytest.approx(e["a"].estimate * e["b"].estimate)
+    assert e["indirect"].standardized == pytest.approx(e["a"].standardized * e["b"].standardized)
+    text = results.mediation_text(model, fit)
+    assert ", with each score as a factor of its items, was fitted in lavaan with" in text
+
+
+@needs_r
+def test_latent_moderation_runs_in_modsem_with_bootstrap(setup):
+    result, sample, data = setup
+    model = items_of(data, ("a",), bootstrap=10)
+    code = mediation_code(model)
+    found, _ = script.run_code(result, sample, data.frame(), code, rscript())
+    fit = med.read_fit(found, model)
+    e = fit.effects
+    assert (fit.package, fit.method, fit.fit) == (med.MODSEM, "lms", {})
+    assert fit.resamples <= 10 and fit.at[1] == 0 and fit.at[0] == pytest.approx(-fit.at[2])
+    assert e["indirect_2"].estimate == pytest.approx(e["a"].estimate * e["b"].estimate)
+    assert e["a"].standardized is not None and e["indirect_2"].standardized is None
+    assert e["index"].low < e["index"].high
+    _, rows = mediation_view.effects_table(model, fit)
+    assert (
+        rows[0]["beta"]
+        and next(r for r in rows if r["effect"] == "Index of moderated mediation")["beta"] == ""
+    )
+    note = mediation_view.table_note(model, fit)
+    assert "modsem, latent interactions by LMS with maximum likelihood" in note
+    assert "A latent interaction model has no chi-square test of fit." in note

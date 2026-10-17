@@ -14,6 +14,7 @@ from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import mediation as med
 from labcatalog.stats.cfa import ESTIMATORS
+from labcatalog.stats.mediation_r import mediation_code
 
 NO_MODERATOR = ""
 PATH_NAMES = {"a": "a (X → M)", "b": "b (M → Y)", "c": "c′ (X → Y)"}
@@ -43,6 +44,7 @@ class Choices:
     estimator: str = med.ML
     booted: bool = True
     bootstrap: int = med.DEFAULT_BOOTSTRAP
+    items: bool = False
 
 
 def render(
@@ -52,33 +54,46 @@ def render(
     choices: dict[str, str],
     totals: list[str],
 ) -> None:
-    # Total scores first, so that X, M and Y start on different instruments.
-    keys = list(dict.fromkeys([*totals, *choices]))
-    taken: list[str] = []
-    for name in ("x", "m", "y"):
-        value = getattr(chosen, name)
-        if value not in choices or value in taken:
-            value = next((k for k in keys if k not in taken), keys[0])
-            setattr(chosen, name, value)
-        taken.append(value)
-    chosen.covariates = [c for c in chosen.covariates if c in choices]
-    if chosen.moderator not in choices:
-        chosen.moderator = NO_MODERATOR
+    scores = {k: v for k, v in choices.items() if not k.startswith(analysis.ITEM_PREFIX)}
+
+    def settle() -> None:
+        # Total scores first, so that X, M and Y start on different instruments.
+        offered = scores if chosen.items else choices
+        keys = list(dict.fromkeys([*[t for t in totals if t in offered], *offered]))
+        taken: list[str] = []
+        for name in ("x", "m", "y"):
+            value = getattr(chosen, name)
+            if value not in offered or value in taken:
+                value = next((k for k in keys if k not in taken), keys[0])
+                setattr(chosen, name, value)
+            taken.append(value)
+        chosen.covariates = [c for c in chosen.covariates if c in choices]
+        if chosen.moderator not in choices:
+            chosen.moderator = NO_MODERATOR
+        if chosen.estimator not in estimators(chosen):
+            chosen.estimator = med.ML
+
+    def variable(data: script.AnalysisData, key: str) -> script.Variable:
+        # In Items mode a score brings its items, to be the indicators of its factor.
+        if chosen.items and not key.startswith(analysis.ITEM_PREFIX):
+            return data.score(key, items=True)
+        return data.variable(key)
 
     def model_of(data: script.AnalysisData) -> med.MediationModel:
         moderators = (
-            [med.Moderator(data.variable(chosen.moderator), tuple(chosen.paths))]
-            if chosen.moderator and chosen.paths
+            [med.Moderator(variable(data, chosen.moderator), tuple(chosen.paths))]
+            if moderated(chosen)
             else []
         )
         return med.MediationModel(
-            data.variable(chosen.x),
-            data.variable(chosen.m),
-            data.variable(chosen.y),
+            variable(data, chosen.x),
+            variable(data, chosen.m),
+            variable(data, chosen.y),
             [data.variable(c) for c in chosen.covariates],
             moderators,
             chosen.estimator,
             chosen.bootstrap if chosen.booted else 0,
+            chosen.items,
         )
 
     async def run() -> None:
@@ -96,15 +111,15 @@ def render(
             return
         data = script.AnalysisData(result, sample)
         model = model_of(data)
+        if problem := item_problem(model):
+            with body:
+                note(problem)
+            return
         frame = data.frame()
-        code = med.mediation_code(model, workers())
+        code = mediation_code(model, workers())
         with body:
             ui.spinner()
-            note(
-                f"Fitting in R with {chosen.bootstrap} bootstrap resamples."
-                if chosen.booted
-                else "Fitting in R."
-            )
+            note(running_text(model))
         try:
             found, _ = await computed(script.run_code, result, sample, frame, code, rscript)
         except LabCatalogError as err:
@@ -139,7 +154,8 @@ def render(
 
     def choose(name: str, value) -> None:
         setattr(chosen, name, value)
-        moderator_row.refresh()
+        settle()
+        controls.refresh()
         body.clear()
         with body:
             preview()
@@ -152,16 +168,25 @@ def render(
         data = script.AnalysisData(result, sample)
         ui.html(diagram(model_of(data), None), sanitize=False).classes("w-full")
 
-    with panel("Mediation", "X on Y through a mediator M, with an optional moderator W"):
+    @ui.refreshable
+    def controls() -> None:
+        offered = scores if chosen.items else choices
         with ui.row().classes("w-full items-center gap-4"):
+            ui.toggle(
+                {False: "Scores", True: "Items"},
+                value=chosen.items,
+                on_change=lambda e: choose("items", e.value),
+            ).props("dense no-caps").tooltip(
+                "Scores as observed variables, or each score's items as indicators of its factor"
+            )
             for name in ("x", "m", "y"):
                 ui.select(
-                    choices,
+                    offered,
                     value=getattr(chosen, name),
                     label=name.upper(),
                     with_input=True,
                     on_change=lambda e, name=name: choose(name, e.value),
-                ).props("dense outlined").classes("w-72")
+                ).props("dense outlined").classes("w-64")
             ui.select(
                 choices,
                 multiple=True,
@@ -169,55 +194,98 @@ def render(
                 label="Covariates",
                 with_input=True,
                 on_change=lambda e: choose("covariates", e.value or []),
-            ).props("dense outlined use-chips").classes("min-w-72 grow")
+            ).props("dense outlined use-chips").classes("min-w-64 grow")
+        with ui.row().classes("w-full items-center gap-4"):
+            ui.select(
+                {NO_MODERATOR: "No moderator", **choices},
+                value=chosen.moderator,
+                label="Moderator W",
+                with_input=True,
+                on_change=lambda e: choose("moderator", e.value or NO_MODERATOR),
+            ).props("dense outlined").classes("w-64")
+            if chosen.moderator:
+                for path, label in PATH_NAMES.items():
+                    ui.checkbox(
+                        label,
+                        value=path in chosen.paths,
+                        on_change=lambda e, path=path: set_path(path, e.value),
+                    ).props("dense")
+            ui.space()
+            ui.toggle(
+                {e: ESTIMATORS[e] for e in estimators(chosen)},
+                value=chosen.estimator,
+                on_change=lambda e: choose("estimator", e.value),
+            ).props("dense no-caps")
+            ui.toggle(
+                {True: "Bootstrap", False: "None"},
+                value=chosen.booted,
+                on_change=lambda e: choose("booted", e.value),
+            ).props("dense no-caps").tooltip(
+                "Percentile bootstrap intervals, or Wald intervals without resampling"
+            )
+            if chosen.booted:
+                ui.number(
+                    "Bootstrap resamples",
+                    value=chosen.bootstrap,
+                    min=100,
+                    step=100,
+                    format="%d",
+                    on_change=lambda e: setattr(
+                        chosen, "bootstrap", int(e.value or 0) or med.DEFAULT_BOOTSTRAP
+                    ),
+                ).props("dense outlined").classes("w-44")
+            ui.button("Fit", icon="play_arrow", on_click=run).props("no-caps")
+        if chosen.items and moderated(chosen):
+            note(
+                "Latent interactions (modsem) treat the items as continuous, so WLSMV is not "
+                "offered; with Bootstrap, each resample refits the model, which takes minutes."
+            )
 
-        @ui.refreshable
-        def moderator_row() -> None:
-            with ui.row().classes("w-full items-center gap-4"):
-                ui.select(
-                    {NO_MODERATOR: "No moderator", **choices},
-                    value=chosen.moderator,
-                    label="Moderator W",
-                    with_input=True,
-                    on_change=lambda e: choose("moderator", e.value or NO_MODERATOR),
-                ).props("dense outlined").classes("w-72")
-                if chosen.moderator:
-                    for path, label in PATH_NAMES.items():
-                        ui.checkbox(
-                            label,
-                            value=path in chosen.paths,
-                            on_change=lambda e, path=path: set_path(path, e.value),
-                        ).props("dense")
-                ui.space()
-                ui.toggle(
-                    {e: ESTIMATORS[e] for e in med.SCORE_ESTIMATORS},
-                    value=chosen.estimator,
-                    on_change=lambda e: choose("estimator", e.value),
-                ).props("dense no-caps")
-                ui.toggle(
-                    {True: "Bootstrap", False: "None"},
-                    value=chosen.booted,
-                    on_change=lambda e: choose("booted", e.value),
-                ).props("dense no-caps").tooltip(
-                    "Percentile bootstrap intervals, or Wald intervals without resampling"
-                )
-                if chosen.booted:
-                    ui.number(
-                        "Bootstrap resamples",
-                        value=chosen.bootstrap,
-                        min=100,
-                        step=100,
-                        format="%d",
-                        on_change=lambda e: setattr(
-                            chosen, "bootstrap", int(e.value or 0) or med.DEFAULT_BOOTSTRAP
-                        ),
-                    ).props("dense outlined").classes("w-44")
-                ui.button("Fit", icon="play_arrow", on_click=run).props("no-caps")
-
-        moderator_row()
+    settle()
+    with panel("Mediation", "X on Y through a mediator M, with an optional moderator W"):
+        controls()
         body = ui.column().classes("w-full gap-2")
         with body:
             preview()
+
+
+def moderated(chosen: Choices) -> bool:
+    return bool(chosen.moderator and chosen.paths)
+
+
+def estimators(chosen: Choices) -> tuple[str, ...]:
+    if not chosen.items:
+        return med.SCORE_ESTIMATORS
+    return med.MODERATED_ITEM_ESTIMATORS if moderated(chosen) else med.ITEM_ESTIMATORS
+
+
+def item_problem(model: med.MediationModel) -> str | None:
+    # Factors need items of their own.
+    if not model.items:
+        return None
+    roles = {"X": model.x, "M": model.m, "Y": model.y}
+    if missing := [r for r, v in roles.items() if not v.items]:
+        return f"In Items mode, {' and '.join(missing)} need a score with two or more items."
+    if model.moderators and model.moderators[0].variable.items:
+        roles["W"] = model.moderators[0].variable
+    seen: dict[str, str] = {}
+    for role, v in roles.items():
+        for item in v.items:
+            if item in seen:
+                return (
+                    f"{seen[item]} and {role} share items, such as {item}; a factor needs items "
+                    "of its own, so pick scores that do not overlap, such as two subscales."
+                )
+            seen[item] = role
+    return None
+
+
+def running_text(model: med.MediationModel) -> str:
+    if not model.bootstrap:
+        return "Fitting in R."
+    if model.package == med.MODSEM:
+        return f"Fitting in R with {model.bootstrap} bootstrap resamples; this takes minutes."
+    return f"Fitting in R with {model.bootstrap} bootstrap resamples."
 
 
 def workers() -> int:
@@ -233,6 +301,7 @@ def effects_table(
         col("se", "SE", numeric=True),
         col("p", "p", numeric=True),
         col("ci", "95% CI", numeric=True),
+        col("beta", "β", numeric=True),
     ]
     places = med.at_labels(model, fit)
     names = dict(ROWS)
@@ -250,6 +319,7 @@ def effects_table(
             "se": fmt(e.se),
             "p": p_value(e.p),
             "ci": f"[{fmt(e.low)}, {fmt(e.high)}]" if e.low is not None else "",
+            "beta": fmt(e.standardized),
         }
         for key, label in names.items()
         if (e := fit.effects.get(key)) is not None
@@ -267,19 +337,38 @@ def table_note(model: med.MediationModel, fit: med.MediationFit) -> str:
         if model.covariates
         else ""
     )
-    centred = " X, M and W are centred at their means." if model.moderators else ""
-    if fit.fit.get("df"):
+    factors = [r for r, v in roles.items() if model.items and v.items]
+    centred = ""
+    if model.moderators:
+        centred = (
+            " The factors have mean 0 and W is centred at its mean."
+            if model.items
+            else " X, M and W are centred at their means."
+        )
+    if factors:
+        centred = (
+            f" {results.series(factors)} are factors of their items, each item's loading on the first "
+            f"fixed at 1.{centred}"
+        )
+    beta = (
+        " β is fully standardized; effects at values of W have none."
+        if model.moderators
+        else " β is fully standardized."
+    )
+    if fit.package == med.MODSEM:
+        fitted = " A latent interaction model has no chi-square test of fit."
+    elif fit.fit.get("df"):
         values = fit.fit
         fitted = (
-            f" Model fit: χ²({values['df']:g}) = {fmt(values['chisq'])}, p = "
-            f"{p_value(values['pvalue'])}, CFI = {fmt(values['cfi'])}, RMSEA = "
+            f" Model fit: χ²({values['df']:g}) = {fmt(values['chisq'])}, "
+            f"{results.p_text(values['pvalue'])}, CFI = {fmt(values['cfi'])}, RMSEA = "
             f"{fmt(values['rmsea'])}, SRMR = {fmt(values['srmr'])}."
         )
     else:
         fitted = " The model is saturated (df = 0), so it has no fit test."
     return (
-        f"{legend}. Unstandardized estimates; lavaan, {med.method_text(fit)}; N = {fit.n}; 95% "
-        f"{med.intervals_text(fit)}.{centred}{covariates}{fitted}"
+        f"{legend}. Unstandardized estimates; {fit.package}, {med.method_text(fit)}; N = {fit.n}; "
+        f"95% {med.intervals_text(fit)}.{beta}{centred}{covariates}{fitted}"
     )
 
 
@@ -315,12 +404,23 @@ def diagram(model: med.MediationModel, fit: med.MediationFit | None) -> str:
         for key in model.moderated:
             (x1, y1), (x2, y2) = edge(paths[key][0], paths[key][1])
             parts.append(arrow(wx, wy - BOX_H / 2, (x1 + x2) / 2, (y1 + y2) / 2, dashed=True))
+    roles = {"x": model.x, "m": model.m, "y": model.y}
+    if model.moderators:
+        roles["w"] = model.moderators[0].variable
     for name, text in labels.items():
         cx, cy = SPOTS[name]
-        parts.append(
-            f'<rect x="{cx - BOX_W / 2}" y="{cy - BOX_H / 2}" width="{BOX_W}" height="{BOX_H}" '
-            'rx="6" fill="var(--lc-surface)" stroke="var(--lc-ink)" stroke-width="1.2"/>'
-        )
+        # Factors are ellipses and observed variables boxes, as in path diagrams.
+        if model.items and roles[name].items:
+            parts.append(
+                f'<ellipse cx="{cx}" cy="{cy}" rx="{BOX_W / 2}" ry="{BOX_H / 2 + 4}" '
+                'fill="var(--lc-surface)" stroke="var(--lc-ink)" stroke-width="1.2"/>'
+            )
+        else:
+            parts.append(
+                f'<rect x="{cx - BOX_W / 2}" y="{cy - BOX_H / 2}" width="{BOX_W}" '
+                f'height="{BOX_H}" rx="6" fill="var(--lc-surface)" stroke="var(--lc-ink)" '
+                'stroke-width="1.2"/>'
+            )
         short = text if len(text) <= 26 else text[:25] + "…"
         parts.append(
             f'<text x="{cx}" y="{cy + 5}" text-anchor="middle" font-size="14" '

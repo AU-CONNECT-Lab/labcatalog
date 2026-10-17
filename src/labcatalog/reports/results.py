@@ -248,9 +248,16 @@ def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) ->
     e, moderated = fit.effects, model.moderated
     w = model.moderators[0].variable.label if model.moderators else ""
     how = method_text(fit)
-    moderator = f", with {w} as moderator" if w else ""
+    # Asides about the model, each set off by commas.
+    asides = []
+    if w:
+        asides.append(f"with {w} as moderator")
+    if model.items:
+        asides.append(factors(model))
+    moderator = "".join(f", {a}" for a in asides) + ("," if asides else "")
     sentences = [
-        f"A mediation model of {x} on {y} through {m}{moderator} was fitted in lavaan with "
+        f"A mediation model of {x} on {y} through {m}{moderator} was fitted in "
+        f"{fit.package} with "
         f"{how} (N = {fit.n})."
     ]
 
@@ -292,6 +299,10 @@ def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) ->
             f"The model gave {fit_indices({**fit.fit, 'p': fit.fit['pvalue']}, digits)}."
         )
     return " ".join(sentences)
+
+
+def factors(model: MediationModel) -> str:
+    return "with each score as a factor of its items"
 
 
 def estimate(effect: Effect, digits: int) -> str:

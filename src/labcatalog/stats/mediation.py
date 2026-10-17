@@ -2,15 +2,24 @@ from dataclasses import dataclass, field
 
 import pandas as pd
 
-from labcatalog.stats.analysis_script import Code, Variable, none, r_string
-from labcatalog.stats.cfa import ML, MLR
+from labcatalog.stats.analysis_script import Variable, none
+from labcatalog.stats.cfa import ML, MLR, WLSMV
 
 PATHS = ("a", "b", "c")
 SCORE_ESTIMATORS = (ML, MLR)
+ITEM_ESTIMATORS = (WLSMV, ML, MLR)
+# modsem's latent interactions treat the items as continuous.
+MODERATED_ITEM_ESTIMATORS = (ML, MLR)
 DEFAULT_BOOTSTRAP = 1000
 DEFAULT_WORKERS = 4
 SEED = 1
-ESTIMATOR_NAMES = {ML: "maximum likelihood", MLR: "robust maximum likelihood (MLR)"}
+ESTIMATOR_NAMES = {
+    ML: "maximum likelihood",
+    MLR: "robust maximum likelihood (MLR)",
+    WLSMV: "WLSMV with the items as ordered categories",
+}
+# Bootstrap refits with the plain estimator, whose estimates the robust one shares.
+BASE = {ML: "ML", MLR: "ML", WLSMV: "DWLS"}
 FIT = {
     ML: ("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "srmr"),
     MLR: (
@@ -22,6 +31,15 @@ FIT = {
         "rmsea.robust",
         "srmr",
     ),
+    WLSMV: (
+        "chisq.scaled",
+        "df.scaled",
+        "pvalue.scaled",
+        "cfi.scaled",
+        "tli.scaled",
+        "rmsea.scaled",
+        "srmr",
+    ),
 }
 FIT_NAMES = {
     "chisq.scaled": "chisq",
@@ -30,7 +48,12 @@ FIT_NAMES = {
     "cfi.robust": "cfi",
     "tli.robust": "tli",
     "rmsea.robust": "rmsea",
+    "cfi.scaled": "cfi",
+    "tli.scaled": "tli",
+    "rmsea.scaled": "rmsea",
 }
+LAVAAN = "lavaan"
+MODSEM = "modsem"
 
 
 @dataclass
@@ -50,10 +73,25 @@ class MediationModel:
     moderators: list[Moderator] = field(default_factory=list)
     estimator: str = ML
     bootstrap: int = DEFAULT_BOOTSTRAP
+    # X, M, Y and a moderator with items become factors of their items.
+    items: bool = False
 
     @property
     def moderated(self) -> set[str]:
         return {p for m in self.moderators for p in m.paths}
+
+    @property
+    def package(self) -> str:
+        return MODSEM if self.items and self.moderators else LAVAAN
+
+    @property
+    def latent_moderator(self) -> bool:
+        return self.items and bool(self.moderators) and bool(self.moderators[0].variable.items)
+
+    @property
+    def method(self) -> str:
+        # LMS needs the moderator to be a factor; QML also takes an observed one.
+        return "lms" if self.latent_moderator else "qml"
 
 
 @dataclass
@@ -64,12 +102,13 @@ class Effect:
     p: float | None
     low: float | None
     high: float | None
+    standardized: float | None = None
 
 
 @dataclass
 class MediationFit:
     n: int
-    # Keyed by lavaan label: a, b, c, a_w, a_xw, y_w, b_mw, c_xw, indirect, total, index,
+    # Keyed by label: a, b, c, a_w, a_xw, y_w, b_mw, c_xw, indirect, total, index,
     # indirect_<k> and direct_<k> at the moderator's k-th value.
     effects: dict[str, Effect]
     fit: dict[str, float | None]
@@ -78,159 +117,30 @@ class MediationFit:
     estimator: str = ML
     bootstrap: int = DEFAULT_BOOTSTRAP
     resamples: int = DEFAULT_BOOTSTRAP
-
-
-R_MEDIATION = """\
-# Mediation: {title}. lavaan, {method}; {intervals}.
-# x, m, y{w_name}: {legend}
-med <- data.frame({columns})
-med <- med[complete.cases(med), ]
-{moderator_prep}model <- paste(
-  {m_equation},
-  {y_equation},
-  {definitions},
-  sep = "\\n"
-)
-{estimation}effects <- estimates[estimates$label != "", c("label", "est", "se", "pvalue", "ci.lower",
-                                              "ci.upper")]
-print(effects)
-{fit_line}measures <- lavaan::fitMeasures({fitted}, c({measures}))
-{resamples}model_fit <- data.frame(n = nrow(med), resamples = resamples, as.list(unclass(measures)),
-                        check.names = FALSE)
-print(model_fit)
-moderator_values <- data.frame(value = {values})
-"""
-BOOTSTRAP = """\
-{robust}fit <- lavaan::sem(model, data = med, estimator = "ML", se = "bootstrap",
-                   bootstrap = {bootstrap}, iseed = {seed}{parallel})
-estimates <- lavaan::parameterEstimates(fit, boot.ci.type = "perc")
-"""
-COUNT = """\
-# Resamples that converged, of those asked for.
-resamples <- sum(complete.cases(lavaan::lavInspect(fit, "boot")))
-"""
-NO_BOOTSTRAP = """\
-fit <- lavaan::sem(model, data = med, estimator = "{estimator}")
-estimates <- lavaan::parameterEstimates(fit)
-"""
-MODERATOR_PREP = """\
-w_mean <- mean(med$w)
-# Centred, so each path is its effect where the other variables are at their means.
-for (v in c("x", "m", "w")) med[[v]] <- med[[v]] - mean(med[[v]])
-med$xw <- med$x * med$w
-med$mw <- med$m * med$w
-# Conditional effects at the moderator's two answers, or at its mean and 1 SD either side.
-w_levels <- sort(unique(med$w))
-w_at <- if (length(w_levels) == 2) w_levels else c(-1, 0, 1) * sd(med$w)
-at <- function(template) {
-  paste(sprintf(template, seq_along(w_at), sprintf("(%.12g)", w_at)), collapse = "\\n")
-}
-"""
-
-
-def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Code:
-    moderated = model.moderated
-    w = model.moderators[0].variable if model.moderators else None
-    names = {"x": model.x, "m": model.m, "y": model.y}
-    if w is not None:
-        names["w"] = w
-    names |= {f"cov{i}": v for i, v in enumerate(model.covariates, start=1)}
-    columns = ", ".join(f"{n} = d[[{r_string(v.column)}]]" for n, v in names.items())
-    legend = "; ".join(f"{n} = {v.label}" for n, v in names.items())
-    covariates = "".join(f" + cov{i}" for i in range(1, len(model.covariates) + 1))
-    m_terms = ["a*x"] + (["a_w*w", "a_xw*xw"] if "a" in moderated else [])
-    y_terms = ["c*x", "b*m"]
-    if moderated & {"b", "c"}:
-        y_terms.append("y_w*w")
-    if "b" in moderated:
-        y_terms.append("b_mw*mw")
-    if "c" in moderated:
-        y_terms.append("c_xw*xw")
-    definitions = definition_lines(moderated)
-    booted = model.bootstrap > 0
-    # Bootstrap needs plain ML, so MLR's fit comes from a second fit.
-    robust = model.estimator == MLR and booted
-    estimation = (
-        BOOTSTRAP.format(
-            robust="# Bootstrap needs plain ML; its estimates are MLR's too, whose fit is below.\n"
-            if robust
-            else "",
-            bootstrap=model.bootstrap,
-            seed=SEED,
-            parallel=f', parallel = "snow", ncpus = {workers}' if workers > 1 else "",
-        )
-        if booted
-        else NO_BOOTSTRAP.format(estimator=model.estimator.upper())
-    )
-    title = f"{model.x.label} to {model.y.label} through {model.m.label}"
-    if w is not None:
-        title += f", moderated by {w.label}"
-    r = R_MEDIATION.format(
-        title=title,
-        method="robust maximum likelihood (MLR) for the model's fit"
-        if robust
-        else ESTIMATOR_NAMES[model.estimator],
-        intervals=f"percentile bootstrap CIs from {model.bootstrap} resamples"
-        if booted
-        else "Wald CIs, by the delta method for the defined effects",
-        estimation=estimation,
-        resamples=COUNT if booted else "resamples <- 0\n",
-        w_name=", w" if w is not None else "",
-        legend=legend,
-        columns=columns,
-        moderator_prep=MODERATOR_PREP if w is not None else "",
-        m_equation=r_string(f"m ~ {' + '.join(m_terms)}{covariates}"),
-        y_equation=r_string(f"y ~ {' + '.join(y_terms)}{covariates}"),
-        definitions=",\n  ".join(definitions),
-        fit_line='robust <- lavaan::sem(model, data = med, estimator = "MLR")\n' if robust else "",
-        fitted="robust" if robust else "fit",
-        measures=", ".join(r_string(m) for m in FIT[model.estimator]),
-        values="w_at + w_mean" if w is not None else "numeric(0)",
-    )
-    return Code(
-        title="Mediation",
-        r=r,
-        python="",
-        outputs=("effects", "model_fit", "moderator_values"),
-        packages=("lavaan",),
-    )
-
-
-def definition_lines(moderated: set[str]) -> list[str]:
-    # R expressions that give the syntax of the defined effects.
-    if not moderated:
-        return [r_string("indirect := a*b"), r_string("total := c + a*b")]
-    a = "(a + a_xw*%2$s)" if "a" in moderated else "a"
-    b = "(b + b_mw*%2$s)" if "b" in moderated else "b"
-    lines = (
-        [f"at({r_string(f'indirect_%1$d := {a}*{b}')})"]
-        if moderated & {"a", "b"}
-        else [r_string("indirect := a*b")]
-    )
-    if "c" in moderated:
-        lines.append(f"at({r_string('direct_%1$d := c + c_xw*%2$s')})")
-    # With one of a and b moderated, the indirect effect is linear in the moderator.
-    if moderated & {"a", "b"} == {"a"}:
-        lines.append(r_string("index := a_xw*b"))
-    elif moderated & {"a", "b"} == {"b"}:
-        lines.append(r_string("index := a*b_mw"))
-    return lines
+    package: str = LAVAAN
+    method: str = ""
 
 
 def read_fit(found: dict[str, pd.DataFrame], model: MediationModel) -> MediationFit:
     effects = {
-        row.label: Effect(
-            row.label,
-            float(row.est),
-            none(row.se),
-            none(row.pvalue),
+        row["label"]: Effect(
+            row["label"],
+            float(row["est"]),
+            none(row["se"]),
+            none(row["pvalue"]),
             none(row["ci.lower"]),
             none(row["ci.upper"]),
+            # Effects at numbers on the moderator's own scale have no standardized form.
+            None if conditional(row["label"]) else none(row["std"]),
         )
         for _, row in found["effects"].iterrows()
     }
     measures = found["model_fit"].iloc[0]
-    fit = {FIT_NAMES.get(k, k): none(measures[k]) for k in FIT[model.estimator]}
+    fit = (
+        {FIT_NAMES.get(k, k): none(measures[k]) for k in FIT[model.estimator]}
+        if model.package == LAVAAN
+        else {}
+    )
     return MediationFit(
         n=int(measures["n"]),
         effects=effects,
@@ -239,7 +149,13 @@ def read_fit(found: dict[str, pd.DataFrame], model: MediationModel) -> Mediation
         estimator=model.estimator,
         bootstrap=model.bootstrap,
         resamples=int(measures["resamples"]),
+        package=model.package,
+        method=model.method if model.package == MODSEM else "",
     )
+
+
+def conditional(label: str) -> bool:
+    return label == "index" or label.startswith(("indirect_", "direct_"))
 
 
 def at_labels(model: MediationModel, fit: MediationFit) -> list[str]:
@@ -263,8 +179,9 @@ def intervals_text(fit: MediationFit) -> str:
 
 
 def method_text(fit: MediationFit) -> str:
-    if fit.estimator == MLR and fit.bootstrap:
-        return (
-            "maximum likelihood for the estimates and robust maximum likelihood (MLR) for the fit"
-        )
-    return ESTIMATOR_NAMES[fit.estimator]
+    name = ESTIMATOR_NAMES[fit.estimator]
+    if fit.package == MODSEM:
+        return f"latent interactions by {fit.method.upper()} with {name}"
+    if fit.bootstrap and fit.estimator != ML:
+        return f"{BASE[fit.estimator]} for the estimates and {name} for the fit"
+    return name
