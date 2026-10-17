@@ -28,3 +28,7 @@ The **Provider** (Anthropic, OpenAI, Gemini, or a local OpenAI-compatible server
 ## Where the settings are kept
 
 In a file named `gui.json`: `%APPDATA%\labcatalog` on Windows, `~/Library/Application Support/labcatalog` on macOS, and `~/.config/labcatalog` on Linux.
+
+## Example project
+
+The example the window opens the first time, and with **Open example**, is a copy kept with these settings, so changes made while trying it out stay there. **Reset the example** puts it back as installed, after asking.

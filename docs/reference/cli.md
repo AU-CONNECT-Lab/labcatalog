@@ -8,7 +8,7 @@ Every command that works on a project takes `--project` (`-p`), the project fold
 labcatalog gui [-p PROJECT]
 ```
 
-Open the labcatalog window, with the project if one is given.
+Open the labcatalog window with the given project; without one, the project open when the window last closed, or the example the first time.
 
 ## init
 

@@ -4,7 +4,7 @@ Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to o
 
 ## Opening a project
 
-**Open project** in the header chooses a project folder, the one with `labcatalog.yaml` in it. The header then shows the project's name (hover over it for the folder) and the date the data are as of, from the datasets' `snapshot_date`.
+The window opens the project that was open when it last closed, or the example project the first time. **Open project** in the header chooses a project folder, the one with `labcatalog.yaml` in it, and **Open example** opens the example. The header then shows the project's name (hover over it for the folder) and the date the data are as of, from the datasets' `snapshot_date`.
 
 ## Refreshing after a change
 

@@ -4,14 +4,16 @@ labcatalog comes with a fictional project, the Mock Family Study: three yearly w
 
 ## Open the example
 
-Copy the example into a new folder and open it:
+The window opens the example the first time you start it, and **Open example** in the header opens it at any time. It is the window's own copy, so changes you make while trying things out never touch the installed package; **Reset the example** on the Settings page puts it back as installed.
+
+To have the example in a folder of your own instead, copy it there and open it:
 
 ```bash
 labcatalog init my_example
 labcatalog gui -p my_example
 ```
 
-`my_example` is now an ordinary project folder: change anything in it and press **Refresh** in the window to see the effect. To start over, delete the folder and run `labcatalog init` again.
+`my_example` is then an ordinary project folder: change anything in it and press **Refresh** in the window to see the effect. To start over, delete the folder and run `labcatalog init` again.
 
 ## Look around the project folder
 

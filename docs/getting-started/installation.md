@@ -53,4 +53,4 @@ This lists the commands. Then open the window:
 labcatalog gui
 ```
 
-The window opens with no project. The next page opens the example project in it.
+The first time, the window opens the example project; after that, it opens the project that was open when it last closed. The next page tours the example.
