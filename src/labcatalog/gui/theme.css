@@ -320,13 +320,15 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .q-field--outlined .q-field__control { border-radius: 6px; background: var(--lc-panel); }
 .q-field--outlined .q-field__control:before { border-color: var(--lc-rule); }
 .q-field--outlined .q-field__control:hover:before { border-color: var(--lc-faint); }
-.q-field .q-chip {
+.q-field .q-chip, .q-chip.lc-filter-chip {
   background: var(--lc-accent-soft);
   color: var(--lc-accent);
   border-radius: 999px;
   font-size: 0.8rem;
 }
-.q-field .q-chip .q-chip__icon--remove { color: var(--lc-accent); opacity: 0.6; }
+.q-chip.lc-filter-chip { margin: 0; }
+.q-field .q-chip .q-chip__icon--remove,
+.q-chip.lc-filter-chip .q-chip__icon--remove { color: var(--lc-accent); opacity: 0.6; }
 
 /* Toggles read as a tab bar: the chosen one is underlined. */
 .q-btn-toggle {

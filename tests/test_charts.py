@@ -198,6 +198,8 @@ def test_score_network_links_strong_pairs_and_colours_by_the_first_matching_tag(
         "instrument",
         "cluster",
         "facet:reporter",
+        "facet:target",
+        "facet:modality",
         "facet:domain",
         "facet:topics",
     ]

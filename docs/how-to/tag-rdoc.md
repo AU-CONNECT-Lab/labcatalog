@@ -51,7 +51,7 @@ custom_fields:
       - Innate Motor Patterns
 
 browse:
-  facets: [study, wave, reporter, rdoc_domain, rdoc_construct]
+  facets: [study, wave, coverage, reporter, rdoc_domain, rdoc_construct, status]
 ```
 
 If `labcatalog.yaml` already has `custom_fields` or `browse`, add the two fields to the list and the two names to `facets` instead of pasting a second copy.

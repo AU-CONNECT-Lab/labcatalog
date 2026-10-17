@@ -163,6 +163,7 @@ def browser(
                     icon="add",
                     on_click=lambda: new_instrument.open_wizard(result, wizard_done(view, cfa)),
                 ).props("flat dense no-caps").classes("lc-quiet-btn")
+            active_filters(index, view, changed)
             shown = table(*list_table(result, found), pagination=PAGE_SIZE)
         shown.set_selection("multiple")
         shown.selected = [row for row in shown.rows if row["id"] in view.chosen]
@@ -477,6 +478,28 @@ def export_dialog(
                     ui.button("Back", on_click=stepper.previous).props("flat")
                     ui.button("Close", on_click=dialog.close).props("flat")
     dialog.open()
+
+
+def active_filters(index: BrowseIndex, view: BrowseView, changed: Callable[[], None]) -> None:
+    def remove(name: str, value: str) -> None:
+        view.selected[name].discard(value)
+        changed()
+
+    chosen = [
+        (facet, value)
+        for facet in index.facets
+        for value in facet.values
+        if value in view.selected.get(facet.name, set())
+    ]
+    if not chosen:
+        return
+    with ui.row().classes("gap-1 items-center"):
+        for facet, value in chosen:
+            ui.chip(
+                f"{facet.label}: {facet.values[value]}",
+                removable=True,
+                on_value_change=lambda _, n=facet.name, v=value: remove(n, v),
+            ).props("dense").classes("lc-filter-chip")
 
 
 def facet_panel(index: BrowseIndex, view: BrowseView, changed: Callable[[], None]) -> None:

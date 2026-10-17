@@ -313,6 +313,8 @@ def open_wizard(
                 "Pick a wave column when the file holds several waves, one row per person per "
                 f"wave; this dataset then reads the rows of wave {wave.value} only."
             )
+            state["wave_status"] = ui.label()
+            state["wave_status"].visible = False
         found = new_dataset.coverage(project, draft().template, rows)
         labels = views.instrument_names(result)
         with ui.row().classes("gap-2"):
@@ -353,12 +355,12 @@ def open_wizard(
     async def pick_wave_column(event) -> None:
         state["wave_column"] = event.value
         if not event.value:
-            wave_status.visible = False
+            state["wave_status"].visible = False
             return
-        await show_rows(wave_status)
+        await show_rows(state["wave_status"])
 
     async def columns_next() -> None:
-        if blank() and state["wave_column"] and not await show_rows(wave_status):
+        if blank() and state["wave_column"] and not await show_rows(state["wave_status"]):
             columns_status.set_text("No rows of this wave; pick another wave column or none")
             return
         rows = await state["grid"].get_client_data()
@@ -546,8 +548,6 @@ def open_wizard(
                     ui.button("Cancel", on_click=cancel).props("flat")
             with ui.step("Columns"):
                 columns()
-                wave_status = ui.label()
-                wave_status.visible = False
                 columns_status = ui.label().classes("lc-bad-text")
                 with ui.stepper_navigation():
                     ui.button("Next", on_click=columns_next)

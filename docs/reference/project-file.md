@@ -102,7 +102,7 @@ A list of fields your lab adds to instruments, scores, administrations or datase
 
 | Key | Default | Meaning |
 |---|---|---|
-| `facets` | `[study, wave, reporter]` | The filters on the Instruments page, in order. Built in: `study`, `wave`, `reporter`, `target`, `modality`; any `choice` or `tags` custom field can be added. |
+| `facets` | `[study, wave, coverage, reporter, target, modality]`, then every `choice` and `tags` custom field, then `status` | The filters on the Instruments page, in order. Built in: `study`, `wave`, `coverage` (given in every wave or in fewer), `reporter`, `target`, `modality`, `status` (complete or what the catalog still lacks); any `choice` or `tags` custom field can be added. |
 
 ## references
 

@@ -3,9 +3,14 @@ from dataclasses import dataclass
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, dataset_by_name
 from labcatalog.data.resolve import as_text_dict
+from labcatalog.metadata.completeness import gaps
 from labcatalog.project import Project
 from labcatalog.schema import Instrument
 from labcatalog.stats.summary import wave_order
+
+EVERY_WAVE = "every wave"
+COMPLETE = "complete"
+NOT_GIVEN = "not in a dataset"
 
 
 @dataclass
@@ -36,7 +41,7 @@ def facet_names(config: ProjectConfig) -> list[str]:
     if config.browse.facets is not None:
         return config.browse.facets
     custom = [f.name for f in config.custom_fields if f.type in defaults.FACET_FIELD_TYPES]
-    return [*defaults.DEFAULT_FACETS, *custom]
+    return [*defaults.DEFAULT_FACETS, *custom, *defaults.DEFAULT_LAST_FACETS]
 
 
 def wave_key(study: str, wave: str) -> str:
@@ -46,6 +51,10 @@ def wave_key(study: str, wave: str) -> str:
 def build_index(project: Project) -> BrowseIndex:
     config = project.config
     names = facet_names(config)
+    coverage = wave_coverage(project)
+    status = {
+        i: [f"no {gap}" for gap in gaps(s)] or [COMPLETE] for i, s in project.instruments.items()
+    }
     rows = []
     for content in project.studies.values():
         for administration in content.administrations:
@@ -58,6 +67,8 @@ def build_index(project: Project) -> BrowseIndex:
                     "reporter": dataset.reporter,
                     "target": administration.target,
                     "modality": dataset.modality,
+                    "coverage": coverage[(instrument.id, dataset.study)],
+                    "status": status[instrument.id],
                 }
                 custom = {
                     **score_values(instrument),
@@ -70,7 +81,11 @@ def build_index(project: Project) -> BrowseIndex:
     administered = {row.instrument_id for row in rows}
     for instrument_id, instrument in project.instruments.items():
         if instrument_id not in administered:
-            custom = {**score_values(instrument), **instrument.custom}
+            custom = {
+                **score_values(instrument),
+                **instrument.custom,
+                "status": [*status[instrument_id], NOT_GIVEN],
+            }
             values = {n: as_set(custom.get(n)) for n in names}
             rows.append(Administered(instrument_id, None, values))
     return BrowseIndex(
@@ -85,6 +100,28 @@ def build_index(project: Project) -> BrowseIndex:
             for i, instrument in project.instruments.items()
         },
     )
+
+
+def wave_coverage(project: Project) -> dict[tuple[str, str], str]:
+    # Counted against the waves of the study that have data, so a planned wave does not count.
+    config = project.config
+    waves: dict[str, set[str]] = {}
+    for d in config.datasets:
+        waves.setdefault(d.study, set()).add(d.wave)
+    given: dict[tuple[str, str], set[str]] = {}
+    for content in project.studies.values():
+        for administration in content.administrations:
+            for name in administration.datasets:
+                d = dataset_by_name(config, name)
+                given.setdefault((administration.instrument, d.study), set()).add(d.wave)
+    return {
+        key: EVERY_WAVE if found == waves[key[1]] else waves_label(len(found))
+        for key, found in given.items()
+    }
+
+
+def waves_label(n: int) -> str:
+    return f"{n} wave" if n == 1 else f"{n} waves"
 
 
 def matches(
@@ -177,6 +214,13 @@ def facet(config: ProjectConfig, name: str, rows: list[Administered]) -> Facet:
             for s, study in config.studies.items()
             for wave in sorted(study.waves, key=wave_order)
         }
+    elif name == "modality":
+        labels = {v: config.vocab.modality_label(v) for v in config.vocab.modalities}
+    elif name == "coverage":
+        sizes = sorted({int(v.split()[0]) for v in present if v != EVERY_WAVE}, reverse=True)
+        labels = {v: v for v in [EVERY_WAVE, *(waves_label(n) for n in sizes)]}
+    elif name == "status":
+        labels = {v: v for v in [COMPLETE, *sorted(present - {COMPLETE, NOT_GIVEN}), NOT_GIVEN]}
     else:
         labels = {v: v for v in value_order(config, name)}
     labels.update({v: v for v in sorted(present - set(labels))})
@@ -199,6 +243,7 @@ def value_order(config: ProjectConfig, name: str) -> list[str]:
 
 def facet_label(config: ProjectConfig, name: str) -> str:
     if name in defaults.BUILTIN_FACETS:
-        return "About" if name == "target" else name.capitalize()
+        named = {"target": "About", "coverage": "Given in", "status": "Catalog"}
+        return named.get(name, name.capitalize())
     field = next(f for f in config.custom_fields if f.name == name)
     return field.label or name.capitalize()

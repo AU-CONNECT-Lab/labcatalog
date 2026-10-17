@@ -285,3 +285,38 @@ def test_a_file_of_every_wave_is_read_again_for_the_next_wave(project_root):
     )
     assert len(load_datasets(after)["parent_w4"].frame) == len(fourth)
     assert not (project_root / "data/parent_w4.csv").exists()
+
+
+def test_a_new_kind_of_file_can_hold_every_wave(project_root, tmp_path):
+    changes.write(
+        load_project(project_root), studies.new_study(load_project(project_root), "pilot", "Pilot")
+    )
+    project = load_project(project_root)
+    source = tmp_path / "pilot_long.csv"
+    items = [f"ems_{n}" for n in range(1, 10)]
+    lines = [",".join(["pid", "visit", *items])]
+    lines += [",".join([pid, visit, *"123412341"]) for pid in ("9001C", "9002C") for visit in "12"]
+    lines.append(",".join(["9003C", "2", *"123412341"]))
+    source.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    draft = new_dataset.suggest_blank(project, "pilot")
+    draft.name, draft.blank.reporter, draft.blank.id_column = "pilot_child_w1", "child", "pid"
+    placement = new_dataset.place(project, draft, source)
+    new_dataset.bring_in(project, source, placement)
+    draft.blank.wave_column = "visit"
+    dataset = new_dataset.dataset_config(project, draft, placement)
+    assert new_dataset.wave_rows(project, dataset) == new_dataset.WaveRows(2, ["1", "2"])
+
+    matched = new_dataset.match_columns(project, dataset)
+    found = new_dataset.changes(project, draft, placement, matched)
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    config = (project_root / "labcatalog.yaml").read_text(encoding="utf-8")
+    line = next(x for x in config.splitlines() if "name: pilot_child_w1" in x)
+    assert "path: data/pilot_child_w1.csv, wave_column: visit, snapshot_date: " in line
+    after = load_project(project_root)
+    assert sorted(load_datasets(after)["pilot_child_w1"].frame["pid"]) == ["9001C", "9002C"]
+    # The file's second wave is then there to repeat.
+    assert "pilot_child_w1" in new_dataset.templates(after)
+    assert (
+        new_dataset.place(after, new_dataset.suggest(after, "pilot_child_w1"), None).copy_to is None
+    )

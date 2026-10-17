@@ -682,7 +682,8 @@ def score_panel(
 
 def network_colorings(result: CatalogResult) -> dict[str, str]:
     config = result.project.config
-    facets = [n for n in facet_names(config) if n not in ("study", "wave")]
+    skipped = ("study", "wave", *defaults.CATALOG_FACETS)
+    facets = [n for n in facet_names(config) if n not in skipped]
     return {
         "instrument": "Instrument",
         "cluster": "Cluster",

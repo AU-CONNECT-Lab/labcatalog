@@ -90,7 +90,7 @@ custom_fields:
 
 # The filters on the Instruments page, in this order.
 browse:
-  facets: [study, wave, reporter, domain, topics]
+  facets: [study, wave, coverage, reporter, target, modality, domain, topics, status]
 
 # The folder holding references.bib and the instruments' reference PDFs (often a shared Box or OneDrive folder; ~ and environment variables work). An instrument names each reference by its key in references.bib, which a reference manager such as Zotero can export and keep up to date; a reference's pdf is a path inside this folder.
 references:
