@@ -5,9 +5,10 @@ from pathlib import Path
 
 from nicegui import app, background_tasks, ui
 
+from labcatalog import defaults
 from labcatalog.ai import scoring as ai_scoring
 from labcatalog.ai.search import Search
-from labcatalog.charts import views
+from labcatalog.charts import network, views
 from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
@@ -30,6 +31,7 @@ from labcatalog.gui.common import (
     unique,
 )
 from labcatalog.gui.datalad import get_button
+from labcatalog.gui.network_graph import NetworkGraph
 from labcatalog.gui.paper import (
     copy_text,
     paper_table,
@@ -91,6 +93,9 @@ from labcatalog.stats.invariance import (
 from labcatalog.stats.summary import VariableSummary
 
 PAGE_SIZE = 50
+LAYOUTS = {"list": "List", "map": "Map"}
+# The instrument tab a click on the map opens, by the kind of dot: scores or items.
+MAP_PARTS = {"s": "scores", "t": "items"}
 CFA_UNSET = "unset"
 CFA_RUNNING = "running"
 CFA_DONE = "done"
@@ -108,6 +113,7 @@ class BrowseView:
     # Instruments ticked for export, kept across filters and refreshes.
     chosen: set[str] = field(default_factory=set)
     asked: Search | None = None
+    layout: str = "list"
 
     @property
     def only(self) -> set[str] | None:
@@ -185,6 +191,7 @@ def browser(
 
         with panel("Instruments", f"{len(found)} of {len(index.instruments)} shown") as tools:
             with tools:
+                ui.toggle(LAYOUTS, value=view.layout, on_change=lambda e: set_layout(e.value))
                 chosen_bar()
                 ui.button(
                     "Add an instrument",
@@ -192,6 +199,9 @@ def browser(
                     on_click=lambda: new_instrument.open_wizard(result, wizard_done(view, cfa)),
                 ).props("flat dense no-caps").classes("lc-quiet-btn")
             active_filters(index, view, changed)
+            if view.layout == "map":
+                catalog_map(result, list(found), view, on_open)
+                return
             shown = table(*list_table(result, found), pagination=PAGE_SIZE)
         shown.set_selection("multiple")
         shown.selected = [row for row in shown.rows if row["id"] in view.chosen]
@@ -202,6 +212,10 @@ def browser(
 
     def changed() -> None:
         facets.refresh()
+        results.refresh()
+
+    def set_layout(value: str) -> None:
+        view.layout = value
         results.refresh()
 
     def set_query(value: str | None) -> None:
@@ -230,6 +244,29 @@ def browser(
         with ui.column().classes("grow min-w-0 gap-4"):
             ask_panel(result, view, changed, on_open)
             results()
+
+
+def catalog_map(
+    result: CatalogResult,
+    instrument_ids: list[str],
+    view: BrowseView,
+    on_open: Callable[[str | None], None],
+) -> None:
+    def opened(node: str) -> None:
+        kind, instrument_id = node.split(":")[:2]
+        view.part = MAP_PARTS.get(kind, view.part)
+        on_open(instrument_id)
+
+    spec = views.catalog_map(result, instrument_ids)
+    if spec is None:
+        note("No instruments match the filters.")
+        return
+    note(
+        "Each instrument holds its scores, and each score its items. A line between scores of "
+        f"different instruments means |r| ≥ {defaults.CHART_MIN_R:g} in some wave; hover over a "
+        "dot to see its links, scroll to zoom, and click to open it."
+    )
+    NetworkGraph(spec, network.MAP_HEIGHT, on_click=opened).classes("w-full")
 
 
 def wizard_done(view: BrowseView, cfa: CfaView) -> Callable[[str], Awaitable[None]]:

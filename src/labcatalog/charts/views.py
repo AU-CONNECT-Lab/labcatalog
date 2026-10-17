@@ -1,3 +1,4 @@
+import html
 from collections import Counter
 from collections.abc import Callable
 from datetime import date
@@ -21,6 +22,8 @@ from labcatalog.stats import multilevel as ml
 from labcatalog.stats.summary import wave_order
 
 RADAR_AXES = 3
+# The catalog map's group for instruments that no dataset holds yet.
+MAP_UNPLACED = "Not in a dataset"
 
 # ---- shared lookups ----
 
@@ -740,6 +743,97 @@ def score_network(
         for i, j in pairs
     ]
     return network.score_network(nodes, links, categories)
+
+
+def catalog_map(result: CatalogResult, instrument_ids: list[str]) -> dict | None:
+    if not instrument_ids:
+        return None
+    instruments = result.project.instruments
+    found = instrument_modalities(result)
+    vocab = result.project.config.vocab
+    kinds = [vocab.modality_label(found[i]) for i in instrument_ids if i in found]
+    order = list(dict.fromkeys(kinds))
+    groups = [(name, group_color(k)) for k, name in enumerate(order)]
+    if len(kinds) < len(instrument_ids):
+        groups.append((MAP_UNPLACED, network.UNSET_COLOR))
+    nodes: list[dict] = []
+    links: list[dict] = []
+    for instrument_id in instrument_ids:
+        instrument = instruments[instrument_id]
+        group = (
+            order.index(vocab.modality_label(found[instrument_id]))
+            if instrument_id in found
+            else len(order)
+        )
+        hub = f"i:{instrument_id}"
+        nodes.append(
+            {
+                "id": hub,
+                "name": instrument.abbreviation or instrument_id,
+                "group": group,
+                "named": True,
+                "tip": f"<b>{html.escape(instrument.name)}</b><br>{len(instrument.items)} items, "
+                f"{len(instrument.scores)} scores",
+            }
+        )
+        # Smallest scores first, so an item hangs from its subscale rather than the total.
+        holder: dict[str, str] = {}
+        for score in sorted(instrument.scores, key=lambda s: len(s.items)):
+            for item_id in score.items:
+                holder.setdefault(item_id, f"s:{instrument_id}:{score.id}")
+        for score in instrument.scores:
+            key = f"s:{instrument_id}:{score.id}"
+            label = short_label(instrument, score)
+            nodes.append(
+                {
+                    "id": key,
+                    "name": label,
+                    "group": group,
+                    "tip": f"<b>{html.escape(label)}</b><br>{len(score.items)} items",
+                }
+            )
+            links.append({"source": hub, "target": key, "r": None, "tip": ""})
+        for item in instrument.items:
+            key = f"t:{instrument_id}:{item.id}"
+            nodes.append(
+                {
+                    "id": key,
+                    "name": item.id,
+                    "group": group,
+                    "tip": f"<b>{html.escape(item.id)}</b><br>"
+                    f"{html.escape(item_text(instrument, item.id))}",
+                }
+            )
+            links.append({"source": holder.get(item.id, hub), "target": key, "r": None, "tip": ""})
+    shown = set(instrument_ids)
+    by_key = {s.key: s for s in result.catalog.scores}
+    # The strongest r between two scores in any wave.
+    strongest: dict[tuple[str, str], tuple[float, str]] = {}
+    for corr in result.summary.correlations:
+        scores = [by_key[k] for k in corr.keys]
+        for i in range(len(scores)):
+            for j in range(i):
+                a, b, r = scores[i], scores[j], corr.r[i][j]
+                if (
+                    r is None
+                    or not np.isfinite(r)
+                    or abs(r) < defaults.CHART_MIN_R
+                    or a.instrument_id == b.instrument_id
+                    or not {a.instrument_id, b.instrument_id} <= shown
+                ):
+                    continue
+                pair = tuple(
+                    sorted(
+                        (f"s:{a.instrument_id}:{a.score_id}", f"s:{b.instrument_id}:{b.score_id}")
+                    )
+                )
+                if abs(r) > abs(strongest.get(pair, (0.0, ""))[0]):
+                    strongest[pair] = (r, wave_name(result, corr.study, corr.wave))
+    names = {n["id"]: n["name"] for n in nodes}
+    for (a, b), (r, wave) in strongest.items():
+        tip = f"{html.escape(names[a])} and {html.escape(names[b])}<br>r = {r:.2f} in {wave}"
+        links.append({"source": a, "target": b, "r": float(r), "tip": tip})
+    return network.catalog_map(nodes, links, groups)
 
 
 def network_groups(

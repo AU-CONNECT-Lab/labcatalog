@@ -240,3 +240,29 @@ def test_network_links_by_id_and_tightens_with_many_nodes():
     assert many["force"]["length"][1] < few["force"]["length"][1]
     assert many["force"]["gravity"] > few["force"]["gravity"]
     assert many["force"]["repel"] < few["force"]["repel"]
+
+
+def test_catalog_map_hangs_items_from_their_smallest_score_and_links_scores_across_instruments(
+    result,
+):
+    instruments = list(result.project.instruments)
+    spec = views.catalog_map(result, instruments)
+    ids = {n["id"] for n in spec["nodes"]}
+    assert {f"i:{i}" for i in instruments} <= ids
+    parents = {
+        link["target"]: link["source"]
+        for link in spec["links"]
+        if link["color"] == network.UNSET_COLOR
+    }
+    mood = result.project.instruments["example_mood"]
+    for item in mood.items:
+        holders = [s for s in mood.scores if item.id in s.items]
+        if holders:
+            smallest = min(holders, key=lambda s: len(s.items))
+            assert parents[f"t:example_mood:{item.id}"] == f"s:example_mood:{smallest.id}"
+    correlated = [link for link in spec["links"] if link["color"] != network.UNSET_COLOR]
+    assert correlated
+    assert all(link["source"].split(":")[1] != link["target"].split(":")[1] for link in correlated)
+    assert all(link["value"] < 1 for link in correlated)
+    assert sum(n.get("named", False) for n in spec["nodes"]) == len(instruments)
+    assert views.catalog_map(result, []) is None

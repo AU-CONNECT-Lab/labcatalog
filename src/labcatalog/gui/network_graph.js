@@ -73,6 +73,7 @@ export default {
       .nodeVisibility((n) => !this.hidden.includes(n.group))
       .linkVisibility((l) => !this.hidden.includes(l.source.group) && !this.hidden.includes(l.target.group))
       .onNodeHover((n) => this.hover(n))
+      .onNodeClick((n) => this.$emit("node_click", n.id))
       .onNodeDrag((n) => this.hover(n))
       .onRenderFramePre(() => this.readTheme())
       .d3VelocityDecay(0.3)
@@ -209,6 +210,11 @@ export default {
       const size = LABEL_SIZE;
       let shown = Math.max(0, Math.min(1, (size * scale - LABEL_FROM_PX) / (LABEL_PX - LABEL_FROM_PX)));
       let font = size;
+      if (n.named) {
+        // Named nodes, such as the instruments of the catalog map, keep a readable label at any zoom.
+        shown = 1;
+        font = Math.max(size, (LABEL_PX - 1) / scale);
+      }
       if (focused) {
         shown = Math.max(shown * alpha, this.level);
         font = Math.max(size, LABEL_PX / scale);
@@ -217,7 +223,7 @@ export default {
       }
       if (shown <= 0.02) return;
       ctx.globalAlpha = shown;
-      ctx.font = `${focused && n.id === this.focus.id ? 600 : 400} ${font}px ${this.colors.font}`;
+      ctx.font = `${n.named || (focused && n.id === this.focus.id) ? 600 : 400} ${font}px ${this.colors.font}`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
       const y = n.y + n.size + font * 0.35;

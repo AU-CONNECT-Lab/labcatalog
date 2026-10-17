@@ -13,6 +13,8 @@ On the left:
 
 The table shows each instrument's abbreviation, name, construct, reporters, number of items, and how many people answered it in each dataset the filters show. The **Missing** column lists what the catalog still lacks for an instrument, such as its scores, reference or license.
 
+**Map** beside **List** draws the instruments the filters show as one graph, colored by modality: each instrument holds its scores, each score its items, and a line joins scores of different instruments that correlate at |*r*| ≥ .30 in some wave. Hover over a dot to see its links and name, scroll to zoom, and click a dot to open its instrument, at the **Scores** tab for a score or the **Items** tab for an item.
+
 ### Ask the language model
 
 With a language model set up (see [Set Up R and Language Models](../how-to/r-and-models.md)), **Ask the language model** finds instruments from a description in your own words, such as "trouble falling asleep". It sends the instruments' names and item wording, never any data. The answer lists the matching instruments and items with the model's reasons, and narrows the list until you press **Clear**.
