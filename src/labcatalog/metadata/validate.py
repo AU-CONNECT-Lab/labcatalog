@@ -74,10 +74,12 @@ def check_vocab(project: Project) -> list[Issue]:
             message = f"{where}.wave: wave {dataset.wave} is not listed for study {dataset.study}"
             issues.append(unknown(message, CONFIG))
     for name, content in project.studies.items():
+        # A dataset of the study can have its own methods in place of its modality's.
+        own = {d.name for d in config.datasets if d.study == content.study}
         found = [
             not_in_vocab(f"methods.{modality}", modality, "vocab.modalities")
             for modality in content.methods
-            if modality not in vocab.modalities
+            if modality not in vocab.modalities and modality not in own
         ]
         for n, administration in enumerate(content.administrations, start=1):
             target = administration.target

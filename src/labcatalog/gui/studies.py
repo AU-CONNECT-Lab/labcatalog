@@ -383,10 +383,13 @@ def text_panels(
     ):
         if not modalities:
             note("The study has no datasets yet; each modality it uses gets a box here.")
+        names = {d.name for d in project.config.datasets if d.study == study}
         for modality in modalities:
             boxes[modality] = (
                 ui.textarea(
-                    vocab.modality_label(modality),
+                    f"{modality} (dataset)"
+                    if modality in names
+                    else vocab.modality_label(modality),
                     value=written.get(modality, "").strip(),
                     on_change=touched,
                 )

@@ -6,6 +6,7 @@ import pytest
 from labcatalog.config import WaveConfig
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import changes, records, studies
+from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
 
 
@@ -119,6 +120,35 @@ def test_methods_and_participants_are_written_as_blocks(mock_project):
     after = load_project(mock_project).studies["mock_study"]
     assert after.methods["eeg"] == "Recorded at 500 Hz.\n\nCleaned by hand.\n"
     assert after.participants == "{waves} {counts}\n"
+
+
+def test_a_dataset_can_have_its_own_methods(mock_project):
+    path = mock_project / "studies" / "mock_study.yaml"
+    own = "  child_w1: Children answered on paper.\n  eeg_w3: A 64-channel cap was used.\n"
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("methods:\n", "methods:\n" + own), encoding="utf-8"
+    )
+    project = load_project(mock_project)
+    written = project.studies["mock_study"].methods
+    first = studies.wave_methods(project, "mock_study", "1")
+    assert [(m, names) for m, names, _ in first[:2]] == [
+        ("questionnaire", ["parent_w1"]),
+        ("questionnaire", ["child_w1"]),
+    ]
+    assert first[1][2] == written["child_w1"]
+    assert ("eeg", [], written["eeg"]) in first
+    assert ("eeg", [], written["eeg_w3"]) in studies.wave_methods(project, "mock_study", "3")
+
+
+def test_a_methods_key_must_be_a_modality_or_a_dataset_of_the_study(mock_project):
+    path = mock_project / "studies" / "mock_study.yaml"
+    text = path.read_text(encoding="utf-8").replace(
+        "methods:\n", "methods:\n  meg: MEG.\n  eeg_w3: Own.\n"
+    )
+    path.write_text(text, encoding="utf-8")
+    found = [i.message for i in validate_project(load_project(mock_project))]
+    assert any(m.startswith("methods.meg:") for m in found)
+    assert not any("child_w1" in m or "eeg_w3" in m for m in found)
 
 
 def test_renaming_a_study_follows_it_into_every_file(mock_project):

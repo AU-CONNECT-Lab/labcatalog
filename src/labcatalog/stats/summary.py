@@ -91,6 +91,7 @@ class ModalityCount(BaseModel):
     wave: str
     modality: str
     n: int
+    n_from_previous: int | None = None
 
 
 class WaveGroups(BaseModel):
@@ -432,15 +433,29 @@ def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
 
 def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
     # Counted the way retention counts a wave, within each modality's files.
-    found: dict[tuple[str, str, str, str], set] = {}
+    found: dict[tuple[str, str, str], dict[str, set]] = {}
     for loaded in datasets.values():
         c = loaded.config
-        key = (c.study, c.reporter, c.wave, c.modality)
-        found.setdefault(key, set()).update(loaded.frame[loaded.id_column])
-    return [
-        ModalityCount(study=study, reporter=reporter, wave=wave, modality=modality, n=len(ids))
-        for (study, reporter, wave, modality), ids in found.items()
-    ]
+        waves = found.setdefault((c.study, c.reporter, c.modality), {})
+        waves.setdefault(c.wave, set()).update(loaded.frame[loaded.id_column])
+    rows = []
+    for (study, reporter, modality), waves in found.items():
+        # Returning counts against the last wave that collected this modality.
+        previous: set | None = None
+        for wave in sorted(waves, key=wave_order):
+            ids = waves[wave]
+            rows.append(
+                ModalityCount(
+                    study=study,
+                    reporter=reporter,
+                    wave=wave,
+                    modality=modality,
+                    n=len(ids),
+                    n_from_previous=None if previous is None else len(ids & previous),
+                )
+            )
+            previous = ids
+    return rows
 
 
 def wave_groups(datasets: dict[str, LoadedDataset]) -> list[WaveGroups]:

@@ -20,7 +20,7 @@ A study opens with its label and ID on top, the buttons **Rename**, **Delete**, 
 
 ## Text
 
-**Methods**: one box per modality the study's datasets use, for how its data were collected and processed. The text is shown on the [Methods](methods.md) page under Procedure and with each dataset. Leave a blank line between paragraphs. It is written to `methods` in the study file.
+**Methods**: one box per modality the study's datasets use, for how its data were collected and processed, and one for each dataset given its own text in the study file. The text is shown on the [Methods](methods.md) page under Procedure and with each dataset. Leave a blank line between paragraphs. It is written to `methods` in the study file.
 
 **Participants**: the template of the study's Participants paragraph on the Methods page, with placeholders such as `{waves}` and `{counts}`; the page lists them all. Leave it empty to use the project's template. **Preview** writes the paragraph from the current data with the template in the box, before you save it.
 

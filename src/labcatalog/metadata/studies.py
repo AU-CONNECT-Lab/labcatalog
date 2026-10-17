@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 from pathlib import PurePosixPath
@@ -134,6 +135,27 @@ def text_change(
     set_block(data, "participants", participants, after="methods" if written else "study")
     new = records.dumped(data)
     return None if new == text else Change(relative, new, opened)
+
+
+def wave_methods(project: Project, study: str, wave: str) -> list[tuple[str, list[str], str]]:
+    # Each modality of the wave with its text; a dataset's own text splits it off.
+    content = next((c for c in project.studies.values() if c.study == study), None)
+    written = content.methods if content else {}
+    found: dict[tuple[str, str], list[str]] = {}
+    for d in project.config.datasets:
+        if (d.study, d.wave) != (study, wave):
+            continue
+        text = written.get(d.name) or written.get(d.modality)
+        if text:
+            found.setdefault((d.modality, text), []).append(d.name)
+    # Datasets are named only where one modality has more than one text.
+    texts = Counter(modality for modality, _ in found)
+    order = project.config.vocab.modalities
+    rows = [
+        (modality, names if texts[modality] > 1 else [], text)
+        for (modality, text), names in found.items()
+    ]
+    return sorted(rows, key=lambda row: order.index(row[0]) if row[0] in order else len(order))
 
 
 def study_file(project: Project, study: str) -> str:

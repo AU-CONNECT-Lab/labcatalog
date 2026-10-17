@@ -14,7 +14,7 @@ administrations:
 | Key | Type | Meaning |
 |---|---|---|
 | `study` | text | The study's ID. Required. |
-| `methods` | mapping | Each modality to a paragraph on how its data were collected and processed. |
+| `methods` | mapping | Each modality to a paragraph on how its data were collected and processed. A key can also be the name of one of the study's datasets, whose text then replaces its modality's for that dataset. |
 | `participants` | text | This study's own Participants template. |
 | `administrations` | list | Which instruments were given in which datasets. |
 

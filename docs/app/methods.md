@@ -8,7 +8,7 @@ The Methods page drafts the parts of a methods section that the catalog already 
 
 - A paragraph on the waves, how many people took part in each, how many returned, and how many have data from each modality.
 - **Participants by Wave**: people per reporter and wave, how many returned from the previous wave, and, with a group, the number of groups and the groups with data from every reporter.
-- **Participants by Modality**: people per modality and wave, shown when the study has two or more modalities.
+- **Participants by Modality**: people per modality and wave, and how many of them came back from the last wave that collected that modality; shown when the study has two or more modalities.
 
 ## Table 1
 
@@ -20,7 +20,7 @@ Compares the people in the chosen wave who took part again in the next wave with
 
 ## Procedure
 
-How each modality's data were collected and processed, from `methods` in the study file.
+How each modality's data were collected and processed in the chosen wave, from `methods` in the study file. A dataset with its own text there (keyed by its name) uses it instead of its modality's; when the datasets of one modality differ, each text is headed by the datasets it covers.
 
 ## Measures
 

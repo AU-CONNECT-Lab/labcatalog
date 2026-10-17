@@ -27,15 +27,37 @@ def test_default_paragraph_gives_waves_counts_and_retention(mock_project):
 def test_modality_table_counts_each_modality_against_its_wave(mock_project):
     result = run_catalog(mock_project)
     columns, rows = methods.modality_table(result, "mock_study")
-    assert [c["label"] for c in columns] == ["Modality", "Reporter", "Wave 1", "Wave 2", "Wave 3"]
+    assert [c["label"] for c in columns] == [
+        "Modality",
+        "Reporter",
+        "Wave 1",
+        "Wave 2",
+        "Wave 2 returning",
+        "Wave 3",
+        "Wave 3 returning",
+    ]
     eeg = next(r for r in rows if r["modality"] == "EEG")
     assert (eeg["w0"], eeg["w2"]) == ("141 (77%)", "125 (84%)") and "w1" not in eeg
+    # EEG skipped wave 2, so its returning count is against wave 1.
+    ids = {
+        d.config.wave: set(d.frame[d.id_column])
+        for d in result.datasets.values()
+        if d.config.modality == "eeg"
+    }
+    both = len(ids["1"] & ids["3"])
+    assert eeg["back2"] == f"{both} ({round(100 * both / 141)}%)" and "back1" not in eeg
     assert rows[0] == {
         "modality": "questionnaires",
         "reporter": "parent",
         "w0": "191 (100%)",
         "w1": "170 (100%)",
+        "back1": "155 (81%)",
         "w2": "159 (100%)",
+        "back2": next(
+            f"{r.n_from_previous} ({round(100 * r.n_from_previous / 170)}%)"
+            for r in result.summary.retention
+            if (r.reporter, r.wave) == ("parent", "3")
+        ),
     }
 
 

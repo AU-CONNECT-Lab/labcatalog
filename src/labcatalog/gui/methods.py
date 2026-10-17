@@ -6,9 +6,10 @@ from labcatalog.charts import views
 from labcatalog.gui import analysis_tables, attrition
 from labcatalog.gui.analysis import sample_text
 from labcatalog.gui.common import col, empty, note, page_head, panel, sorted_waves, unique
-from labcatalog.gui.datasets import methods_of, paragraphs
+from labcatalog.gui.datasets import paragraphs
 from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView
 from labcatalog.gui.paper import copy_text, paper_table, save_button
+from labcatalog.metadata.studies import wave_methods
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import measures, participants
 from labcatalog.reports.participants import wave_dates
@@ -44,8 +45,8 @@ def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
             view.wave = waves[0]
         with page_head(
             "Methods",
-            "Text and tables for a paper's Methods section; Table 1 and Measures describe the "
-            "chosen wave.",
+            "Text and tables for a paper's Methods section; Table 1, Procedure and Measures "
+            "describe the chosen wave.",
         ):
             if len(studies) > 1:
                 ui.toggle(
@@ -58,7 +59,7 @@ def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
                     on_change=lambda e: choose_wave(e.value),
                 ).props("dense no-caps")
         participants_part(result, view)
-        procedure(result, view.study)
+        procedure(result, view.study, view.wave)
         measures_body(result, view, cfa)
 
     def choose_study(value: str) -> None:
@@ -100,7 +101,8 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
             "Participants by Modality",
             *modality_table(result, study),
             "n is the number of people in each modality's files at each wave, with their "
-            "share of that wave's n for the same reporter.",
+            "share of that wave's n for the same reporter; returning are those also in the "
+            "last wave with this modality, with their share of it.",
         )
     with panel("Participants by wave", "Who took part at each wave and who came back"):
         for table in shown.values():
@@ -124,14 +126,25 @@ def modality_table(result: CatalogResult, study: str) -> tuple[list[dict], list[
     columns = [col("modality", "Modality")]
     if several:
         columns.append(col("reporter", "Reporter"))
-    columns += [col(f"w{i}", f"Wave {w}", numeric=True) for i, w in enumerate(waves)]
+    returning = {
+        m.wave for _, _, counted in found for m in counted if m.n_from_previous is not None
+    }
+    for i, w in enumerate(waves):
+        columns.append(col(f"w{i}", f"Wave {w}", numeric=True))
+        if w in returning:
+            columns.append(col(f"back{i}", f"Wave {w} returning", numeric=True))
     vocab = result.project.config.vocab
     rows = []
     for modality, reporter, counted in found:
         row = {"modality": vocab.modality_label(modality), "reporter": reporter}
-        for m in counted:
+        for before, m in zip([None, *counted], counted, strict=False):
+            i = waves.index(m.wave)
             total = totals[(m.wave, reporter)]
-            row[f"w{waves.index(m.wave)}"] = f"{m.n}{participants.share(m.n, total)}"
+            row[f"w{i}"] = f"{m.n}{participants.share(m.n, total)}"
+            if before is not None and m.n_from_previous is not None:
+                row[f"back{i}"] = (
+                    f"{m.n_from_previous}{participants.share(m.n_from_previous, before.n)}"
+                )
         rows.append(row)
     return columns, rows
 
@@ -177,17 +190,20 @@ def retention_table(result: CatalogResult, study: str) -> tuple[list[dict], list
     return columns, table_rows
 
 
-def procedure(result: CatalogResult, study: str) -> None:
-    found = methods_of(result, study)
+def procedure(result: CatalogResult, study: str, wave: str) -> None:
+    found = wave_methods(result.project, study, wave)
     labels = result.project.config.vocab.modality_labels
     with panel("Procedure", "How each modality's data were collected"):
         if not found:
             note(
                 "Write how each modality's data were collected under methods: in the study's "
-                "file in studies/."
+                "file in studies/; a dataset's name there gives that dataset its own text."
             )
-        for modality, text in found.items():
-            subhead(labels.get(modality, modality.capitalize()), " ".join(text.split()))
+        for modality, datasets, text in found:
+            title = labels.get(modality, modality.capitalize())
+            subhead(
+                f"{title} ({', '.join(datasets)})" if datasets else title, " ".join(text.split())
+            )
             paragraphs(text)
 
 
