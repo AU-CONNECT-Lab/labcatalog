@@ -18,7 +18,8 @@ measures, the instructions to respondents, the response options, every item and 
 Take everything from the document, and copy the item wording and the instructions word for \
 word. Where the document does not say, leave the field empty; do not fill it in from what you \
 know about the instrument. If the document describes several instruments or versions, draft \
-the one it presents as the main one and name the others in the notes.
+the one the lab names under "Instrument to draft", or, when it names none, the one the \
+document presents as the main one, and name the others in the notes.
 
 IDs use lower-case letters, digits and underscores. Item IDs are the abbreviation and the \
 item's number (ems_1); score IDs are the abbreviation and the score's name (ems_total). An \
@@ -119,19 +120,24 @@ def draft_path(root: Path, instrument_id: str) -> Path:
     return root / defaults.DRAFTS_DIR / f"{instrument_id}.yaml"
 
 
-def instrument_request(instrument_id: str, pdf: Path) -> str:
+def instrument_request(instrument_id: str, pdf: Path, which: str = "") -> str:
     text = pdf_text(pdf)
     if not text.strip():
         raise LLMError(f"{pdf.name} has no text to read; a scanned PDF needs OCR first")
-    return "\n".join([f"Instrument ID: {instrument_id}", "", "<document>", text, "</document>"])
+    named = [f"Instrument to draft: {which}"] if which else []
+    return "\n".join(
+        [f"Instrument ID: {instrument_id}", *named, "", "<document>", text, "</document>"]
+    )
 
 
 def draft_instrument(
-    root: Path, instrument_id: str, pdf: Path, client: LLMClient
+    root: Path, instrument_id: str, pdf: Path, client: LLMClient, which: str = ""
 ) -> InstrumentDraft:
     free_instrument_path(root, instrument_id)
     output, meta = client.complete_structured(
-        system=SYSTEM, user_message=instrument_request(instrument_id, pdf), tool_schema=SCHEMA
+        system=SYSTEM,
+        user_message=instrument_request(instrument_id, pdf, which.strip()),
+        tool_schema=SCHEMA,
     )
     notes = [" ".join(line.split()) for line in output["notes"]]
     modeline, body = yaml_text(instrument_document(instrument_id, output), "instrument").split(

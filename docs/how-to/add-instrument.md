@@ -43,7 +43,7 @@ If the codebook is a PDF or a document, a language model can fill in the three f
 
 With a language model set up on the Settings page (see [Set Up R and Language Models](r-and-models.md)), the **Edit** page can draft a whole instrument file, scores included, from the instrument's PDF:
 
-1. On the **Edit** page, press **New instrument from a PDF**, give the instrument an ID, choose the PDF and press **Draft**. The PDF's text, including the item wording, is sent to the model's provider.
+1. On the **Edit** page, press **New instrument from a PDF**, give the instrument an ID, choose the PDF and press **Draft**. When the PDF holds several instruments or versions, say which one to draft (for example "the short form"); otherwise the model drafts the one the PDF presents as the main one and names the others in its notes. The PDF's text, including the item wording, is sent to the model's provider.
 2. The draft is written to `drafts/<id>.yaml`, outside the catalog. Open it on the Edit page and check every item, option and score against the PDF.
 3. Press **Move to instruments**. The instrument is now in the catalog.
 

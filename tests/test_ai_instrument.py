@@ -113,6 +113,14 @@ def test_the_draft_is_a_valid_instrument_with_the_notes_on_top(mock_project, pdf
     assert instrument.scores[0].missing_rule == "prorate" and instrument.scores[0].min_valid == 1
 
 
+def test_the_lab_can_name_which_instrument_of_the_pdf_to_draft(mock_project, pdf):
+    client = FakeClient()
+    ai_instrument.draft_instrument(mock_project, "mood", pdf, client)
+    assert "Instrument to draft" not in client.request
+    ai_instrument.draft_instrument(mock_project, "mood", pdf, client, " the short form ")
+    assert client.request.startswith("Instrument ID: mood\nInstrument to draft: the short form\n")
+
+
 def test_an_id_already_in_instruments_is_refused_before_asking_the_model(mock_project, pdf):
     client = FakeClient()
     with pytest.raises(EditError, match="already exists"):

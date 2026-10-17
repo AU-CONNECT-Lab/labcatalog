@@ -155,10 +155,16 @@ def run_description_draft(
 
 
 def run_instrument_draft(
-    root: Path, instrument_id: str, pdf: Path, provider: str, model: str, url: str
+    root: Path,
+    instrument_id: str,
+    pdf: Path,
+    provider: str,
+    model: str,
+    url: str,
+    which: str = "",
 ) -> InstrumentDraft:
     client = make_llm_client(provider, model, url)
-    return draft_instrument(root, instrument_id, pdf, client)
+    return draft_instrument(root, instrument_id, pdf, client, which)
 
 
 def run_search(result: CatalogResult, query: str, provider: str, model: str, url: str) -> Search:

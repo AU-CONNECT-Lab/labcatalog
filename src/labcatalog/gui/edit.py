@@ -246,6 +246,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         settings.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
                         settings.get(preferences.LLM_MODEL, ""),
                         settings.get(preferences.LLM_URL, ""),
+                        which.value or "",
                     )
                 except LabCatalogError as err:
                     status.set_text(str(err))
@@ -264,6 +265,10 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     "flat no-caps"
                 )
                 picked = ui.label()
+            which = ui.input(
+                "Which instrument, if the PDF has several (optional)",
+                placeholder="for example the short form",
+            ).classes("w-full")
             note(
                 f"The draft goes into {defaults.DRAFTS_DIR}/, replacing a draft with the "
                 "same ID, and stays out of the catalog until you move it to instruments/. The "
