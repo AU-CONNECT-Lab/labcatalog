@@ -7,6 +7,7 @@ import webview
 from nicegui import app, ui
 
 from labcatalog.charts import views
+from labcatalog.config import dataset_by_name
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note, path_input
 from labcatalog.metadata import changes, new_dataset
@@ -45,6 +46,7 @@ def open_wizard(
         "id_column": None,
         "date_column": None,
         "paths": [],
+        "prefilled": None,
     }
 
     def cleanup() -> None:
@@ -70,7 +72,9 @@ def open_wizard(
         return mode.value == BLANK
 
     def folder() -> bool:
-        return blank() and kind.value == FOLDER
+        if blank():
+            return kind.value == FOLDER
+        return dataset_by_name(config, template.value).source == FOLDER
 
     def draft() -> new_dataset.Draft:
         described = None
@@ -81,7 +85,6 @@ def open_wizard(
                 reporter.value,
                 state["id_column"],
                 state["date_column"] or None,
-                (files.value or "").strip() if folder() else None,
             )
         return new_dataset.Draft(
             "" if blank() else template.value,
@@ -89,9 +92,20 @@ def open_wizard(
             (wave.value or "").strip(),
             date.fromisoformat((as_of.value or "").strip()),
             described,
+            (files.value or "").strip() if folder() else None,
         )
 
-    def start_next() -> None:
+    async def prefill_folder() -> None:
+        # From the dataset it repeats, kept once the person has changed it for this template and wave.
+        chosen_wave = (wave.value or "").strip()
+        if state["prefilled"] == (template.value, chosen_wave):
+            return
+        state["prefilled"] = (template.value, chosen_wave)
+        folder_path.set_value(dataset_by_name(config, template.value).path)
+        files.set_value(new_dataset.suggest_files(project, template.value, chosen_wave))
+        await scan_folder()
+
+    async def start_next() -> None:
         try:
             new_dataset.check_draft(project, draft())
         except ValueError:
@@ -102,6 +116,8 @@ def open_wizard(
             return
         start_status.set_text("")
         table_box.visible, folder_box.visible = not folder(), folder()
+        if folder() and not blank():
+            await prefill_folder()
         stepper.next()
 
     async def choose() -> None:
@@ -363,7 +379,8 @@ def open_wizard(
                     note(
                         "Pick the dataset this one repeats, usually the same file from the last "
                         "wave. The new one takes its modality, study, reporter, ID and date "
-                        "columns, and its cleaning step if it has one."
+                        "columns, and its cleaning step if it has one. A folder of files takes its "
+                        "folder and files rule, with the wave changed where the rule names it."
                     )
                     template = ui.select(
                         {n: views.dataset_label(result, n) for n in names},

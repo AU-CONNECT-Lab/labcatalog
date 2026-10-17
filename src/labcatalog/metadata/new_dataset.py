@@ -102,9 +102,14 @@ def suggest(project: Project, template: str) -> Draft:
     name = template
     if old.wave.isdigit() and template.endswith(old.wave):
         name = template[: -len(old.wave)] + wave
-    # A folder's files rule usually names the wave too, as in ses-1.
-    files = renamed(old.files, old.wave, wave) if old.source == "folder" else None
+    files = suggest_files(project, template, wave) if old.source == "folder" else None
     return Draft(template, name, wave, date.today(), files=files)
+
+
+def suggest_files(project: Project, template: str, wave: str) -> str:
+    # A folder's files rule usually names the wave too, as in ses-1.
+    old = dataset_by_name(project.config, template)
+    return renamed(old.files, old.wave, wave)
 
 
 def suggest_blank(project: Project, study: str) -> Draft:
