@@ -5,8 +5,8 @@ const LABEL_FROM_PX = 8;
 const LABEL_PX = 12;
 const LABEL_SIZE = 3;
 // Links are hairlines in a neutral grey until a hover colours them by sign.
-const HAIRLINE_PX = 0.7;
-const HAIRLINE_ALPHA = 0.45;
+const HAIRLINE_PX = 0.5;
+const HAIRLINE_ALPHA = 0.28;
 const FADE_MS = 220;
 const DIM = 0.12;
 // The fitted view never zooms in further than this, so a small network keeps room around it.

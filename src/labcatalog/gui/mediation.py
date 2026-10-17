@@ -225,17 +225,17 @@ def render(
             ).props("dense no-caps").tooltip(
                 "Percentile bootstrap intervals, or Wald intervals without resampling"
             )
-            if chosen.booted:
-                ui.number(
-                    "Bootstrap resamples",
-                    value=chosen.bootstrap,
-                    min=100,
-                    step=100,
-                    format="%d",
-                    on_change=lambda e: setattr(
-                        chosen, "bootstrap", int(e.value or 0) or med.DEFAULT_BOOTSTRAP
-                    ),
-                ).props("dense outlined").classes("w-44")
+            # Kept in place when off, so the controls after it do not move.
+            ui.number(
+                "Bootstrap resamples",
+                value=chosen.bootstrap,
+                min=100,
+                step=100,
+                format="%d",
+                on_change=lambda e: setattr(
+                    chosen, "bootstrap", int(e.value or 0) or med.DEFAULT_BOOTSTRAP
+                ),
+            ).props("dense outlined").classes("w-44").set_enabled(chosen.booted)
             ui.button("Fit", icon="play_arrow", on_click=run).props("no-caps")
         if chosen.items and moderated(chosen):
             note(
