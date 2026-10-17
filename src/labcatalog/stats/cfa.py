@@ -7,7 +7,7 @@ import pandas as pd
 import semopy
 
 from labcatalog.data.resolve import Catalog, ResolvedScore
-from labcatalog.data.scoring import scorable, score_items
+from labcatalog.data.scoring import compute_score, scorable, score_items
 from labcatalog.project import Project
 from labcatalog.schema import Instrument
 from labcatalog.sources import LoadedDataset
@@ -15,8 +15,14 @@ from labcatalog.stats.rbridge import run_r
 
 R_SCRIPT = Path(__file__).parent / "cfa.R"
 MIN_ITEMS = 3
+MIN_SUBSCALES = 3
 SUBSCALES = "subscales"
 ONE_FACTOR = "one factor"
+SECOND_ORDER = "second order"
+SUBSCALE_SCORES = "subscale scores"
+# Models of a general factor over the subscales; their fits keep its loadings and ω only.
+GENERAL_KINDS = (SECOND_ORDER, SUBSCALE_SCORES)
+GENERAL = "general"
 R = "R"
 PYTHON = "Python"
 IMPROPER = "improper solution (a negative variance or a correlation above 1)"
@@ -49,9 +55,13 @@ class CfaModel:
     instrument_id: str
     dataset: str
     kind: str
-    # Score id to the columns that load on it.
+    # Score id to the columns that load on it; for subscale scores, GENERAL to the score ids.
     factors: dict[str, list[str]]
     data: pd.DataFrame
+
+    @property
+    def ordered(self) -> bool:
+        return self.kind != SUBSCALE_SCORES
 
 
 @dataclass
@@ -64,6 +74,8 @@ class CfaFit:
     fit: dict[str, float | None] = field(default_factory=dict)
     loadings: dict[tuple[str, str], float] = field(default_factory=dict)
     omega: dict[str, float] = field(default_factory=dict)
+    # Hierarchical ω of a second-order model, or ω of the subscale scores.
+    general_omega: float | None = None
     problem: str | None = None
     engine: str = R
     estimator: str = WLSMV
@@ -88,17 +100,23 @@ def build_models(
         subscales = [s for s in scores if not is_total(instrument, s.score_id)]
         if len(subscales) >= 2:
             sets = [(SUBSCALES, subscales)]
+            if len(subscales) >= MIN_SUBSCALES:
+                sets += [(SECOND_ORDER, subscales), (SUBSCALE_SCORES, subscales)]
             sets += [(ONE_FACTOR, [s]) for s in scores if is_total(instrument, s.score_id)]
         else:
             sets = [(ONE_FACTOR, [s]) for s in scores]
         for kind, members in sets:
             if kind == ONE_FACTOR and len(members[0].columns) < MIN_ITEMS:
                 continue
-            frames = [score_items(datasets[dataset], s) for s in members]
-            data = pd.concat(frames, axis=1)
-            data = data.loc[:, ~data.columns.duplicated()].dropna()
-            factors = {s.score_id: s.columns for s in members}
-            models.append(CfaModel(instrument_id, dataset, kind, factors, data))
+            loaded = datasets[dataset]
+            if kind == SUBSCALE_SCORES:
+                data = pd.DataFrame({s.score_id: compute_score(loaded, s) for s in members})
+                factors = {GENERAL: list(data.columns)}
+            else:
+                data = pd.concat([score_items(loaded, s) for s in members], axis=1)
+                data = data.loc[:, ~data.columns.duplicated()]
+                factors = {s.score_id: s.columns for s in members}
+            models.append(CfaModel(instrument_id, dataset, kind, factors, data.dropna()))
     return models
 
 
@@ -110,32 +128,60 @@ def fit_models(models: list[CfaModel], rscript: str | None, estimator: str = WLS
         return []
     with tempfile.TemporaryDirectory() as temp:
         folder = Path(temp)
-        names = [write_model(folder, n, model) for n, model in enumerate(models, start=1)]
-        run_r(rscript, [str(R_SCRIPT), str(folder), estimator])
+        names = [
+            write_model(folder, n, model, estimator) for n, model in enumerate(models, start=1)
+        ]
+        run_r(rscript, [str(R_SCRIPT), str(folder)])
         results = pd.read_csv(
             folder / "results.csv", keep_default_na=False, na_values={"value": ["NA"]}
         )
     return [
-        read_fit(model, name, results, estimator) for model, name in zip(models, names, strict=True)
+        read_fit(model, name, results, model_estimator(model, estimator))
+        for model, name in zip(models, names, strict=True)
     ]
 
 
-def write_model(folder: Path, n: int, model: CfaModel) -> tuple[str, dict[str, str]]:
+def model_estimator(model: CfaModel, estimator: str) -> str:
+    # Subscale scores are continuous whatever the project asks for its items.
+    return estimator if model.ordered else ML
+
+
+def lavaan_names(model: CfaModel) -> tuple[dict[str, str], dict[str, str]]:
     # R and lavaan never rename x1 or f1, so results map back to columns and scores safely.
-    columns = list(model.data.columns)
-    items = {column: f"x{i}" for i, column in enumerate(columns, start=1)}
+    items = {column: f"x{i}" for i, column in enumerate(model.data.columns, start=1)}
     factors = {score: f"f{i}" for i, score in enumerate(model.factors, start=1)}
-    syntax = "; ".join(
-        f"{factors[score]} =~ {' + '.join(items[c] for c in columns_)}"
-        for score, columns_ in model.factors.items()
-    )
+    if model.kind == SECOND_ORDER:
+        factors[GENERAL] = "g"
+    return items, factors
+
+
+def model_syntax(model: CfaModel, items: dict[str, str], factors: dict[str, str]) -> list[str]:
+    lines = [
+        f"{factors[score]} =~ {' + '.join(items[c] for c in columns)}"
+        for score, columns in model.factors.items()
+    ]
+    if model.kind == SECOND_ORDER:
+        lines.append(f"g =~ {' + '.join(factors[score] for score in model.factors)}")
+    return lines
+
+
+def write_model(
+    folder: Path, n: int, model: CfaModel, estimator: str
+) -> tuple[str, dict[str, str]]:
+    items, factors = lavaan_names(model)
     name = f"m{n}"
     model.data.set_axis(list(items.values()), axis=1).to_csv(
         folder / f"{name}.csv", index=False, float_format="%g"
     )
-    entry = pd.DataFrame([{"model": name, "data": f"{name}.csv", "syntax": syntax}])
+    entry = {
+        "model": name,
+        "data": f"{name}.csv",
+        "syntax": "; ".join(model_syntax(model, items, factors)),
+        "estimator": model_estimator(model, estimator),
+        "higher": "g" if model.kind == SECOND_ORDER else "",
+    }
     path = folder / "models.csv"
-    entry.to_csv(path, mode="a", header=not path.exists(), index=False)
+    pd.DataFrame([entry]).to_csv(path, mode="a", header=not path.exists(), index=False)
     return name, {**{v: k for k, v in items.items()}, **{v: k for k, v in factors.items()}}
 
 
@@ -163,7 +209,16 @@ def read_fit(
             fit.loadings[(original[row.factor], original[row.item])] = float(row.value)
         elif row.what == "omega":
             fit.omega[original[row.factor]] = float(row.value)
-    return exact(fit)
+    return exact(general(fit))
+
+
+def general(fit: CfaFit) -> CfaFit:
+    # The item loadings and subscale ω of these models repeat the subscale model's.
+    if fit.kind in GENERAL_KINDS:
+        fit.loadings = {k: v for k, v in fit.loadings.items() if k[0] == GENERAL}
+        fit.general_omega = fit.omega.get(GENERAL)
+        fit.omega = {}
+    return fit
 
 
 def exact(fit: CfaFit) -> CfaFit:
@@ -175,13 +230,9 @@ def exact(fit: CfaFit) -> CfaFit:
 
 def fit_python(model: CfaModel) -> CfaFit:
     # Items as continuous, maximum likelihood; lavaan's ML gives the same numbers.
-    items = {c: f"x{i}" for i, c in enumerate(model.data.columns, start=1)}
-    factors = {score: f"f{i}" for i, score in enumerate(model.factors, start=1)}
+    items, factors = lavaan_names(model)
     original = {v: k for k, v in {**items, **factors}.items()}
-    syntax = "\n".join(
-        f"{factors[score]} =~ {' + '.join(items[c] for c in columns)}"
-        for score, columns in model.factors.items()
-    )
+    syntax = "\n".join(model_syntax(model, items, factors))
     data = model.data.set_axis(list(items.values()), axis=1)
     fit = CfaFit(
         model.instrument_id,
@@ -227,6 +278,9 @@ def fit_python(model: CfaModel) -> CfaFit:
         loadings["lval"], loadings["rval"], standard[loadings.index], strict=True
     ):
         fit.loadings[(original[factor], original[item])] = float(value)
+    if model.kind == SECOND_ORDER:
+        # Hierarchical ω is left to semTools in R.
+        return exact(general(fit))
     # semTools' omega: the factor's share of the observed variance of the summed items.
     observed = data.cov(ddof=0)
     for factor in factors.values():
@@ -235,4 +289,4 @@ def fit_python(model: CfaModel) -> CfaFit:
         columns = list(rows["lval"])
         common = estimate[rows.index].sum() ** 2 * float(variance.iloc[0])
         fit.omega[original[factor]] = common / observed.loc[columns, columns].to_numpy().sum()
-    return exact(fit)
+    return exact(general(fit))

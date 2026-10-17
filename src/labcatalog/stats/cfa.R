@@ -1,8 +1,6 @@
 # Fits the factor models labcatalog writes to a folder and writes results.csv beside them.
 args <- commandArgs(trailingOnly = TRUE)
 folder <- args[1]
-# wlsmv treats the items as ordered categories, ml as continuous.
-ordinal <- args[2] == "wlsmv"
 
 needed <- c("lavaan", "semTools")
 missing <- needed[!vapply(needed, requireNamespace, logical(1), quietly = TRUE)]
@@ -11,19 +9,16 @@ if (length(missing) > 0) {
   quit(status = 3)
 }
 
-measures <- if (ordinal) {
-  c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled",
-    "rmsea.ci.lower.scaled", "rmsea.ci.upper.scaled", "srmr")
-} else {
-  c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "rmsea.ci.lower", "rmsea.ci.upper", "srmr")
-}
 rows <- list()
 add <- function(model, what, factor = "", item = "", value = NA, message = "") {
   rows[[length(rows) + 1]] <<- data.frame(model = model, what = what, factor = factor,
                                           item = item, value = value, message = message)
 }
 
-fit_one <- function(model, syntax, data) {
+# wlsmv treats the items as ordered categories, ml as continuous; higher names a second-order
+# factor, whose omega is then hierarchical.
+fit_one <- function(model, syntax, data, estimator, higher) {
+  ordinal <- estimator == "wlsmv"
   # Small samples often leave empty response cells; lavaan warns but the fit stands.
   fit <- withCallingHandlers(
     if (ordinal) {
@@ -40,21 +35,30 @@ fit_one <- function(model, syntax, data) {
     return(add(model, "problem",
                message = "improper solution (a negative variance or a correlation above 1)"))
   }
+  measures <- if (ordinal) {
+    c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled",
+      "rmsea.ci.lower.scaled", "rmsea.ci.upper.scaled", "srmr")
+  } else {
+    c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "rmsea.ci.lower", "rmsea.ci.upper", "srmr")
+  }
   values <- lavaan::fitMeasures(fit, measures)
   for (name in names(values)) add(model, "fit", item = name, value = values[[name]])
   std <- lavaan::standardizedSolution(fit)
   std <- std[std$op == "=~", ]
   for (i in seq_len(nrow(std))) add(model, "loading", std$lhs[i], std$rhs[i], std$est.std[i])
-  omega <- suppressWarnings(semTools::compRelSEM(fit))
+  omega <- suppressWarnings(
+    if (higher == "") semTools::compRelSEM(fit) else semTools::compRelSEM(fit, higher = higher)
+  )
   for (name in names(omega)) add(model, "omega", name, value = omega[[name]])
 }
 
-models <- read.csv(file.path(folder, "models.csv"), stringsAsFactors = FALSE)
+models <- read.csv(file.path(folder, "models.csv"), stringsAsFactors = FALSE,
+                   colClasses = "character")
 for (i in seq_len(nrow(models))) {
   model <- models$model[i]
   data <- read.csv(file.path(folder, models$data[i]))
   tryCatch(
-    fit_one(model, models$syntax[i], data),
+    fit_one(model, models$syntax[i], data, models$estimator[i], models$higher[i]),
     error = function(e) add(model, "problem", message = conditionMessage(e))
   )
 }
