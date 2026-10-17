@@ -245,6 +245,22 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 /* Unshrunk, so a long panel overflows the column and scrolls instead of being clipped. */
 .lc-sticky > * { flex-shrink: 0; }
 
+/* The score network: a canvas, its legend underneath and its tooltip. */
+.lc-network { position: relative; width: 100%; }
+.lc-network-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; padding: 6px 0 2px; font-size: 0.8rem; color: var(--lc-muted); }
+.lc-network-key { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; }
+.lc-network-key:hover { color: var(--lc-ink); }
+.lc-network-off { opacity: 0.4; }
+.lc-network-swatch { width: 9px; height: 9px; border-radius: 50%; }
+.lc-network .float-tooltip-kap {
+  padding: 5px 9px;
+  background: var(--lc-tooltip);
+  color: var(--lc-tooltip-ink);
+  border-radius: 6px;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 /* An expansion drawn as a panel whose header is the title bar. */
 .q-expansion-item.lc-expansion > .q-expansion-item__container > .q-item {
   padding: 8px 16px;

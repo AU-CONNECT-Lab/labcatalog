@@ -203,45 +203,40 @@ def test_score_network_links_strong_pairs_and_colours_by_the_first_matching_tag(
         "facet:domain",
         "facet:topics",
     ]
-    option = views.score_network(result, "mock_study", "1", everything, "facet:topics")
-    series = option["series"][0]
-    names = [n["name"] for n in series["data"]]
-    categories = [c["name"] for c in series["categories"]]
-    assert categories == ["negative affect", "positive affect", "parenting", "sleep"]
-    strain = series["data"][names.index("EPS strain")]
-    assert categories[strain["category"]] == "negative affect"
-    name_of = {n["id"]: n["name"] for n in series["data"]}
-    linked = {frozenset((name_of[e["source"]], name_of[e["target"]])) for e in series["links"]}
+    spec = views.score_network(result, "mock_study", "1", everything, "facet:topics")
+    names = [n["name"] for n in spec["nodes"]]
+    groups = [g["name"] for g in spec["groups"]]
+    assert groups == ["negative affect", "positive affect", "parenting", "sleep"]
+    strain = spec["nodes"][names.index("EPS strain")]
+    assert groups[strain["group"]] == "negative affect"
+    name_of = {n["id"]: n["name"] for n in spec["nodes"]}
+    linked = {frozenset((name_of[e["source"]], name_of[e["target"]])) for e in spec["links"]}
     assert frozenset(("EMS total score", "EMS sadness")) not in linked
-    assert all(e["value"] >= 0.3 for e in series["links"])
+    assert all(e["value"] >= 0.3 for e in spec["links"])
     for color_by in views.network_colorings(result):
-        option = views.score_network(result, "mock_study", "1", everything, color_by)
-        used = {n["category"] for n in option["series"][0]["data"]}
-        assert used <= set(range(len(option["series"][0]["categories"])))
+        spec = views.score_network(result, "mock_study", "1", everything, color_by)
+        used = {n["group"] for n in spec["nodes"]}
+        assert used <= set(range(len(spec["groups"])))
 
 
 def test_network_colours_the_instruments_shown_in_palette_order(result):
     everything = list(views.correlated_instruments(result))
-    option = views.score_network(result, "mock_study", "1", everything, "instrument")
-    colors = [c["itemStyle"]["color"] for c in option["series"][0]["categories"]]
+    spec = views.score_network(result, "mock_study", "1", everything, "instrument")
+    colors = [g["color"] for g in spec["groups"]]
     assert colors == [style.group_color(k) for k in range(len(colors))]
     # A weak link is drawn from the stronger part of the scale, not near white.
-    weakest = min(option["series"][0]["links"], key=lambda e: e["value"])
-    assert weakest["lineStyle"]["color"] != style.scale_color(
-        weakest["value"], style.CORRELATION_SCALE, -1, 1
-    )
+    weakest = min(spec["links"], key=lambda e: e["value"])
+    assert weakest["color"] != style.scale_color(weakest["value"], style.CORRELATION_SCALE, -1, 1)
 
 
-def test_network_pins_nodes_on_recolour_and_tightens_with_many_nodes():
-    def option(n: int, pinned: bool = False) -> dict:
+def test_network_links_by_id_and_tightens_with_many_nodes():
+    def spec(n: int) -> dict:
         nodes = [{"key": f"s{i}", "label": f"S{i}", "category": 0, "tip": ""} for i in range(n)]
         links = [{"source": 0, "target": 1, "r": 0.5, "tip": ""}]
-        return network.score_network(nodes, links, [("All", "#000")], pinned)["series"][0]
+        return network.score_network(nodes, links, [("All", "#000")])
 
-    few, many = option(10), option(90)
-    assert not any(n["fixed"] for n in few["data"])
-    assert all(n["fixed"] for n in option(10, pinned=True)["data"])
+    few, many = spec(10), spec(90)
     assert few["links"][0] == {**few["links"][0], "source": "s0", "target": "s1"}
-    assert many["force"]["edgeLength"][1] < few["force"]["edgeLength"][1]
+    assert many["force"]["length"][1] < few["force"]["length"][1]
     assert many["force"]["gravity"] > few["force"]["gravity"]
-    assert few["label"]["show"] and not many["label"]["show"]
+    assert many["force"]["repel"] < few["force"]["repel"]

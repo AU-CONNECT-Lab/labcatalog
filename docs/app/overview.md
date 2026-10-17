@@ -18,7 +18,7 @@ For each reporter, how many rows had come in by each week since each wave starte
 
 ## How the scores relate
 
-A network of the scores measured in one wave: scores that correlate at |*r*| ≥ .30 are linked, red for positive and blue for negative, thicker for stronger. Drag the nodes and scroll to zoom. Above the chart:
+A network of the scores measured in one wave: scores that correlate at |*r*| ≥ .30 are linked, red for positive and blue for negative, thicker for stronger. Hover over a score to bring out its links and fade the rest, drag a score and its neighbours follow, and scroll to zoom: names appear as you zoom in. Click a group in the legend to hide or show it. Above the chart:
 
 - **Instruments**: which instruments' scores to show.
 - **Wave**: which wave.

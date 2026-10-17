@@ -6,6 +6,7 @@ from labcatalog import defaults
 from labcatalog.charts import mindmap, network, views
 from labcatalog.gui import theme
 from labcatalog.gui.common import apa, caption, col, note, panel, table
+from labcatalog.gui.network_graph import NetworkGraph
 from labcatalog.pipeline import CatalogResult
 from labcatalog.schema import Instrument
 
@@ -221,27 +222,23 @@ def score_relations(result: CatalogResult) -> None:
 
     drawn: dict = {"chart": None}
 
-    def graph(recolored: bool = False) -> None:
+    def graph() -> None:
         study, wave = picked["wave"].split("|")
-        option = views.score_network(
-            result, study, wave, picked["instruments"], picked["color"], recolored
-        )
+        spec = views.score_network(result, study, wave, picked["instruments"], picked["color"])
         chart = drawn["chart"]
-        # Updating the same chart keeps every node where it is, so the layout only drifts.
-        if option is not None and chart is not None:
-            chart.options.clear()
-            chart.options.update(theme.echart_for_page(option))
-            chart.update()
+        # Updating the same graph keeps every node where it is, so the layout only drifts.
+        if spec is not None and chart is not None:
+            chart.show(spec)
             return
         holder.clear()
         with holder:
-            drawn["chart"] = show_network(option, "Pick instruments with at least two scores.")
+            drawn["chart"] = show_network(spec, "Pick instruments with at least two scores.")
 
     def changed(key: str, value) -> None:
         picked[key] = value or []
         if key == "instruments":
             chooser.props(f'display-value="{shown()}"')
-        graph(recolored=key == "color")
+        graph()
 
     def shown() -> str:
         return f"{len(picked['instruments'])} of {len(instruments)} instruments"
@@ -250,7 +247,7 @@ def score_relations(result: CatalogResult) -> None:
     with panel(
         "How the scores relate",
         f"{coefficient} between scores measured in one wave, linked at |r| ≥ "
-        f"{defaults.CHART_MIN_R:g}. Drag to move, scroll to zoom.",
+        f"{defaults.CHART_MIN_R:g}. Hover a score to see its links, drag to move, scroll to zoom.",
     ) as tools:
         with tools:
             chooser = (
@@ -275,15 +272,11 @@ def score_relations(result: CatalogResult) -> None:
         graph()
 
 
-def show_network(option: dict | None, empty: str) -> ui.echart | None:
-    if option is None:
+def show_network(spec: dict | None, empty: str) -> NetworkGraph | None:
+    if spec is None:
         note(empty)
         return None
-    return (
-        ui.echart(theme.echart_for_page(option))
-        .classes("w-full")
-        .style(f"height:{network.NETWORK_HEIGHT}px")
-    )
+    return NetworkGraph(spec, network.NETWORK_HEIGHT).classes("w-full")
 
 
 def show_tree(instrument: Instrument) -> ui.echart:

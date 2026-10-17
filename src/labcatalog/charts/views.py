@@ -697,7 +697,6 @@ def score_network(
     wave: str,
     instruments: list[str],
     color_by: str,
-    pinned: bool = False,
 ) -> dict | None:
     p = score_panel(result, study, wave, instruments)
     if p is None:
@@ -740,7 +739,7 @@ def score_network(
         }
         for i, j in pairs
     ]
-    return network.score_network(nodes, links, categories, pinned)
+    return network.score_network(nodes, links, categories)
 
 
 def network_groups(
