@@ -111,6 +111,12 @@ def test_search_names_and_optionally_item_text(mock_project):
     ]
 
 
+def test_search_finds_an_instrument_by_its_data_column(mock_project):
+    index = index_for(mock_project)
+    assert list(matches(index, {}, "ecs_3_w2")) == ["example_child_sleep"]
+    assert list(matches(index, {}, "ECS_3")) == ["example_child_sleep"]
+
+
 def test_instruments_never_administered_still_appear_unfiltered(mock_project):
     (mock_project / "instruments" / "unused.yaml").write_text(
         "id: unused\nname: Not given yet\ncustom: {domain: media}\n", encoding="utf-8"

@@ -8,7 +8,7 @@ The Instruments page lists every instrument. Click one to open its page: items a
 
 On the left:
 
-- **Search** finds instruments by ID, name, abbreviation, construct or custom field. Tick **Also search item text** to search the wording of the items too.
+- **Search** finds instruments by ID, name, abbreviation, construct, custom field or the name of a data column mapped to them. Tick **Also search item text** to search the wording of the items too.
 - The filters narrow the list by study, wave, reporter, who the instrument is about, modality and the `choice` and `tags` custom fields, or by the list set in `browse.facets`. **Given in** finds instruments given in every wave of their study, or in fewer. **Catalog** finds instruments that are complete or still lack something, such as scores or a license, and those not yet in any dataset. A filter with only one value is hidden. Values within one filter combine with "or", different filters with "and". The number beside each value is how many instruments it would show. The chosen values appear above the table, where × removes one; **Clear** clears them all.
 
 The table shows each instrument's abbreviation, name, construct, reporters, number of items, and how many people answered it in each dataset the filters show. The **Missing** column lists what the catalog still lacks for an instrument, such as its scores, reference or license.

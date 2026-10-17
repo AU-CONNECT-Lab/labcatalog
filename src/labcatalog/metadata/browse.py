@@ -79,6 +79,12 @@ def build_index(project: Project) -> BrowseIndex:
                 values = {n: as_set(known[n] if n in known else custom.get(n)) for n in names}
                 rows.append(Administered(instrument.id, name, values))
     administered = {row.instrument_id for row in rows}
+    # Data column names find their instrument, as its ID does.
+    columns: dict[str, set[str]] = {}
+    for entries in project.maps.values():
+        for entry in entries:
+            if entry.instrument:
+                columns.setdefault(entry.instrument, set()).add(entry.column)
     for instrument_id, instrument in project.instruments.items():
         if instrument_id not in administered:
             custom = {
@@ -92,7 +98,10 @@ def build_index(project: Project) -> BrowseIndex:
         instruments=list(project.instruments),
         facets=[facet(config, name, rows) for name in names],
         rows=rows,
-        text={i: search_text(instrument) for i, instrument in project.instruments.items()},
+        text={
+            i: "\n".join([search_text(instrument), *sorted(columns.get(i, ()))]).lower()
+            for i, instrument in project.instruments.items()
+        },
         item_text={
             i: "\n".join(
                 text for item in instrument.items for text in as_text_dict(item.text).values()
