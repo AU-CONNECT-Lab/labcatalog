@@ -33,6 +33,15 @@ def paper_table(shown: PaperTable) -> None:
         copy_button("Copy table", "Table", kinds)
 
 
+def results_text(text: str) -> None:
+    if not text:
+        return
+    with ui.column().classes("w-full gap-1"):
+        ui.label("Results paragraph").classes("lc-facet")
+        ui.label(text).classes("lc-prose")
+        copy_text(text)
+
+
 def copy_text(text: str) -> None:
     if wants_latex():
         copy_button("Copy as LaTeX", "Text", {"text/plain": tables.tex(text)})

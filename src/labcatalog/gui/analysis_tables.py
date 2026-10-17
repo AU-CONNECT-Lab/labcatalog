@@ -6,9 +6,10 @@ from nicegui import ui
 from labcatalog.charts import plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
-from labcatalog.gui import charts, paper, preferences
+from labcatalog.gui import charts, common, paper, preferences
 from labcatalog.gui.common import apa, code_tabs, col, computed, fmt, note, p_value, panel
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
@@ -242,6 +243,9 @@ def group_section(
                 drawn = paper.Chart(charts.show(fig), fig)
                 for shown in papers.values():
                     paper.paper_table(shown)
+                paper.results_text(
+                    results.comparison_text(comparison, outcome.label, common.decimals)
+                )
                 paper.result_actions(result, "groups", papers, drawn, texts, engine)
                 code_view(texts)
 
@@ -319,15 +323,6 @@ def test_note(comparison: Comparison) -> str:
     return f"η² and ω² (JASP's default) with their 95% confidence intervals.{omega}"
 
 
-def df_text(comparison: Comparison) -> str:
-    # Welch's df is fractional; Student's and the ANOVA's are whole.
-    if comparison.test == script.WELCH:
-        return f"{comparison.df1:.1f}"
-    if comparison.test == script.STUDENT:
-        return f"{comparison.df1:g}"
-    return f"{comparison.df1:g}, {comparison.df2:g}"
-
-
 def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
     two = comparison.test != script.ANOVA
     columns = [
@@ -351,7 +346,7 @@ def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
     row = {
         "test": TESTS[comparison.test],
         "statistic": decimal(comparison.statistic),
-        "df": df_text(comparison),
+        "df": results.df_text(comparison),
         "p": p_value(comparison.p),
         "effect": with_interval(comparison.effect, comparison.effect_low, comparison.effect_high),
     }

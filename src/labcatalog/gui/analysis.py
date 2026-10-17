@@ -6,10 +6,11 @@ from nicegui import ui
 
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import analysis_tables, charts, group_invariance, multilevel
+from labcatalog.gui import analysis_tables, charts, common, group_invariance, multilevel
 from labcatalog.gui.common import apa, col, empty, fmt, note, p_value, panel
-from labcatalog.gui.paper import Chart, paper_table, result_actions
+from labcatalog.gui.paper import Chart, paper_table, result_actions, results_text
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis, analysis_script
 from labcatalog.stats import multilevel as ml
@@ -241,6 +242,8 @@ def correlation_section(
             def content() -> None:
                 chart()
                 paper_table(shown)
+                spearman = stats.correlation == "spearman"
+                results_text(results.correlation_text(labels, matrix, spearman, common.decimals))
                 result_actions(
                     result, "correlations", {"correlations": shown}, drawn, texts, engine
                 )
@@ -348,6 +351,9 @@ def pair_section(
             def content() -> None:
                 drawn = Chart(charts.show(fig), fig)
                 paper_table(shown)
+                results_text(
+                    results.regression_text(fits, choices, choices[y_key], common.decimals)
+                )
                 result_actions(result, "regression", {"regression": shown}, drawn, texts, engine)
                 analysis_tables.code_view(texts)
 
