@@ -86,8 +86,8 @@ EXPLAIN: dict[str, tuple[str, str]] = {
         PICK,
     ),
     "wave_unclaimed": (
-        "The file holds rows for a wave that no dataset reads, often a wave written another way "
-        "in the data than in the dataset's settings.",
+        "The file holds rows for a wave that no dataset reads: a new wave, or a wave written "
+        "another way in the data than in the dataset's settings.",
         PICK,
     ),
     "unexpected_value": (
