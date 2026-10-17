@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -35,19 +36,27 @@ def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str
     split: dict[str, str] = {}
     crossed = 0
     every = pd.concat(parts) if parts else pd.DataFrame(columns=["name", "id", "group", "row"])
-    for group, cell in every.groupby("group", sort=False):
-        counts = cell["name"].value_counts()
-        if counts.max() == 1:
-            for name, row in zip(cell["name"], cell["row"], strict=True):
+    # Plain lists, since a pandas frame per group is slow when there are thousands of groups.
+    cells: dict[str, list[tuple[str, object, int]]] = {}
+    columns = (every[c].tolist() for c in ("group", "name", "id", "row"))
+    for group, name, person, row in zip(*columns, strict=True):
+        cells.setdefault(group, []).append((name, person, row))
+    for group, cell in cells.items():
+        counts = Counter(name for name, _, _ in cell)
+        if max(counts.values()) == 1:
+            for name, _, row in cell:
                 found[name][group] = int(row)
             continue
         several = [
-            set(cell.loc[cell["name"] == n, "id"].dropna()) for n in counts.index[counts > 1]
+            {p for n, p, _ in cell if n == name and not pd.isna(p)}
+            for name, k in counts.items()
+            if k > 1
         ]
         people = set().union(*several)
         crossed += any(a.isdisjoint(b) for a, b in combinations(several, 2))
-        for name, own in cell.groupby("name", sort=False):
-            ids, rows = own["id"].tolist(), own["row"].tolist()
+        for name in counts:
+            ids = [p for n, p, _ in cell if n == name]
+            rows = [r for n, _, r in cell if n == name]
             for person in people:
                 if person in ids:
                     found[name][person] = int(rows[ids.index(person)])

@@ -5,11 +5,6 @@ from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.sources import LoadedDataset
 
 
-def item_values(numbers: pd.Series, valid: list[float]) -> pd.Series:
-    # Only real response options count; missing codes, blanks and stray values become NA.
-    return numbers.where(numbers.isin(valid))
-
-
 def reverse(values: pd.Series, low: float, high: float) -> pd.Series:
     return low + high - values
 
@@ -19,9 +14,7 @@ def scorable(loaded: LoadedDataset, score: ResolvedScore) -> bool:
 
 
 def raw_items(loaded: LoadedDataset, score: ResolvedScore) -> pd.DataFrame:
-    return pd.DataFrame(
-        {c: item_values(loaded.numbers(c), score.valid_values[c]) for c in score.columns}
-    )
+    return pd.DataFrame({c: loaded.answers(c, score.valid_values[c]) for c in score.columns})
 
 
 def score_items(loaded: LoadedDataset, score: ResolvedScore) -> pd.DataFrame:

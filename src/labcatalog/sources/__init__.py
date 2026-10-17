@@ -30,12 +30,21 @@ class LoadedDataset:
     # Every wave named in a file that holds several, before this dataset's rows were taken.
     file_waves: set[str] | None = None
     numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
+    answer_cache: dict[tuple, pd.Series] = field(default_factory=dict, repr=False)
 
     def numbers(self, column: str) -> pd.Series:
         # Converting text to numbers is the slowest step on wide data, so each column is done once.
         if column not in self.numeric_cache:
             self.numeric_cache[column] = pd.to_numeric(self.frame[column], errors="coerce")
         return self.numeric_cache[column]
+
+    def answers(self, column: str, valid: list[float]) -> pd.Series:
+        # Only real response options count; missing codes, blanks and stray values become NA.
+        key = (column, *valid)
+        if key not in self.answer_cache:
+            numbers = self.numbers(column)
+            self.answer_cache[key] = numbers.where(numbers.isin(valid))
+        return self.answer_cache[key]
 
 
 def get_source(name: str) -> DataSource:

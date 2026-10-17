@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, missing_labels_for
 from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
-from labcatalog.data.scoring import item_values, scorable, score_items
+from labcatalog.data.scoring import scorable, score_items
 from labcatalog.sources import LoadedDataset
 from labcatalog.stats.link import link
 
@@ -193,7 +193,9 @@ def summarize_variable(
             str(v): int((values == v).sum()) if isinstance(v, str) else int((numbers == v).sum())
             for v in options
         }
-        numeric = item_values(numbers, [float(v) for v in options if not isinstance(v, str)])
+        numeric = loaded.answers(
+            variable.column, [float(v) for v in options if not isinstance(v, str)]
+        )
     elif variable.type == "number":
         numeric = numbers[valid]
     else:
@@ -297,7 +299,10 @@ def cronbach_alpha(items: pd.DataFrame) -> float | None:
     if items.shape[1] < 2 or len(answered) < defaults.MIN_CORRELATION_N:
         return None
     # From the pairwise covariances, as JASP computes it.
-    cov = answered.cov().to_numpy()
+    return alpha_of(answered.cov().to_numpy())
+
+
+def alpha_of(cov: np.ndarray) -> float | None:
     k = len(cov)
     with np.errstate(divide="ignore", invalid="ignore"):
         found = k / (k - 1) * (1 - np.trace(cov) / cov.sum())
@@ -307,16 +312,22 @@ def cronbach_alpha(items: pd.DataFrame) -> float | None:
 def item_total(items: pd.DataFrame) -> list[ItemTotal]:
     if items.shape[1] < 3:
         return []
+    # Pairwise covariances without an item are the full ones less its row and column.
+    cov = items.cov().to_numpy()
+    answered = items.notna().to_numpy()
+    filled = items.fillna(0)
+    total = filled.sum(axis=1)
     rows = []
-    for column in items.columns:
-        rest = items.drop(columns=column)
+    for i, column in enumerate(items.columns):
+        keep = [j for j in range(len(cov)) if j != i]
+        enough = answered[:, keep].any(axis=1).sum() >= defaults.MIN_CORRELATION_N
         # The rest score sums whatever was answered, so a skipped item counts as zero.
-        r = items[column].corr(rest.sum(axis=1))
+        r = items[column].corr(total - filled[column])
         rows.append(
             ItemTotal(
                 column=column,
                 r=float(r) if np.isfinite(r) else None,
-                alpha_if_deleted=cronbach_alpha(rest),
+                alpha_if_deleted=alpha_of(cov[np.ix_(keep, keep)]) if enough else None,
             )
         )
     return rows
