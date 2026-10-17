@@ -81,6 +81,10 @@ class CfaFit:
     estimator: str = WLSMV
 
 
+def scores_of(model: CfaModel | CfaFit) -> list[str]:
+    return model.factors[GENERAL] if model.kind == SUBSCALE_SCORES else list(model.factors)
+
+
 def is_total(instrument: Instrument, score_id: str) -> bool:
     # The total covers every item the instrument's scores use, as on the charts.
     used = set().union(*(set(s.items) for s in instrument.scores))

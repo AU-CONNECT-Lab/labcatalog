@@ -1,6 +1,15 @@
 from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import ANOVA, STUDENT, WELCH, Comparison, GroupStats
-from labcatalog.stats.cfa import SUBSCALES, WLSMV, CfaFit
+from labcatalog.stats.cfa import (
+    GENERAL_KINDS,
+    MIN_SUBSCALES,
+    SECOND_ORDER,
+    SUBSCALE_SCORES,
+    SUBSCALES,
+    WLSMV,
+    CfaFit,
+    scores_of,
+)
 from labcatalog.stats.cfa import R as LAVAAN
 from labcatalog.stats.invariance import STEPS, InvarianceStep, InvarianceTest
 from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
@@ -157,25 +166,33 @@ def cfa_text(fits: list[CfaFit], labels: dict[str, str], digits: int = 2) -> str
 
 
 def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
-    model = model_phrase(fit.kind, [labels[s] for s in fit.factors])
+    model = model_phrase(fit.kind, [labels[s] for s in scores_of(fit)])
     if fit.problem:
         return f"{opening_case(model)} could not be used: {fit.problem}."
     package = "lavaan" if fit.engine == LAVAAN else "semopy"
+    indicators = "subscale scores" if fit.kind == SUBSCALE_SCORES else "items"
     how = (
-        "the WLSMV estimator and the items as ordered categories"
+        f"the WLSMV estimator and the {indicators} as ordered categories"
         if fit.estimator == WLSMV
-        else "maximum likelihood and the items as continuous"
+        else f"maximum likelihood and the {indicators} as continuous"
     )
     opening = f"{opening_case(model)}, fitted in {package} with {how} (N = {fit.n}),"
     if fit.fit.get("df") == 0:
-        sentences = [f"{opening} fits exactly with three items, so it has no fit indices."]
+        sentences = [f"{opening} fits exactly with three {indicators}, so it has no fit indices."]
     else:
         sentences = [f"{opening} gave {fit_indices(fit.fit, digits)}."]
+    if fit.kind == SECOND_ORDER and len(fit.factors) == MIN_SUBSCALES:
+        sentences.append("With three subscales, its fit equals that of the subscale model.")
     if fit.loadings:
         low, high = min(fit.loadings.values()), max(fit.loadings.values())
+        which = " of the subscales on the general factor" if fit.kind in GENERAL_KINDS else ""
         sentences.append(
-            f"Standardized loadings ranged from {bounded(low, digits)} to {bounded(high, digits)}."
+            f"Standardized loadings{which} ranged from {bounded(low, digits)} to "
+            f"{bounded(high, digits)}."
         )
+    if fit.general_omega is not None:
+        name = "Hierarchical ω" if fit.kind == SECOND_ORDER else "ω of the summed subscale scores"
+        sentences.append(f"{name} was {bounded(fit.general_omega, digits)}.")
     omega = [(labels[s], v) for s, v in fit.omega.items()]
     if len(omega) == 1:
         sentences.append(f"ω was {bounded(omega[0][1], digits)}.")
@@ -194,6 +211,10 @@ def opening_case(text: str) -> str:
 def model_phrase(kind: str, names: list[str]) -> str:
     if kind == SUBSCALES:
         return f"a model with one factor for each subscale ({series(names)})"
+    if kind == SECOND_ORDER:
+        return f"a second-order model with a general factor over the subscales ({series(names)})"
+    if kind == SUBSCALE_SCORES:
+        return f"a one-factor model of the subscale scores ({series(names)})"
     return f"a one-factor model of {series(names)}"
 
 

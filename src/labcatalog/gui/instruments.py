@@ -63,7 +63,19 @@ from labcatalog.reports.export import (
 )
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument, Reference, Text
-from labcatalog.stats.cfa import SUBSCALES, WLSMV, CfaFit, R
+from labcatalog.stats.cfa import (
+    GENERAL,
+    GENERAL_KINDS,
+    MIN_SUBSCALES,
+    ONE_FACTOR,
+    SECOND_ORDER,
+    SUBSCALE_SCORES,
+    SUBSCALES,
+    WLSMV,
+    CfaFit,
+    R,
+    scores_of,
+)
 from labcatalog.stats.invariance import (
     REPORTERS,
     WAVES,
@@ -1093,18 +1105,27 @@ def factor_structure(
                 else "ω is the factor's share of the observed variance of the summed items, as "
                 "semTools gives it for continuous items."
             )
+            scores = [f for f in fits if f.kind not in GENERAL_KINDS]
+            general = [f for f in fits if f.kind in GENERAL_KINDS and not f.problem]
             papers = {
                 "cfa_fit": PaperTable(
                     f"Fit of Factor Models for {instrument.name}",
                     *without_empty(*without_empty(*fit_table(instrument, fits), "problem"), "srmr"),
-                    method,
+                    method
+                    + (" Subscale scores are continuous, maximum likelihood." if general else ""),
                 ),
                 "cfa_loadings": PaperTable(
                     f"Standardized Loadings and ω for {instrument.name}",
-                    *loading_table(result, instrument, dataset, fits),
+                    *loading_table(result, instrument, dataset, scores),
                     f"{method} {omega}",
                 ),
             }
+            if general:
+                papers["cfa_general"] = PaperTable(
+                    f"Loadings of the Subscales on a General Factor for {instrument.name}",
+                    *general_table(instrument, general),
+                    general_note(general),
+                )
             for shown in papers.values():
                 paper_table(shown)
             labels = {s.id: s.label for s in instrument.scores}
@@ -1119,6 +1140,21 @@ def factor_structure(
                     "This project's stats: cfa_estimator is wlsmv; set Rscript on the Settings "
                     "page to fit the items as ordered categories in lavaan.",
                 )
+
+
+def general_note(fits: list[CfaFit]) -> str:
+    notes = ["Standardized loadings."]
+    for f in fits:
+        if f.kind == SUBSCALE_SCORES:
+            notes.append("For subscale scores, ω is that of the summed subscale scores.")
+        elif f.engine == R:
+            notes.append(
+                "For the second-order model, ω is hierarchical: the share of the summed items' "
+                "variance that the general factor explains (semTools)."
+            )
+        else:
+            notes.append("Hierarchical ω of the second-order model is computed only in R.")
+    return " ".join(notes)
 
 
 def settings_hint(cfa: CfaView, text: str) -> None:
@@ -1197,6 +1233,14 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
         shown = ui.column().classes("gap-1")
 
 
+MODEL_NAMES = {
+    SUBSCALES: "Subscales",
+    SECOND_ORDER: "Second order",
+    SUBSCALE_SCORES: "Subscale scores",
+    ONE_FACTOR: "One factor",
+}
+
+
 def omegas(fits: list[CfaFit]) -> dict[str, float]:
     return {score: value for f in fits for score, value in f.omega.items()}
 
@@ -1216,10 +1260,8 @@ def fit_table(instrument: Instrument, fits: list[CfaFit]) -> tuple[list[dict], l
     ]
     rows = []
     for f in fits:
-        names = ", ".join(labels[s] for s in f.factors)
-        model = f"Subscales: {names}" if f.kind == SUBSCALES else f"One factor: {names}"
+        model = f"{MODEL_NAMES[f.kind]}: {', '.join(labels[s] for s in scores_of(f))}"
         values = f.fit
-        exact = not f.problem and values.get("df") == 0
         rows.append(
             {
                 "model": model,
@@ -1230,11 +1272,21 @@ def fit_table(instrument: Instrument, fits: list[CfaFit]) -> tuple[list[dict], l
                 "p": p_value(values.get("p")),
                 **{key: fmt(values.get(key)) for key in ("cfi", "tli", "srmr")},
                 "rmsea": rmsea_text(values),
-                "problem": f.problem
-                or ("3 items: the model fits exactly, so it has no fit indices" if exact else ""),
+                "problem": fit_note(f),
             }
         )
     return columns, rows
+
+
+def fit_note(f: CfaFit) -> str:
+    if f.problem:
+        return f.problem
+    if f.fit.get("df") == 0:
+        counted = "subscales" if f.kind == SUBSCALE_SCORES else "items"
+        return f"3 {counted}: the model fits exactly, so it has no fit indices"
+    if f.kind == SECOND_ORDER and len(f.factors) == MIN_SUBSCALES:
+        return "3 subscales: the fit equals that of the subscale model"
+    return ""
 
 
 def rmsea_text(values: dict[str, float | None]) -> str:
@@ -1271,6 +1323,24 @@ def loading_table(
     ]
     found = omegas(fits)
     rows.append({"column": "ω", "item": "", **{f"s_{s.id}": fmt(found.get(s.id)) for s in scores}})
+    return columns, rows
+
+
+def general_table(instrument: Instrument, fits: list[CfaFit]) -> tuple[list[dict], list[dict]]:
+    # One column per model of a general factor: its subscales' loadings, then its ω.
+    labels = {s.id: s.label for s in instrument.scores}
+    columns = [
+        col("score", "Subscale"),
+        *[col(f"m{i}", MODEL_NAMES[f.kind], numeric=True) for i, f in enumerate(fits)],
+    ]
+    rows = [
+        {
+            "score": labels[score],
+            **{f"m{i}": fmt(f.loadings.get((GENERAL, score))) for i, f in enumerate(fits)},
+        }
+        for score in scores_of(fits[0])
+    ]
+    rows.append({"score": "ω", **{f"m{i}": fmt(f.general_omega) for i, f in enumerate(fits)}})
     return columns, rows
 
 

@@ -275,6 +275,37 @@ def test_ordinal_cfa_fit_matches_jasp(result, tmp_path):
         assert fit.fit[key] == pytest.approx(jasp[key], rel=1e-4, abs=1e-6), key
 
 
+@pytest.mark.skipif(not ready(CFA_PACKAGES), reason="R with lavaan and semTools is not installed")
+def test_second_order_fit_and_hierarchical_omega_match_jasp(result, tmp_path):
+    models = cfa.build_models(result.project, result.catalog, result.datasets)
+    model = next(
+        m
+        for m in models
+        if (m.instrument_id, m.dataset, m.kind) == ("example_mood", "child_w1", cfa.SECOND_ORDER)
+    )
+    [fit] = cfa.fit_models([model], rscript(), cfa.WLSMV)
+    # jaspFactor's Second-Order box adds SecondOrder =~ over the factors; its reliability table
+    # takes semTools' omega with higher = "SecondOrder" (semTools 0.5-7 in JASP).
+    columns = {c: f"x{i}" for i, c in enumerate(model.data.columns, 1)}
+    syntax = lavaan_syntax(model.factors, columns)
+    syntax += "\nSecondOrder =~ " + " + ".join(f"F{j}" for j in range(1, len(model.factors) + 1))
+    code = JASP_CFA.format(
+        ordered="for (i in items) d[[i]] <- ordered(d[[i]])",
+        syntax=syntax.replace("\n", "; "),
+        group="NULL",
+        equal='""',
+        measures=ORDINAL_MEASURES,
+    )
+    code += (
+        'out$omega <- semTools::compRelSEM(fit, return.total = TRUE, higher = "SecondOrder")'
+        '[["SecondOrder"]]\n'
+    )
+    jasp = fit_keys(in_jasp(tmp_path, ["jaspFactor"], code, model.data.rename(columns=columns)))
+    for key in ("chisq", "df", "cfi", "rmsea", "rmsea_low", "rmsea_high", "srmr"):
+        assert fit.fit[key] == pytest.approx(jasp[key], rel=1e-4, abs=1e-6), key
+    assert fit.general_omega == pytest.approx(jasp["omega"], rel=1e-4)
+
+
 @pytest.mark.parametrize("engine", engines(CFA_PACKAGES))
 def test_continuous_cfa_fit_matches_jasp(result, tmp_path, engine):
     model = cfa_model(result)
