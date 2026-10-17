@@ -5,7 +5,7 @@ from nicegui import run, ui
 from labcatalog.config import FreedParameter
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
-from labcatalog.gui.common import col, fmt, note, p_value, table
+from labcatalog.gui.common import col, computed, fmt, note, p_value, table
 from labcatalog.gui.paper import paper_table, save_button, without_empty
 from labcatalog.metadata.editing import save_freed
 from labcatalog.pipeline import CatalogResult
@@ -183,8 +183,8 @@ def score_dialog(
             note("Running the score tests in R; each item takes a few seconds.")
         rscript = preferences.load().get(preferences.RSCRIPT)
         try:
-            built = await run.io_bound(model)
-            found = await run.io_bound(
+            built = await computed(model)
+            found = await computed(
                 invariance.score_tests, built, chosen["step"], rscript, estimator
             )
         except (LabCatalogError, ValueError) as err:

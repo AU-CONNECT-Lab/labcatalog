@@ -222,19 +222,27 @@ def score_relations(result: CatalogResult) -> None:
         "color": "instrument",
     }
 
-    @ui.refreshable
+    drawn: dict = {"chart": None}
+
     def graph() -> None:
         study, wave = picked["wave"].split("|")
-        show_network(
-            views.score_network(result, study, wave, picked["instruments"], picked["color"]),
-            "Pick instruments with at least two scores.",
-        )
+        option = views.score_network(result, study, wave, picked["instruments"], picked["color"])
+        chart = drawn["chart"]
+        # Updating the same chart keeps every node where it is, so the layout only drifts.
+        if option is not None and chart is not None:
+            chart.options.clear()
+            chart.options.update(theme.echart_for_page(option))
+            chart.update()
+            return
+        holder.clear()
+        with holder:
+            drawn["chart"] = show_network(option, "Pick instruments with at least two scores.")
 
     def changed(key: str, value) -> None:
         picked[key] = value or []
         if key == "instruments":
             chooser.props(f'display-value="{shown()}"')
-        graph.refresh()
+        graph()
 
     def shown() -> str:
         return f"{len(picked['instruments'])} of {len(instruments)} instruments"
@@ -264,15 +272,18 @@ def score_relations(result: CatalogResult) -> None:
                 label="Color by",
                 on_change=lambda e: changed("color", e.value),
             ).props("dense outlined").classes("w-56")
+        holder = ui.element("div").classes("w-full")
         graph()
 
 
-def show_network(option: dict | None, empty: str) -> None:
+def show_network(option: dict | None, empty: str) -> ui.echart | None:
     if option is None:
         note(empty)
-        return
-    ui.echart(theme.echart_for_page(option)).classes("w-full").style(
-        f"height:{network.NETWORK_HEIGHT}px"
+        return None
+    return (
+        ui.echart(theme.echart_for_page(option))
+        .classes("w-full")
+        .style(f"height:{network.NETWORK_HEIGHT}px")
     )
 
 

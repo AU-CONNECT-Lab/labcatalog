@@ -2,7 +2,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import webview
-from nicegui import app, background_tasks, run, ui
+from nicegui import app, background_tasks, ui
 
 from labcatalog.charts import style
 from labcatalog.datalad.annex import dataset_root
@@ -206,7 +206,7 @@ class Window:
     async def load(self, root: Path) -> None:
         self.set_busy(True)
         try:
-            result = await run.io_bound(run_catalog, root)
+            result = await common.computed(run_catalog, root)
         except LabCatalogError as err:
             # The project stays open so the Prepare page can make the missing data.
             ui.notify(str(err), type="negative", multi_line=True)
@@ -237,7 +237,7 @@ class Window:
             return
         self.set_busy(True)
         try:
-            copy = await run.io_bound(run_open_freeze, self.root, name, datalad)
+            copy = await common.computed(run_open_freeze, self.root, name, datalad)
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
             return
@@ -274,7 +274,7 @@ class Window:
         cfa_changed()
         fits, message, status = await in_r(run_cfa, result, rscript)
         if status == CFA_FAILED:
-            fits = await run.io_bound(run_cfa, result, None)
+            fits = await common.computed(run_cfa, result, None)
             message, status = (
                 f"R failed, so the factor models were fitted in Python: {message}",
                 CFA_DONE,
@@ -487,7 +487,7 @@ async def in_r(
     rscript: str | None,
 ) -> tuple[list, str, str]:
     try:
-        found = await run.io_bound(function, result, rscript)
+        found = await common.computed(function, result, rscript)
     except LabCatalogError as err:
         return [], str(err), CFA_FAILED
     return found, "", CFA_DONE

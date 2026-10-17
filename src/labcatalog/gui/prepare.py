@@ -2,13 +2,13 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.data.prepare import FileState, Session, StepState, run_steps, step_states, stop
 from labcatalog.exceptions import DataladError, LabCatalogError
 from labcatalog.gui import preferences
-from labcatalog.gui.common import note, open_path
+from labcatalog.gui.common import computed, note, open_path
 from labcatalog.gui.datalad import get_button
 from labcatalog.pipeline import run_get
 from labcatalog.project import load_project
@@ -61,7 +61,7 @@ def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[Non
         steps.refresh()
         tools = preferences.load()
         try:
-            runs = await run.io_bound(
+            runs = await computed(
                 run_steps,
                 project,
                 chosen,

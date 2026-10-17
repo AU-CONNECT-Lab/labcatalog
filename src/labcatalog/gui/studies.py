@@ -3,12 +3,12 @@ from dataclasses import dataclass
 from datetime import date
 from functools import partial
 
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import new_dataset
-from labcatalog.gui.common import cited, note, panel, table
+from labcatalog.gui.common import cited, computed, note, panel, table
 from labcatalog.gui.datasets import dataset_table
 from labcatalog.issues import Issue
 from labcatalog.metadata import changes, records, studies
@@ -65,7 +65,7 @@ def render(
     async def apply(found: list, then: str) -> bool:
         # Checks the project with the changes in place, writes them, and reloads the catalog.
         try:
-            issues = await run.io_bound(changes.check, project, found)
+            issues = await computed(changes.check, project, found)
             if issues:
                 ui.notify(issues[0].message, type="warning", multi_line=True)
                 return False
@@ -239,7 +239,7 @@ def detail(
                 studies.text_change(project, study, texts, template.value or ""),
             ]
             pending = [c for c in pending if c and (c.opened is None or c.text != c.opened.text)]
-            issues = await run.io_bound(changes.check, project, pending)
+            issues = await computed(changes.check, project, pending)
             show(issues)
             if issues:
                 ui.notify("Not saved: fix the problems listed above", type="warning")

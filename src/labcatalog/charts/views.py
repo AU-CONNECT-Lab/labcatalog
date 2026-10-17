@@ -751,6 +751,7 @@ def score_network(
     names = instrument_names(result)
     nodes = [
         {
+            "key": p["scores"][i].key,
             "label": label,
             "category": which[i],
             "tip": "<br>".join(

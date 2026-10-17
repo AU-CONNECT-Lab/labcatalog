@@ -4,11 +4,11 @@ import urllib.parse
 from dataclasses import dataclass
 
 import plotly.graph_objects as go
-from nicegui import run, ui
+from nicegui import ui
 from nicegui.events import GenericEventArguments
 
 from labcatalog.gui import preferences
-from labcatalog.gui.common import note, open_path
+from labcatalog.gui.common import computed, note, open_path
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import outputs, tables
@@ -82,7 +82,7 @@ def save_button(
             for kind in IMAGE_KINDS:
                 files[f"{name}.{kind}"] = await image(chart, kind)
         root = result.project.root
-        folder = await run.io_bound(outputs.write_output, root, name, files, result.manifest)
+        folder = await computed(outputs.write_output, root, name, files, result.manifest)
         saved.clear()
         with saved:
             note(f"Saved to {portable_path(folder, root).as_posix()}")

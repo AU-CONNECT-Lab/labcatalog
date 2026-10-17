@@ -26,7 +26,7 @@ def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[s
     top = max((abs(link["r"]) for link in links), default=1.0)
     data = [
         {
-            "id": str(i),
+            "id": node["key"],
             "name": node["label"],
             "category": node["category"],
             "symbolSize": round(NODE_MIN + NODE_SPAN * strength[i] / peak, 2),
@@ -36,8 +36,8 @@ def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[s
     ]
     edges = [
         {
-            "source": str(link["source"]),
-            "target": str(link["target"]),
+            "source": nodes[link["source"]]["key"],
+            "target": nodes[link["target"]]["key"],
             "value": abs(link["r"]),
             "lineStyle": {
                 "color": scale_color(
@@ -85,8 +85,10 @@ def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[s
                     "backgroundColor": "rgba(255,255,255,0.75)",
                 },
                 "emphasis": {"focus": "adjacency", "lineStyle": {"width": 3}},
+                # Low friction lets the layout drift and settle slowly; ids keep places across updates.
                 "force": {
-                    "initLayout": "circular",
+                    "initLayout": "none",
+                    "friction": 0.12,
                     "repulsion": 900,
                     "gravity": 0.03,
                     "edgeLength": [90, 280],

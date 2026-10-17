@@ -29,7 +29,7 @@ The export writes a new folder in `outputs/`:
 |---|---|
 | `variables.csv` | Every item and score in each dataset: its study, wave, reporter, column, instrument, wording, type, options, allowed range and missing codes. |
 | `<dataset>.csv` or `data_by_<id or group>.csv` | The data: the ID, group and date columns, the chosen items as they are in the data, and the scores labcatalog computes. |
-| `score_statistics.csv` | Each score's n, mean, SD and range in each dataset. |
+| `score_statistics.csv` | Each score's n, mean, SD, range and α in each dataset, and ω when the window has fitted the factor models (the command line leaves it empty). |
 | `item_statistics.csv` | The same for each item. |
 | `manifest.json` | The data files and checksums the export came from. |
 

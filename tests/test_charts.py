@@ -213,9 +213,8 @@ def test_score_network_links_strong_pairs_and_colours_by_the_first_matching_tag(
     assert categories == ["negative affect", "positive affect", "parenting", "sleep"]
     strain = series["data"][names.index("EPS strain")]
     assert categories[strain["category"]] == "negative affect"
-    linked = {
-        frozenset((names[int(e["source"])], names[int(e["target"])])) for e in series["links"]
-    }
+    name_of = {n["id"]: n["name"] for n in series["data"]}
+    linked = {frozenset((name_of[e["source"]], name_of[e["target"]])) for e in series["links"]}
     assert frozenset(("EMS total score", "EMS sadness")) not in linked
     assert all(e["value"] >= 0.3 for e in series["links"])
     for color_by in views.network_colorings(result):

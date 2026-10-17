@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from functools import cache
 from pathlib import Path
 
-from nicegui import app, run, ui
+from nicegui import app, ui
 
 from labcatalog.ai import scoring as ai_scoring
 from labcatalog.ai.search import Search
@@ -19,6 +19,7 @@ from labcatalog.gui.common import (
     cited,
     code_tabs,
     col,
+    computed,
     fmt,
     note,
     open_path,
@@ -112,7 +113,7 @@ def render(
     cfa: CfaView,
 ) -> None:
     if view.instrument not in result.project.instruments:
-        browser(result, index, view, on_open)
+        browser(result, index, view, on_open, cfa)
         return
     found = matches(index, view.selected, view.query, view.items, view.only)
     instrument = result.project.instruments[view.instrument]
@@ -130,6 +131,7 @@ def browser(
     index: BrowseIndex,
     view: BrowseView,
     on_open: Callable[[str | None], None],
+    cfa: CfaView,
 ) -> None:
     @ui.refreshable
     def facets() -> None:
@@ -143,7 +145,7 @@ def browser(
         def chosen_bar() -> None:
             ui.label(f"{len(view.chosen)} chosen").classes("lc-note")
             ui.button(
-                "Export", icon="download", on_click=lambda: export_dialog(result, found, view)
+                "Export", icon="download", on_click=lambda: export_dialog(result, found, view, cfa)
             ).props("flat dense no-caps").classes("lc-quiet-btn").set_enabled(bool(view.chosen))
 
         def choose(selection: list[dict]) -> None:
@@ -233,7 +235,7 @@ def ask_panel(
         status.set_text("Asking the language model.")
         chosen = preferences.load()
         try:
-            asked = await run.io_bound(
+            asked = await computed(
                 run_search,
                 result,
                 query,
@@ -288,7 +290,9 @@ def ask_panel(
         answer()
 
 
-def export_dialog(result: CatalogResult, found: dict[str, list[str]], view: BrowseView) -> None:
+def export_dialog(
+    result: CatalogResult, found: dict[str, list[str]], view: BrowseView, cfa: CfaView
+) -> None:
     plan = export_plan(result, found, view.chosen)
     names = {i: s.abbreviation or s.name for i, s in result.project.instruments.items()}
     left_out = [names[i] for i in view.chosen if not any(i in ids for ids in plan.values())]
@@ -302,7 +306,7 @@ def export_dialog(result: CatalogResult, found: dict[str, list[str]], view: Brow
     }
 
     async def go() -> None:
-        done = await run.io_bound(write_export, result, plan, layout.value)
+        done = await computed(write_export, result, plan, layout.value, cfa.fits)
         saved.clear()
         with saved:
             note(f"Saved to {portable_path(done.folder, root).as_posix()}")
@@ -783,7 +787,7 @@ def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str)
         status.set_text("Reading the reference and writing the scripts.")
         chosen = preferences.load()
         try:
-            meta = await run.io_bound(
+            meta = await computed(
                 run_scoring_script,
                 result,
                 instrument.id,
@@ -988,7 +992,7 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
         status.set_text("Reading the reference and drafting the description.")
         chosen = preferences.load()
         try:
-            draft = await run.io_bound(
+            draft = await computed(
                 run_description_draft,
                 result,
                 instrument.id,

@@ -1,10 +1,10 @@
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui import preferences
-from labcatalog.gui.common import note, section
+from labcatalog.gui.common import computed, note, section
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
@@ -41,8 +41,8 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
         measure, group = view.invariance_measure, view.invariance_group
         estimator = result.project.config.stats.cfa_estimator
         try:
-            models = await run.io_bound(group_models, result, sample, measure, group)
-            tests = await run.io_bound(fit_models, models, rscript, estimator)
+            models = await computed(group_models, result, sample, measure, group)
+            tests = await computed(fit_models, models, rscript, estimator)
         except LabCatalogError as err:
             body.clear()
             with body:

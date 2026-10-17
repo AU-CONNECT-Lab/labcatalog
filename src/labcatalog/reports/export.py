@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.reports.codegen import output_name
 from labcatalog.reports.outputs import write_output
 from labcatalog.stats.analysis import linkable
+from labcatalog.stats.cfa import CfaFit
 
 VARIABLES = "variables.csv"
 SCORE_STATISTICS = "score_statistics.csv"
@@ -122,8 +124,11 @@ def variable_rows(result: CatalogResult, plan: dict[str, list[str]]) -> list[dic
     return [{column: row.get(column, "") for column in COLUMNS} for row in rows]
 
 
-def score_statistics(result: CatalogResult, plan: dict[str, list[str]]) -> list[dict]:
+def score_statistics(
+    result: CatalogResult, plan: dict[str, list[str]], fits: Sequence[CfaFit] = ()
+) -> list[dict]:
     found = {s.key: s for s in result.summary.scores}
+    omega = {(f.instrument_id, f.dataset, s): v for f in fits for s, v in f.omega.items()}
     rows = []
     for dataset, instrument_ids in plan.items():
         info = result.datasets[dataset].config
@@ -150,6 +155,8 @@ def score_statistics(result: CatalogResult, plan: dict[str, list[str]]) -> list[
                     "possible_min": low,
                     "possible_max": high,
                     "alpha": stats.alpha,
+                    # Only as fitted by the window's factor models; empty otherwise.
+                    "omega": omega.get((score.instrument_id, dataset, score.score_id), ""),
                 }
             )
     return rows
@@ -247,13 +254,15 @@ def layouts(result: CatalogResult, plan: dict[str, list[str]]) -> list[str]:
     return [BY_DATASET, BY_ID, *([BY_GROUP] if grouped else [])]
 
 
-def write_export(result: CatalogResult, plan: dict[str, list[str]], layout: str) -> Export:
+def write_export(
+    result: CatalogResult, plan: dict[str, list[str]], layout: str, fits: Sequence[CfaFit] = ()
+) -> Export:
     allowed = layouts(result, plan)
     if layout not in allowed:
         raise ExportError(f"Cannot export by {layout}; these datasets allow {', '.join(allowed)}")
     variables = pd.DataFrame(variable_rows(result, plan), columns=COLUMNS)
     statistics = {
-        SCORE_STATISTICS: pd.DataFrame(score_statistics(result, plan)),
+        SCORE_STATISTICS: pd.DataFrame(score_statistics(result, plan, fits)),
         ITEM_STATISTICS: pd.DataFrame(item_statistics(result, plan)),
     }
     if layout == BY_DATASET:

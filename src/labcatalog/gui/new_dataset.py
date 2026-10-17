@@ -4,11 +4,11 @@ from datetime import date
 from pathlib import Path
 
 import webview
-from nicegui import app, run, ui
+from nicegui import app, ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui.common import note
+from labcatalog.gui.common import computed, note
 from labcatalog.metadata import changes, new_dataset
 from labcatalog.pipeline import CatalogResult
 
@@ -117,7 +117,7 @@ def open_wizard(
             f"Copying it to {placement.copy_to}"
             + (f" and running {placement.step.name}" if placement.step else "")
         )
-        brought = await run.io_bound(new_dataset.bring_in, project, state["source"], placement)
+        brought = await computed(new_dataset.bring_in, project, state["source"], placement)
         state["created"] = brought.created
         if brought.run is not None and brought.run.exit_code != 0:
             file_status.set_text(
@@ -130,12 +130,12 @@ def open_wizard(
         try:
             dataset = new_dataset.dataset_config(project, draft(), placement)
             if blank():
-                found = await run.io_bound(new_dataset.file_columns, project, dataset)
+                found = await computed(new_dataset.file_columns, project, dataset)
                 usual = config.defaults.id_column
                 state["columns"] = found
                 state["id_column"] = usual if usual in found else found[0]
                 state["date_column"] = next((c for c in found if "date" in c.lower()), "")
-            state["rows"] = await run.io_bound(new_dataset.match_columns, project, dataset)
+            state["rows"] = await computed(new_dataset.match_columns, project, dataset)
         except LabCatalogError as err:
             file_status.set_text(str(err))
             return

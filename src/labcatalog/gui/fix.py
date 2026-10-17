@@ -2,14 +2,14 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog.codebook.core import holds
 from labcatalog.config import dataset_by_name
 from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
-from labcatalog.gui.common import caption, col, note, split_location, table
+from labcatalog.gui.common import caption, col, computed, note, split_location, table
 from labcatalog.issues import Issue
 from labcatalog.metadata import accepted, changes, fixes
 from labcatalog.metadata.changes import Change
@@ -168,7 +168,7 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         status.set_text(f"Running {step}")
         tools = preferences.load()
         try:
-            runs = await run.io_bound(
+            runs = await computed(
                 run_steps,
                 project,
                 [step],

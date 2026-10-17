@@ -10,7 +10,7 @@ from labcatalog.codebook import core as codebook
 from labcatalog.codebook.core import ImportResult
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import problems
-from labcatalog.gui.common import col, heading, note, open_path, section, table
+from labcatalog.gui.common import col, computed, heading, note, open_path, section, table
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
 
@@ -68,7 +68,7 @@ def render(
 
     async def import_files() -> None:
         try:
-            outcome = await run.io_bound(codebook.import_codebook, project, view.dataset)
+            outcome = await computed(codebook.import_codebook, project, view.dataset)
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
             return

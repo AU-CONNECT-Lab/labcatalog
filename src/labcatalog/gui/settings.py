@@ -1,12 +1,12 @@
 import os
 from collections.abc import Awaitable, Callable
 
-from nicegui import run, ui
+from nicegui import ui
 
 from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import common, datalad, preferences, theme
-from labcatalog.gui.common import note, section
+from labcatalog.gui.common import computed, note, section
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
 
@@ -48,7 +48,7 @@ def render(
             return
         status.set_text("Checking R")
         try:
-            found = await run.io_bound(r_status, value)
+            found = await computed(r_status, value)
         except LabCatalogError as err:
             status.set_text(str(err))
             return

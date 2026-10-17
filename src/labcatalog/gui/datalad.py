@@ -16,7 +16,7 @@ from labcatalog.datalad.freeze import (
 )
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
-from labcatalog.gui.common import col, heading, note, section, table
+from labcatalog.gui.common import col, computed, heading, note, section, table
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult, run_freeze, run_push_freeze
 
@@ -71,7 +71,7 @@ def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
         use_folder(value)
         status.set_text("Checking DataLad")
         try:
-            found = await run.io_bound(datalad_status, value)
+            found = await computed(datalad_status, value)
         except LabCatalogError as err:
             status.set_text(str(err))
             return
@@ -127,7 +127,7 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                 datalad = preferences.load().get(preferences.DATALAD)
                 status.set_text("Freezing")
                 try:
-                    path, record = await run.io_bound(
+                    path, record = await computed(
                         run_freeze, root, (name.value or "").strip(), datalad
                     )
                 except LabCatalogError as err:
@@ -139,7 +139,7 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                 if push is not None and push.value:
                     status.set_text("Pushing")
                     try:
-                        pushed = await run.io_bound(run_push_freeze, root, record.name, datalad)
+                        pushed = await computed(run_push_freeze, root, record.name, datalad)
                         done += f", pushed {len(pushed)}"
                     except LabCatalogError as err:
                         # The freeze stands; only the push is left to do.

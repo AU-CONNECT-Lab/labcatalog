@@ -4,12 +4,12 @@ from functools import partial
 from pathlib import Path
 
 import webview
-from nicegui import app, run, ui
+from nicegui import app, ui
 
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences, theme
-from labcatalog.gui.common import LINE_SUFFIX, heading, note
+from labcatalog.gui.common import LINE_SUFFIX, computed, heading, note
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
 from labcatalog.pipeline import run_instrument_draft
@@ -227,7 +227,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 status.set_text("Reading the PDF and drafting the instrument.")
                 settings = preferences.load()
                 try:
-                    drafted = await run.io_bound(
+                    drafted = await computed(
                         run_instrument_draft,
                         root,
                         (name.value or "").strip(),

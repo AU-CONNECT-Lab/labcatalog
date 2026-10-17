@@ -20,6 +20,7 @@ from labcatalog.reports.export import (
     variable_rows,
     write_export,
 )
+from labcatalog.stats.cfa import CfaFit
 
 
 @pytest.fixture
@@ -181,3 +182,14 @@ def test_statistics_match_the_summary_and_leave_out_open_answers(result):
     wide = write_export(result, {"child_w1": ["example_mood"]}, BY_ID)
     columns = pd.read_csv(wide.folder / SCORE_STATISTICS, encoding="utf-8-sig")["column"]
     assert all(c.startswith("child_w1_") for c in columns)
+
+
+def test_score_statistics_carry_the_omega_of_the_window_s_factor_models(result):
+    plan = {"child_w1": ["example_mood"]}
+    fit = CfaFit("example_mood", "child_w1", "one factor", {}, 180, omega={"ems_total": 0.87})
+    scores = pd.read_csv(
+        write_export(result, plan, BY_DATASET, [fit]).folder / SCORE_STATISTICS,
+        encoding="utf-8-sig",
+    ).set_index("score")
+    assert scores.loc["ems_total", "omega"] == pytest.approx(0.87)
+    assert scores.drop("ems_total")["omega"].isna().all()
