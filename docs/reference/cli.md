@@ -50,6 +50,14 @@ labcatalog freeze NAME [--push] [-p PROJECT]
 
 Record the data as they are now under `NAME`, for example `2026-06-submission`. Datasets in DataLad are also saved and tagged; with `--push`, the tag and the data then go to each dataset's sibling (its only one, or `origin`). See [Using labcatalog with DataLad](../how-to/datalad.md).
 
+## derivatives
+
+```bash
+labcatalog derivatives TABLE --name NAME --study STUDY --modality MODALITY --reporter REPORTER [--split ENTITY]... [--columns PATTERN]... [--wave WAVE] [--label LABEL] [-p PROJECT]
+```
+
+Write instruments, column maps and a data file per wave from a pipeline's table (`.tsv`) and its JSON sidecar, and print the lines to add to `labcatalog.yaml` and the study file. See [Bring In a Pipeline's Tables](../how-to/pipeline-tables.md).
+
 ## database
 
 ```bash

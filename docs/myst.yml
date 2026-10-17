@@ -42,6 +42,7 @@ project:
         - file: how-to/tag-rdoc.md
         - file: how-to/add-dataset.md
         - file: how-to/prepare-steps.md
+        - file: how-to/pipeline-tables.md
         - file: how-to/fix-problems.md
         - file: how-to/copy-tables.md
         - file: how-to/export-data.md

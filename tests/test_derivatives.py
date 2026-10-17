@@ -1,0 +1,146 @@
+import json
+import sys
+from pathlib import Path
+
+import pytest
+import yaml
+
+from labcatalog.cli import main
+from labcatalog.codebook.derivatives import Request, run_derivatives
+from labcatalog.exceptions import CodebookError
+from labcatalog.metadata.validate import validate_project
+from labcatalog.project import load_project
+
+ROWS = [
+    "bids_name\tsci\tsnr\tdevice",
+    "sub-01_ses-01_task-rest_nirs\t0.9\t12\tA",
+    "sub-01_ses-01_task-nback_nirs\t0.8\tn/a\tA",
+    "sub-02_ses-01_task-rest_nirs\t0.7\t9\tB",
+    "sub-01_ses-02_task-rest_nirs\t0.95\t14\tA",
+]
+SIDECAR = {
+    "sci": {"LongName": "Mean SCI", "Description": "Scalp coupling index."},
+    "snr": {"Description": "Signal to noise.", "Units": "dB"},
+}
+
+
+def pipeline_table(root: Path, rows: list[str] = ROWS) -> Path:
+    folder = root / "derivatives" / "pipe"
+    folder.mkdir(parents=True)
+    (folder / "dataset_description.json").write_text(
+        json.dumps({"Name": "pipe output", "GeneratedBy": [{"Name": "pipe", "Version": "1.2"}]})
+    )
+    (folder / "desc-qc.json").write_text(json.dumps(SIDECAR))
+    table = folder / "desc-qc.tsv"
+    table.write_text("\n".join(rows) + "\n")
+    return table
+
+
+def request(table: Path, **changes) -> Request:
+    fields = {"name": "qc", "study": "demo_study", "modality": "fnirs", "reporter": "child"}
+    return Request(table, **(fields | changes))
+
+
+def test_writes_an_instrument_per_task_and_a_data_file_per_session(demo_project):
+    table = pipeline_table(demo_project)
+    done = run_derivatives(demo_project, request(table, split=["task"]))
+    assert done.left_out == ["device"]
+    rest = yaml.safe_load((demo_project / "instruments" / "qc_rest.yaml").read_text())
+    assert rest["kind"] == "fnirs" and rest["description"] == "Measures from pipe 1.2 for rest."
+    assert rest["items"] == [
+        {"id": "sci", "label": "Mean SCI", "text": "Scalp coupling index.", "type": "number"},
+        {"id": "snr", "text": "Signal to noise. (dB)", "type": "number"},
+    ]
+    first = (demo_project / "data" / "qc_w1.csv").read_text().splitlines()
+    assert first[0].split(",")[1:] == ["nback_sci", "nback_snr", "rest_sci", "rest_snr"]
+    assert first[1:] == ["sub-01,0.8,,0.9,12", "sub-02,,,0.7,9"]
+    assert (demo_project / "maps" / "qc_w2.csv").read_text().splitlines()[3] == (
+        "nback_snr,qc_nback,snr"
+    )
+    steps = dict(done.steps)
+    assert list(steps) == [
+        "In labcatalog.yaml, add under studies, demo_study, waves:",
+        "In labcatalog.yaml, add under datasets:",
+        "In studies/demo_study.yaml, add under administrations:",
+    ]
+    assert steps["In labcatalog.yaml, add under studies, demo_study, waves:"] == "  2: {}"
+    assert (
+        "{name: qc_w2, modality: fnirs, study: demo_study, wave: 2, reporter: child"
+        in (steps["In labcatalog.yaml, add under datasets:"])
+    )
+
+
+def test_the_printed_lines_make_a_valid_project(demo_project):
+    table = pipeline_table(demo_project)
+    done = run_derivatives(demo_project, request(table, split=["task"]))
+    config = demo_project / "labcatalog.yaml"
+    steps = list(dict(done.steps).values())
+    data = yaml.safe_load(config.read_text())
+    data["studies"]["demo_study"]["waves"] |= yaml.safe_load(steps[0])
+    data["datasets"] += yaml.safe_load(steps[1])
+    data["vocab"]["modalities"].append("fnirs")
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+    study = next((demo_project / "studies").glob("*.yaml"))
+    content = yaml.safe_load(study.read_text())
+    content["administrations"] += yaml.safe_load(steps[2])
+    study.write_text(yaml.safe_dump(content, sort_keys=False))
+    issues = validate_project(load_project(demo_project))
+    assert [i for i in issues if i.level == "error"] == []
+    assert run_derivatives(demo_project, request(table, split=["task"])).steps == []
+
+
+def test_running_again_keeps_what_the_user_changed(demo_project):
+    table = pipeline_table(demo_project)
+    run_derivatives(demo_project, request(table, columns=["sci"], split=["task"]))
+    path = demo_project / "instruments" / "qc_rest.yaml"
+    edited = yaml.safe_load(path.read_text())
+    edited["name"] = "Resting quality"
+    edited["items"][0]["text"] = "My wording."
+    path.write_text(yaml.safe_dump(edited, sort_keys=False))
+    run_derivatives(demo_project, request(table, split=["task"]))
+    again = yaml.safe_load(path.read_text())
+    assert again["name"] == "Resting quality"
+    assert [i["id"] for i in again["items"]] == ["sci", "snr"]
+    assert again["items"][0]["text"] == "My wording."
+
+
+def test_rows_that_repeat_name_the_entity_to_split_by(demo_project):
+    table = pipeline_table(demo_project)
+    with pytest.raises(
+        CodebookError, match="Several rows for sub-01 in wave 1; split them by task"
+    ):
+        run_derivatives(demo_project, request(table))
+
+
+def test_a_table_without_sessions_needs_a_wave(demo_project):
+    rows = ["participant_id\tage", "sub-01\t30", "sub-02\t41"]
+    table = pipeline_table(demo_project, rows)
+    with pytest.raises(CodebookError, match="pass --wave"):
+        run_derivatives(demo_project, request(table))
+    run_derivatives(demo_project, request(table, wave="1"))
+    assert (demo_project / "data" / "qc_w1.csv").read_text().splitlines() == [
+        "id,age",
+        "sub-01,30",
+        "sub-02,41",
+    ]
+
+
+def test_command_prints_what_to_add(demo_project, monkeypatch, capsys):
+    table = pipeline_table(demo_project)
+    argv = ["labcatalog", "derivatives", str(table), "--name", "qc", "--study", "demo_study"]
+    argv += [
+        "--modality",
+        "fnirs",
+        "--reporter",
+        "child",
+        "--split",
+        "task",
+        "-p",
+        str(demo_project),
+    ]
+    monkeypatch.setattr(sys, "argv", argv)
+    with pytest.raises(SystemExit) as caught:
+        main()
+    out = capsys.readouterr().out
+    assert caught.value.code == 0
+    assert "Not numbers, so left out: device" in out and "add under datasets:" in out

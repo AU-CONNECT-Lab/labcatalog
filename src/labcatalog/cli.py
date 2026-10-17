@@ -7,6 +7,7 @@ from typing import Annotated
 import typer
 
 from labcatalog import defaults
+from labcatalog.codebook.derivatives import Request, run_derivatives
 from labcatalog.datalad.freeze import RECORD_ONLY
 from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
 from labcatalog.issues import Issue, has_errors, summarize_issues
@@ -218,6 +219,48 @@ def export(
     typer.echo(f"Wrote {done.folder}")
     for name, n in done.left_out.items():
         typer.echo(f"Left out {n} rows of {name}: their {by} repeats in that file")
+
+
+@app.command()
+def derivatives(
+    table: Annotated[
+        Path,
+        typer.Argument(help="A pipeline's table (.tsv) with a bids_name or participant_id column."),
+    ],
+    name: Annotated[str, typer.Option(help="Name for the instruments and datasets it makes.")],
+    study: Annotated[str, typer.Option(help="Study the datasets belong to.")],
+    modality: Annotated[str, typer.Option(help="Modality of the datasets, such as fnirs.")],
+    reporter: Annotated[str, typer.Option(help="Reporter of the datasets, such as self.")],
+    split: Annotated[
+        list[str] | None,
+        typer.Option(
+            help="Entity whose values become separate instruments, such as task; repeat for more."
+        ),
+    ] = None,
+    columns: Annotated[
+        list[str] | None,
+        typer.Option(help="Only columns matching this pattern, such as 'raw_*'; repeat for more."),
+    ] = None,
+    wave: Annotated[
+        str | None, typer.Option(help="Wave of every row, for a table without sessions.")
+    ] = None,
+    label: Annotated[
+        str | None, typer.Option(help="Name of the instruments; the --name when left out.")
+    ] = None,
+    project: ProjectOption = Path("."),
+) -> None:
+    """Write instruments, column maps and data files from a pipeline's table and its JSON sidecar."""
+    request = Request(
+        table.resolve(), name, study, modality, reporter, split or [], columns or [], wave, label
+    )
+    done = run_derivatives(project, request)
+    for path in done.written:
+        typer.echo(f"Wrote {path}")
+    if done.left_out:
+        typer.echo(f"Not numbers, so left out: {', '.join(done.left_out)}")
+    for instruction, lines in done.steps:
+        typer.echo(instruction)
+        typer.echo(lines)
 
 
 @app.command()
