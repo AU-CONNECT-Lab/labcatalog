@@ -10,6 +10,7 @@ SCORE_ESTIMATORS = (ML, MLR)
 DEFAULT_BOOTSTRAP = 1000
 DEFAULT_WORKERS = 4
 SEED = 1
+ESTIMATOR_NAMES = {ML: "maximum likelihood", MLR: "robust maximum likelihood (MLR)"}
 FIT = {
     ML: ("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "srmr"),
     MLR: (
@@ -80,7 +81,7 @@ class MediationFit:
 
 
 R_MEDIATION = """\
-# Mediation: {title}. lavaan, {method}; percentile bootstrap CIs from {bootstrap} resamples.
+# Mediation: {title}. lavaan, {method}; {intervals}.
 # x, m, y{w_name}: {legend}
 med <- data.frame({columns})
 med <- med[complete.cases(med), ]
@@ -90,19 +91,27 @@ med <- med[complete.cases(med), ]
   {definitions},
   sep = "\\n"
 )
-{robust}fit <- lavaan::sem(model, data = med, estimator = "ML", se = "bootstrap",
-                   bootstrap = {bootstrap}, iseed = {seed}{parallel})
-estimates <- lavaan::parameterEstimates(fit, boot.ci.type = "perc")
-effects <- estimates[estimates$label != "", c("label", "est", "se", "pvalue", "ci.lower",
+{estimation}effects <- estimates[estimates$label != "", c("label", "est", "se", "pvalue", "ci.lower",
                                               "ci.upper")]
 print(effects)
 {fit_line}measures <- lavaan::fitMeasures({fitted}, c({measures}))
-# Resamples that converged, of those asked for.
-resamples <- sum(complete.cases(lavaan::lavInspect(fit, "boot")))
-model_fit <- data.frame(n = nrow(med), resamples = resamples, as.list(unclass(measures)),
+{resamples}model_fit <- data.frame(n = nrow(med), resamples = resamples, as.list(unclass(measures)),
                         check.names = FALSE)
 print(model_fit)
 moderator_values <- data.frame(value = {values})
+"""
+BOOTSTRAP = """\
+{robust}fit <- lavaan::sem(model, data = med, estimator = "ML", se = "bootstrap",
+                   bootstrap = {bootstrap}, iseed = {seed}{parallel})
+estimates <- lavaan::parameterEstimates(fit, boot.ci.type = "perc")
+"""
+COUNT = """\
+# Resamples that converged, of those asked for.
+resamples <- sum(complete.cases(lavaan::lavInspect(fit, "boot")))
+"""
+NO_BOOTSTRAP = """\
+fit <- lavaan::sem(model, data = med, estimator = "{estimator}")
+estimates <- lavaan::parameterEstimates(fit)
 """
 MODERATOR_PREP = """\
 w_mean <- mean(med$w)
@@ -138,8 +147,21 @@ def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Cod
     if "c" in moderated:
         y_terms.append("c_xw*xw")
     definitions = definition_lines(moderated)
-    robust = model.estimator == MLR
-    fitted = "robust" if robust else "fit"
+    booted = model.bootstrap > 0
+    # Bootstrap needs plain ML, so MLR's fit comes from a second fit.
+    robust = model.estimator == MLR and booted
+    estimation = (
+        BOOTSTRAP.format(
+            robust="# Bootstrap needs plain ML; its estimates are MLR's too, whose fit is below.\n"
+            if robust
+            else "",
+            bootstrap=model.bootstrap,
+            seed=SEED,
+            parallel=f', parallel = "snow", ncpus = {workers}' if workers > 1 else "",
+        )
+        if booted
+        else NO_BOOTSTRAP.format(estimator=model.estimator.upper())
+    )
     title = f"{model.x.label} to {model.y.label} through {model.m.label}"
     if w is not None:
         title += f", moderated by {w.label}"
@@ -147,8 +169,12 @@ def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Cod
         title=title,
         method="robust maximum likelihood (MLR) for the model's fit"
         if robust
-        else "maximum likelihood",
-        bootstrap=model.bootstrap,
+        else ESTIMATOR_NAMES[model.estimator],
+        intervals=f"percentile bootstrap CIs from {model.bootstrap} resamples"
+        if booted
+        else "Wald CIs, by the delta method for the defined effects",
+        estimation=estimation,
+        resamples=COUNT if booted else "resamples <- 0\n",
         w_name=", w" if w is not None else "",
         legend=legend,
         columns=columns,
@@ -156,13 +182,8 @@ def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Cod
         m_equation=r_string(f"m ~ {' + '.join(m_terms)}{covariates}"),
         y_equation=r_string(f"y ~ {' + '.join(y_terms)}{covariates}"),
         definitions=",\n  ".join(definitions),
-        robust="# Bootstrap needs plain ML; its estimates are MLR's too, whose fit is below.\n"
-        if robust
-        else "",
-        seed=SEED,
-        parallel=f', parallel = "snow", ncpus = {workers}' if workers > 1 else "",
         fit_line='robust <- lavaan::sem(model, data = med, estimator = "MLR")\n' if robust else "",
-        fitted=fitted,
+        fitted="robust" if robust else "fit",
         measures=", ".join(r_string(m) for m in FIT[model.estimator]),
         values="w_at + w_mean" if w is not None else "numeric(0)",
     )
@@ -230,3 +251,20 @@ def at_labels(model: MediationModel, fit: MediationFit) -> list[str]:
         options = dict(w.options)
         return [options.get(v, f"{v:g}") for v in fit.at]
     return ["1 SD below the mean", "the mean", "1 SD above the mean"]
+
+
+def intervals_text(fit: MediationFit) -> str:
+    if not fit.bootstrap:
+        return "Wald intervals, by the delta method for the defined effects"
+    done = (
+        fit.bootstrap if fit.resamples >= fit.bootstrap else f"{fit.resamples} of {fit.bootstrap}"
+    )
+    return f"percentile bootstrap intervals from {done} resamples"
+
+
+def method_text(fit: MediationFit) -> str:
+    if fit.estimator == MLR and fit.bootstrap:
+        return (
+            "maximum likelihood for the estimates and robust maximum likelihood (MLR) for the fit"
+        )
+    return ESTIMATOR_NAMES[fit.estimator]

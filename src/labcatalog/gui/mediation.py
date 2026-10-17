@@ -13,7 +13,7 @@ from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import mediation as med
-from labcatalog.stats.cfa import ESTIMATORS, MLR
+from labcatalog.stats.cfa import ESTIMATORS
 
 NO_MODERATOR = ""
 PATH_NAMES = {"a": "a (X → M)", "b": "b (M → Y)", "c": "c′ (X → Y)"}
@@ -41,6 +41,7 @@ class Choices:
     moderator: str = NO_MODERATOR
     paths: list[str] = field(default_factory=lambda: ["a"])
     estimator: str = med.ML
+    booted: bool = True
     bootstrap: int = med.DEFAULT_BOOTSTRAP
 
 
@@ -77,7 +78,7 @@ def render(
             [data.variable(c) for c in chosen.covariates],
             moderators,
             chosen.estimator,
-            chosen.bootstrap,
+            chosen.bootstrap if chosen.booted else 0,
         )
 
     async def run() -> None:
@@ -99,7 +100,11 @@ def render(
         code = med.mediation_code(model, workers())
         with body:
             ui.spinner()
-            note(f"Fitting in R with {chosen.bootstrap} bootstrap resamples.")
+            note(
+                f"Fitting in R with {chosen.bootstrap} bootstrap resamples."
+                if chosen.booted
+                else "Fitting in R."
+            )
         try:
             found, _ = await computed(script.run_code, result, sample, frame, code, rscript)
         except LabCatalogError as err:
@@ -189,14 +194,24 @@ def render(
                     value=chosen.estimator,
                     on_change=lambda e: choose("estimator", e.value),
                 ).props("dense no-caps")
-                ui.number(
-                    "Bootstrap resamples",
-                    value=chosen.bootstrap,
-                    min=100,
-                    step=100,
-                    format="%d",
-                    on_change=lambda e: setattr(chosen, "bootstrap", int(e.value or 0) or 1000),
-                ).props("dense outlined").classes("w-44")
+                ui.toggle(
+                    {True: "Bootstrap", False: "None"},
+                    value=chosen.booted,
+                    on_change=lambda e: choose("booted", e.value),
+                ).props("dense no-caps").tooltip(
+                    "Percentile bootstrap intervals, or Wald intervals without resampling"
+                )
+                if chosen.booted:
+                    ui.number(
+                        "Bootstrap resamples",
+                        value=chosen.bootstrap,
+                        min=100,
+                        step=100,
+                        format="%d",
+                        on_change=lambda e: setattr(
+                            chosen, "bootstrap", int(e.value or 0) or med.DEFAULT_BOOTSTRAP
+                        ),
+                    ).props("dense outlined").classes("w-44")
                 ui.button("Fit", icon="play_arrow", on_click=run).props("no-caps")
 
         moderator_row()
@@ -253,14 +268,6 @@ def table_note(model: med.MediationModel, fit: med.MediationFit) -> str:
         else ""
     )
     centred = " X, M and W are centred at their means." if model.moderators else ""
-    resamples = (
-        f"{fit.resamples} of {fit.bootstrap}" if fit.resamples < fit.bootstrap else fit.bootstrap
-    )
-    method = (
-        "lavaan; estimates by maximum likelihood, model fit by MLR"
-        if fit.estimator == MLR
-        else "lavaan, maximum likelihood"
-    )
     if fit.fit.get("df"):
         values = fit.fit
         fitted = (
@@ -271,8 +278,8 @@ def table_note(model: med.MediationModel, fit: med.MediationFit) -> str:
     else:
         fitted = " The model is saturated (df = 0), so it has no fit test."
     return (
-        f"{legend}. Unstandardized estimates; {method}; N = {fit.n}; 95% percentile bootstrap "
-        f"CIs from {resamples} resamples.{centred}{covariates}{fitted}"
+        f"{legend}. Unstandardized estimates; lavaan, {med.method_text(fit)}; N = {fit.n}; 95% "
+        f"{med.intervals_text(fit)}.{centred}{covariates}{fitted}"
     )
 
 

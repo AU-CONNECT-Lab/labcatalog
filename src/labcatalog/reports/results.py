@@ -13,7 +13,14 @@ from labcatalog.stats.cfa import (
 )
 from labcatalog.stats.cfa import R as LAVAAN
 from labcatalog.stats.invariance import STEPS, InvarianceStep, InvarianceTest
-from labcatalog.stats.mediation import Effect, MediationFit, MediationModel, at_labels
+from labcatalog.stats.mediation import (
+    Effect,
+    MediationFit,
+    MediationModel,
+    at_labels,
+    intervals_text,
+    method_text,
+)
 from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
 from labcatalog.stats.multilevel import R as LME4
 
@@ -240,11 +247,7 @@ def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) ->
     x, m, y = model.x.label, model.m.label, model.y.label
     e, moderated = fit.effects, model.moderated
     w = model.moderators[0].variable.label if model.moderators else ""
-    how = (
-        "robust maximum likelihood (MLR) for its fit and maximum likelihood for its estimates"
-        if fit.estimator == MLR
-        else "maximum likelihood"
-    )
+    how = method_text(fit)
     moderator = f", with {w} as moderator" if w else ""
     sentences = [
         f"A mediation model of {x} on {y} through {m}{moderator} was fitted in lavaan with "
@@ -283,12 +286,7 @@ def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) ->
             sentences.append(f"The conditional {kind} effect was {series(parts)}.")
     if "index" in e:
         sentences.append(f"The index of moderated mediation was {estimate(e['index'], digits)}.")
-    resamples = (
-        f"{fit.resamples} of {fit.bootstrap}" if fit.resamples < fit.bootstrap else fit.bootstrap
-    )
-    sentences.append(
-        f"Confidence intervals are percentile bootstrap intervals from {resamples} resamples."
-    )
+    sentences.append(f"Confidence intervals are {intervals_text(fit)}.")
     if fit.fit.get("df"):
         sentences.append(
             f"The model gave {fit_indices({**fit.fit, 'p': fit.fit['pvalue']}, digits)}."

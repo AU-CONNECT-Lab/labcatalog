@@ -179,3 +179,20 @@ def test_the_table_names_each_effect_and_the_diagram_draws_the_moderator(setup):
     svg = mediation_view.diagram(model, fit)
     assert svg.count("stroke-dasharray") == 2 and "a = 1.00" in svg and "c′ = 2.00" in svg
     assert mediation_view.diagram(model_of(data), None).count("stroke-dasharray") == 0
+
+
+@needs_r
+def test_without_bootstrap_mlr_gives_wald_intervals_from_one_fit(setup):
+    result, sample, data = setup
+    model = model_of(data, ("a",), estimator=med.MLR, bootstrap=0)
+    code = med.mediation_code(model)
+    assert "bootstrap" not in code.r.split("model <- paste")[1] and 'estimator = "MLR"' in code.r
+    found, _ = script.run_code(result, sample, data.frame(), code, rscript())
+    fit = med.read_fit(found, model)
+    assert fit.resamples == 0 and fit.fit["df"] == 2
+    index = fit.effects["index"]
+    # Wald intervals are symmetric around the estimate.
+    assert index.estimate - index.low == pytest.approx(index.high - index.estimate)
+    assert med.intervals_text(fit) == "Wald intervals, by the delta method for the defined effects"
+    assert med.method_text(fit) == "robust maximum likelihood (MLR)"
+    assert "Confidence intervals are Wald intervals" in results.mediation_text(model, fit)
