@@ -422,7 +422,9 @@ def check_variable_maps(project: Project) -> list[Issue]:
             if entry.instrument not in expected:
                 stray_rows.setdefault(entry.instrument, []).append(entry.line)
                 continue
-            instrument = project.instruments[entry.instrument]
+            instrument = project.instruments.get(entry.instrument)
+            if instrument is None:
+                continue
             if entry.score_id is not None:
                 if entry.score_id not in {score.id for score in instrument.scores}:
                     issues.append(

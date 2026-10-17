@@ -35,6 +35,13 @@ def test_unknown_instrument_in_study(mock_project):
     assert "example_moood" in issues[0].message
 
 
+def test_deleted_instrument_still_in_study_and_maps(mock_project):
+    (mock_project / "instruments" / "example_parent_stress.yaml").unlink()
+    issues = run_validate(mock_project)
+    assert "unknown_reference" in codes(issues)
+    assert any("example_parent_stress" in i.message for i in issues)
+
+
 def test_methods_for_a_modality_outside_vocab(mock_project):
     edit(mock_project / "studies" / "mock_study.yaml", "  questionnaire: |", "  survey: |")
     [issue] = run_validate(mock_project)
