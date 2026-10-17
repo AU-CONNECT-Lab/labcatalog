@@ -1,7 +1,16 @@
 from labcatalog.reports import results
 from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import ANOVA, WELCH, Comparison, GroupStats
-from labcatalog.stats.cfa import IMPROPER, ONE_FACTOR, SUBSCALES, CfaFit
+from labcatalog.stats.cfa import (
+    GENERAL,
+    IMPROPER,
+    ML,
+    ONE_FACTOR,
+    SECOND_ORDER,
+    SUBSCALE_SCORES,
+    SUBSCALES,
+    CfaFit,
+)
 from labcatalog.stats.invariance import InvarianceStep, InvarianceTest
 from labcatalog.stats.multilevel import Fitted, Term, Variance
 
@@ -117,6 +126,39 @@ def test_cfa_reports_fit_loadings_and_omega():
     )
     one.fit = {**FIT, "rmsea_low": 0.0, "rmsea_high": 0.082}
     assert "RMSEA = .04, 90% CI [.00, .08]. Standardized" in results.cfa_text([one], LABELS)
+    general = CfaFit(
+        "mood",
+        "child_w1",
+        SECOND_ORDER,
+        {"sad": [], "worry": [], "total": []},
+        412,
+        FIT,
+        {(GENERAL, "sad"): 0.9, (GENERAL, "worry"): 0.7, (GENERAL, "total"): 0.8},
+        general_omega=0.81,
+    )
+    assert results.cfa_text([general], LABELS) == (
+        "A second-order model with a general factor over the subscales (Sadness, Worry and Total "
+        "score), fitted in lavaan with the WLSMV estimator and the items as ordered categories "
+        "(N = 412), gave χ²(24) = 31.24, p = .146, CFI = .98, TLI = .98, RMSEA = .04. With three "
+        "subscales, its fit equals that of the subscale model. Standardized loadings of the "
+        "subscales on the general factor ranged from .70 to .90. Hierarchical ω was .81."
+    )
+    sums = CfaFit(
+        "mood",
+        "child_w1",
+        SUBSCALE_SCORES,
+        {GENERAL: ["sad", "worry", "total"]},
+        420,
+        {"chisq": None, "df": 0.0},
+        general_omega=0.8,
+        estimator=ML,
+    )
+    assert results.cfa_text([sums], LABELS) == (
+        "A one-factor model of the subscale scores (Sadness, Worry and Total score), fitted in "
+        "lavaan with maximum likelihood and the subscale scores as continuous (N = 420), fits "
+        "exactly with three subscale scores, so it has no fit indices. ω of the summed subscale "
+        "scores was .80."
+    )
     two = CfaFit("mood", "child_w1", SUBSCALES, {"sad": [], "worry": []}, 412, problem=IMPROPER)
     assert results.cfa_text([two], LABELS).startswith(
         "A model with one factor for each subscale (Sadness and Worry) could not be used: improper"

@@ -5,10 +5,20 @@ from glob import glob
 import pandas as pd
 import pytest
 
-from labcatalog.data.scoring import score_items
+from labcatalog.data.scoring import compute_score, score_items
 from labcatalog.exceptions import RError
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats.cfa import ML, ONE_FACTOR, PYTHON, SUBSCALES, build_models, fit_models
+from labcatalog.stats.cfa import (
+    GENERAL,
+    ML,
+    ONE_FACTOR,
+    PYTHON,
+    SECOND_ORDER,
+    SUBSCALE_SCORES,
+    SUBSCALES,
+    build_models,
+    fit_models,
+)
 from labcatalog.stats.rbridge import CFA_PACKAGES, r_status
 
 
@@ -42,6 +52,17 @@ def test_subscales_share_a_model_and_the_total_gets_its_own(result):
     assert list(total.factors) == ["ems_total"]
     assert len(total.data.columns) == 9
     assert not any(m.instrument_id == "example_screen_time" for m in found.values())
+
+
+def test_three_subscales_add_a_second_order_and_a_subscale_scores_model(result):
+    found = {(m.instrument_id, m.dataset, m.kind): m for m in models_of(result)}
+    second = found[("example_mood", "child_w1", SECOND_ORDER)]
+    assert list(second.factors) == ["ems_sadness", "ems_worry", "ems_low_positive"]
+    sums = found[("example_mood", "child_w1", SUBSCALE_SCORES)]
+    assert sums.factors == {GENERAL: list(second.factors)} and not sums.ordered
+    score = next(s for s in result.catalog.scores if s.key == "example_mood.ems_worry@child_w1")
+    expected = compute_score(result.datasets["child_w1"], score)
+    assert sums.data["ems_worry"].equals(expected[sums.data.index])
 
 
 def test_model_data_are_the_reversed_items_of_people_who_answered_all(result):
@@ -108,6 +129,25 @@ def test_three_items_give_omega_but_no_fit_indices(result):
     [fit] = fit_models([mood], rscript())
     assert fit.fit == {"chisq": None, "df": 0.0}
     assert set(fit.omega) == {"ems_sadness"}
+
+
+@needs_r
+def test_general_factor_models_give_its_loadings_and_omega(result):
+    models = [
+        m for m in models_of(result) if (m.instrument_id, m.dataset) == ("example_mood", "child_w1")
+    ]
+    fits = {f.kind: f for f in fit_models(models, rscript())}
+    second, sums = fits[SECOND_ORDER], fits[SUBSCALE_SCORES]
+    # With three subscales the second-order model is the subscale model rewritten.
+    assert second.fit["chisq"] == pytest.approx(fits[SUBSCALES].fit["chisq"])
+    assert set(second.loadings) == {(GENERAL, s) for s in second.factors}
+    assert second.omega == {}
+    assert 0.5 < second.general_omega < fits[ONE_FACTOR].omega["ems_total"]
+    assert (sums.estimator, sums.fit) == (ML, {"chisq": None, "df": 0.0})
+    assert 0.5 < sums.general_omega < 1
+    in_python = {f.kind: f for f in fit_models(models, None)}
+    assert in_python[SECOND_ORDER].general_omega is None
+    assert in_python[SUBSCALE_SCORES].general_omega == pytest.approx(sums.general_omega, abs=1e-3)
 
 
 def test_models_fit_in_python_without_r(result):

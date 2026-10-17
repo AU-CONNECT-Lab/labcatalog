@@ -8,7 +8,14 @@ from labcatalog.issues import Issue
 from labcatalog.metadata.bibliography import citation
 from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats.cfa import ONE_FACTOR, SUBSCALES, CfaFit
+from labcatalog.stats.cfa import (
+    GENERAL,
+    ONE_FACTOR,
+    SECOND_ORDER,
+    SUBSCALE_SCORES,
+    SUBSCALES,
+    CfaFit,
+)
 from labcatalog.stats.invariance import InvarianceStep, InvarianceTest
 
 
@@ -182,6 +189,39 @@ def test_factor_tables_show_fit_loadings_and_omega(mock_project):
     assert sadness["s_ems_sadness"] == "0.81"
     assert rows[-1]["column"] == "ω" and rows[-1]["s_ems_sadness"] == "0.87"
     assert instruments.omegas(fits) == {"ems_sadness": 0.87}
+
+    names = list(subscales)
+    general = [
+        CfaFit(
+            "example_mood",
+            "child_w1",
+            SECOND_ORDER,
+            subscales,
+            110,
+            fit=fits[0].fit,
+            loadings={(GENERAL, s): 0.9 for s in names},
+            general_omega=0.82,
+        ),
+        CfaFit(
+            "example_mood",
+            "child_w1",
+            SUBSCALE_SCORES,
+            {GENERAL: names},
+            112,
+            fit={"chisq": None, "df": 0.0},
+            loadings={(GENERAL, names[0]): 0.85},
+            general_omega=0.8,
+        ),
+    ]
+    _, rows = instruments.fit_table(mood, general)
+    assert rows[0]["model"].startswith("Second order: Sadness")
+    assert rows[0]["problem"] == "3 subscales: the fit equals that of the subscale model"
+    assert rows[1]["model"].startswith("Subscale scores: Sadness")
+    assert rows[1]["problem"].startswith("3 subscales: the model fits exactly")
+    columns, rows = instruments.general_table(mood, general)
+    assert [c["label"] for c in columns] == ["Subscale", "Second order", "Subscale scores"]
+    assert (rows[0]["m0"], rows[0]["m1"], rows[1]["m1"]) == ("0.90", "0.85", "")
+    assert rows[-1] == {"score": "ω", "m0": "0.82", "m1": "0.80"}
 
 
 def test_invariance_table_shows_each_step_against_the_one_before():
