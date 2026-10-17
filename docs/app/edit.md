@@ -4,11 +4,21 @@ The Edit page edits the project's files: `labcatalog.yaml`, the instrument files
 
 ![The Edit page with labcatalog.yaml open](../images/app/edit.png)
 
-## Text mode
+## Form
 
-Every file opens as text. **Save** checks the file the same way loading the project does. If something is wrong, nothing is written, and each problem is listed under the editor with its line, which is also marked in the text. When the file is right, it is saved and the catalog reloads. **Reload from disk** throws away your changes.
+Every YAML file opens as a form: boxes to type in, lists to pick from and tick boxes, so nobody needs to know YAML. An instrument file shows **About** (name, abbreviation, kind, construct, description, instructions, default response set, license), **Response sets**, **Items**, **Scores**, **References** and, when the project declares instrument fields, **Custom fields**. A study file shows its **Administrations** and their **Overrides**; `labcatalog.yaml` shows its **Datasets**. The lists offer what the project already has: the response sets and items of the instrument, the instruments and datasets of the project, the studies, waves, reporters and modalities of `labcatalog.yaml`, and the keys in `references.bib`. Typing a value that is not offered is still allowed.
 
-## Table mode
+Each entry is one line; the button with the sliders opens its other fields, the arrows move it and the bin deletes it. **Add item**, **Add score** and the like add an entry at the end, numbered after the last one (`ems_10` after `ems_9`) and with the same response set as the entry above it. **Save** checks the file as below and lists any problem under the buttons; **Discard changes** goes back to the file as saved. A part of the file the form cannot show, such as item text written per language, says so and is left as it is.
+
+## Advanced: text and tables
+
+**Advanced** opens the file as text or as tables, and **Form** goes back. Column maps always open as text.
+
+### Text mode
+
+Every file can be edited as text. **Save** checks the file the same way loading the project does. If something is wrong, nothing is written, and each problem is listed under the editor with its line, which is also marked in the text. When the file is right, it is saved and the catalog reloads. **Reload from disk** throws away your changes.
+
+### Table mode
 
 Some parts of a file can also be edited as a table, chosen with the toggle above the editor:
 
