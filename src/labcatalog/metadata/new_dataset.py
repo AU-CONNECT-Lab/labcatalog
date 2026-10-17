@@ -46,8 +46,6 @@ class Blank:
     reporter: str
     id_column: str | None = None
     date_column: str | None = None
-    # Set for a folder of files: which files to count, with {id} where the path holds the ID.
-    files: str | None = None
 
 
 @dataclass
@@ -58,6 +56,8 @@ class Draft:
     wave: str
     snapshot_date: date
     blank: Blank | None = None
+    # Set for a folder of files: which files to count, with {id} where the path holds the ID.
+    files: str | None = None
 
 
 @dataclass
@@ -82,9 +82,12 @@ class Brought:
 
 
 def templates(project: Project) -> list[str]:
-    # Only datasets the wizard can repeat: one file, cleaned by at most one step that reads one file.
+    # Datasets the wizard can repeat: a folder, or one file cleaned by at most one step that reads one.
     usable = []
     for d in project.config.datasets:
+        if d.source == "folder":
+            usable.append(d.name)
+            continue
         try:
             placement_for(project, d.name, f"{d.name}_next", ".csv")
         except EditError:
@@ -99,7 +102,9 @@ def suggest(project: Project, template: str) -> Draft:
     name = template
     if old.wave.isdigit() and template.endswith(old.wave):
         name = template[: -len(old.wave)] + wave
-    return Draft(template, name, wave, date.today())
+    # A folder's files rule usually names the wave too, as in ses-1.
+    files = renamed(old.files, old.wave, wave) if old.source == "folder" else None
+    return Draft(template, name, wave, date.today(), files=files)
 
 
 def suggest_blank(project: Project, study: str) -> Draft:
@@ -110,7 +115,7 @@ def suggest_blank(project: Project, study: str) -> Draft:
 
 
 def is_folder(draft: Draft) -> bool:
-    return draft.blank is not None and draft.blank.files is not None
+    return draft.files is not None
 
 
 def folder_files(folder: Path) -> list[str]:
@@ -228,14 +233,14 @@ def dataset_config(project: Project, draft: Draft, placement: Placement) -> Data
             reporter=draft.blank.reporter,
             source="folder" if is_folder(draft) else "csv",
             path=placement.data_path,
-            files=draft.blank.files,
+            files=draft.files,
             id_column=own_id_column(project, draft.blank),
             date_column=draft.blank.date_column,
             snapshot_date=draft.snapshot_date,
         )
     old = dataset_by_name(project.config, draft.template)
     fields = old.model_dump(exclude=set(OWN_FILE))
-    fields.update(name=draft.name, wave=draft.wave, path=placement.data_path)
+    fields.update(name=draft.name, wave=draft.wave, path=placement.data_path, files=draft.files)
     fields.update(snapshot_date=draft.snapshot_date)
     return DatasetConfig(**fields)
 
@@ -322,7 +327,9 @@ def settings_change(project: Project, draft: Draft, placement: Placement) -> Cha
     if draft.blank is None:
         at = next(n for n, d in enumerate(datasets) if d["name"] == draft.template)
         for key, value in datasets[at].items():
-            if key not in OWN_FILE:
+            if key == "files" and is_folder(draft):
+                entry[key] = draft.files
+            elif key not in OWN_FILE:
                 entry[key] = value
         numeric = isinstance(entry.get("wave"), int)
     else:

@@ -144,7 +144,7 @@ def test_a_folder_of_files_is_read_in_place(project_root):
 
     draft = new_dataset.suggest_blank(project, "mock_study")
     draft.name, draft.blank.modality, draft.blank.reporter = "scans_w1", "fmri", "child"
-    draft.blank.files = rule
+    draft.files = rule
     new_dataset.check_draft(project, draft)
     placement = new_dataset.place(project, draft, project_root / "bids")
     assert (placement.copy_to, placement.data_path) == (None, "bids")
@@ -162,6 +162,35 @@ def test_a_folder_of_files_is_read_in_place(project_root):
     scans = load_datasets(after)["scans_w1"]
     assert scans.frame["files"].tolist() == ["2", "1"]
     assert not [i for i in validate_project(after) if "scans_w1" in i.message]
+
+
+def test_a_folder_dataset_is_repeated_for_the_next_wave(project_root):
+    test_a_folder_of_files_is_read_in_place(project_root)
+    for name in ["sub-2001C/ses-2/func/sub-2001C_task-rest_bold.nii.gz"]:
+        path = project_root / "bids" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+    project = load_project(project_root)
+    assert "scans_w1" in new_dataset.templates(project)
+    draft = new_dataset.suggest(project, "scans_w1")
+    assert (draft.name, draft.wave, draft.files) == (
+        "scans_w2",
+        "2",
+        "sub-{id}/ses-2/func/*_bold.nii.gz",
+    )
+    placement = new_dataset.place(project, draft, Path("bids"))
+    found = new_dataset.changes(project, draft, placement, [])
+    assert [c.path for c in found] == ["labcatalog.yaml"]
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    config = (project_root / "labcatalog.yaml").read_text(encoding="utf-8")
+    # The files rule keeps its place among the template's keys.
+    assert (
+        "  - {name: scans_w2, modality: fmri, study: mock_study, wave: 2, reporter: child, "
+        "source: folder, path: bids, files: 'sub-{id}/ses-2/func/*_bold.nii.gz', snapshot_date: "
+    ) in config
+    scans = load_datasets(load_project(project_root))["scans_w2"]
+    assert scans.frame["files"].tolist() == ["1"]
 
 
 def test_cancelling_removes_only_what_the_wizard_made(project_root, export):
