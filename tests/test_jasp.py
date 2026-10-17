@@ -11,7 +11,7 @@ import pytest
 
 from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats import analysis, cfa, group_invariance, invariance
+from labcatalog.stats import analysis, attrition, cfa, group_invariance, invariance
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import multilevel as ml
 from labcatalog.stats.rbridge import (
@@ -348,3 +348,118 @@ out <- list(b0 = table[1, "Estimate"], se0 = table[1, "Std. Error"], df0 = table
     assert (time.estimate, time.se, time.df, time.p) == pytest.approx(
         (jasp["b1"], jasp["se1"], jasp["df1"], jasp["p1"]), rel=1e-4
     )
+
+
+@pytest.mark.parametrize("engine", engines())
+def test_spearman_matches_jasp(result, sample, tmp_path, engine):
+    data = script.AnalysisData(result, sample)
+    x, y = data.score(EPS), data.score(EMS)
+    frame = data.frame()
+    code = script.correlation_code([x, y], "spearman")
+    found, _ = script.run_code(result, sample, frame, code, engine)
+    _, matrix = script.read_correlations(found, [x.column, y.column])
+    # jaspRegression: cor.test with its default exact = NULL.
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspRegression"],
+        f"""
+test <- suppressWarnings(cor.test(d[["{x.column}"]], d[["{y.column}"]], method = "spearman"))
+out <- list(r = test$estimate, p = test$p.value)
+""",
+        frame,
+    )
+    assert (matrix[1][0].r, matrix[1][0].p) == pytest.approx((jasp["r"], jasp["p"]), rel=1e-6)
+
+
+def test_item_rest_r_and_alpha_without_the_item_match_jasp(result, tmp_path):
+    summary = next(s for s in result.summary.scores if s.key == EMS)
+    score = next(s for s in result.catalog.scores if s.key == EMS)
+    items = score_items(result.datasets["child_w1"], score)
+    # jaspReliability: the item against the sum of the others, and alpha with its row and column
+    # taken out of the pairwise covariances.
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspReliability"],
+        """
+cc <- cov(d, use = "pairwise.complete.obs")
+out <- list()
+for (i in seq_len(ncol(d))) {
+  out[[paste0("alpha", i)]] <- Bayesrel:::applyalpha(cc[-i, -i])
+  out[[paste0("r", i)]] <- cor(d[, i], rowSums(as.matrix(d[, -i]), na.rm = TRUE),
+                               use = "pairwise.complete.obs")
+}
+""",
+        items,
+    )
+    assert [t.column for t in summary.item_total] == list(items.columns)
+    for i, total in enumerate(summary.item_total, 1):
+        assert (total.r, total.alpha_if_deleted) == pytest.approx(
+            (jasp[f"r{i}"], jasp[f"alpha{i}"]), rel=1e-10
+        )
+
+
+@pytest.mark.parametrize("engine", engines())
+def test_attrition_chi_square_matches_jasp(result, tmp_path, engine):
+    plan = attrition.plan(result, "mock_study", "1", ["item:example_demographics.dem_gender"])
+    found, _ = script.run_code(result, plan.sample, plan.frame, plan.code, engine)
+    [gender] = attrition.read(found, plan.labels)
+    column = next(c for c in plan.frame.columns if c.startswith("dem_gender"))
+    # jaspFrequencies: the chi-square row of Contingency Tables, without continuity correction.
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspFrequencies"],
+        f"""
+test <- chisq.test(table(d[["{column}"]], d[["{attrition.RETURNED}"]]), correct = FALSE)
+out <- list(chi = test$statistic, df = test$parameter, p = test$p.value)
+""",
+        plan.frame,
+    )
+    assert (gender.test.statistic, gender.test.df, gender.test.p) == pytest.approx(
+        (jasp["chi"], jasp["df"], jasp["p"]), rel=1e-6
+    )
+
+
+@pytest.mark.parametrize("engine", engines())
+def test_table_one_matches_jasp_descriptives(result, sample, tmp_path, engine):
+    data = script.AnalysisData(result, sample)
+    rows = script.measure_variables(data, script.default_measures(result, sample.datasets), True)
+    code = script.table_one_code(sample.datasets, rows)
+    frame = data.frame()
+    found, _ = script.run_code(result, sample, frame, code, engine)
+    table = found["table1"]
+    variables = [v for _, vs in rows for v in vs]
+    numbers = [v for v in variables if v.kind != script.CHOICE]
+    choices = [v for v in variables if v.kind == script.CHOICE]
+    # Descriptives and Frequencies: mean, sd and valid n, and the percent of those who answered;
+    # alpha as in jaspReliability.
+    lines = ["out <- list()"]
+    for i, v in enumerate(numbers):
+        lines.append(
+            f'x <- d[["{v.column}"]]; out[["n{i}"]] <- sum(!is.na(x)); '
+            f'out[["mean{i}"]] <- mean(x, na.rm = TRUE); out[["sd{i}"]] <- sd(x, na.rm = TRUE)'
+        )
+        if v.items:
+            columns = ", ".join(f'"{c}"' for c in v.items)
+            lines.append(
+                f'out[["alpha{i}"]] <- Bayesrel:::applyalpha(cov(d[c({columns})], '
+                'use = "pairwise.complete.obs"))'
+            )
+    for i, v in enumerate(choices):
+        for j, (value, _) in enumerate(v.options):
+            lines.append(
+                f'x <- d[["{v.column}"]]; '
+                f'out[["share{i}_{j}"]] <- 100 * sum(x == {value}, na.rm = TRUE) / sum(!is.na(x))'
+            )
+    jasp = in_jasp(tmp_path, ["jaspReliability"], "\n".join(lines), frame)
+    assert numbers and choices
+    for i, v in enumerate(numbers):
+        [row] = table[(table["variable"] == v.label) & (table["dataset"] == v.dataset)].itertuples()
+        assert (row.n, row.mean, row.sd) == pytest.approx(
+            (jasp[f"n{i}"], jasp[f"mean{i}"], jasp[f"sd{i}"]), rel=1e-10
+        ), v.label
+        if v.items:
+            assert row.alpha == pytest.approx(jasp[f"alpha{i}"], rel=1e-8), v.label
+    for i, v in enumerate(choices):
+        shown = table[(table["variable"] == v.label) & (table["dataset"] == v.dataset)]
+        expected = [jasp[f"share{i}_{j}"] for j in range(len(v.options))]
+        assert shown["percent"].tolist() == pytest.approx(expected, rel=1e-10), v.label
