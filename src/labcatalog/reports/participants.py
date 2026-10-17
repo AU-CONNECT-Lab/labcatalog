@@ -30,18 +30,26 @@ def placeholder_values(project: Project, summary: Summary, study: str) -> dict[s
     else:
         collected = f"Data were collected in {number(len(waves))} waves: {series(described)}."
     groups = {g.wave: g for g in summary.groups if g.study == study}
+    # With one reporter, naming it adds nothing ("30 self respondents").
+    named = len({r.reporter for r in rows}) > 1
     return {
         "study": config.label or study,
         "n_waves": number(len(waves)),
         "waves": collected,
         "counts": " ".join(
-            counts(wave, [r for r in rows if r.wave == wave], groups.get(wave), summary.group_name)
+            counts(
+                wave,
+                [r for r in rows if r.wave == wave],
+                groups.get(wave),
+                summary.group_name,
+                named,
+            )
             for wave in waves
         ),
         "retention": " ".join(
-            returned(waves[i - 1], wave, rows) for i, wave in enumerate(waves) if i
+            returned(waves[i - 1], wave, rows, named) for i, wave in enumerate(waves) if i
         ),
-        "modalities": modalities(summary, study, project.config.vocab),
+        "modalities": modalities(summary, study, project.config.vocab, named),
     }
 
 
@@ -67,7 +75,7 @@ def wave_totals(summary: Summary, study: str) -> dict[tuple[str, str], int]:
     return {(r.wave, r.reporter): r.n for r in summary.retention if r.study == study}
 
 
-def modalities(summary: Summary, study: str, vocab: Vocab) -> str:
+def modalities(summary: Summary, study: str, vocab: Vocab, named: bool) -> str:
     totals = wave_totals(summary, study)
     sentences = []
     for modality, reporter, counted in modality_rows(summary, study):
@@ -77,7 +85,7 @@ def modalities(summary: Summary, study: str, vocab: Vocab) -> str:
         parts = []
         for i, m in enumerate(counted):
             total = totals[(m.wave, reporter)]
-            who = f" {reporter} respondents" if i == 0 else ""
+            who = f" {respondents(reporter, named)}" if i == 0 else ""
             parts.append(
                 f"{number(m.n)} of {number(total)}{who} at Wave {m.wave}{share(m.n, total)}"
             )
@@ -86,8 +94,18 @@ def modalities(summary: Summary, study: str, vocab: Vocab) -> str:
     return " ".join(sentences)
 
 
-def counts(wave: str, rows: list[WaveRetention], groups, group_name: str | None) -> str:
-    text = f"At Wave {wave}, {series([f'{number(r.n)} {r.reporter}' for r in rows])} respondents"
+def respondents(reporter: str, named: bool) -> str:
+    return f"{reporter} respondents" if named else "respondents"
+
+
+def counted(n: int, reporter: str, named: bool) -> str:
+    return f"{number(n)} {reporter}" if named else number(n)
+
+
+def counts(
+    wave: str, rows: list[WaveRetention], groups, group_name: str | None, named: bool
+) -> str:
+    text = f"At Wave {wave}, {series([counted(r.n, r.reporter, named) for r in rows])} respondents"
     if groups is not None and group_name:
         text += (
             f" from {number(groups.groups)} {group_name} groups "
@@ -96,17 +114,17 @@ def counts(wave: str, rows: list[WaveRetention], groups, group_name: str | None)
     return f"{text} took part."
 
 
-def returned(previous: str, wave: str, rows: list[WaveRetention]) -> str:
+def returned(previous: str, wave: str, rows: list[WaveRetention], named: bool) -> str:
     before = {r.reporter: r.n for r in rows if r.wave == previous}
     now = [r for r in rows if r.wave == wave and before.get(r.reporter)]
     if not now:
         return ""
     again = [
-        f"{number(r.n_from_previous)} of {number(before[r.reporter])} {r.reporter} respondents "
+        f"{number(r.n_from_previous)} of {number(before[r.reporter])} {respondents(r.reporter, named)} "
         f"({round(100 * r.n_from_previous / before[r.reporter])}%)"
         for r in now
     ]
-    new = [f"{number(r.n_new)} {r.reporter}" for r in now]
+    new = [counted(r.n_new, r.reporter, named) for r in now]
     return (
         f"At Wave {wave}, {series(again)} from Wave {previous} took part again; "
         f"{series(new)} respondents were new."

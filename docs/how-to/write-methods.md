@@ -44,4 +44,6 @@ An instrument can have its own `measures` template, and a study its own `partici
 | `measures` | `name`, `abbreviation`, `cite`, `named`, `construct`, `reporter`, `n_items`, `scale`, `description`, `items`, `reverse`, `scoring`, `alpha`, `omega` |
 | `participants` | `study`, `n_waves`, `waves`, `counts`, `retention`, `modalities` |
 
+`counts`, `retention` and `modalities` name each reporter ("191 parent and 182 child respondents"); in a study with one reporter they leave the word out ("30 respondents").
+
 `labcatalog validate` reports a placeholder it does not know.

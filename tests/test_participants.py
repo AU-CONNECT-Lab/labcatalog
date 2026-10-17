@@ -81,3 +81,20 @@ def test_retention_table_shows_who_came_back(mock_project):
     assert labels[-2:] == ["Family groups", "With every reporter"]
     assert (rows[0]["n_parent"], rows[0]["back_parent"]) == (191, "")
     assert rows[1]["back_parent"] == "155 (81%)"
+
+
+def test_one_reporter_is_not_named_in_the_paragraph(mock_project):
+    result = run_catalog(mock_project)
+    summary = result.summary
+    children = summary.model_copy(
+        update={
+            "retention": [r for r in summary.retention if r.reporter == "child"],
+            "modalities": [m for m in summary.modalities if m.reporter == "child"],
+            "groups": [],
+        }
+    )
+    text = participants.paragraph(result.project, children, "mock_study")
+    assert "At Wave 1, 182 respondents took part." in text
+    assert "At Wave 2, 143 of 182 respondents (79%) from Wave 1 took part again" in text
+    assert "15 respondents were new" in text
+    assert "131 of 182 respondents at Wave 1" in text and "child" not in text
