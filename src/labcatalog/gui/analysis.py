@@ -17,6 +17,14 @@ from labcatalog.stats import multilevel as ml
 
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
 STARS_NOTE = "*p < .05. **p < .01. ***p < .001."
+PARTS = {
+    "correlation": "Correlation table",
+    "regression": "Regression",
+    "groups": "Group comparison",
+    "invariance": "Invariance",
+    "multilevel": "Multilevel model",
+    "script": "Script",
+}
 
 
 @dataclass
@@ -36,6 +44,7 @@ class AnalysisView:
     invariance_estimator: str | None = None
     # The instruments whose variables the page offers; None until first shown, then all.
     instruments: list[str] | None = None
+    part: str = "correlation"
 
 
 def variables(view: AnalysisView) -> Callable[[CatalogResult, list[str]], dict[str, str]]:
@@ -61,44 +70,61 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
 
     counted: dict[str, ui.label] = {}
 
-    @ui.refreshable
-    def tools() -> None:
+    def recount() -> analysis.Sample:
         sample = analysis.build_sample(result, view.datasets, view.intersect)
         where = "in every selected dataset" if view.intersect else "in any selected dataset"
         counted["label"].set_text(sample_text(result, sample, where))
+        return sample
+
+    # Only the shown part is built, so a change of sample recomputes one analysis.
+    @ui.refreshable
+    def section() -> None:
+        sample = recount()
+        if view.part == "multilevel":
+            multilevel.render(result, view)
+            return
         choices = variables(view)(result, view.datasets)
-        if len(choices) < 2:
-            with panel("Correlation table"):
+        if view.part in ("correlation", "regression") and len(choices) < 2:
+            with panel(PARTS[view.part]):
                 note(
                     "Pick datasets and measures with at least two scores or numbers between "
                     "them for correlations."
                 )
-        else:
+        elif view.part == "correlation":
             correlation_section(result, sample, view, choices)
+        elif view.part == "regression":
             pair_section(result, sample, view, choices)
-        analysis_tables.group_section(result, sample, view, choices)
-        group_invariance.render(result, sample, view)
-        analysis_tables.script_section(result, sample, view, choices)
+        elif view.part == "groups":
+            analysis_tables.group_section(result, sample, view, choices)
+        elif view.part == "invariance":
+            group_invariance.render(result, sample, view)
+        else:
+            analysis_tables.script_section(result, sample, view, choices)
+
+    def sample_changed() -> None:
+        # The multilevel model picks its own waves and people, so the sample does not refit it.
+        if view.part == "multilevel":
+            recount()
+        else:
+            section.refresh()
 
     def set_datasets(value: list[str]) -> None:
         view.datasets = [n for n in names if n in value]
         sidebar.refresh()
-        tools.refresh()
+        sample_changed()
 
     def set_intersect(value: bool) -> None:
         view.intersect = value
-        tools.refresh()
+        sample_changed()
 
     def set_instruments(value: list[str]) -> None:
         view.instruments = [i for i in measures if i in value]
         sidebar.refresh()
-        tools.refresh()
-        models.refresh()
+        section.refresh()
 
-    # Its own waves and people, so changing the sample does not refit it.
-    @ui.refreshable
-    def models() -> None:
-        multilevel.render(result, view)
+    def pick(part: str) -> None:
+        view.part = part
+        section.refresh()
 
     @ui.refreshable
     def sidebar() -> None:
@@ -119,8 +145,14 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         with ui.column().classes("w-72 shrink-0 lc-sticky"):
             sidebar()
         with ui.column().classes("grow min-w-0 gap-4"):
-            tools()
-            models()
+            with (
+                ui.tabs(value=view.part, on_change=lambda e: pick(e.value))
+                .props("dense no-caps align=left")
+                .classes("lc-subnav w-full")
+            ):
+                for name, label in PARTS.items():
+                    ui.tab(name, label=label)
+            section()
 
 
 def ticks(

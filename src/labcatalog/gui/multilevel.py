@@ -50,7 +50,7 @@ def render(result: CatalogResult, view) -> None:
         note(
             "Waves within people, people within groups, or both, fitted the way JASP's linear "
             "mixed models are. This section picks its own waves and keeps everyone with at least "
-            "one; the Sample above does not apply."
+            "one; the Sample on the left does not apply."
         )
 
         @ui.refreshable

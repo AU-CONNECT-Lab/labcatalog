@@ -382,7 +382,7 @@ def script_section(
         holder.clear()
         with holder:
             if found is None:
-                note("Nothing above to write a script for yet.")
+                note("Nothing on the other tabs to write a script for yet.")
                 return
             r_text, python_text, frame = found
             texts = {
@@ -395,7 +395,7 @@ def script_section(
 
     with panel(
         "Script",
-        "The tables above as one R script and one Python script, for the choices made when "
+        "The tables on the other tabs as one R script and one Python script, for the choices made when "
         f"you press the button. Saving puts the data beside them as {script.DATA_FILE}, "
         "so either script runs in that folder.",
     ) as tools:

@@ -1,12 +1,12 @@
 # Analysis
 
-The Analysis page runs the analyses most papers need on the datasets you choose: a correlation table, regressions, a group comparison and a multilevel model. Each result is a table ready for a manuscript, with a chart, a **Copy table** button, **Save to outputs**, and a **Code** section with the R and Python code that reproduces it. A note under each result says whether it was computed in R or in Python. The correlation table, the regressions and the group comparison also write a **Results paragraph** in APA style, with a **Copy text** button: the significant correlations (each pair when there are three or fewer, otherwise the five strongest), each predictor's *b*, *SE*, *p* and *R*², or the groups' means with the test and its effect size. Significance is *p* < .05, and the numbers have the decimal places set on the Settings page. With a language model set up (see [Set Up R and Language Models](../how-to/r-and-models.md)), **Interpret with the language model** under any Results paragraph, here or on an instrument's page, asks the model for a short interpretation of the result and a list of things to check. It sends the tables and the paragraph, never any data, and its answer is a draft to check against the tables.
+The Analysis page runs the analyses most papers need on the datasets you choose: a correlation table, regressions, a group comparison and a multilevel model, each on its own tab beside the Sample. Each result is a table ready for a manuscript, with a chart, a **Copy table** button, **Save to outputs**, and a **Code** section with the R and Python code that reproduces it. A note under each result says whether it was computed in R or in Python. The correlation table, the regressions and the group comparison also write a **Results paragraph** in APA style, with a **Copy text** button: the significant correlations (each pair when there are three or fewer, otherwise the five strongest), each predictor's *b*, *SE*, *p* and *R*², or the groups' means with the test and its effect size. Significance is *p* < .05, and the numbers have the decimal places set on the Settings page. With a language model set up (see [Set Up R and Language Models](../how-to/r-and-models.md)), **Interpret with the language model** under any Results paragraph, here or on an instrument's page, asks the model for a short interpretation of the result and a list of things to check. It sends the tables and the paragraph, never any data, and its answer is a draft to check against the tables.
 
 ![The Analysis page with a correlation table](../images/app/analysis.png)
 
 ## Sample
 
-The choices here apply to every section of the page except the multilevel model.
+The Sample on the left applies to every tab except the multilevel model.
 
 - **Datasets**: the data files to analyze. By default, every dataset of the first wave of the first study.
 - **Only people in every selected dataset**: on (the default) keeps the people who are in all of them; off keeps everyone in any of them.
@@ -32,15 +32,15 @@ Choose the **Groups**, an answer-option item of a demographics instrument, and t
 
 ## Measurement invariance across groups
 
-Choose an **Instrument** in one of the chosen datasets and the **Groups**, an answer-option item of a demographics instrument, then press **Test**. labcatalog fits a multigroup factor model in R with one group per answer and tests configural, threshold (for ordered items), metric and scalar invariance, the same steps as across waves on the instrument page. The grouping item may be in another dataset, such as the child's gender reported by the parent; people are matched as in the Sample above. A group needs more people than the model has items, and smaller groups are left out and named. **Which items differ** and **Save and rerun** work as on the instrument page, with the freed items stored for this grouping item.
+Choose an **Instrument** in one of the chosen datasets and the **Groups**, an answer-option item of a demographics instrument, then press **Test**. labcatalog fits a multigroup factor model in R with one group per answer and tests configural, threshold (for ordered items), metric and scalar invariance, the same steps as across waves on the instrument page. The grouping item may be in another dataset, such as the child's gender reported by the parent; people are matched as in the Sample. A group needs more people than the model has items, and smaller groups are left out and named. **Which items differ** and **Save and rerun** work as on the instrument page, with the freed items stored for this grouping item.
 
 ## Script
 
-**Write script** writes the correlations, regression and group comparison above, as currently chosen, as one R script and one Python script. **Save to outputs** saves them with the data as `analysis_data.csv`, so either script runs in that folder.
+**Write script** writes the correlations, regression and group comparison, as currently chosen on their tabs, as one R script and one Python script. **Save to outputs** saves them with the data as `analysis_data.csv`, so either script runs in that folder.
 
 ## Multilevel model
 
-A linear mixed model of one outcome across waves. This section picks its own waves and keeps everyone with at least one; the Sample above does not apply, except for **Measures**.
+A linear mixed model of one outcome across waves. This section picks its own waves and keeps everyone with at least one; the Sample does not apply, except for **Measures**.
 
 - **Outcome**: a score or number item. By default, the first total score measured in two or more waves.
 - **Waves**: the datasets that hold the outcome, one per wave, from one study. By default, all of them.
