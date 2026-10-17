@@ -8,7 +8,7 @@ It works with questionnaires and with features from other modalities (EEG, fMRI,
 
 ## How it works
 
-![Your data, prepared by your own scripts, described in plain files and checked, then browsed, analyzed and written up](docs/images/workflow.svg)
+![Your data, prepared by your own scripts, described in plain files and checked, then browsed, analyzed and written up](docs/images/workflow.png)
 
 Each step has its own page in the window, so the whole loop runs without a terminal. The files stay plain YAML and CSV in your project folder, readable and versioned like any other code.
 
