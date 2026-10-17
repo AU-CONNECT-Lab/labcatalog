@@ -78,12 +78,11 @@ def later(fill: Callable) -> ui.column:
 
 
 def placeholder() -> None:
-    # The rough shape of a chart beside a table, shown while the numbers are computed.
-    with ui.row().classes("w-full no-wrap items-start gap-6"):
-        ui.skeleton(height="200px").classes("grow")
-        with ui.column().classes("grow gap-2"):
-            for width in ("55%", "100%", "100%", "85%", "100%", "70%"):
-                ui.skeleton("text", width=width)
+    # The rough shape of a chart above a table, shown while the numbers are computed.
+    with ui.column().classes("w-full gap-2"):
+        ui.skeleton(height="200px").classes("w-full")
+        for width in ("55%", "100%", "100%", "85%", "100%", "70%"):
+            ui.skeleton("text", width=width)
 
 
 def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> None:
@@ -240,12 +239,9 @@ def group_section(
             }
 
             def content() -> None:
-                with ui.row().classes("w-full gap-6 items-start"):
-                    with charts.figure_column(fig):
-                        drawn = paper.Chart(charts.show(fig), fig)
-                    with charts.rest_column():
-                        for shown in papers.values():
-                            paper.paper_table(shown)
+                drawn = paper.Chart(charts.show(fig), fig)
+                for shown in papers.values():
+                    paper.paper_table(shown)
                 paper.result_actions(result, "groups", papers, drawn, texts, engine)
                 code_view(texts)
 

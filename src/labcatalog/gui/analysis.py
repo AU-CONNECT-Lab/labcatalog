@@ -185,7 +185,8 @@ def sample_text(result: CatalogResult, sample: analysis.Sample, where: str) -> s
 def correlation_section(
     result: CatalogResult, sample: analysis.Sample, view: AnalysisView, choices: dict[str, str]
 ) -> None:
-    view.scores = [k for k in view.scores if k in choices] or default_totals(result, view, choices)
+    scores = [k for k in choices if not k.startswith(analysis.ITEM_PREFIX)]
+    view.scores = [k for k in view.scores if k in choices] or scores
 
     @ui.refreshable
     def body() -> None:
@@ -238,10 +239,8 @@ def correlation_section(
             )
 
             def content() -> None:
-                with ui.row().classes("w-full gap-6 items-start"):
-                    chart()
-                    with charts.rest_column():
-                        paper_table(shown)
+                chart()
+                paper_table(shown)
                 result_actions(
                     result, "correlations", {"correlations": shown}, drawn, texts, engine
                 )

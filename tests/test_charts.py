@@ -117,7 +117,7 @@ def test_item_heatmap_and_table_keep_the_item_order_below_the_diagonal(result):
     items, z, _ = views.item_correlations(result, "example_mood", first)
     assert items == [f"ems_{k}" for k in range(1, 10)]
     grid = views.item_grid(result, "example_mood", first).data[0]
-    assert list(grid.x) == [str(k) for k in range(1, 9)]
+    assert list(grid.x) == [f"{k}. ems_{k}" for k in range(1, 9)]
     assert list(grid.y) == [f"{k}. ems_{k}" for k in range(2, 10)]
     assert grid.z[0][0] == pytest.approx(z[1, 0])
     assert all(v is None for k, row in enumerate(grid.z) for v in row[k + 1 :])

@@ -18,9 +18,9 @@ The variable lists hold every score and number item of the chosen measures in th
 
 ## Correlation table
 
-Choose the **Variables**; by default, the total score of each instrument. The **Select** menu adds all variables, all of one wave or all of one modality.
+Choose the **Variables**; by default, every score of the chosen measures, without the number items. The **Select** menu adds all variables, all of one wave or all of one modality.
 
-The table lists each variable's *n*, *M* and *SD* and the correlation of every pair, with stars for *p* < .05, .01 and .001. Each pair uses everyone with both values. The coefficient is Pearson's *r*, or Spearman's ρ when `stats.correlation` is `spearman`. With three or more variables, a chart beside the table shows the correlations as a **Heatmap** or as **Dots**.
+The table lists each variable's *n*, *M* and *SD* and the correlation of every pair, with stars for *p* < .05, .01 and .001. Each pair uses everyone with both values. The coefficient is Pearson's *r*, or Spearman's ρ when `stats.correlation` is `spearman`. With three or more variables, a chart above the table shows the correlations as a **Heatmap** or as **Dots**.
 
 ## Regression
 

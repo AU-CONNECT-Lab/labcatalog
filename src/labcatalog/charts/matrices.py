@@ -14,6 +14,8 @@ from labcatalog.charts.style import (
 
 COLORBAR_TICKS = [-1, -0.5, 0, 0.5, 1]
 LABEL_CHAR = 5.4
+# Column labels slant this way, so long names fit below narrow cells.
+COLUMN_ANGLE = -45
 MIN_CELL, MAX_CELL = 18, 40
 # Pixels the cells share before they reach their minimum size.
 CELL_ROOM = 360
@@ -54,7 +56,7 @@ def heatmap(
                 [float(z[i, j]) if j < i and np.isfinite(z[i, j]) else None for j in cols]
                 for i in rows
             ],
-            x=[str(j + 1) for j in cols],
+            x=[names[j] for j in cols],
             y=[names[i] for i in rows],
             text=[[hover[i][j] if j < i else "" for j in cols] for i in rows],
             hovertemplate="%{text}<extra></extra>",
@@ -80,7 +82,7 @@ def heatmap(
         ticks="",
         tickfont=dict(size=11, color=LABEL_INK),
     )
-    fig.update_xaxes(constrain="domain", **ticks)
+    fig.update_xaxes(constrain="domain", tickangle=COLUMN_ANGLE, **ticks)
     fig.update_yaxes(
         autorange="reversed",
         scaleanchor="x",
@@ -90,12 +92,14 @@ def heatmap(
         **ticks,
     )
     left = int(LABEL_CHAR * max(len(names[i]) for i in rows)) + 16
+    # A label at 45 degrees drops about 0.71 of its length.
+    bottom = int(0.71 * LABEL_CHAR * max(len(names[j]) for j in cols)) + 24
     side = int(cell * len(cols))
     return base_layout(
         fig,
-        side + 60,
+        side + 20 + bottom,
         width=left + side + COLORBAR_ROOM,
-        margin=dict(l=left, r=COLORBAR_ROOM, t=20, b=40),
+        margin=dict(l=left, r=COLORBAR_ROOM, t=20, b=bottom),
     )
 
 
