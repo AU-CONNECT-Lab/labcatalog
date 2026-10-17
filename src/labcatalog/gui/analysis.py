@@ -6,7 +6,14 @@ from nicegui import ui
 
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import analysis_tables, charts, common, group_invariance, multilevel
+from labcatalog.gui import (
+    analysis_tables,
+    charts,
+    common,
+    group_invariance,
+    mediation,
+    multilevel,
+)
 from labcatalog.gui.common import apa, col, empty, fmt, note, p_value, panel
 from labcatalog.gui.paper import Chart, paper_table, result_actions, results_text
 from labcatalog.pipeline import CatalogResult
@@ -22,6 +29,7 @@ PARTS = {
     "regression": "Regression",
     "groups": "Group comparison",
     "invariance": "Invariance",
+    "mediation": "Mediation",
     "multilevel": "Multilevel model",
     "script": "Script",
 }
@@ -42,6 +50,7 @@ class AnalysisView:
     invariance_group: str | None = None
     # None keeps the project's stats.cfa_estimator.
     invariance_estimator: str | None = None
+    mediation: mediation.Choices = field(default_factory=mediation.Choices)
     # The instruments whose variables the page offers; None until first shown, then all.
     instruments: list[str] | None = None
     part: str = "correlation"
@@ -98,6 +107,13 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
             analysis_tables.group_section(result, sample, view, choices)
         elif view.part == "invariance":
             group_invariance.render(result, sample, view)
+        elif view.part == "mediation":
+            if len(choices) < 3:
+                with panel(PARTS[view.part]):
+                    note("Pick datasets and measures with at least three scores or numbers.")
+            else:
+                totals = default_totals(result, view, choices)
+                mediation.render(result, sample, view.mediation, choices, totals)
         else:
             analysis_tables.script_section(result, sample, view, choices)
 

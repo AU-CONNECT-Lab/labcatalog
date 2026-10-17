@@ -9,6 +9,7 @@ from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import common, datalad, example, preferences, theme
 from labcatalog.gui.common import command, computed, note, panel, path_input, show_status
 from labcatalog.llm import KEY_ENV, PROVIDERS
+from labcatalog.stats.mediation import DEFAULT_WORKERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
 
 RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
@@ -55,6 +56,15 @@ def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
             button = ui.button("Save and check")
         status = ui.label()
         status.visible = False
+        ui.select(
+            {n: str(n) for n in range(1, 9)},
+            value=int(preferences.load().get(preferences.BOOTSTRAP_WORKERS, DEFAULT_WORKERS)),
+            label="R processes for bootstrap resamples (mediation)",
+            on_change=lambda e: preferences.save({preferences.BOOTSTRAP_WORKERS: e.value}),
+        ).props("outlined dense").classes("w-96 mt-2").tooltip(
+            "More processes finish sooner; the resamples drawn differ with the number, so the "
+            "intervals can move in the last digit"
+        )
 
         async def save() -> None:
             # Windows' "Copy as path" wraps the path in quotes.

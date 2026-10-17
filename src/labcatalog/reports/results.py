@@ -13,6 +13,7 @@ from labcatalog.stats.cfa import (
 )
 from labcatalog.stats.cfa import R as LAVAAN
 from labcatalog.stats.invariance import STEPS, InvarianceStep, InvarianceTest
+from labcatalog.stats.mediation import Effect, MediationFit, MediationModel, at_labels
 from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
 from labcatalog.stats.multilevel import R as LME4
 
@@ -233,6 +234,73 @@ def fit_indices(values: dict[str, float | None], digits: int) -> str:
         rmsea = parts.index(f"RMSEA = {bounded(values['rmsea'], digits)}")
         parts.insert(rmsea + 1, f"90% CI [{low}, {high}]")
     return ", ".join(parts)
+
+
+def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) -> str:
+    x, m, y = model.x.label, model.m.label, model.y.label
+    e, moderated = fit.effects, model.moderated
+    w = model.moderators[0].variable.label if model.moderators else ""
+    how = (
+        "robust maximum likelihood (MLR) for its fit and maximum likelihood for its estimates"
+        if fit.estimator == MLR
+        else "maximum likelihood"
+    )
+    moderator = f", with {w} as moderator" if w else ""
+    sentences = [
+        f"A mediation model of {x} on {y} through {m}{moderator} was fitted in lavaan with "
+        f"{how} (N = {fit.n})."
+    ]
+
+    def path(key: str, symbol: str) -> str:
+        where = " at the mean of the moderator" if key in moderated else ""
+        return f"{symbol} = {estimate(e[key], digits)}{where}"
+
+    sentences.append(
+        f"The path from {x} to {m} was {path('a', 'a')}, and the path from {m} to {y}, with {x} "
+        f"held constant, was {path('b', 'b')}."
+    )
+    names = {"a_xw": f"{x} × {w} on {m}", "b_mw": f"{m} × {w} on {y}", "c_xw": f"{x} × {w} on {y}"}
+    parts = [f"{name}, {estimate(e[key], digits)}" for key, name in names.items() if key in e]
+    if parts:
+        word = "interaction was" if len(parts) == 1 else "interactions were"
+        sentences.append(f"The {word} {series(parts)}.")
+    direct = f"the direct effect was {path('c', 'c′')}"
+    if "indirect" in e:
+        total = f"; the total effect was c = {estimate(e['total'], digits)}" if "total" in e else ""
+        sentences.append(
+            f"The indirect effect through {m} was ab = {estimate(e['indirect'], digits)}, and "
+            f"{direct}{total}."
+        )
+    else:
+        sentences.append(f"{opening_case(direct)}.")
+    places = at_labels(model, fit)
+    for kind in ("indirect", "direct"):
+        found = [e.get(f"{kind}_{k}") for k in range(1, len(places) + 1)]
+        if places and all(found):
+            parts = [
+                f"{estimate(f, digits)} at {place}" for f, place in zip(found, places, strict=True)
+            ]
+            sentences.append(f"The conditional {kind} effect was {series(parts)}.")
+    if "index" in e:
+        sentences.append(f"The index of moderated mediation was {estimate(e['index'], digits)}.")
+    resamples = (
+        f"{fit.resamples} of {fit.bootstrap}" if fit.resamples < fit.bootstrap else fit.bootstrap
+    )
+    sentences.append(
+        f"Confidence intervals are percentile bootstrap intervals from {resamples} resamples."
+    )
+    if fit.fit.get("df"):
+        sentences.append(
+            f"The model gave {fit_indices({**fit.fit, 'p': fit.fit['pvalue']}, digits)}."
+        )
+    return " ".join(sentences)
+
+
+def estimate(effect: Effect, digits: int) -> str:
+    if effect.low is None:
+        return number(effect.estimate, digits)
+    low, high = number(effect.low, digits), number(effect.high, digits)
+    return f"{number(effect.estimate, digits)}, 95% CI [{low}, {high}]"
 
 
 def invariance_text(

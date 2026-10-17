@@ -12,6 +12,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 | Confirmatory factor analysis, ω | lavaan, semTools | semopy |
 | Measurement invariance across waves, reporters and groups, score tests | lavaan, semTools | not available |
 | Multilevel models | lme4, lmerTest, performance | statsmodels |
+| Mediation, with an optional moderator | lavaan | not available |
 
 ## Settings that change the numbers
 
