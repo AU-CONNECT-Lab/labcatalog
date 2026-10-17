@@ -16,7 +16,9 @@ from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
 from labcatalog.metadata.changes import Change
 from labcatalog.metadata.varmap import MAP_COLUMNS
+from labcatalog.paths import portable_path
 from labcatalog.project import Project
+from labcatalog.sources.folder_source import ID, file_pattern
 
 # Fields of the template that describe its own file, so a new dataset does not take them over.
 OWN_FILE = ("url", "table", "files")
@@ -29,6 +31,7 @@ BLANK_KEYS = (
     "reporter",
     "source",
     "path",
+    "files",
     "id_column",
     "date_column",
     "snapshot_date",
@@ -43,6 +46,8 @@ class Blank:
     reporter: str
     id_column: str | None = None
     date_column: str | None = None
+    # Set for a folder of files: which files to count, with {id} where the path holds the ID.
+    files: str | None = None
 
 
 @dataclass
@@ -57,10 +62,17 @@ class Draft:
 
 @dataclass
 class Placement:
-    # Where the chosen file is copied, and the file the catalog then reads.
-    copy_to: str
+    # Where the chosen file is copied, and the file the catalog then reads; a folder is not copied.
+    copy_to: str | None
     data_path: str
     step: PrepareStep | None = None
+
+
+@dataclass
+class FolderPreview:
+    people: int
+    files: int
+    unmatched: list[str]
 
 
 @dataclass
@@ -97,6 +109,30 @@ def suggest_blank(project: Project, study: str) -> Draft:
     return Draft("", "", waves[0] if waves else "1", date.today(), blank)
 
 
+def is_folder(draft: Draft) -> bool:
+    return draft.blank is not None and draft.blank.files is not None
+
+
+def folder_files(folder: Path) -> list[str]:
+    # Paths, not contents, as the folder source counts them.
+    return sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if not p.is_dir())
+
+
+def preview_folder(paths: list[str], files: str) -> FolderPreview:
+    if files.count(ID) != 1:
+        raise EditError("Files: put {id} once, where each file's path holds the ID")
+    matcher = file_pattern(files)
+    people = set()
+    unmatched = []
+    for path in paths:
+        found = matcher.fullmatch(path)
+        if found:
+            people.add(found.group("id"))
+        else:
+            unmatched.append(path)
+    return FolderPreview(len(people), len(paths) - len(unmatched), unmatched)
+
+
 def study_of(project: Project, draft: Draft) -> str:
     if draft.blank is not None:
         return draft.blank.study
@@ -115,6 +151,8 @@ def check_draft(project: Project, draft: Draft) -> None:
 
 
 def place(project: Project, draft: Draft, source: Path) -> Placement:
+    if is_folder(draft):
+        return Placement(None, portable_path(source, project.root).as_posix())
     if draft.blank is not None:
         path = f"{defaults.DATA_DIR}/{draft.name}{source.suffix}"
         placement = Placement(path, path)
@@ -186,8 +224,9 @@ def dataset_config(project: Project, draft: Draft, placement: Placement) -> Data
             study=draft.blank.study,
             wave=draft.wave,
             reporter=draft.blank.reporter,
-            source="csv",
+            source="folder" if is_folder(draft) else "csv",
             path=placement.data_path,
+            files=draft.blank.files,
             id_column=own_id_column(project, draft.blank),
             date_column=draft.blank.date_column,
             snapshot_date=draft.snapshot_date,
@@ -258,6 +297,9 @@ def check_rows(project: Project, rows: list[dict[str, str]]) -> list[str]:
 def changes(
     project: Project, draft: Draft, placement: Placement, rows: list[dict[str, str]]
 ) -> list[Change]:
+    if is_folder(draft):
+        # A folder's only column counts files, so there is nothing to map or administer.
+        return [settings_change(project, draft, placement)]
     instruments = list(dict.fromkeys(r["instrument"].strip() for r in rows if r["instrument"]))
     return [
         settings_change(project, draft, placement),

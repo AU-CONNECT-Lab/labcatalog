@@ -64,6 +64,16 @@ def test_small_multiples(result):
     assert sum(value is None for value in background) == len(result.datasets["child_w1"].frame)
 
 
+def test_an_instrument_of_numbers_gets_no_answer_scale_charts(result):
+    assert views.wave_profiles(result, "eeg_resting") is None
+    assert views.subscale_radars(result, "eeg_resting") is None
+    assert views.people_profiles(result, "eeg_resting", "eeg_w1") is None
+    # Every instrument of the example draws or skips them without an error.
+    for instrument_id in result.project.instruments:
+        views.wave_profiles(result, instrument_id)
+        views.subscale_radars(result, instrument_id)
+
+
 def test_means_show_one_instrument(result):
     means = views.score_means(result, "example_mood")
     labels = ["Total score", "Sadness", "Worry and fatigue", "Low positive affect"]

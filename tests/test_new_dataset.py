@@ -7,6 +7,7 @@ from labcatalog.exceptions import EditError
 from labcatalog.metadata import changes, new_dataset, studies
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
+from labcatalog.sources import load_datasets
 
 PYTHON = Path(sys.executable).as_posix()
 
@@ -119,6 +120,47 @@ def test_a_dataset_that_repeats_none_starts_a_new_study(project_root, tmp_path):
     assert "    label: Pilot\n    waves:\n      1: {}\n\n# One entry per data file" in config
     after = load_project(project_root)
     assert after.studies["pilot"].administrations[0].datasets == ["pilot_child_w1"]
+
+
+def test_a_folder_of_files_is_read_in_place(project_root):
+    for name in [
+        "sub-2001C/ses-1/func/sub-2001C_task-rest_run-1_bold.nii.gz",
+        "sub-2001C/ses-1/func/sub-2001C_task-rest_run-2_bold.nii.gz",
+        "sub-2002C/ses-1/func/sub-2002C_task-rest_bold.nii.gz",
+        "sub-2002C/ses-1/anat/sub-2002C_T1w.nii.gz",
+        "README",
+    ]:
+        path = project_root / "bids" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"x")
+    project = load_project(project_root)
+    paths = new_dataset.folder_files(project_root / "bids")
+    rule = "sub-{id}/ses-1/func/*_bold.nii.gz"
+    seen = new_dataset.preview_folder(paths, rule)
+    assert (seen.people, seen.files) == (2, 3)
+    assert seen.unmatched == ["README", "sub-2002C/ses-1/anat/sub-2002C_T1w.nii.gz"]
+    with pytest.raises(EditError, match="put {id} once"):
+        new_dataset.preview_folder(paths, "sub-*/ses-1/func/*_bold.nii.gz")
+
+    draft = new_dataset.suggest_blank(project, "mock_study")
+    draft.name, draft.blank.modality, draft.blank.reporter = "scans_w1", "fmri", "child"
+    draft.blank.files = rule
+    new_dataset.check_draft(project, draft)
+    placement = new_dataset.place(project, draft, project_root / "bids")
+    assert (placement.copy_to, placement.data_path) == (None, "bids")
+    found = new_dataset.changes(project, draft, placement, [])
+    assert [c.path for c in found] == ["labcatalog.yaml"]
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    config = (project_root / "labcatalog.yaml").read_text(encoding="utf-8")
+    assert (
+        "  - {name: scans_w1, modality: fmri, study: mock_study, wave: 1, reporter: child, "
+        "source: folder, path: bids, files: sub-{id}/ses-1/func/*_bold.nii.gz, snapshot_date: "
+    ) in config
+    after = load_project(project_root)
+    scans = load_datasets(after)["scans_w1"]
+    assert scans.frame["files"].tolist() == ["2", "1"]
+    assert not [i for i in validate_project(after) if "scans_w1" in i.message]
 
 
 def test_cancelling_removes_only_what_the_wizard_made(project_root, export):
