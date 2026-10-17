@@ -45,6 +45,7 @@ def open_wizard(
         "columns": [],
         "id_column": None,
         "date_column": None,
+        "wave_column": None,
         "paths": [],
         "prefilled": None,
     }
@@ -88,6 +89,7 @@ def open_wizard(
                 reporter.value,
                 state["id_column"],
                 state["date_column"] or None,
+                state["wave_column"] or None,
             )
         return new_dataset.Draft(
             "" if blank() else template.value,
@@ -123,7 +125,7 @@ def open_wizard(
         if folder() and not blank():
             await prefill_folder()
         if long():
-            await show_rows()
+            await show_rows(rows_status)
         stepper.next()
 
     async def choose() -> None:
@@ -178,26 +180,26 @@ def open_wizard(
             more = f" and {len(seen.unmatched) - 5} more" if len(seen.unmatched) > 5 else ""
             note(f"Not counted ({len(seen.unmatched)}): {shown}{more}")
 
-    async def show_rows() -> bool:
+    async def show_rows(status: ui.label) -> bool:
         # The rows the new dataset will read, so a wave written differently shows up here.
         try:
-            placement = new_dataset.place(project, draft(), None)
+            placement = state["placement"] if blank() else new_dataset.place(project, draft(), None)
             dataset = new_dataset.dataset_config(project, draft(), placement)
             seen = await computed(new_dataset.wave_rows, project, dataset)
         except LabCatalogError as err:
-            show_status(rows_status, str(err), "bad")
+            show_status(status, str(err), "bad")
             return False
         found = f"of {dataset.path} have {dataset.wave_column} {dataset.wave}"
         if not seen.rows:
             waves = ", ".join(seen.waves) or "none"
-            show_status(rows_status, f"No rows {found}; the waves in it are {waves}.", "warn")
+            show_status(status, f"No rows {found}; the waves in it are {waves}.", "warn")
             return False
-        show_status(rows_status, f"{seen.rows} rows {found}", "ok")
+        show_status(status, f"{seen.rows} rows {found}", "ok")
         state["placement"] = placement
         return True
 
     async def long_next() -> None:
-        if not await show_rows():
+        if not await show_rows(rows_status):
             return
         state["rows"] = new_dataset.template_rows(project, template.value)
         columns.refresh()
@@ -273,6 +275,7 @@ def open_wizard(
                 state["columns"] = found
                 state["id_column"] = usual if usual in found else found[0]
                 state["date_column"] = next((c for c in found if "date" in c.lower()), "")
+                state["wave_column"] = ""
             state["rows"] = await computed(new_dataset.match_columns, project, dataset)
         except LabCatalogError as err:
             file_status.set_text(str(err))
@@ -300,6 +303,16 @@ def open_wizard(
                     label="Date column (optional)",
                     on_change=lambda e: state.update(date_column=e.value),
                 ).classes("w-56")
+                ui.select(
+                    ["", *state["columns"]],
+                    value=state["wave_column"],
+                    label="Wave column (optional)",
+                    on_change=pick_wave_column,
+                ).classes("w-56")
+            note(
+                "Pick a wave column when the file holds several waves, one row per person per "
+                f"wave; this dataset then reads the rows of wave {wave.value} only."
+            )
         found = new_dataset.coverage(project, draft().template, rows)
         labels = views.instrument_names(result)
         with ui.row().classes("gap-2"):
@@ -337,7 +350,17 @@ def open_wizard(
             .style("height: 45vh")
         )
 
+    async def pick_wave_column(event) -> None:
+        state["wave_column"] = event.value
+        if not event.value:
+            wave_status.visible = False
+            return
+        await show_rows(wave_status)
+
     async def columns_next() -> None:
+        if blank() and state["wave_column"] and not await show_rows(wave_status):
+            columns_status.set_text("No rows of this wave; pick another wave column or none")
+            return
         rows = await state["grid"].get_client_data()
         rows = [{k: (r.get(k) or "") for k in ("column", "instrument", "item")} for r in rows]
         problems = new_dataset.check_rows(project, rows)
@@ -523,6 +546,8 @@ def open_wizard(
                     ui.button("Cancel", on_click=cancel).props("flat")
             with ui.step("Columns"):
                 columns()
+                wave_status = ui.label()
+                wave_status.visible = False
                 columns_status = ui.label().classes("lc-bad-text")
                 with ui.stepper_navigation():
                     ui.button("Next", on_click=columns_next)

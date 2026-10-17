@@ -112,21 +112,6 @@ def test_overview_charts(result):
     assert views.score_network(result, "mock_study", "1", [], "instrument") is None
 
 
-def test_score_levels_put_every_wave_on_one_row_per_score(result):
-    fig = views.score_levels(result)
-    waves = fig.data[1:]
-    assert [w.name for w in waves] == ["Wave 1", "Wave 2", "Wave 3"]
-    scores = {(s.instrument_id, s.score_id) for s in result.catalog.scores}
-    assert len(fig.layout.yaxis.ticktext) == len(scores)
-    wave_1 = {
-        (s.instrument_id, s.score_id)
-        for s in result.catalog.scores
-        if s.dataset in ("parent_w1", "child_w1")
-    }
-    assert len(waves[0].x) == len(wave_1)
-    assert all(0 <= share <= 1 for w in waves for share in w.x)
-
-
 def test_item_heatmap_and_table_keep_the_item_order_below_the_diagonal(result):
     first = next(iter(views.item_waves(result, "example_mood")))
     items, z, _ = views.item_correlations(result, "example_mood", first)
@@ -258,12 +243,3 @@ def test_network_pins_nodes_on_recolour_and_tightens_with_many_nodes():
     assert many["force"]["edgeLength"][1] < few["force"]["edgeLength"][1]
     assert many["force"]["gravity"] > few["force"]["gravity"]
     assert few["label"]["show"] and not many["label"]["show"]
-
-
-def test_score_levels_show_only_the_chosen_instruments(result):
-    everything = views.level_instruments(result)
-    assert "example_mood" in everything and "example_demographics" not in everything
-    fig = views.score_levels(result, ["example_mood"])
-    mood = {s.score_id for s in result.catalog.scores if s.instrument_id == "example_mood"}
-    assert len(fig.layout.yaxis.ticktext) == len(mood)
-    assert views.score_levels(result, []) is None

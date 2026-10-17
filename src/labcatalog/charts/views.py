@@ -21,8 +21,6 @@ from labcatalog.stats import multilevel as ml
 from labcatalog.stats.summary import wave_order
 
 RADAR_AXES = 3
-# Room beyond 0% and 100% so dots at either end stay whole.
-LEVEL_RANGE = (-0.03, 1.03)
 
 # ---- shared lookups ----
 
@@ -611,62 +609,6 @@ def collection_pace(result: CatalogResult) -> go.Figure | None:
     return plots.collection_pace(facets, waves, colors)
 
 
-def level_instruments(result: CatalogResult) -> dict[str, str]:
-    found = {
-        s.instrument_id for s in result.catalog.scores if summary_of(result, s.key).mean is not None
-    }
-    return {
-        i: result.project.instruments[i].abbreviation or i
-        for i in instrument_order(result)
-        if i in found
-    }
-
-
-def score_levels(result: CatalogResult, instruments: list[str] | None = None) -> go.Figure | None:
-    # Scores differ in range, so each mean is shown as its place within the possible range.
-    config = result.project.config
-    found: dict[tuple[str, str], dict[Member, ResolvedScore]] = {}
-    for s in result.catalog.scores:
-        if instruments is not None and s.instrument_id not in instruments:
-            continue
-        d = dataset_by_name(config, s.dataset)
-        if summary_of(result, s.key).mean is not None:
-            found.setdefault((d.study, d.wave), {})[(s.instrument_id, s.score_id, d.reporter)] = s
-    if not found:
-        return None
-    series = []
-    for study, study_config in config.studies.items():
-        for wave in sorted(study_config.waves, key=wave_order):
-            values, notes = {}, {}
-            for member, s in found.get((study, wave), {}).items():
-                summary = summary_of(result, s.key)
-                low, high = summary.possible_range
-                values[member] = (summary.mean - low) / (high - low) if high > low else 0.0
-                notes[member] = (
-                    f"<br>mean {summary.mean:.2f}, possible {low:g} to {high:g}"
-                    f"<br>n = {summary.n_valid}"
-                )
-            if values:
-                series.append(
-                    {
-                        "name": wave_name(result, study, wave),
-                        "color": wave_colors(result)[wave],
-                        "values": values,
-                        "notes": notes,
-                    }
-                )
-    members = sorted(
-        {m for scores in found.values() for m in scores}, key=lambda m: member_rank(result, m)
-    )
-    labels = dict(zip(members, member_labels(result, members), strict=True))
-    names = instrument_names(result)
-    blocks = [
-        (names[i], [{"id": m, "tick": labels[m], "hover": labels[m]} for m in members if m[0] == i])
-        for i in dict.fromkeys(m[0] for m in members)
-    ]
-    return plots.dot_rows(blocks, series, "% of possible range", "", LEVEL_RANGE, ".0%")
-
-
 def instrument_names(result: CatalogResult) -> dict[str, str]:
     return {
         i: f"{x.abbreviation}: {x.name}" if x.abbreviation else x.name
@@ -871,32 +813,6 @@ def score_facet(result: CatalogResult, score: ResolvedScore, name: str) -> set[s
         **definition(result, score).custom,
     }
     return as_set(custom.get(name))
-
-
-Member = tuple[str, str, str]
-
-
-def member_rank(result: CatalogResult, member: Member) -> tuple:
-    instrument = result.project.instruments[member[0]]
-    score = next(s for s in instrument.scores if s.id == member[1])
-    return (
-        instrument_order(result).index(member[0]),
-        not is_total(instrument, score),
-        instrument.scores.index(score),
-        member[2],
-    )
-
-
-def member_labels(result: CatalogResult, members: list[Member]) -> list[str]:
-    reporters: dict[str, set[str]] = {}
-    for instrument_id, _, reporter in members:
-        reporters.setdefault(instrument_id, set()).add(reporter)
-    labels = []
-    for instrument_id, score_id, reporter in members:
-        instrument = result.project.instruments[instrument_id]
-        label = short_label(instrument, next(s for s in instrument.scores if s.id == score_id))
-        labels.append(f"{label} ({reporter})" if len(reporters[instrument_id]) > 1 else label)
-    return labels
 
 
 def score_choices(result: CatalogResult) -> dict[str, str]:

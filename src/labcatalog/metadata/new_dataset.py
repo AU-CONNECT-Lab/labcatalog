@@ -32,6 +32,7 @@ BLANK_KEYS = (
     "source",
     "path",
     "files",
+    "wave_column",
     "id_column",
     "date_column",
     "snapshot_date",
@@ -46,6 +47,7 @@ class Blank:
     reporter: str
     id_column: str | None = None
     date_column: str | None = None
+    wave_column: str | None = None
 
 
 @dataclass
@@ -262,6 +264,7 @@ def dataset_config(project: Project, draft: Draft, placement: Placement) -> Data
             files=draft.files,
             id_column=own_id_column(project, draft.blank),
             date_column=draft.blank.date_column,
+            wave_column=draft.blank.wave_column,
             snapshot_date=draft.snapshot_date,
         )
     old = dataset_by_name(project.config, draft.template)

@@ -16,10 +16,6 @@ Each wave as a bar from its start to its end date, with the number of people per
 
 For each reporter, how many rows had come in by each week since each wave started, one line per wave. It needs a `date_column` on the datasets. Use it to see whether a wave is collecting faster or slower than the last.
 
-## Scores in each wave
-
-Every score's mean in each wave, as a share of its possible range, so scores on different scales can be compared. One row per score, one dot per wave. **Instruments** picks which instruments are shown; a project with more than 15 starts with the first 15.
-
 ## How the scores relate
 
 A network of the scores measured in one wave: scores that correlate at |*r*| ≥ .30 are linked, red for positive and blue for negative, thicker for stronger. Drag the nodes and scroll to zoom. Above the chart:
