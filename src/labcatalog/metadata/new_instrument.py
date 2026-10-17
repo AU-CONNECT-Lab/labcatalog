@@ -39,6 +39,8 @@ class Draft:
     scores: list[dict[str, Any]] = field(default_factory=list)
     default_set: str = ""
     references: list[str] = field(default_factory=list)
+    # The PDF of a reference, relative to the references folder.
+    pdfs: dict[str, str] = field(default_factory=dict)
     # New datasets it is given in, each with the data column of every item found there.
     given: dict[str, dict[str, str]] = field(default_factory=dict)
     # The file being completed; None for a new instrument.
@@ -58,6 +60,7 @@ def existing(project: Project, instrument_id: str) -> Draft:
         scores=records.read_rows(text, "scores", tables["scores"]),
         default_set=str(data.get("default_response_set") or ""),
         references=[str(r["key"]) for r in data.get("references") or []],
+        pdfs={str(r["key"]): str(r["pdf"]) for r in data.get("references") or [] if r.get("pdf")},
         path=path,
     )
 
@@ -174,7 +177,7 @@ def instrument_change(project: Project, draft: Draft) -> Change:
             value = None
         put(data, key, value)
     put(data, "default_response_set", draft.default_set or None)
-    put(data, "references", references(data, draft.references))
+    put(data, "references", references(data, draft.references, draft.pdfs))
     relative = draft.path or f"{defaults.INSTRUMENTS_DIR}/{draft.id}.yaml"
     return Change(relative, records.dumped(data), opened)
 
@@ -199,10 +202,9 @@ def put(data: CommentedMap, key: str, value: Any) -> None:
     place_key(data, key, value, before[-1] if before else "id")
 
 
-def references(data: CommentedMap, keys: list[str]) -> CommentedSeq | None:
-    # A reference kept keeps its PDF; a new one is just its key.
+def references(data: CommentedMap, keys: list[str], pdfs: dict[str, str]) -> CommentedSeq | None:
     kept = {str(r["key"]): r for r in data.get("references") or []}
-    if list(kept) == keys:
+    if list(kept) == keys and all(pdfs.get(k) == kept[k].get("pdf") for k in keys):
         return data.get("references")
     found = CommentedSeq()
     for key in keys:
@@ -210,6 +212,10 @@ def references(data: CommentedMap, keys: list[str]) -> CommentedSeq | None:
         if entry is None:
             entry = CommentedMap(key=key)
             entry.fa.set_flow_style()
+        if pdfs.get(key):
+            entry["pdf"] = pdfs[key]
+        else:
+            entry.pop("pdf", None)
         found.append(entry)
     return found or None
 

@@ -104,7 +104,7 @@ def test_block(
     paper_table(shown)
     labels = {s.id: s.label for s in instrument.scores}
     freed = freed_text(instrument, test.freed)
-    results_text(results.invariance_text(test, labels, across, freed))
+    results_text(results.invariance_text(test, labels, across, freed), [shown])
     with ui.row().classes("items-center gap-2"):
         steps = [s.step for s in test.steps if s.step != "configural" and not s.problem]
         if steps:

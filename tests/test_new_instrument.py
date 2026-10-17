@@ -97,6 +97,23 @@ def test_completing_an_instrument_changes_only_what_was_filled_in(mock_project):
     assert changes.check(project, [change]) == []
 
 
+def test_completing_an_instrument_can_give_a_reference_its_pdf(mock_project):
+    project = load_project(mock_project)
+    draft = new_instrument.existing(project, "example_screen_time")
+    draft.references = ["example2019"]
+    draft.pdfs = {"example2019": "example_mood.pdf"}
+    change = new_instrument.instrument_change(project, draft)
+    assert "  - {key: example2019, pdf: example_mood.pdf}" in change.text.splitlines()
+    assert changes.check(project, [change]) == []
+    changes.write(project, [change])
+
+    draft = new_instrument.existing(load_project(mock_project), "example_screen_time")
+    assert draft.pdfs == {"example2019": "example_mood.pdf"}
+    draft.pdfs = {}
+    change = new_instrument.instrument_change(project, draft)
+    assert "  - {key: example2019}" in change.text.splitlines()
+
+
 def test_a_new_instrument_needs_a_free_id_and_a_name(mock_project):
     project = load_project(mock_project)
     with pytest.raises(EditError, match="already exists"):

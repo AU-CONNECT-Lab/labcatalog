@@ -22,6 +22,7 @@ project:
         - file: concepts/instruments.md
         - file: concepts/variable-maps.md
         - file: concepts/ids-groups-missing.md
+        - file: concepts/good-practice.md
     - title: Using the App
       children:
         - file: app/index.md

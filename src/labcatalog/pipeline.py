@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog.ai.instrument import InstrumentDraft, draft_instrument
+from labcatalog.ai.interpret import Interpretation, interpret
 from labcatalog.ai.measures import Draft, draft_description
 from labcatalog.ai.scoring import write_scoring_scripts
 from labcatalog.ai.search import Search, search_catalog
@@ -33,6 +34,7 @@ from labcatalog.metadata.validate import validate_project
 from labcatalog.paths import expand_path
 from labcatalog.project import Project, load_config, load_project, references_root, write_schemas
 from labcatalog.reports.codegen import label_snippets, scoring_snippets
+from labcatalog.reports.tables import PaperTable
 from labcatalog.sources import LoadedDataset, load_datasets
 from labcatalog.stats import invariance
 from labcatalog.stats.cfa import CfaFit, build_models, fit_models
@@ -162,6 +164,13 @@ def run_instrument_draft(
 def run_search(result: CatalogResult, query: str, provider: str, model: str, url: str) -> Search:
     client = make_llm_client(provider, model, url)
     return search_catalog(result.project, query, client)
+
+
+def run_interpretation(
+    shown: list[PaperTable], paragraph: str, provider: str, model: str, url: str
+) -> Interpretation:
+    client = make_llm_client(provider, model, url)
+    return interpret(shown, paragraph, client)
 
 
 def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze]:

@@ -19,11 +19,11 @@ With a language model set up (see [Set Up R and Language Models](../how-to/r-and
 
 ### Add an instrument
 
-**Add an instrument** walks through a new instrument in six steps: what it is (ID, name, abbreviation, kind, construct, description, references from `references.bib`, license); its answer options, copied from an instrument with the same answers or typed in; its items, pasted one per line, with `(R)` at the end of a reverse-keyed item; its scores, starting from **Add a total score**; the datasets it was given in, where **Find the columns** guesses each item's column from the column names; and a last step that shows the lines each file gains before **Save**. It writes `instruments/<id>.yaml`, the rows of each dataset's column map and the administrations in the study files.
+**Add an instrument** walks through a new instrument in six steps: what it is (ID, name, abbreviation, kind, construct, description, references from `references.bib` with the PDF of each, license); its answer options, copied from an instrument with the same answers or typed in; its items, pasted one per line, with `(R)` at the end of a reverse-keyed item; its scores, starting from **Add a total score**; the datasets it was given in, where **Find the columns** guesses each item's column from the column names; and a last step that shows the lines each file gains before **Save**. It writes `instruments/<id>.yaml`, the rows of each dataset's column map and the administrations in the study files.
 
 ![The Items step of Add an instrument, with three pasted items, one of them reverse-keyed](../images/app/instrument-wizard.png)
 
-On an instrument's page, **Complete this instrument** beside what is missing opens the same steps on that instrument, starting at the first step with something missing. Lines of the file that are not changed stay as they were, comments included.
+On an instrument's page, **Complete this instrument** beside what is missing opens the same steps on that instrument, starting at the first step with something missing. Press a step's title to go straight to it; only **Check and save** is reached with **Next**. Lines of the file that are not changed stay as they were, comments included.
 
 ### Export
 
@@ -52,7 +52,7 @@ A table of every score in every wave: *N*, mean, *SD*, median, observed and poss
 - **Invariance across reporters**: the same test between reporters who answered the instrument in the same wave, such as a parent and a child rating the child's mood. The reporters of one group are paired through `stats.correlate_by`, so this section appears only when that names a group.
 - **Against other scores**: how this score correlates with every other score measured in the same wave.
 
-Under each invariance table, **Which items differ** runs a score test for each item at the step you choose: how much the fit would improve if that item's loadings, thresholds or intercepts were free to differ. Tick the items to free and press **Save and rerun**; labcatalog writes them under `stats.invariance_free` in `labcatalog.yaml` and tests again with those items freed (partial invariance). The table note lists what is freed. To hold an item equal again, untick it in the same dialog.
+Under each invariance table, a **Results paragraph** gives every step's fit and its change from the step before (Δχ², ΔCFI, ΔRMSEA), with a **Copy text** button; it reports the numbers and leaves the judgement of which step holds to you. **Which items differ** runs a score test for each item at the step you choose: how much the fit would improve if that item's loadings, thresholds or intercepts were free to differ. Tick the items to free and press **Save and rerun**; labcatalog writes them under `stats.invariance_free` in `labcatalog.yaml` and tests again with those items freed (partial invariance). The table note lists what is freed. To hold an item equal again, untick it in the same dialog.
 
 ### Item analysis
 
@@ -63,7 +63,7 @@ How the items were answered: the share of each option per item and wave, item me
 Pick a dataset to see the instrument in that file alone:
 
 - **Items in** the dataset: valid answers, missing codes and values that are not options, per item.
-- **Factor structure**: a confirmatory factor analysis of the scores' items, with fit indices, standardized loadings and ω. Without R, it is fitted in Python with the items as continuous; with R, it follows `stats.cfa_estimator`.
+- **Factor structure**: a confirmatory factor analysis of the scores' items, with fit indices, standardized loadings and ω. Without R, it is fitted in Python with the items as continuous; with R, it follows `stats.cfa_estimator`. A **Results paragraph** below the tables reports each model's fit indices, the range of its standardized loadings and ω, without judging the fit.
 - **Measures paragraph**: a draft paragraph for the paper, with α and ω in this dataset, and a **Copy text** button. With a language model and the reference PDF, **Draft the description from the reference PDF** drafts the instrument's `description` for you to check.
 - **Everyone's answers**, **Answers by participant** and **Standardized scores**: each person's answers and scores, to spot unusual response patterns.
 - **Scoring code**: R and Python code that computes the scores from this data file.

@@ -5,10 +5,11 @@ from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, paper
+from labcatalog.gui import charts, common, paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
 from labcatalog.gui.common import apa, code_tabs, col, computed, note, p_value, panel
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
 from labcatalog.stats import multilevel as ml
@@ -92,6 +93,10 @@ def render(result: CatalogResult, view) -> None:
                         ui.label(f"Warning: {text}").classes("text-negative")
                     for shown in papers.values():
                         paper.paper_table(shown)
+                    paper.results_text(
+                        results.multilevel_text(fitted, label, common.decimals),
+                        list(papers.values()),
+                    )
                     fig = views.trajectories(long, fitted, label)
                     drawn = paper.Chart(charts.show(fig), fig)
                     note(trajectory_note(long))

@@ -7,10 +7,11 @@ import plotly.graph_objects as go
 from nicegui import ui
 from nicegui.events import GenericEventArguments
 
+from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import computed, note, open_path
 from labcatalog.paths import portable_path
-from labcatalog.pipeline import CatalogResult
+from labcatalog.pipeline import CatalogResult, run_interpretation
 from labcatalog.reports import outputs, tables
 from labcatalog.reports.tables import PaperTable
 
@@ -33,13 +34,55 @@ def paper_table(shown: PaperTable) -> None:
         copy_button("Copy table", "Table", kinds)
 
 
-def results_text(text: str) -> None:
+def results_text(text: str, shown: list[PaperTable] | None = None) -> None:
     if not text:
         return
+
+    async def ask() -> None:
+        button.disable()
+        status.set_text("Asking the language model.")
+        chosen = preferences.load()
+        try:
+            found = await computed(
+                run_interpretation,
+                shown,
+                text,
+                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
+                chosen.get(preferences.LLM_MODEL, ""),
+                chosen.get(preferences.LLM_URL, ""),
+            )
+        except LabCatalogError as err:
+            status.set_text(str(err))
+        else:
+            meta = found.meta
+            status.set_text(
+                f"A draft by {meta.model} in {meta.latency_ms / 1000:.0f} s, {meta.input_tokens} "
+                f"tokens in and {meta.output_tokens} out; check it against the tables."
+            )
+            answer.clear()
+            with answer:
+                ui.label(found.text).classes("lc-prose")
+                copy_text(found.text)
+                for line in found.notes:
+                    note(f"To check: {line}")
+        finally:
+            button.enable()
+
     with ui.column().classes("w-full gap-1"):
         ui.label("Results paragraph").classes("lc-facet")
         ui.label(text).classes("lc-prose")
-        copy_text(text)
+        with ui.row().classes("items-center gap-2"):
+            copy_text(text)
+            if shown and preferences.model_set():
+                button = ui.button(
+                    "Interpret with the language model", icon="psychology", on_click=ask
+                ).props("flat dense no-caps")
+                button.tooltip(
+                    "Sends these tables and the paragraph, never any data, to the model set on "
+                    "the Settings page."
+                )
+        status = ui.label().classes("lc-note")
+        answer = ui.column().classes("w-full gap-1")
 
 
 def copy_text(text: str) -> None:

@@ -1108,7 +1108,7 @@ def factor_structure(
             for shown in papers.values():
                 paper_table(shown)
             labels = {s.id: s.label for s in instrument.scores}
-            results_text(results.cfa_text(fits, labels, common.decimals))
+            results_text(results.cfa_text(fits, labels, common.decimals), list(papers.values()))
             save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
             if cfa.message:
                 note(cfa.message)

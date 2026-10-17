@@ -36,10 +36,3 @@ def posix_str(path: Path | str) -> str:
 
 def stored_path(value: str) -> Path:
     return Path(value.replace("\\", "/"))
-
-
-def resolve_existing(value: str | None, base: Path) -> Path | None:
-    if not value:
-        return None
-    path = expand_path(value, base)
-    return path if path.exists() else None

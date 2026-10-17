@@ -243,7 +243,9 @@ def correlation_section(
                 chart()
                 paper_table(shown)
                 spearman = stats.correlation == "spearman"
-                results_text(results.correlation_text(labels, matrix, spearman, common.decimals))
+                results_text(
+                    results.correlation_text(labels, matrix, spearman, common.decimals), [shown]
+                )
                 result_actions(
                     result, "correlations", {"correlations": shown}, drawn, texts, engine
                 )
@@ -352,7 +354,8 @@ def pair_section(
                 drawn = Chart(charts.show(fig), fig)
                 paper_table(shown)
                 results_text(
-                    results.regression_text(fits, choices, choices[y_key], common.decimals)
+                    results.regression_text(fits, choices, choices[y_key], common.decimals),
+                    [shown],
                 )
                 result_actions(result, "regression", {"regression": shown}, drawn, texts, engine)
                 analysis_tables.code_view(texts)

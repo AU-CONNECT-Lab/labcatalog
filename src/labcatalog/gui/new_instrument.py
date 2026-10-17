@@ -1,7 +1,9 @@
 import difflib
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
-from nicegui import ui
+import webview
+from nicegui import app, ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
@@ -9,7 +11,9 @@ from labcatalog.gui.common import computed, note
 from labcatalog.gui.edit import cell, grid_options
 from labcatalog.metadata import changes, new_instrument, records
 from labcatalog.metadata.completeness import DEMOGRAPHICS, QUESTIONNAIRE
+from labcatalog.paths import portable_path, posix_str
 from labcatalog.pipeline import CatalogResult
+from labcatalog.project import references_root
 
 TITLES = {
     "about": "About",
@@ -26,11 +30,15 @@ class TableEditor:
     def __init__(self, table: records.Table, rows: list[dict]) -> None:
         self.table = table
         self.grid = ui.aggrid(grid_options(table, rows)).classes("w-full").style("height: 40vh")
+        # A step not shown yet has no grid in the browser, and nothing edited in it.
+        self.shown = False
 
     def column(self, key: str) -> dict:
         return next(d for d in self.grid.options["columnDefs"] if d["field"] == key)
 
     async def rows(self) -> list[dict]:
+        if not self.shown:
+            return self.grid.options["rowData"]
         return await self.grid.get_client_data(method="filtered_sorted")
 
     def blank(self) -> dict:
@@ -77,7 +85,7 @@ def open_wizard(
         return
     first = new_instrument.first_gap(project, instrument_id) if completing else "about"
     tables = records.INSTRUMENT_TABLES
-    state: dict = {"changes": []}
+    state: dict = {"changes": [], "step": TITLES[first]}
     kinds = sorted({QUESTIONNAIRE, DEMOGRAPHICS, *(i.kind for i in project.instruments.values())})
     with_sets = {
         i: s.abbreviation or s.name for i, s in project.instruments.items() if s.response_sets
@@ -95,6 +103,30 @@ def open_wizard(
             "license": license_input.value or "",
         }
         draft.references = list(reference.value or [])
+        draft.pdfs = {k: v for k, v in draft.pdfs.items() if k in draft.references and v}
+
+    async def choose_pdf(key: str) -> None:
+        selection = await app.native.main_window.create_file_dialog(
+            webview.FileDialog.OPEN, file_types=("PDF files (*.pdf)",)
+        )
+        if selection:
+            root = references_root(project.config, project.root)
+            draft.pdfs[key] = posix_str(portable_path(Path(selection[0]), root))
+            pdf_rows.refresh()
+
+    def set_pdf(key: str, value: str) -> None:
+        draft.pdfs[key] = (value or "").strip()
+
+    @ui.refreshable
+    def pdf_rows() -> None:
+        for key in reference.value or []:
+            with ui.row().classes("items-center gap-3 w-full no-wrap"):
+                ui.input(
+                    f"PDF of {key} (in the references folder)",
+                    value=draft.pdfs.get(key, ""),
+                    on_change=lambda e, k=key: set_pdf(k, e.value),
+                ).classes("grow")
+                ui.button("Choose", on_click=lambda k=key: choose_pdf(k)).props("flat")
 
     def about_next() -> None:
         collect_about()
@@ -110,7 +142,7 @@ def open_wizard(
         if copy_from.value:
             await options.add(new_instrument.copy_options(project, copy_from.value))
 
-    async def options_next() -> None:
+    async def sync_options() -> None:
         draft.options = await options.rows()
         sets = list(dict.fromkeys(str(r["id"]) for r in draft.options if r.get("id")))
         if draft.default_set not in sets:
@@ -120,7 +152,6 @@ def open_wizard(
             cellEditor="agSelectCellEditor", cellEditorParams={"values": ["", *sets]}
         )
         items.grid.update()
-        stepper.next()
 
     async def paste_items() -> None:
         draft.items = await items.rows()
@@ -128,13 +159,28 @@ def open_wizard(
         await items.add(new_instrument.items_from_lines(draft, pasted.value or ""))
         pasted.set_value("")
 
-    async def items_next() -> None:
+    async def sync_items() -> None:
         draft.items = await items.rows()
         draft.default_set = default_set.value or ""
         ids = [str(r["id"]) for r in draft.items]
         scores.column("items").update(headerName=f"Items ({', '.join(ids)})")
         scores.grid.update()
-        stepper.next()
+
+    def show(step: str) -> None:
+        editors = {TITLES["options"]: options, TITLES["items"]: items, TITLES["scores"]: scores}
+        if step in editors:
+            editors[step].shown = True
+
+    async def left_step(e) -> None:
+        # The header also moves between steps, so leaving a step does what its Next did.
+        left, state["step"] = state["step"], e.value
+        show(e.value)
+        if left == TITLES["about"]:
+            collect_about()
+        elif left == TITLES["options"]:
+            await sync_options()
+        elif left == TITLES["items"]:
+            await sync_items()
 
     async def add_total() -> None:
         await scores.add([new_instrument.suggest_total(draft)])
@@ -172,6 +218,11 @@ def open_wizard(
 
     async def given_next() -> None:
         await collect()
+        try:
+            new_instrument.check_about(project, draft)
+        except LabCatalogError as err:
+            given_status.set_text(f"About: {err}")
+            return
         draft.given = {}
         for row in await columns.get_client_data():
             draft.given.setdefault(row["dataset"], {})[row["item"]] = row.get("column") or ""
@@ -226,7 +277,11 @@ def open_wizard(
     )
     with ui.dialog().props("persistent") as dialog, ui.card().classes("w-[76rem] max-w-full"):
         ui.label(title).classes("text-lg font-medium")
-        with ui.stepper(value=TITLES[first]).props("flat animated").classes("w-full") as stepper:
+        with (
+            ui.stepper(value=TITLES[first], on_value_change=left_step)
+            .props("flat animated header-nav")
+            .classes("w-full") as stepper
+        ):
             with ui.step(TITLES["about"]):
                 with ui.row().classes("gap-3"):
                     id_input = ui.input("ID", value=draft.id).classes("w-56")
@@ -257,6 +312,7 @@ def open_wizard(
                             value=draft.references,
                             label="References (keys in references.bib)",
                             multiple=True,
+                            on_change=lambda: pdf_rows.refresh(),
                         )
                         .props("use-chips")
                         .classes("w-96")
@@ -264,6 +320,7 @@ def open_wizard(
                     license_input = ui.input(
                         "License", value=draft.about.get("license", "")
                     ).classes("grow")
+                pdf_rows()
                 note(
                     "The ID names the file and goes before every item's ID. A reference that is "
                     "not in references.bib yet is added there by whoever looks after the settings."
@@ -286,7 +343,7 @@ def open_wizard(
                         "flat no-caps"
                     )
                 options = TableEditor(tables["response_sets"], draft.options)
-                navigation(options_next)
+                navigation(stepper.next)
             with ui.step(TITLES["items"]):
                 with ui.row().classes("w-full items-end gap-3 no-wrap"):
                     pasted = (
@@ -312,7 +369,7 @@ def open_wizard(
                         "flat no-caps"
                     )
                 items = TableEditor(tables["items"], draft.items)
-                navigation(items_next)
+                navigation(stepper.next)
             with ui.step(TITLES["scores"]):
                 note(
                     "Each score adds up (sum) or averages (mean) its items, listed by ID with "
@@ -378,11 +435,14 @@ def open_wizard(
                 )
                 given_status = ui.label().classes("lc-bad-text")
                 navigation(given_next)
-            with ui.step(TITLES["check"]):
+            # Check and save shows what Next on the step before it worked out.
+            with ui.step(TITLES["check"]) as check_step:
+                check_step.props["header-nav"] = False
                 review()
                 review_status = ui.label().classes("lc-bad-text")
                 with ui.stepper_navigation():
                     ui.button("Save", icon="check", on_click=finish)
                     ui.button("Back", on_click=stepper.previous).props("flat")
                     ui.button("Cancel", on_click=dialog.close).props("flat")
+    show(TITLES[first])
     dialog.open()

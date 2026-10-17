@@ -3,6 +3,8 @@ from labcatalog.stats.analysis_script import ANOVA, STUDENT, WELCH, Comparison, 
 from labcatalog.stats.cfa import SUBSCALES, WLSMV, CfaFit
 from labcatalog.stats.cfa import R as LAVAAN
 from labcatalog.stats.invariance import STEPS, InvarianceStep, InvarianceTest
+from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
+from labcatalog.stats.multilevel import R as LME4
 
 SIGNIFICANT = 0.05
 # A table with this many pairs or fewer is told pair by pair; a larger one by its strongest pairs.
@@ -151,14 +153,14 @@ def cfa_text(fits: list[CfaFit], labels: dict[str, str], digits: int = 2) -> str
 def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
     model = model_phrase(fit.kind, [labels[s] for s in fit.factors])
     if fit.problem:
-        return f"{model.capitalize()} could not be used: {fit.problem}."
+        return f"{opening_case(model)} could not be used: {fit.problem}."
     package = "lavaan" if fit.engine == LAVAAN else "semopy"
     how = (
         "the WLSMV estimator and the items as ordered categories"
         if fit.estimator == WLSMV
         else "maximum likelihood and the items as continuous"
     )
-    opening = f"{model.capitalize()}, fitted in {package} with {how} (N = {fit.n}),"
+    opening = f"{opening_case(model)}, fitted in {package} with {how} (N = {fit.n}),"
     if fit.fit.get("df") == 0:
         sentences = [f"{opening} fits exactly with three items, so it has no fit indices."]
     else:
@@ -176,6 +178,11 @@ def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
             f"ω was {series([f'{bounded(v, digits)} for {name}' for name, v in omega])}."
         )
     return " ".join(sentences)
+
+
+def opening_case(text: str) -> str:
+    # Only the first letter, so labels inside keep their own case.
+    return text[:1].upper() + text[1:]
 
 
 def model_phrase(kind: str, names: list[str]) -> str:
@@ -237,3 +244,51 @@ def step_sentence(step: InvarianceStep, before: dict[str, float | None]) -> str:
         ],
     ]
     return f"{name} gave {', '.join(found)}; against the step before, {', '.join(change)}."
+
+
+def multilevel_text(fitted: Fitted, outcome: str, digits: int = 2) -> str:
+    package = "lme4" if fitted.engine == LME4 else "statsmodels"
+    nested = f" in {fitted.groups} groups" if fitted.groups is not None else ""
+    sentences = [
+        f"A multilevel model of {outcome}, fitted by REML in {package}, used "
+        f"{fitted.observations} observations from {fitted.people} people{nested}."
+    ]
+    if fitted.icc:
+        found = [
+            f"{bounded(icc, digits)} at the {level.lower()} level" for level, icc in fitted.icc
+        ]
+        sentences.append(
+            f"In the model with only the random intercepts, the ICC was {series(found)}."
+        )
+    terms = [t for t in fitted.fixed if t.label != "Intercept"]
+    if terms:
+        sentences.append(f"Fixed effects: {'; '.join(term_text(t, digits) for t in terms)}.")
+    if fitted.random:
+        found = [variance_text(v, digits) for v in fitted.random]
+        sentences.append(f"Random effects: {series(found)}.")
+    if fitted.singular:
+        sentences.append("The fit was singular, so some random effects are estimated as zero.")
+    return " ".join(sentences)
+
+
+def term_text(term: Term, digits: int) -> str:
+    test = "z" if term.df is None else f"t({term.df:.1f})"
+    return (
+        f"{term.label}, b = {number(term.estimate, digits)}, SE = {number(term.se, digits)}, "
+        f"{test} = {number(term.statistic, digits)}, {p_text(term.p)}, "
+        f"95% CI [{number(term.low, digits)}, {number(term.high, digits)}]"
+    )
+
+
+def variance_text(variance: Variance, digits: int) -> str:
+    sd = f"SD = {number(variance.sd, digits)}"
+    if variance.level == RESIDUAL:
+        return f"{sd} for the residuals"
+    if variance.term == "Intercept":
+        return f"{sd} for the {variance.level.lower()} intercepts"
+    tied = (
+        f" (r = {bounded(variance.correlation, digits)} with the intercepts)"
+        if variance.correlation is not None
+        else ""
+    )
+    return f"{sd} for the {variance.level.lower()} slopes of {variance.term}{tied}"
