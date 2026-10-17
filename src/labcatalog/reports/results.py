@@ -22,32 +22,38 @@ STEP_PHRASES = {
 
 
 def correlation_text(
-    labels: list[str], matrix: list[list[Correlation]], spearman: bool, digits: int = 2
+    labels: list[str],
+    instruments: list[str],
+    matrix: list[list[Correlation]],
+    spearman: bool,
+    digits: int = 2,
 ) -> str:
     symbol = "rs" if spearman else "r"
     pairs = [
-        (labels[i], labels[j], matrix[i][j])
+        (labels[i], labels[j], matrix[i][j], instruments[i] == instruments[j])
         for i in range(len(labels))
         for j in range(i)
         if matrix[i][j].r is not None
     ]
     if len(pairs) <= EVERY_PAIR:
-        return " ".join(pair_sentence(a, b, c, symbol, digits) for a, b, c in pairs)
-    significant = sorted(
-        (pair for pair in pairs if pair[2].p < SIGNIFICANT), key=lambda pair: -abs(pair[2].r)
-    )
+        return " ".join(pair_sentence(a, b, c, symbol, digits) for a, b, c, _ in pairs)
+    significant = [pair for pair in pairs if pair[2].p < SIGNIFICANT]
     verb = "was" if len(significant) == 1 else "were"
     opening = f"Of the {len(pairs)} correlations, {len(significant)} {verb} significant at p < .05."
     if not significant:
         return opening
+    # Scores of one instrument share items, so their correlations say little and are left out.
+    between = sorted((p for p in significant if not p[3]), key=lambda p: -abs(p[2].r))
+    if not between:
+        return f"{opening} All of them were between scores of the same instrument."
     lead = (
-        f"The {len(significant[:STRONGEST])} strongest were between"
-        if len(significant) > STRONGEST
-        else "They were between"
-        if len(significant) > 1
-        else "It was between"
+        f"Between instruments, the {STRONGEST} strongest were between"
+        if len(between) > STRONGEST
+        else "Between instruments, they were between"
+        if len(between) > 1
+        else "Between instruments, it was between"
     )
-    shown = [f"{a} and {b} ({statistic(symbol, c, digits)})" for a, b, c in significant[:STRONGEST]]
+    shown = [f"{a} and {b} ({statistic(symbol, c, digits)})" for a, b, c, _ in between[:STRONGEST]]
     return f"{opening} {lead} {series(shown)}."
 
 

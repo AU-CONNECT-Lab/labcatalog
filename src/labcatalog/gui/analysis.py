@@ -244,7 +244,14 @@ def correlation_section(
                 paper_table(shown)
                 spearman = stats.correlation == "spearman"
                 results_text(
-                    results.correlation_text(labels, matrix, spearman, common.decimals), [shown]
+                    results.correlation_text(
+                        labels,
+                        [analysis.instrument_of(k) for k in keys],
+                        matrix,
+                        spearman,
+                        common.decimals,
+                    ),
+                    [shown],
                 )
                 result_actions(
                     result, "correlations", {"correlations": shown}, drawn, texts, engine

@@ -15,14 +15,14 @@ def matrix_of(n: int, pairs: dict[tuple[int, int], tuple[float, float]]) -> list
 
 def test_a_small_table_is_told_pair_by_pair():
     matrix = matrix_of(2, {(1, 0): (-0.342, 0.0002)})
-    text = results.correlation_text(["Mood", "Sleep"], matrix, spearman=False)
+    text = results.correlation_text(["Mood", "Sleep"], ["m", "s"], matrix, spearman=False)
     assert text == "Sleep was negatively correlated with Mood, r(118) = -.34, p < .001."
     matrix = matrix_of(2, {(1, 0): (0.05, 0.587)})
-    text = results.correlation_text(["Mood", "Sleep"], matrix, spearman=True)
+    text = results.correlation_text(["Mood", "Sleep"], ["m", "s"], matrix, spearman=True)
     assert text == "Sleep was not significantly correlated with Mood, rs(118) = .05, p = .587."
 
 
-def test_a_large_table_names_its_strongest_significant_pairs():
+def test_a_large_table_names_its_strongest_pairs_between_instruments():
     labels = ["A", "B", "C", "D"]
     matrix = matrix_of(
         4,
@@ -35,11 +35,17 @@ def test_a_large_table_names_its_strongest_significant_pairs():
             (3, 2): (0.06, 0.5),
         },
     )
-    text = results.correlation_text(labels, matrix, spearman=False)
+    text = results.correlation_text(labels, ["a", "b", "c", "d"], matrix, spearman=False)
     assert text.startswith("Of the 6 correlations, 2 were significant at p < .05.")
     assert text.endswith(
-        "They were between C and B (r(118) = .55, p < .001) and B and A (r(118) = .30, p = .001)."
+        "Between instruments, they were between C and B (r(118) = .55, p < .001) and B and A "
+        "(r(118) = .30, p = .001)."
     )
+    # C and B are scores of one instrument, so only B and A is named.
+    text = results.correlation_text(labels, ["a", "b", "b", "d"], matrix, spearman=False)
+    assert text.endswith("Between instruments, it was between B and A (r(118) = .30, p = .001).")
+    text = results.correlation_text(labels, ["a", "a", "a", "d"], matrix, spearman=False)
+    assert text.endswith("All of them were between scores of the same instrument.")
 
 
 def test_regression_reports_each_predictor():
