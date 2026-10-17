@@ -10,6 +10,8 @@ Every YAML file opens as a form: boxes to type in, lists to pick from and tick b
 
 Each entry is one line; the button with the sliders opens its other fields, the arrows move it and the bin deletes it. **Add item**, **Add score** and the like add an entry at the end, numbered after the last one (`ems_10` after `ems_9`) and with the same response set as the entry above it. **Save** checks the file as below and lists any problem under the buttons; **Discard changes** goes back to the file as saved. A part of the file the form cannot show, such as item text written per language, says so and is left as it is.
 
+An instrument file has its **Structure** above the editor, the same tree as on the instrument's page. It follows your changes within a second, in the form, the text and the tables alike; while the file cannot be read, it keeps the last version it could draw and says why. Click its title to fold it away.
+
 ## Advanced: text and tables
 
 **Advanced** opens the file as text or as tables, and **Form** goes back. Column maps always open as text.

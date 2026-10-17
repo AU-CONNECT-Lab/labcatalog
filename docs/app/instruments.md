@@ -39,7 +39,9 @@ The top shows the instrument's name, abbreviation, construct, who reported on wh
 
 ### Items
 
-The items with their wording, whether they are reversed, and the column that holds each one in every dataset. Beside them, the response options and the missing codes.
+**Structure** draws the instrument as a tree: its scores, each with its items, and the items no score uses. A score made of every item of the other scores, such as a total, is one leaf, so its items are not drawn twice; **Answer options** opens with a click. Hover over a node for an item's wording and type or a score's items and missing-answer rule.
+
+Below it, the items with their wording, whether they are reversed, and the column that holds each one in every dataset. Beside them, the response options and the missing codes.
 
 ### Scores
 
