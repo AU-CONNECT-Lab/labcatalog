@@ -12,7 +12,7 @@ from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument
-from labcatalog.stats import invariance
+from labcatalog.stats import invariance, mplus
 from labcatalog.stats.cfa import SUBSCALES, WLSMV
 from labcatalog.stats.invariance import (
     REPORTERS,
@@ -113,7 +113,14 @@ def test_block(
                 icon="rule",
                 on_click=lambda: score_dialog(result, instrument, test, steps, model, reload),
             ).props("flat dense no-caps")
-        save_button(result, name, {"invariance": shown})
+        save_button(
+            result,
+            name,
+            {"invariance": shown},
+            later_texts=lambda: mplus.invariance_files(
+                model(), result.project.config.stats.cfa_estimator, f"{instrument.name}, {heading}"
+            ),
+        )
 
 
 def invariance_table(test: InvarianceTest) -> tuple[list[dict], list[dict]]:
