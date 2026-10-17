@@ -19,7 +19,7 @@ missing_codes: []
 # Optional: how the statistics run, shown here with their defaults. Everyone opening the project gets the same numbers.
 #   stats:
 #     correlate_by: id          # how people in different files are matched: id, a group name under ids, or none
-#     cfa_estimator: wlsmv      # factor models with the items as ordered categories (wlsmv) or continuous (ml)
+#     cfa_estimator: wlsmv      # factor models start with the items as ordered categories (wlsmv) or continuous (ml, mlr)
 #     t_test: welch             # two groups: Welch's (welch) or Student's (student) t test
 #     correlation: pearson      # correlations: pearson or spearman
 #     invariance_free: []       # items freed in invariance tests, for example: [{instrument: my_scale, item: q3, parameter: loading, across: waves}]

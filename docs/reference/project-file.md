@@ -123,7 +123,7 @@ Settings that change the numbers, kept in the project so that everyone gets the 
 | `correlate_by` | `id` | `id`, the group's name, or `none`: how people in different datasets are matched. |
 | `correlation` | `pearson` | `pearson` or `spearman`. |
 | `t_test` | `welch` | `welch` or `student`. |
-| `cfa_estimator` | `wlsmv` | `wlsmv` (items as ordered categories) or `ml` (items as continuous). |
+| `cfa_estimator` | `wlsmv` | The estimator factor models and invariance tests start from: `wlsmv` (items as ordered categories), `ml` or `mlr` (items as continuous; `mlr` is robust maximum likelihood). The pages can switch it for what they show. |
 | `invariance_free` | none | Items whose parameters an invariance test lets differ, each as `{instrument, item, parameter, across}`: `parameter` is `loading`, `threshold` or `intercept`, and `across` is `waves`, `reporters`, or the grouping item as `instrument.item`. Written by **Save and rerun** on the invariance tables. |
 
 ## prepare and prepare_with
