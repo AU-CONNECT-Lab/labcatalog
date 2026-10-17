@@ -136,6 +136,8 @@ class FixActions:
     follow: Callable[[str], None]
     reload: Callable[[], Awaitable[None]]
     root: Path
+    # Opens Add a dataset repeating a dataset for a wave.
+    add_dataset: Callable[[str, str], None]
 
 
 def note_text(issue: Issue, rows: list[dict[str, str]]) -> str:
@@ -228,6 +230,10 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         dialog.close()
         actions.follow(issue.location)
 
+    def add_dataset(wave: str) -> None:
+        dialog.close()
+        actions.add_dataset(issue.details["dataset"], wave)
+
     def copy_note() -> None:
         ui.clipboard.write(note_text(issue, rows))
         ui.notify("Note copied")
@@ -259,6 +265,13 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
                 ui.button(
                     f"Run {issue.details['step']} again", icon="play_arrow", on_click=run_step
                 )
+            if issue.code == "wave_unclaimed" and project is not None:
+                for wave in issue.details.get("waves", []):
+                    ui.button(
+                        f"Add a dataset for wave {wave}",
+                        icon="add",
+                        on_click=lambda wave=wave: add_dataset(wave),
+                    )
             if issue.location:
                 ui.button(
                     f"Open {split_location(issue.location)[0]}", icon="open_in_new", on_click=follow

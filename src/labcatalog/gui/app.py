@@ -19,6 +19,7 @@ from labcatalog.gui import (
     fix,
     instruments,
     methods,
+    new_dataset,
     overview,
     preferences,
     prepare,
@@ -493,6 +494,9 @@ class Window:
             lambda location: problems.follow(self.root, location, self.edit_location),
             self.reload,
             self.root,
+            lambda template, wave: new_dataset.open_wizard(
+                self.result, self.dataset_added, repeat=(template, wave)
+            ),
         )
         fix.open_fix(self.result, issue, actions)
 

@@ -24,13 +24,20 @@ CHECK_STEP = "Check and add"
 
 
 def open_wizard(
-    result: CatalogResult, on_done: Callable[[str], Awaitable[None]], study: str | None = None
+    result: CatalogResult,
+    on_done: Callable[[str], Awaitable[None]],
+    study: str | None = None,
+    repeat: tuple[str, str] | None = None,
 ) -> None:
+    # repeat is (template, wave), to start with both filled in.
     project = result.project
     config = project.config
     names = new_dataset.templates(project)
     # A study with nothing to repeat yet starts from nothing.
-    if study is not None or not names:
+    if repeat is not None:
+        start = REPEAT
+        first = new_dataset.suggest(project, *repeat)
+    elif study is not None or not names:
         start = BLANK
         first = new_dataset.suggest_blank(project, study or next(iter(config.studies)))
     else:
@@ -451,7 +458,7 @@ def open_wizard(
                     )
                     template = ui.select(
                         {n: views.dataset_label(result, n) for n in names},
-                        value=names[-1] if names else None,
+                        value=first.template or (names[-1] if names else None),
                         label="Same as",
                         on_change=lambda e: suggest(e.value),
                     ).classes("w-96")

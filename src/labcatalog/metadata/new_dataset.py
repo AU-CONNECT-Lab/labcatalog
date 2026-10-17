@@ -104,9 +104,10 @@ def templates(project: Project) -> list[str]:
     return usable
 
 
-def suggest(project: Project, template: str) -> Draft:
+def suggest(project: Project, template: str, wave: str | None = None) -> Draft:
     old = dataset_by_name(project.config, template)
-    wave = str(int(old.wave) + 1) if old.wave.isdigit() else old.wave
+    if wave is None:
+        wave = str(int(old.wave) + 1) if old.wave.isdigit() else old.wave
     name = template
     if old.wave.isdigit() and template.endswith(old.wave):
         name = template[: -len(old.wave)] + wave

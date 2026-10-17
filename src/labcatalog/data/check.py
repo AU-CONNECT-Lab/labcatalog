@@ -104,7 +104,18 @@ def check_waves(project: Project, datasets: dict[str, LoadedDataset]) -> list[Is
             waves = examples(sorted(repr(wave) if not wave.strip() else wave for wave in left))
             message = f"{column} has rows for wave(s) that no dataset reads: {waves}"
             where = location(project, readers[0])
-            issues.append(problem("wave_unclaimed", message, where, "warning", column=column))
+            # The last reader is what a dataset for a missing wave would repeat.
+            issues.append(
+                problem(
+                    "wave_unclaimed",
+                    message,
+                    where,
+                    "warning",
+                    column=column,
+                    dataset=readers[-1].config.name,
+                    waves=sorted(wave for wave in left if wave.strip()),
+                )
+            )
     return issues
 
 
