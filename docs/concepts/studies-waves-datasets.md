@@ -56,7 +56,7 @@ datasets:
   - {name: parent_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_long.csv, wave_column: wave}
 ```
 
-Each dataset reads only the rows whose `wave` column matches its own `wave`, written the same way (`1` matches `1`, not `01` or `T1`). Everything else treats it as a file of its own: each dataset has its own column map in `maps/`, where the wave column is listed like the ID column, with no instrument. If the file has rows for a wave that no dataset reads, `labcatalog check` warns with `wave_unclaimed`. Problems point to the row's line in the shared file.
+Each dataset reads only the rows whose `wave` column matches its own `wave`, written the same way (`1` matches `1`, not `01` or `T1`). Everything else treats it as a file of its own: each dataset has its own column map in `maps/`, where the wave column is listed like the ID column, with no instrument. If the file has rows for a wave that no dataset reads, `labcatalog check` warns with `wave_unclaimed`. Problems point to the row's line in the shared file. When the file gains a wave, **Repeat a dataset** on the [Datasets](../app/datasets.md#add-a-dataset) page adds the next dataset for it, and the Edit page's Datasets table has a **Wave column** column.
 
 ## Modalities
 
