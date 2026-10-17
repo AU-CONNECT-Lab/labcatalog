@@ -9,7 +9,7 @@ from labcatalog import defaults
 from labcatalog.codebook import core as codebook
 from labcatalog.codebook.core import ImportResult
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import problems
+from labcatalog.gui import pipeline_table, problems
 from labcatalog.gui.common import col, computed, heading, note, open_path, section, table
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
@@ -20,6 +20,7 @@ class ImportView:
     dataset: str | None = None
     answer: str = ""
     issues: list[Issue] = field(default_factory=list)
+    pipeline: pipeline_table.PipelineForm = field(default_factory=pipeline_table.PipelineForm)
 
 
 def render(
@@ -33,6 +34,7 @@ def render(
             f"codebook for a new data file, add the file under datasets in "
             f"{defaults.CONFIG_FILENAME}, then press Refresh."
         )
+        pipeline_table.render(project, view.pipeline)
         return
     if view.dataset not in names:
         view.dataset, view.issues = names[0], []
@@ -162,6 +164,7 @@ def render(
         "dense outlined"
     ).classes("w-64 mt-2")
     steps()
+    pipeline_table.render(project, view.pipeline)
 
 
 def file_link(root: Path, path: Path) -> None:

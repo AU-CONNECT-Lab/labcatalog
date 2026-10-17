@@ -1,0 +1,145 @@
+from dataclasses import dataclass
+from pathlib import Path
+
+import webview
+from nicegui import app, ui
+
+from labcatalog.codebook.derivatives import Derived, Request, command_line, derive
+from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui.common import computed, note, open_path, section
+from labcatalog.paths import portable_path
+from labcatalog.project import Project
+
+
+@dataclass
+class PipelineForm:
+    table: str = ""
+    name: str = ""
+    study: str | None = None
+    modality: str | None = None
+    reporter: str | None = None
+    split: str = ""
+    columns: str = ""
+    wave: str = ""
+    label: str = ""
+
+
+def words(text: str) -> list[str]:
+    return [w for w in text.replace(",", " ").split() if w]
+
+
+def request_of(form: PipelineForm) -> Request:
+    return Request(
+        Path(form.table),
+        form.name.strip(),
+        form.study or "",
+        form.modality or "",
+        form.reporter or "",
+        words(form.split),
+        words(form.columns),
+        form.wave.strip() or None,
+        form.label.strip() or None,
+    )
+
+
+def missing(form: PipelineForm) -> list[str]:
+    fields = {
+        "a table": form.table,
+        "a name": form.name.strip(),
+        "the study": form.study,
+        "the modality": form.modality,
+        "the reporter": form.reporter,
+    }
+    return [label for label, value in fields.items() if not value]
+
+
+def render(project: Project, form: PipelineForm) -> None:
+    config = project.config
+    form.study = form.study or next(iter(config.studies), None)
+
+    async def choose() -> None:
+        selection = await app.native.main_window.create_file_dialog(
+            webview.FileDialog.OPEN, file_types=("Tables (*.tsv)",)
+        )
+        if selection:
+            form.table = selection[0]
+            chosen.set_text(portable_path(Path(form.table), project.root).as_posix())
+
+    async def write() -> None:
+        if absent := missing(form):
+            ui.notify(f"Give {', '.join(absent)} first", type="warning")
+            return
+        request = request_of(form)
+        try:
+            done = await computed(derive, project, request)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative", multi_line=True)
+            return
+        written_dialog(project.root, done, command_line(request, project.root))
+
+    section("From a pipeline's table")
+    note(
+        "A pipeline's table of measures, a .tsv with a bids_name or participant_id column and a "
+        ".json sidecar of the same name, becomes one instrument per value of Split by, and a "
+        "data file and a column map for each wave. Running it again keeps your edits to the "
+        "instruments."
+    )
+    with ui.row().classes("items-center gap-4 mt-2"):
+        ui.button("Choose table", icon="table_view", on_click=choose).props("outline")
+        chosen = ui.label(
+            portable_path(Path(form.table), project.root).as_posix() if form.table else ""
+        ).classes("lc-note")
+    with ui.row().classes("items-start gap-4 mt-2"):
+        ui.input("Name", placeholder="fnirs_qc").bind_value(form, "name").props(
+            "dense outlined"
+        ).classes("w-48")
+        ui.select(list(config.studies), label="Study").bind_value(form, "study").props(
+            "dense outlined"
+        ).classes("w-48")
+        ui.select(config.vocab.modalities, label="Modality").bind_value(form, "modality").props(
+            "dense outlined"
+        ).classes("w-48")
+        ui.select(config.vocab.reporters, label="Reporter").bind_value(form, "reporter").props(
+            "dense outlined"
+        ).classes("w-48")
+    with ui.row().classes("items-start gap-4"):
+        ui.input("Split by", placeholder="task").bind_value(form, "split").props(
+            "dense outlined"
+        ).classes("w-48").tooltip("Entities whose values become separate instruments")
+        ui.input("Columns", placeholder="raw_* motion_*").bind_value(form, "columns").props(
+            "dense outlined"
+        ).classes("w-64").tooltip("Patterns of the columns to take; every numeric column if empty")
+        ui.input("Wave", placeholder="from ses-").bind_value(form, "wave").props(
+            "dense outlined"
+        ).classes("w-36").tooltip("Only for a table without sessions")
+        ui.input("Instrument name", placeholder="the Name").bind_value(form, "label").props(
+            "dense outlined"
+        ).classes("w-64")
+    ui.button("Write the files", icon="upload", on_click=write).classes("mt-2")
+
+
+def written_dialog(root: Path, done: Derived, command: str) -> None:
+    with ui.dialog() as dialog, ui.card().classes("w-[48rem] max-w-full"):
+        ui.label("Written").classes("text-xl font-medium")
+        with ui.column().classes("gap-1"):
+            for path in done.written:
+                ui.label(portable_path(path, root).as_posix()).classes(
+                    "text-primary cursor-pointer"
+                ).on("click", lambda p=path: open_path(p))
+        if done.left_out:
+            note(f"Not numbers, so left out: {', '.join(done.left_out)}")
+        if done.steps:
+            ui.label(
+                "labcatalog does not edit labcatalog.yaml or the study files, so add these "
+                "lines yourself, then press Refresh."
+            )
+            for instruction, lines in done.steps:
+                ui.label(instruction)
+                ui.code(lines, language="yaml").classes("w-full")
+        else:
+            ui.label("Press Refresh to read the new files.")
+        ui.label("To run it again whenever the pipeline does, add it as a prepare step:")
+        ui.code(command, language="bash").classes("w-full")
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Close", on_click=dialog.close)
+    dialog.open()

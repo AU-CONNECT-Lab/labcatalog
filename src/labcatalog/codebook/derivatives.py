@@ -1,7 +1,10 @@
 import csv
 import fnmatch
 import json
+import os
 import re
+import shlex
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -46,6 +49,22 @@ class Request:
     columns: list[str] = field(default_factory=list)
     wave: str | None = None
     label: str | None = None
+
+
+def command_line(request: Request, root: Path) -> str:
+    # The same run, for a prepare step; prepare steps go through the shell.
+    parts = ["labcatalog", "derivatives", portable_path(request.table, root).as_posix()]
+    parts += ["--name", request.name, "--study", request.study]
+    parts += ["--modality", request.modality, "--reporter", request.reporter]
+    for entity in request.split:
+        parts += ["--split", entity]
+    for pattern in request.columns:
+        parts += ["--columns", pattern]
+    if request.wave is not None:
+        parts += ["--wave", request.wave]
+    if request.label is not None:
+        parts += ["--label", request.label]
+    return subprocess.list2cmdline(parts) if os.name == "nt" else shlex.join(parts)
 
 
 def run_derivatives(root: Path, request: Request) -> Derived:

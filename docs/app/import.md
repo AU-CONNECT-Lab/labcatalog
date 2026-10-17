@@ -22,3 +22,7 @@ Once the files exist, the page links to them and **Open folder** opens their fol
 ## 3. Import
 
 **Check and import** checks the three files and lists every problem by file and line. When there are none, it writes the instrument files and `maps/<dataset>.csv`, and shows the lines to add to the study file, since labcatalog does not change study files itself. Instruments already in the project are only mapped.
+
+## From a pipeline's table
+
+Below the codebook steps, and also when every dataset already has a column map, **From a pipeline's table** brings in a pipeline's table of measures as [labcatalog derivatives](../how-to/pipeline-tables.md) does. **Choose table** picks the `.tsv`; give the **Name** that starts the new instruments' and datasets' IDs, and the **Study**, **Modality** and **Reporter** of the datasets. **Split by**, **Columns**, **Wave** and **Instrument name** are optional; several values are separated by spaces or commas. **Write the files** writes them and shows the lines to add to `labcatalog.yaml` and the study file, and the command to register as a prepare step so that it runs again whenever the pipeline does.

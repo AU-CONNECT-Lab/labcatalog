@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -6,8 +7,9 @@ import pytest
 import yaml
 
 from labcatalog.cli import main
-from labcatalog.codebook.derivatives import Request, run_derivatives
+from labcatalog.codebook.derivatives import Request, command_line, run_derivatives
 from labcatalog.exceptions import CodebookError
+from labcatalog.gui.pipeline_table import PipelineForm, missing, request_of
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
 
@@ -148,3 +150,25 @@ def test_command_prints_what_to_add(demo_project, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert caught.value.code == 0
     assert "Not numbers, so left out: device" in out and "add under datasets:" in out
+
+
+def test_command_line_repeats_the_run_for_a_prepare_step(demo_project):
+    table = pipeline_table(demo_project)
+    line = command_line(request(table, split=["task"], label="Pipe quality"), demo_project)
+    assert line.startswith("labcatalog derivatives derivatives/pipe/desc-qc.tsv --name qc ")
+    assert line.endswith(
+        "--split task --label " + ('"Pipe quality"' if os.name == "nt" else "'Pipe quality'")
+    )
+
+
+def test_the_import_page_form_asks_for_what_is_missing_and_splits_lists():
+    form = PipelineForm(table="t.tsv", name=" qc ", study="s", modality="fnirs")
+    assert missing(form) == ["the reporter"]
+    form.reporter, form.split, form.columns = "self", "task, run", "raw_* motion_*"
+    made = request_of(form)
+    assert (made.name, made.split, made.columns, made.wave) == (
+        "qc",
+        ["task", "run"],
+        ["raw_*", "motion_*"],
+        None,
+    )
