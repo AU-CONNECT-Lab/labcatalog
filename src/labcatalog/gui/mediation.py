@@ -15,6 +15,7 @@ from labcatalog.stats import analysis_script as script
 from labcatalog.stats import mediation as med
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.mediation_r import mediation_code
+from labcatalog.stats.mplus_mediation import mediation_files
 
 NO_MODERATOR = ""
 PATH_NAMES = {"a": "a (X → M)", "b": "b (M → Y)", "c": "c′ (X → Y)"}
@@ -132,6 +133,7 @@ def render(
         fit = med.read_fit(found, model)
         r_text, _ = script.script(result, sample, [code])
         texts = {script.DATA_FILE: frame.to_csv(index=False), "mediation.R": r_text}
+        texts |= mediation_files(model, frame, f"{model.x.label} on {model.y.label}")
         body.clear()
         with body:
             show(model, fit, texts)

@@ -4,7 +4,10 @@ from labcatalog.config import FreedParameter
 from labcatalog.exceptions import MplusError
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import analysis, group_invariance, invariance, mplus
+from labcatalog.stats import analysis_script as script
+from labcatalog.stats import mediation as med
 from labcatalog.stats.cfa import SECOND_ORDER, SUBSCALE_SCORES, SUBSCALES, build_models
+from labcatalog.stats.mplus_mediation import mediation_files
 
 
 @pytest.fixture
@@ -121,3 +124,49 @@ def test_mlr_invariance_has_no_difftest(result):
     files = mplus.invariance_files(wave_model(result), "mlr", "EMS")
     metric = files["mplus_invariance_2_metric.inp"]
     assert "  ESTIMATOR = MLR;" in metric and "DIFFTEST" not in metric
+
+
+def mediation_setup(result):
+    sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
+    data = script.AnalysisData(result, sample)
+    keys = {
+        "x": "example_parent_stress.eps_strain@parent_w1",
+        "m": "example_child_sleep.ecs_total@parent_w1",
+        "y": "example_mood.ems_total@child_w1",
+        "w": "example_parent_stress.eps_child@parent_w1",
+    }
+    return data, keys
+
+
+def test_score_mediation_centres_in_the_data_and_bootstraps_with_ml(result):
+    data, keys = mediation_setup(result)
+    x, m, y, w = (data.score(keys[r]) for r in "xmyw")
+    model = med.MediationModel(x, m, y, moderators=[med.Moderator(w, ("b", "c"))], estimator="mlr")
+    files = mediation_files(model, data.frame(), "EPS")
+    text = files["mplus_mediation.inp"]
+    assert "  ESTIMATOR = ML;" in text and "  BOOTSTRAP = 1000;" in text
+    assert "Mplus bootstraps with ML only" in text
+    assert "DEFINE:\n  xw = x*w;\n  mw = m*w;" in text
+    assert "  y ON mw (b_mw);" in text and "  index = a*b_mw;" in text
+    assert "  ind1 = a*(b + b_mw*(-" in text and "CINTERVAL(BOOTSTRAP)" in text
+    rows = [list(map(float, r.split())) for r in files["mplus_mediation.dat"].splitlines()]
+    assert all(len(r) == 4 for r in rows)
+    assert abs(sum(r[0] for r in rows) / len(rows)) < 1e-4
+    assert all(len(line) <= 90 for line in text.splitlines())
+
+
+def test_item_mediation_uses_factors_and_xwith_for_latent_moderation(result):
+    data, keys = mediation_setup(result)
+    x, m, y, w = (data.score(keys[r], items=True) for r in "xmyw")
+    plain = mediation_files(
+        med.MediationModel(x, m, y, estimator="wlsmv", items=True), data.frame(), "EPS"
+    )
+    text = plain["mplus_mediation.inp"]
+    assert "  X BY x_1-x_3;" in text and "CATEGORICAL" in text and "  BOOTSTRAP = 1000;" in text
+    assert "  NEW(indirect total);" in text
+    moderated = med.MediationModel(x, m, y, moderators=[med.Moderator(w, ("a",))], items=True)
+    text = mediation_files(moderated, data.frame(), "EPS")["mplus_mediation.inp"]
+    assert "  XW | X XWITH W;" in text and "  ALGORITHM = INTEGRATION;" in text
+    assert "BOOTSTRAP" not in text.split("ANALYSIS:")[1] and "  W (v_w);" in text
+    assert "  ind1 = (a + a_xw*(-SQRT(v_w)))*b;" in text
+    assert all(len(line) <= 90 for line in text.splitlines())
