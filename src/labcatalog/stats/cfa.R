@@ -13,9 +13,9 @@ if (length(missing) > 0) {
 
 measures <- if (ordinal) {
   c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled",
-    "srmr")
+    "rmsea.ci.lower.scaled", "rmsea.ci.upper.scaled", "srmr")
 } else {
-  c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "srmr")
+  c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "rmsea.ci.lower", "rmsea.ci.upper", "srmr")
 }
 rows <- list()
 add <- function(model, what, factor = "", item = "", value = NA, message = "") {

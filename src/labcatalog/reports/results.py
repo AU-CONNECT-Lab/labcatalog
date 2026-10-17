@@ -204,6 +204,10 @@ def fit_indices(values: dict[str, float | None], digits: int) -> str:
         for key, name in FIT_INDICES.items()
         if values.get(key) is not None
     ]
+    if values.get("rmsea_low") is not None:
+        low, high = bounded(values["rmsea_low"], digits), bounded(values["rmsea_high"], digits)
+        rmsea = parts.index(f"RMSEA = {bounded(values['rmsea'], digits)}")
+        parts.insert(rmsea + 1, f"90% CI [{low}, {high}]")
     return ", ".join(parts)
 
 

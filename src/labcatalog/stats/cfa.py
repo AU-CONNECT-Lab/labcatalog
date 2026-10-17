@@ -30,12 +30,16 @@ FIT = {
     "cfi.scaled": "cfi",
     "tli.scaled": "tli",
     "rmsea.scaled": "rmsea",
+    "rmsea.ci.lower.scaled": "rmsea_low",
+    "rmsea.ci.upper.scaled": "rmsea_high",
     "chisq": "chisq",
     "df": "df",
     "pvalue": "p",
     "cfi": "cfi",
     "tli": "tli",
     "rmsea": "rmsea",
+    "rmsea.ci.lower": "rmsea_low",
+    "rmsea.ci.upper": "rmsea_high",
     "srmr": "srmr",
 }
 

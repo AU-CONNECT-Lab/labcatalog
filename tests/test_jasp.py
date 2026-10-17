@@ -239,8 +239,11 @@ fit <- lavaan::lavaan(
 measures <- lavaan::fitMeasures(fit, {measures})
 out <- as.list(measures)
 """
-ORDINAL_MEASURES = 'c("chisq.scaled", "df.scaled", "cfi.scaled", "rmsea.scaled", "srmr")'
-CONTINUOUS_MEASURES = 'c("chisq", "df", "cfi", "rmsea", "srmr")'
+ORDINAL_MEASURES = (
+    'c("chisq.scaled", "df.scaled", "cfi.scaled", "rmsea.scaled", "rmsea.ci.lower.scaled", '
+    '"rmsea.ci.upper.scaled", "srmr")'
+)
+CONTINUOUS_MEASURES = 'c("chisq", "df", "cfi", "rmsea", "rmsea.ci.lower", "rmsea.ci.upper", "srmr")'
 
 
 def jasp_cfa(tmp_path, data, factors, ordinal, group="NULL", equal='""') -> dict:
@@ -258,7 +261,9 @@ def jasp_cfa(tmp_path, data, factors, ordinal, group="NULL", equal='""') -> dict
 
 
 def fit_keys(found: dict) -> dict:
-    return {k.removesuffix(".scaled"): v for k, v in found.items()}
+    names = {"rmsea.ci.lower": "rmsea_low", "rmsea.ci.upper": "rmsea_high"}
+    keys = (k.removesuffix(".scaled") for k in found)
+    return {names.get(k, k): v for k, v in zip(keys, found.values(), strict=True)}
 
 
 @pytest.mark.skipif(not ready(CFA_PACKAGES), reason="R with lavaan and semTools is not installed")
@@ -266,7 +271,7 @@ def test_ordinal_cfa_fit_matches_jasp(result, tmp_path):
     model = cfa_model(result)
     [fit] = cfa.fit_models([model], rscript(), cfa.WLSMV)
     jasp = fit_keys(jasp_cfa(tmp_path, model.data, model.factors, ordinal=True))
-    for key in ("chisq", "df", "cfi", "rmsea", "srmr"):
+    for key in ("chisq", "df", "cfi", "rmsea", "rmsea_low", "rmsea_high", "srmr"):
         assert fit.fit[key] == pytest.approx(jasp[key], rel=1e-4, abs=1e-6), key
 
 
@@ -274,10 +279,11 @@ def test_ordinal_cfa_fit_matches_jasp(result, tmp_path):
 def test_continuous_cfa_fit_matches_jasp(result, tmp_path, engine):
     model = cfa_model(result)
     [fit] = cfa.fit_models([model], engine, cfa.ML)
-    jasp = jasp_cfa(tmp_path, model.data, model.factors, ordinal=False)
-    # semopy and lavaan reach the same maximum by different optimizers.
+    jasp = fit_keys(jasp_cfa(tmp_path, model.data, model.factors, ordinal=False))
+    # semopy and lavaan reach the same maximum by different optimizers; semopy has no interval.
     close = 1e-6 if engine else 1e-3
-    for key in ("chisq", "df", "cfi", "rmsea"):
+    keys = ("chisq", "df", "cfi", "rmsea") + (("rmsea_low", "rmsea_high") if engine else ())
+    for key in keys:
         assert fit.fit[key] == pytest.approx(jasp[key], rel=close, abs=close), key
 
 

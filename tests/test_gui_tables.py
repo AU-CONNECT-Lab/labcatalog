@@ -146,6 +146,8 @@ def test_factor_tables_show_fit_loadings_and_omega(mock_project):
                 "cfi": 1.0,
                 "tli": 1.0,
                 "rmsea": 0.0,
+                "rmsea_low": 0.0,
+                "rmsea_high": 0.071,
                 "srmr": 0.033,
             },
             loadings={("ems_sadness", "ems_2_w1"): 0.81},
@@ -171,6 +173,7 @@ def test_factor_tables_show_fit_loadings_and_omega(mock_project):
     _, rows = instruments.fit_table(mood, fits)
     assert rows[0]["model"] == "Subscales: Sadness, Worry and fatigue, Low positive affect"
     assert (rows[0]["chisq"], rows[0]["p"], rows[0]["cfi"]) == ("23.45 (24)", ".493", "1.00")
+    assert rows[0]["rmsea"] == "0.00 [0.00, 0.07]"
     assert rows[1]["problem"] == "improper solution"
     assert rows[2]["problem"].startswith("3 items")
     columns, rows = instruments.loading_table(result, mood, "child_w1", fits)

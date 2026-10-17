@@ -115,6 +115,8 @@ def test_cfa_reports_fit_loadings_and_omega():
         "items as ordered categories (N = 412), gave χ²(24) = 31.24, p = .146, CFI = .98, "
         "TLI = .98, RMSEA = .04. Standardized loadings ranged from .45 to .82. ω was .84."
     )
+    one.fit = {**FIT, "rmsea_low": 0.0, "rmsea_high": 0.082}
+    assert "RMSEA = .04, 90% CI [.00, .08]. Standardized" in results.cfa_text([one], LABELS)
     two = CfaFit("mood", "child_w1", SUBSCALES, {"sad": [], "worry": []}, 412, problem=IMPROPER)
     assert results.cfa_text([two], LABELS).startswith(
         "A model with one factor for each subscale (Sadness and Worry) could not be used: improper"

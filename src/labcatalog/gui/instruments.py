@@ -1210,7 +1210,7 @@ def fit_table(instrument: Instrument, fits: list[CfaFit]) -> tuple[list[dict], l
         col("p", "p", numeric=True),
         col("cfi", "CFI", numeric=True),
         col("tli", "TLI", numeric=True),
-        col("rmsea", "RMSEA", numeric=True),
+        col("rmsea", "RMSEA [90% CI]", numeric=True),
         col("srmr", "SRMR", numeric=True),
         col("problem", "Note", sortable=False),
     ]
@@ -1228,12 +1228,20 @@ def fit_table(instrument: Instrument, fits: list[CfaFit]) -> tuple[list[dict], l
                 if values.get("chisq") is not None
                 else "",
                 "p": p_value(values.get("p")),
-                **{key: fmt(values.get(key)) for key in ("cfi", "tli", "rmsea", "srmr")},
+                **{key: fmt(values.get(key)) for key in ("cfi", "tli", "srmr")},
+                "rmsea": rmsea_text(values),
                 "problem": f.problem
                 or ("3 items: the model fits exactly, so it has no fit indices" if exact else ""),
             }
         )
     return columns, rows
+
+
+def rmsea_text(values: dict[str, float | None]) -> str:
+    # semopy gives no interval.
+    if values.get("rmsea_low") is None:
+        return fmt(values.get("rmsea"))
+    return f"{fmt(values['rmsea'])} [{fmt(values['rmsea_low'])}, {fmt(values['rmsea_high'])}]"
 
 
 def loading_table(

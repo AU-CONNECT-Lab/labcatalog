@@ -75,7 +75,18 @@ def test_models_fit_in_r_with_omega_for_every_score(result):
         next(m for m in models if m.kind == SUBSCALES and m.dataset == "child_w1").data
     )
     assert mood.fit["df"] == 24
-    assert set(mood.fit) == {"chisq", "df", "p", "cfi", "tli", "rmsea", "srmr"}
+    assert set(mood.fit) == {
+        "chisq",
+        "df",
+        "p",
+        "cfi",
+        "tli",
+        "rmsea",
+        "rmsea_low",
+        "rmsea_high",
+        "srmr",
+    }
+    assert mood.fit["rmsea_low"] <= mood.fit["rmsea"] <= mood.fit["rmsea_high"]
     assert set(mood.omega) == {"ems_sadness", "ems_worry", "ems_low_positive"}
     assert all(0.5 < v < 1 for v in mood.omega.values())
     assert len(mood.loadings) == 9 and all(v > 0.5 for v in mood.loadings.values())
