@@ -40,6 +40,12 @@ def test_ml_items_are_continuous(mood):
     assert "CATEGORICAL" not in text and "  ESTIMATOR = ML;" in text
 
 
+def test_mlr_is_written_as_mplus_mlr(mood):
+    files = mplus.cfa_files(mood, "mlr", "EMS")
+    assert all("  ESTIMATOR = MLR;" in t for n, t in files.items() if n.endswith(".inp"))
+    assert not any("CATEGORICAL" in t for t in files.values())
+
+
 def test_run_writes_an_output_beside_each_input(tmp_path):
     fake = tmp_path / "mplus.bat"
     fake.write_text("@copy %1 %2 >nul\n", encoding="utf-8")
@@ -109,3 +115,9 @@ def test_groups_use_mplus_own_steps(result):
     assert "  GROUPING = g (1 = g1 2 = g2);" in text and "! g1 = Girl" in text
     codes = {row.split()[-1] for row in files[mplus.DATA].splitlines()}
     assert codes == {"1", "2"}
+
+
+def test_mlr_invariance_has_no_difftest(result):
+    files = mplus.invariance_files(wave_model(result), "mlr", "EMS")
+    metric = files["mplus_invariance_2_metric.inp"]
+    assert "  ESTIMATOR = MLR;" in metric and "DIFFTEST" not in metric

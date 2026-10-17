@@ -28,7 +28,9 @@ PYTHON = "Python"
 IMPROPER = "improper solution (a negative variance or a correlation above 1)"
 WLSMV = "wlsmv"
 ML = "ml"
-# lavaan's names for the scaled (WLSMV) and plain (ML) fit measures.
+MLR = "mlr"
+ESTIMATORS = {WLSMV: "WLSMV", ML: "ML", MLR: "MLR"}
+# lavaan's names for the scaled (WLSMV), robust (MLR) and plain (ML) fit measures.
 FIT = {
     "chisq.scaled": "chisq",
     "df.scaled": "df",
@@ -46,6 +48,11 @@ FIT = {
     "rmsea": "rmsea",
     "rmsea.ci.lower": "rmsea_low",
     "rmsea.ci.upper": "rmsea_high",
+    "cfi.robust": "cfi",
+    "tli.robust": "tli",
+    "rmsea.robust": "rmsea",
+    "rmsea.ci.lower.robust": "rmsea_low",
+    "rmsea.ci.upper.robust": "rmsea_high",
     "srmr": "srmr",
 }
 
@@ -79,6 +86,13 @@ class CfaFit:
     problem: str | None = None
     engine: str = R
     estimator: str = WLSMV
+
+
+def estimator_text(estimator: str, indicators: str = "items") -> str:
+    if estimator == WLSMV:
+        return f"WLSMV with the {indicators} as ordered categories"
+    name = "robust maximum likelihood (MLR)" if estimator == MLR else "maximum likelihood"
+    return f"{name} with the {indicators} as continuous"
 
 
 def scores_of(model: CfaModel | CfaFit) -> list[str]:
@@ -146,8 +160,8 @@ def fit_models(models: list[CfaModel], rscript: str | None, estimator: str = WLS
 
 
 def model_estimator(model: CfaModel, estimator: str) -> str:
-    # Subscale scores are continuous whatever the project asks for its items.
-    return estimator if model.ordered else ML
+    # Subscale scores are continuous whatever is asked for the items.
+    return ML if estimator == WLSMV and not model.ordered else estimator
 
 
 def lavaan_names(model: CfaModel) -> tuple[dict[str, str], dict[str, str]]:

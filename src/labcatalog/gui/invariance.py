@@ -13,7 +13,7 @@ from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument
 from labcatalog.stats import invariance, mplus
-from labcatalog.stats.cfa import SUBSCALES, WLSMV
+from labcatalog.stats.cfa import MLR, SUBSCALES, WLSMV, estimator_text
 from labcatalog.stats.invariance import (
     REPORTERS,
     STEPS,
@@ -34,16 +34,18 @@ PARAMETERS = {"loading": "loading", "threshold": "thresholds", "intercept": "int
 Reload = Callable[[], Awaitable[None]]
 
 
-def method_text(result: CatalogResult, across: str, by: str) -> str:
+def method_text(result: CatalogResult, across: str, by: str, estimator: str) -> str:
     # by names what the occasions are: waves, reporters, or the groups of an item.
     config = result.project.config
+    steps = f"Each step holds one more set of parameters equal across {by}"
+    missing = "a wave" if across == WAVES else "an occasion"
     how = (
-        "WLSMV with the items as ordered categories, people who answered every item. Each step "
-        f"holds one more set of parameters equal across {by}; Δχ² is the scaled difference test"
-        if config.stats.cfa_estimator == WLSMV
-        else "maximum likelihood with the items as continuous, full information for people "
-        f"missing {'a wave' if across == WAVES else 'an occasion'}. Each step holds one more set "
-        f"of parameters equal across {by}; Δχ² is the likelihood ratio test"
+        f"{estimator_text(estimator)}, people who answered every item. {steps}; Δχ² is the "
+        "scaled difference test"
+        if estimator == WLSMV
+        else f"{estimator_text(estimator)}, full information for people missing {missing}. "
+        f"{steps}; Δχ² is the "
+        + ("scaled likelihood ratio test" if estimator == MLR else "likelihood ratio test")
     )
     if across == WAVES:
         model = (
@@ -118,7 +120,7 @@ def test_block(
             name,
             {"invariance": shown},
             later_texts=lambda: mplus.invariance_files(
-                model(), result.project.config.stats.cfa_estimator, f"{instrument.name}, {heading}"
+                model(), test.estimator, f"{instrument.name}, {heading}"
             ),
         )
 
@@ -184,7 +186,7 @@ def score_dialog(
     reload: Reload | None,
 ) -> None:
     config = result.project.config
-    estimator = config.stats.cfa_estimator
+    estimator = test.estimator
     chosen = {"step": steps[0]}
     ticked: set[tuple[str, str]] = set()
 

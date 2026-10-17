@@ -5,6 +5,7 @@ from labcatalog.stats.cfa import (
     GENERAL,
     IMPROPER,
     ML,
+    MLR,
     ONE_FACTOR,
     SECOND_ORDER,
     SUBSCALE_SCORES,
@@ -158,6 +159,10 @@ def test_cfa_reports_fit_loadings_and_omega():
         "lavaan with maximum likelihood and the subscale scores as continuous (N = 420), fits "
         "exactly with three subscale scores, so it has no fit indices. ω of the summed subscale "
         "scores was .80."
+    )
+    one.estimator = MLR
+    assert "with robust maximum likelihood (MLR) and the items as continuous" in (
+        results.cfa_text([one], LABELS)
     )
     two = CfaFit("mood", "child_w1", SUBSCALES, {"sad": [], "worry": []}, 412, problem=IMPROPER)
     assert results.cfa_text([two], LABELS).startswith(

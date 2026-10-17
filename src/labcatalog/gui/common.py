@@ -3,7 +3,7 @@ import os
 import re
 import subprocess
 import sys
-from collections.abc import Iterable, Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -11,6 +11,7 @@ from nicegui import run, ui
 
 from labcatalog import defaults
 from labcatalog.metadata.bibliography import Bibliography, citation
+from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.summary import wave_order
 
 LINE_SUFFIX = re.compile(r":(\d+)$")
@@ -171,6 +172,12 @@ def command(text: str) -> None:
 def copy_command(text: str) -> None:
     ui.clipboard.write(text)
     ui.notify("Copied")
+
+
+def estimator_toggle(value: str, on_change: Callable[[str], None]) -> None:
+    ui.toggle(ESTIMATORS, value=value, on_change=lambda e: on_change(e.value)).props(
+        "dense no-caps"
+    ).tooltip("How the factor models treat the items; the project's default is in labcatalog.yaml")
 
 
 def path_input(label: str, value: str, hint: str) -> ui.input:

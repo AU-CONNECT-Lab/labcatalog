@@ -108,14 +108,14 @@ def load_validated(root: Path) -> tuple[Project | None, list[Issue]]:
     return (None if has_errors(issues) else project), issues
 
 
-def run_cfa(result: CatalogResult, rscript: str | None) -> list[CfaFit]:
+def run_cfa(result: CatalogResult, rscript: str | None, estimator: str) -> list[CfaFit]:
     models = build_models(result.project, result.catalog, result.datasets)
-    return fit_models(models, rscript, result.project.config.stats.cfa_estimator)
+    return fit_models(models, rscript, estimator)
 
 
-def run_invariance(result: CatalogResult, rscript: str) -> list[InvarianceTest]:
+def run_invariance(result: CatalogResult, rscript: str, estimator: str) -> list[InvarianceTest]:
     models = invariance.build_models(result.project, result.catalog, result.datasets)
-    return invariance.fit_models(models, rscript, result.project.config.stats.cfa_estimator)
+    return invariance.fit_models(models, rscript, estimator)
 
 
 def run_codebook_create(root: Path, dataset: str, dictionary: Path | None) -> list[Path]:

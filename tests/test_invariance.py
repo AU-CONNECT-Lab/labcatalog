@@ -102,6 +102,19 @@ def test_continuous_items_have_no_thresholds_step_or_option_check(result):
     assert all(s.df_diff > 0 for s in test.steps[1:])
 
 
+@needs_r
+def test_mlr_gives_robust_fit_and_scaled_differences(result):
+    stress = models_of(result)["example_parent_stress"]
+    [ml] = invariance.fit_models([stress], rscript(), "ml")
+    [mlr] = invariance.fit_models([stress], rscript(), "mlr")
+    assert (ml.estimator, mlr.estimator) == ("ml", "mlr")
+    assert [s.step for s in mlr.steps] == ["configural", "metric", "scalar"]
+    assert all(s.problem is None and s.df_diff > 0 for s in mlr.steps[1:])
+    # The robust chi-square is the ML one divided by a scaling factor.
+    assert mlr.steps[0].fit["df"] == ml.steps[0].fit["df"]
+    assert mlr.steps[0].fit["chisq"] != pytest.approx(ml.steps[0].fit["chisq"])
+
+
 def test_an_option_nobody_chose_in_one_wave_stops_the_model_before_r(result):
     stress = models_of(result)["example_parent_stress"]
     stress.occasions["3"]["eps_1"] = stress.occasions["3"]["eps_1"].replace(5.0, 4.0)

@@ -32,6 +32,8 @@ class AnalysisView:
     multilevel: ml.Model | None = None
     invariance_measure: str | None = None
     invariance_group: str | None = None
+    # None keeps the project's stats.cfa_estimator.
+    invariance_estimator: str | None = None
     # The instruments whose variables the page offers; None until first shown, then all.
     instruments: list[str] | None = None
 

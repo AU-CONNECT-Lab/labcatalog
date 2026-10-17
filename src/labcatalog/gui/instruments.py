@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from functools import cache, partial
 from pathlib import Path
 
-from nicegui import app, ui
+from nicegui import app, background_tasks, ui
 
 from labcatalog.ai import scoring as ai_scoring
 from labcatalog.ai.search import Search
@@ -20,6 +20,7 @@ from labcatalog.gui.common import (
     code_tabs,
     col,
     computed,
+    estimator_toggle,
     fmt,
     note,
     open_path,
@@ -65,6 +66,7 @@ from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument, Reference, Text
 from labcatalog.stats import mplus
 from labcatalog.stats.cfa import (
+    ESTIMATORS,
     GENERAL,
     GENERAL_KINDS,
     MIN_SUBSCALES,
@@ -75,6 +77,7 @@ from labcatalog.stats.cfa import (
     WLSMV,
     CfaFit,
     R,
+    estimator_text,
     scores_of,
 )
 from labcatalog.stats.cfa import build_models as cfa_models
@@ -124,6 +127,11 @@ class CfaView:
     open_settings: Callable[[], None] | None = None
     # Reloads the project, after a change to labcatalog.yaml.
     reload: Callable[[], Awaitable[None]] | None = None
+    # The estimators chosen on the page; None keeps the project's stats.cfa_estimator.
+    estimator: str | None = None
+    invariance_estimator: str | None = None
+    refit: Callable[[], Awaitable[None]] | None = None
+    retest: Callable[[], Awaitable[None]] | None = None
 
 
 def render(
@@ -1087,7 +1095,15 @@ def factor_structure(
     if not score_summaries(result, instrument, dataset):
         return
     fits = [f for f in cfa.fits if (f.instrument_id, f.dataset) == (instrument.id, dataset)]
-    with panel("Factor structure", dataset):
+    chosen = cfa.estimator or result.project.config.stats.cfa_estimator
+
+    def choose(value: str) -> None:
+        cfa.estimator = value
+        background_tasks.create(cfa.refit())
+
+    with panel("Factor structure", dataset) as tools:
+        with tools:
+            estimator_toggle(chosen, choose)
         if cfa.status in (CFA_UNSET, CFA_RUNNING):
             note("Fitting factor models.")
         elif cfa.status == CFA_FAILED:
@@ -1098,12 +1114,7 @@ def factor_structure(
             engine, estimator = fits[0].engine, fits[0].estimator
             ordinal = estimator == WLSMV
             package = "lavaan" if engine == R else "semopy"
-            how = (
-                "WLSMV with the items as ordered categories"
-                if ordinal
-                else "maximum likelihood with the items as continuous"
-            )
-            method = f"{package}, {how}, people who answered every item."
+            method = f"{package}, {estimator_text(estimator)}, people who answered every item."
             omega = (
                 "ω is semTools' categorical omega."
                 if ordinal
@@ -1117,7 +1128,11 @@ def factor_structure(
                     f"Fit of Factor Models for {instrument.name}",
                     *without_empty(*without_empty(*fit_table(instrument, fits), "problem"), "srmr"),
                     method
-                    + (" Subscale scores are continuous, maximum likelihood." if general else ""),
+                    + (
+                        " Subscale scores are continuous, maximum likelihood."
+                        if general and ordinal
+                        else ""
+                    ),
                 ),
                 "cfa_loadings": PaperTable(
                     f"Standardized Loadings and ω for {instrument.name}",
@@ -1139,26 +1154,27 @@ def factor_structure(
                 result,
                 f"cfa_{instrument.id}_{dataset}",
                 papers,
-                later_texts=partial(mplus_inputs, result, instrument, dataset),
+                later_texts=partial(mplus_inputs, result, instrument, dataset, chosen),
             )
             if cfa.message:
                 note(cfa.message)
-            elif result.project.config.stats.cfa_estimator != estimator:
-                # The project asks for ordered items, which only lavaan in R can fit.
+            elif chosen != estimator:
+                # semopy has ML only.
                 settings_hint(
                     cfa,
-                    "This project's stats: cfa_estimator is wlsmv; set Rscript on the Settings "
-                    "page to fit the items as ordered categories in lavaan.",
+                    f"{ESTIMATORS[chosen]} needs lavaan in R; set Rscript on the Settings page.",
                 )
 
 
-def mplus_inputs(result: CatalogResult, instrument: Instrument, dataset: str) -> dict[str, str]:
+def mplus_inputs(
+    result: CatalogResult, instrument: Instrument, dataset: str, estimator: str
+) -> dict[str, str]:
     models = [
         m
         for m in cfa_models(result.project, result.catalog, result.datasets)
         if (m.instrument_id, m.dataset) == (instrument.id, dataset)
     ]
-    return mplus.cfa_files(models, result.project.config.stats.cfa_estimator, instrument.name)
+    return mplus.cfa_files(models, estimator, instrument.name)
 
 
 def general_note(fits: list[CfaFit]) -> str:
@@ -1368,8 +1384,16 @@ def invariance_section(
     result: CatalogResult, instrument: Instrument, cfa: CfaView, several_waves: bool
 ) -> None:
     tests = [t for t in cfa.invariance if t.instrument_id == instrument.id]
+    chosen = cfa.invariance_estimator or result.project.config.stats.cfa_estimator
+
+    def choose(value: str) -> None:
+        cfa.invariance_estimator = value
+        background_tasks.create(cfa.retest())
+
     if several_waves:
-        with panel("Invariance across waves"):
+        with panel("Invariance across waves") as tools:
+            with tools:
+                estimator_toggle(chosen, choose)
             waves = [t for t in tests if t.across == WAVES]
             if cfa.invariance_status == CFA_UNSET:
                 settings_hint(
@@ -1384,7 +1408,7 @@ def invariance_section(
                 note("No model: no score here has three or more items in two or more waves.")
             else:
                 note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
-                method = invariance_view.method_text(result, WAVES, "waves")
+                method = invariance_view.method_text(result, WAVES, "waves", chosen)
                 for i, test in enumerate(waves, start=1):
                     counts = ", ".join(
                         f"{views.wave_name(result, test.study, wave)} {n}"
@@ -1406,9 +1430,11 @@ def invariance_section(
                     )
     reporters = [t for t in tests if t.across == REPORTERS]
     if reporters:
-        with panel("Invariance across reporters"):
+        with panel("Invariance across reporters") as tools:
+            with tools:
+                estimator_toggle(chosen, choose)
             note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
-            method = invariance_view.method_text(result, REPORTERS, "reporters")
+            method = invariance_view.method_text(result, REPORTERS, "reporters", chosen)
             for i, test in enumerate(reporters, start=1):
                 counts = ", ".join(f"{reporter} {n}" for reporter, n in test.n.items())
                 wave = views.wave_name(result, test.study, test.wave)

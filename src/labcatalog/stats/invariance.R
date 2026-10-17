@@ -2,8 +2,9 @@
 # Arguments: the folder, the estimator, and "steps" to fit every step or "score" for score tests.
 args <- commandArgs(trailingOnly = TRUE)
 folder <- args[1]
-# wlsmv treats the items as ordered categories, ml as continuous.
-ordinal <- args[2] == "wlsmv"
+# wlsmv treats the items as ordered categories, ml and mlr (robust) as continuous.
+estimator <- args[2]
+ordinal <- estimator == "wlsmv"
 action <- args[3]
 
 needed <- c("lavaan", "semTools")
@@ -20,6 +21,11 @@ if (ordinal) {
                 metric = c("thresholds", "loadings"),
                 scalar = c("thresholds", "loadings", "intercepts"))
   added <- list(thresholds = "|", metric = "=~", scalar = "~1")
+} else if (estimator == "mlr") {
+  measures <- c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.robust", "tli.robust",
+                "rmsea.robust", "srmr")
+  steps <- list(configural = "", metric = "loadings", scalar = c("loadings", "intercepts"))
+  added <- list(metric = "=~", scalar = "~1")
 } else {
   measures <- c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "srmr")
   steps <- list(configural = "", metric = "loadings", scalar = c("loadings", "intercepts"))
@@ -44,7 +50,7 @@ fit_step <- function(syntax, data, equal, partial, group) {
          ID.cat = "Wu.Estabrook.2016")
   } else {
     # Full-information ML keeps the people missing an occasion.
-    list(estimator = "ML", missing = "ml")
+    list(estimator = toupper(estimator), missing = "ml")
   })
   options <- c(options, if (group == "") {
     list(longFacNames = by_stem(lavaan::lavNames(syntax, "lv")), longIndNames = by_stem(items),

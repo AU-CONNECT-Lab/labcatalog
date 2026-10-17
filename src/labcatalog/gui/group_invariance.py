@@ -4,7 +4,7 @@ from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui import preferences
-from labcatalog.gui.common import computed, note, panel
+from labcatalog.gui.common import computed, estimator_toggle, note, panel
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
@@ -42,7 +42,7 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
                 ui.spinner()
                 note("Testing invariance across groups in R.")
             measure, group = view.invariance_measure, view.invariance_group
-            estimator = result.project.config.stats.cfa_estimator
+            estimator = chosen_estimator()
             try:
                 models = await computed(group_models, result, sample, measure, group)
                 tests = await computed(fit_models, models, rscript, estimator)
@@ -55,14 +55,14 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
                 return
             body.clear()
             with body:
-                show(models, tests, measure, group)
+                show(models, tests, measure, group, estimator)
 
-        def show(models, tests, measure: str, group: str) -> None:
+        def show(models, tests, measure: str, group: str, estimator: str) -> None:
             if not tests:
                 note("Fewer than two groups have two or more people who answered every item.")
                 return
             instrument = result.project.instruments[measure.split(MEASURE_SEPARATOR)[0]]
-            method = invariance_view.method_text(result, "groups", groups[group])
+            method = invariance_view.method_text(result, "groups", groups[group], estimator)
             note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
             for i, (model, found) in enumerate(zip(models, tests, strict=True), start=1):
                 counts = ", ".join(f"{label} {n}" for label, n in found.n.items())
@@ -86,6 +86,9 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
             setattr(view, key, value)
             body.clear()
 
+        def chosen_estimator() -> str:
+            return view.invariance_estimator or result.project.config.stats.cfa_estimator
+
         with ui.row().classes("w-full items-center gap-4"):
             ui.select(
                 measures,
@@ -101,5 +104,8 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
                 with_input=True,
                 on_change=lambda e: choose("invariance_group", e.value),
             ).props("dense outlined").classes("min-w-96 grow")
+            estimator_toggle(
+                chosen_estimator(), lambda value: choose("invariance_estimator", value)
+            )
             ui.button("Test", icon="play_arrow", on_click=test).props("no-caps")
         body = ui.column().classes("w-full gap-2")

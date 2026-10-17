@@ -7,6 +7,7 @@ import pandas as pd
 
 from labcatalog.exceptions import MplusError
 from labcatalog.stats.cfa import (
+    ESTIMATORS,
     SECOND_ORDER,
     SUBSCALE_SCORES,
     WLSMV,
@@ -61,7 +62,7 @@ def cfa_input(model: CfaModel, data_file: str, estimator: str, title: str) -> st
         *([f"  CATEGORICAL = {names};"] if ordered else []),
         f"  MISSING = ALL ({MISSING});",
         "ANALYSIS:",
-        f"  ESTIMATOR = {'WLSMV' if ordered else 'ML'};",
+        f"  ESTIMATOR = {ESTIMATORS[model_estimator(model, estimator)]};",
         "MODEL:",
     ]
     # Loadings free and factor variances fixed at 1, as lavaan's std.lv.
@@ -146,7 +147,7 @@ def grouped_input(
         f"  GROUPING = {GROUP_COLUMN} ({codes});",
         f"  MISSING = ALL ({MISSING});",
         "ANALYSIS:",
-        *estimator_lines(ordered),
+        *estimator_lines(estimator),
         # Mplus has no metric step for binary items with WLSMV.
         f"  MODEL = {'CONFIGURAL SCALAR' if binary else 'CONFIGURAL METRIC SCALAR'};",
         "MODEL:",
@@ -197,7 +198,7 @@ def longitudinal_input(
         *(statement(f"CATEGORICAL = {' '.join(names)}") if ordered else []),
         f"  MISSING = ALL ({MISSING});",
         "ANALYSIS:",
-        *estimator_lines(ordered),
+        *estimator_lines(estimator),
         *([f"  DIFFTEST = {STEPS[k - 2]}.dif;"] if ordered and k > 1 else []),
         "MODEL:",
     ]
@@ -236,10 +237,10 @@ def longitudinal_input(
     return "\n".join(lines)
 
 
-def estimator_lines(ordered: bool) -> list[str]:
-    if ordered:
+def estimator_lines(estimator: str) -> list[str]:
+    if estimator == WLSMV:
         return ["  ESTIMATOR = WLSMV;", "  PARAMETERIZATION = THETA;"]
-    return ["  ESTIMATOR = ML;"]
+    return [f"  ESTIMATOR = {ESTIMATORS[estimator]};"]
 
 
 def freed_lines(model: InvarianceModel, applied: bool) -> list[str]:

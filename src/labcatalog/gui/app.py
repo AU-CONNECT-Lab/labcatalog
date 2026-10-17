@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from functools import partial
 from pathlib import Path
 
 import webview
@@ -117,7 +118,10 @@ class Window:
         self.editing = EditView()
         self.preparing = PrepareView()
         self.cfa = CfaView(
-            open_settings=lambda: self.tabs.set_value("settings"), reload=self.reload
+            open_settings=lambda: self.tabs.set_value("settings"),
+            reload=self.reload,
+            refit=self.fit_factor_models,
+            retest=self.test_invariance,
         )
         self.dataset: str | None = None
         self.error: str | None = None
@@ -261,6 +265,7 @@ class Window:
                 self.importing = ImportView()
                 self.editing = EditView()
                 self.preparing = PrepareView()
+                self.cfa.estimator = self.cfa.invariance_estimator = None
                 self.root = root
             self.set_busy(False)
         self.result = result
@@ -300,19 +305,27 @@ class Window:
 
     async def start_cfa(self) -> None:
         result, cfa = self.result, self.cfa
-        rscript = preferences.load().get(preferences.RSCRIPT)
         cfa.fits, cfa.message = [], ""
         cfa.invariance, cfa.invariance_message = [], ""
         if result is None or result.project is None:
             cfa.status = cfa.invariance_status = CFA_UNSET
             cfa_changed()
             return
-        cfa.status = CFA_RUNNING
+        rscript = preferences.load().get(preferences.RSCRIPT)
         cfa.invariance_status = CFA_RUNNING if rscript else CFA_UNSET
+        await self.fit_factor_models()
+        if rscript and self.result is result:
+            await self.test_invariance()
+
+    async def fit_factor_models(self) -> None:
+        result, cfa = self.result, self.cfa
+        rscript = preferences.load().get(preferences.RSCRIPT)
+        fit = partial(run_cfa, estimator=cfa.estimator or default_estimator(result))
+        cfa.fits, cfa.message, cfa.status = [], "", CFA_RUNNING
         cfa_changed()
-        fits, message, status = await in_r(run_cfa, result, rscript)
+        fits, message, status = await in_r(fit, result, rscript)
         if status == CFA_FAILED:
-            fits = await common.computed(run_cfa, result, None)
+            fits = await common.computed(fit, result, None)
             message, status = (
                 f"R failed, so the factor models were fitted in Python: {message}",
                 CFA_DONE,
@@ -322,9 +335,16 @@ class Window:
             return
         cfa.fits, cfa.message, cfa.status = fits, message, status
         cfa_changed()
-        if not rscript:
-            return
-        found = await in_r(run_invariance, result, rscript)
+
+    async def test_invariance(self) -> None:
+        result, cfa = self.result, self.cfa
+        rscript = preferences.load().get(preferences.RSCRIPT)
+        test = partial(
+            run_invariance, estimator=cfa.invariance_estimator or default_estimator(result)
+        )
+        cfa.invariance, cfa.invariance_message, cfa.invariance_status = [], "", CFA_RUNNING
+        cfa_changed()
+        found = await in_r(test, result, rscript)
         if self.result is not result:
             return
         cfa.invariance, cfa.invariance_message, cfa.invariance_status = found
@@ -518,6 +538,10 @@ class Window:
 def cfa_changed() -> None:
     instruments.cfa_changed()
     methods.cfa_changed()
+
+
+def default_estimator(result: CatalogResult) -> str:
+    return result.project.config.stats.cfa_estimator
 
 
 async def in_r(

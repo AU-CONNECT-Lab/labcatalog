@@ -109,8 +109,9 @@ class FreedParameter(StrictModel):
 
 class StatsConfig(StrictModel):
     correlate_by: str = defaults.CORRELATE_BY
-    # Factor models: items as ordered categories (WLSMV) or as continuous (ML).
-    cfa_estimator: Literal["wlsmv", "ml"] = "wlsmv"
+    # Factor models: items as ordered categories (WLSMV) or as continuous (ML, robust MLR); the
+    # default the pages start from.
+    cfa_estimator: Literal["wlsmv", "ml", "mlr"] = "wlsmv"
     # Two groups: Welch's t test with d from the mean of the two variances, or Student's with
     # the pooled SD, as JASP gives it by default.
     t_test: Literal["welch", "student"] = "welch"

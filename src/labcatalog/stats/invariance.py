@@ -71,6 +71,7 @@ class InvarianceTest:
     across: str = WAVES
     wave: str = ""
     freed: list[FreedParameter] = field(default_factory=list)
+    estimator: str = WLSMV
 
 
 @dataclass
@@ -233,10 +234,13 @@ def fit_models(
     gaps = [unchosen_options(model) if estimator == WLSMV else None for model in models]
     ready = [model for model, gap in zip(models, gaps, strict=True) if gap is None]
     tested = iter(fit_in_r(ready, rscript, estimator))
-    return [
+    found = [
         next(tested) if gap is None else new_test(model, problem=gap)
         for model, gap in zip(models, gaps, strict=True)
     ]
+    for test in found:
+        test.estimator = estimator
+    return found
 
 
 def unchosen_options(model: InvarianceModel) -> str | None:

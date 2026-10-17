@@ -3,6 +3,7 @@ from labcatalog.stats.analysis_script import ANOVA, STUDENT, WELCH, Comparison, 
 from labcatalog.stats.cfa import (
     GENERAL_KINDS,
     MIN_SUBSCALES,
+    MLR,
     SECOND_ORDER,
     SUBSCALE_SCORES,
     SUBSCALES,
@@ -174,6 +175,8 @@ def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
     how = (
         f"the WLSMV estimator and the {indicators} as ordered categories"
         if fit.estimator == WLSMV
+        else f"robust maximum likelihood (MLR) and the {indicators} as continuous"
+        if fit.estimator == MLR
         else f"maximum likelihood and the {indicators} as continuous"
     )
     opening = f"{opening_case(model)}, fitted in {package} with {how} (N = {fit.n}),"

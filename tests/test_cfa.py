@@ -11,6 +11,7 @@ from labcatalog.pipeline import run_catalog
 from labcatalog.stats.cfa import (
     GENERAL,
     ML,
+    MLR,
     ONE_FACTOR,
     PYTHON,
     SECOND_ORDER,
@@ -150,7 +151,34 @@ def test_general_factor_models_give_its_loadings_and_omega(result):
     assert in_python[SUBSCALE_SCORES].general_omega == pytest.approx(sums.general_omega, abs=1e-3)
 
 
+@needs_r
+def test_mlr_gives_robust_fit_indices(result):
+    models = [
+        m for m in models_of(result) if (m.instrument_id, m.dataset) == ("example_mood", "child_w1")
+    ]
+    fits = {f.kind: f for f in fit_models(models, rscript(), MLR)}
+    ml = {f.kind: f for f in fit_models(models, rscript(), ML)}
+    mood = fits[SUBSCALES]
+    assert mood.estimator == MLR and mood.problem is None
+    assert set(mood.fit) == {
+        "chisq",
+        "df",
+        "p",
+        "cfi",
+        "tli",
+        "rmsea",
+        "rmsea_low",
+        "rmsea_high",
+        "srmr",
+    }
+    assert mood.fit["chisq"] != pytest.approx(ml[SUBSCALES].fit["chisq"])
+    assert mood.loadings == pytest.approx(ml[SUBSCALES].loadings)
+    assert fits[SUBSCALE_SCORES].estimator == MLR
+
+
 def test_models_fit_in_python_without_r(result):
+    # Python has ML only, whatever was asked.
+    assert {f.estimator for f in fit_models(models_of(result)[:2], None, MLR)} == {ML}
     models = [m for m in models_of(result) if m.dataset == "child_w1"]
     fits = {(f.instrument_id, f.kind): f for f in fit_models(models, None)}
     mood = fits[("example_mood", SUBSCALES)]

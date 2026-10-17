@@ -15,8 +15,8 @@ add <- function(model, what, factor = "", item = "", value = NA, message = "") {
                                           item = item, value = value, message = message)
 }
 
-# wlsmv treats the items as ordered categories, ml as continuous; composite, when given, is
-# the one composite to take omega of, such as all items of a second-order model.
+# wlsmv treats the items as ordered categories, ml and mlr (robust) as continuous; composite,
+# when given, is the one composite to take omega of, such as all items of a second-order model.
 fit_one <- function(model, syntax, data, estimator, composite) {
   ordinal <- estimator == "wlsmv"
   # Small samples often leave empty response cells; lavaan warns but the fit stands.
@@ -24,7 +24,7 @@ fit_one <- function(model, syntax, data, estimator, composite) {
     if (ordinal) {
       lavaan::cfa(syntax, data = data, ordered = names(data), estimator = "WLSMV", std.lv = TRUE)
     } else {
-      lavaan::cfa(syntax, data = data, estimator = "ML", std.lv = TRUE)
+      lavaan::cfa(syntax, data = data, estimator = toupper(estimator), std.lv = TRUE)
     },
     warning = function(w) invokeRestart("muffleWarning")
   )
@@ -38,6 +38,9 @@ fit_one <- function(model, syntax, data, estimator, composite) {
   measures <- if (ordinal) {
     c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", "rmsea.scaled",
       "rmsea.ci.lower.scaled", "rmsea.ci.upper.scaled", "srmr")
+  } else if (estimator == "mlr") {
+    c("chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.robust", "tli.robust", "rmsea.robust",
+      "rmsea.ci.lower.robust", "rmsea.ci.upper.robust", "srmr")
   } else {
     c("chisq", "df", "pvalue", "cfi", "tli", "rmsea", "rmsea.ci.lower", "rmsea.ci.upper", "srmr")
   }
