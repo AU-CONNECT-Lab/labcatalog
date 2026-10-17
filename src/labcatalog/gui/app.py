@@ -15,6 +15,7 @@ from labcatalog.gui import (
     common,
     datasets,
     edit,
+    example,
     fix,
     instruments,
     methods,
@@ -98,8 +99,8 @@ def main_page(project: Path | None) -> None:
     )
     window = Window()
     window.build()
-    if project is not None:
-        ui.timer(0, lambda: window.load(project.resolve()), once=True)
+    start = project.resolve() if project is not None else example.start_folder()
+    ui.timer(0, lambda: window.open_project(start), once=True)
 
 
 class Window:
@@ -151,6 +152,9 @@ class Window:
                     .classes("lc-quiet-btn")
                 )
                 self.refresh_button.disable()
+                ui.button("Open example", icon="school", on_click=self.open_example).props(
+                    "flat"
+                ).classes("lc-quiet-btn")
                 self.open_button = ui.button(
                     "Open project", icon="folder_open", on_click=self.choose_folder
                 )
@@ -194,6 +198,7 @@ class Window:
                     self.instruments_panel.refresh,
                     self.reload,
                     self.set_decimals,
+                    self.reset_example,
                 )
 
     async def choose_folder(self) -> None:
@@ -201,7 +206,23 @@ class Window:
         if selection:
             self.home = None
             self.frozen_bar.visible = False
-            await self.load(Path(selection[0]))
+            await self.open_project(Path(selection[0]))
+
+    async def open_project(self, root: Path) -> None:
+        # Remembered for the next start; a freeze opened from it is not.
+        preferences.save({preferences.LAST_PROJECT: str(root)})
+        await self.load(root)
+
+    async def open_example(self) -> None:
+        self.home = None
+        self.frozen_bar.visible = False
+        await self.open_project(example.example_copy())
+
+    async def reset_example(self) -> None:
+        folder = example.reset_example()
+        if self.root == folder:
+            await self.load(folder)
+        ui.notify("The example is back as installed")
 
     async def load(self, root: Path) -> None:
         self.set_busy(True)

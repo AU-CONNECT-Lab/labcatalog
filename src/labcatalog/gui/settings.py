@@ -5,7 +5,7 @@ from nicegui import ui
 
 from labcatalog.charts import style
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import common, datalad, preferences, theme
+from labcatalog.gui import common, datalad, example, preferences, theme
 from labcatalog.gui.common import computed, note, section
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
@@ -20,6 +20,7 @@ def render(
     on_model: Callable[[], None],
     on_datalad: Callable[[], Awaitable[None]],
     on_decimals: Callable[[int], None],
+    on_reset_example: Callable[[], Awaitable[None]],
 ) -> None:
     section("R")
     note(
@@ -96,6 +97,30 @@ def render(
         label="Decimal places in tables (p values keep three)",
         on_change=lambda e: on_decimals(e.value),
     ).props("outlined dense").classes("w-72 mt-2")
+
+    section("Example project")
+    note(
+        "The window opens the project that was open when it last closed, or the example the "
+        f"first time. The example is a copy in {example.example_folder()}, so changes made "
+        "while trying it out stay there; Reset puts it back as installed."
+    )
+
+    def confirm_reset() -> None:
+        with ui.dialog() as dialog, ui.card():
+            ui.label("Reset the example? Every change made to it is lost.")
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Cancel", on_click=dialog.close).props("flat")
+
+                async def reset() -> None:
+                    dialog.close()
+                    await on_reset_example()
+
+                ui.button("Reset", on_click=reset).props("color=negative")
+        dialog.open()
+
+    ui.button("Reset the example", icon="restart_alt", on_click=confirm_reset).props(
+        "outline"
+    ).classes("mt-2")
 
 
 def models_section(on_model: Callable[[], None]) -> None:
