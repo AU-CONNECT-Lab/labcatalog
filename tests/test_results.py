@@ -137,7 +137,7 @@ def test_cfa_reports_fit_loadings_and_omega():
         general_omega=0.81,
     )
     assert results.cfa_text([general], LABELS) == (
-        "A second-order model with a general factor over the subscales (Sadness, Worry and Total "
+        "A second-order model with a general factor over the subscales (Sadness, Worry, and Total "
         "score), fitted in lavaan with the WLSMV estimator and the items as ordered categories "
         "(N = 412), gave χ²(24) = 31.24, p = .146, CFI = .98, TLI = .98, RMSEA = .04. With three "
         "subscales, its fit equals that of the subscale model. Standardized loadings of the "
@@ -154,7 +154,7 @@ def test_cfa_reports_fit_loadings_and_omega():
         estimator=ML,
     )
     assert results.cfa_text([sums], LABELS) == (
-        "A one-factor model of the subscale scores (Sadness, Worry and Total score), fitted in "
+        "A one-factor model of the subscale scores (Sadness, Worry, and Total score), fitted in "
         "lavaan with maximum likelihood and the subscale scores as continuous (N = 420), fits "
         "exactly with three subscale scores, so it has no fit indices. ω of the summed subscale "
         "scores was .80."
