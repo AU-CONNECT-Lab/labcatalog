@@ -162,10 +162,8 @@ def score_boxes(result: CatalogResult, instrument_id: str) -> go.Figure | None:
                     "values": values,
                 }
             )
-    title = f"{instrument.abbreviation or instrument.id} scores by wave"
-    return (
-        plots.score_boxes(title, [s.label for s in instrument.scores], series) if series else None
-    )
+    # The panel around the chart carries the title.
+    return plots.score_boxes("", [s.label for s in instrument.scores], series) if series else None
 
 
 def number_distributions(result: CatalogResult, instrument_id: str) -> list[go.Figure]:
@@ -486,13 +484,11 @@ def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -
         return sum(found) / len(found)
 
     ordered = sorted(members, key=strength, reverse=True)
-    instrument = result.project.instruments[instrument_id]
-    score = next(s for s in instrument.scores if s.id == score_id)
     return plots.dot_rows(
         [("", [members[m] for m in ordered])],
         series,
         result.project.config.stats.coefficient(),
-        f"{short_label(instrument, score)} against every other score",
+        "",
     )
 
 

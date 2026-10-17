@@ -63,7 +63,7 @@ def later(fill: Callable) -> ui.column:
     # Results that may wait for R fill in after the rest of the page shows.
     holder = ui.column().classes("w-full gap-2")
     with holder:
-        ui.spinner(size="sm")
+        placeholder()
 
     async def run_fill() -> None:
         content = await fill()
@@ -75,6 +75,15 @@ def later(fill: Callable) -> ui.column:
 
     ui.timer(0, run_fill, once=True)
     return holder
+
+
+def placeholder() -> None:
+    # The rough shape of a chart beside a table, shown while the numbers are computed.
+    with ui.row().classes("w-full no-wrap items-start gap-6"):
+        ui.skeleton(height="200px").classes("grow")
+        with ui.column().classes("grow gap-2"):
+            for width in ("55%", "100%", "100%", "85%", "100%", "70%"):
+                ui.skeleton("text", width=width)
 
 
 def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> None:
