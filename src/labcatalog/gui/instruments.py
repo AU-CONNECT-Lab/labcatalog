@@ -12,7 +12,7 @@ from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, new_instrument, preferences
+from labcatalog.gui import charts, common, new_instrument, preferences
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
@@ -29,7 +29,13 @@ from labcatalog.gui.common import (
     unique,
 )
 from labcatalog.gui.datalad import get_button
-from labcatalog.gui.paper import copy_text, paper_table, save_button, without_empty
+from labcatalog.gui.paper import (
+    copy_text,
+    paper_table,
+    results_text,
+    save_button,
+    without_empty,
+)
 from labcatalog.metadata.browse import BrowseIndex, counts, matches
 from labcatalog.metadata.completeness import gaps
 from labcatalog.metadata.history import Change, file_history
@@ -42,7 +48,7 @@ from labcatalog.pipeline import (
     run_search,
 )
 from labcatalog.project import Project, reference_pdf
-from labcatalog.reports import measures
+from labcatalog.reports import measures, results
 from labcatalog.reports.export import (
     BY_DATASET,
     BY_GROUP,
@@ -1101,6 +1107,8 @@ def factor_structure(
             }
             for shown in papers.values():
                 paper_table(shown)
+            labels = {s.id: s.label for s in instrument.scores}
+            results_text(results.cfa_text(fits, labels, common.decimals))
             save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
             if cfa.message:
                 note(cfa.message)
@@ -1297,6 +1305,7 @@ def invariance_section(
                         f"invariance_{instrument.id}_{i}",
                         lambda test=test: model_of(result, test),
                         cfa.reload,
+                        "waves",
                     )
     reporters = [t for t in tests if t.across == REPORTERS]
     if reporters:
@@ -1316,6 +1325,7 @@ def invariance_section(
                     f"invariance_reporters_{instrument.id}_{i}",
                     lambda test=test: model_of(result, test),
                     cfa.reload,
+                    "reporters",
                 )
 
 

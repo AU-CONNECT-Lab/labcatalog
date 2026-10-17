@@ -6,9 +6,10 @@ from labcatalog.config import FreedParameter
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import col, computed, fmt, note, p_value, table
-from labcatalog.gui.paper import paper_table, save_button, without_empty
+from labcatalog.gui.paper import paper_table, results_text, save_button, without_empty
 from labcatalog.metadata.editing import save_freed
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument
 from labcatalog.stats import invariance
@@ -85,6 +86,7 @@ def test_block(
     name: str,
     model: Callable[[], InvarianceModel],
     reload: Reload | None,
+    across: str,
 ) -> None:
     heading = model_heading(instrument, test)
     ui.label(heading).classes("font-medium mt-2")
@@ -100,6 +102,9 @@ def test_block(
         method + (f" Freed: {freed_text(instrument, test.freed)}." if test.freed else ""),
     )
     paper_table(shown)
+    labels = {s.id: s.label for s in instrument.scores}
+    freed = freed_text(instrument, test.freed)
+    results_text(results.invariance_text(test, labels, across, freed))
     with ui.row().classes("items-center gap-2"):
         steps = [s.step for s in test.steps if s.step != "configural" and not s.problem]
         if steps:

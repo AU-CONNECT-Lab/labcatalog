@@ -79,6 +79,7 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
                     f"invariance_groups_{instrument.id}_{i}",
                     lambda model=model: model,
                     test,
+                    f"the groups of {groups[group]}",
                 )
 
         def choose(key: str, value: str) -> None:

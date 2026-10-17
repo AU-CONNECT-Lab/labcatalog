@@ -1,11 +1,22 @@
 from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import ANOVA, STUDENT, WELCH, Comparison, GroupStats
+from labcatalog.stats.cfa import SUBSCALES, WLSMV, CfaFit
+from labcatalog.stats.cfa import R as LAVAAN
+from labcatalog.stats.invariance import STEPS, InvarianceStep, InvarianceTest
 
 SIGNIFICANT = 0.05
 # A table with this many pairs or fewer is told pair by pair; a larger one by its strongest pairs.
 EVERY_PAIR = 3
 STRONGEST = 5
 TEST_SYMBOLS = {WELCH: "Welch's t", STUDENT: "t", ANOVA: "F"}
+FIT_INDICES = {"cfi": "CFI", "tli": "TLI", "rmsea": "RMSEA", "srmr": "SRMR"}
+# Invariance steps and changes in fit are read to the third decimal, as in their table.
+FINE = 3
+STEP_PHRASES = {
+    "thresholds": "Holding the thresholds equal",
+    "metric": "Adding equal loadings",
+    "scalar": "Adding equal intercepts",
+}
 
 
 def correlation_text(
@@ -131,3 +142,98 @@ def series(parts: list[str]) -> str:
     if len(parts) < 3:
         return " and ".join(parts)
     return f"{', '.join(parts[:-1])}, and {parts[-1]}"
+
+
+def cfa_text(fits: list[CfaFit], labels: dict[str, str], digits: int = 2) -> str:
+    return " ".join(cfa_sentences(fit, labels, digits) for fit in fits)
+
+
+def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
+    model = model_phrase(fit.kind, [labels[s] for s in fit.factors])
+    if fit.problem:
+        return f"{model.capitalize()} could not be used: {fit.problem}."
+    package = "lavaan" if fit.engine == LAVAAN else "semopy"
+    how = (
+        "the WLSMV estimator and the items as ordered categories"
+        if fit.estimator == WLSMV
+        else "maximum likelihood and the items as continuous"
+    )
+    opening = f"{model.capitalize()}, fitted in {package} with {how} (N = {fit.n}),"
+    if fit.fit.get("df") == 0:
+        sentences = [f"{opening} fits exactly with three items, so it has no fit indices."]
+    else:
+        sentences = [f"{opening} gave {fit_indices(fit.fit, digits)}."]
+    if fit.loadings:
+        low, high = min(fit.loadings.values()), max(fit.loadings.values())
+        sentences.append(
+            f"Standardized loadings ranged from {bounded(low, digits)} to {bounded(high, digits)}."
+        )
+    omega = [(labels[s], v) for s, v in fit.omega.items()]
+    if len(omega) == 1:
+        sentences.append(f"ω was {bounded(omega[0][1], digits)}.")
+    elif omega:
+        sentences.append(
+            f"ω was {series([f'{bounded(v, digits)} for {name}' for name, v in omega])}."
+        )
+    return " ".join(sentences)
+
+
+def model_phrase(kind: str, names: list[str]) -> str:
+    if kind == SUBSCALES:
+        return f"a model with one factor for each subscale ({series(names)})"
+    return f"a one-factor model of {series(names)}"
+
+
+def fit_indices(values: dict[str, float | None], digits: int) -> str:
+    parts = [f"χ²({values['df']:g}) = {number(values['chisq'], digits)}", p_text(values["p"])]
+    parts += [
+        f"{name} = {bounded(values[key], digits)}"
+        for key, name in FIT_INDICES.items()
+        if values.get(key) is not None
+    ]
+    return ", ".join(parts)
+
+
+def invariance_text(
+    test: InvarianceTest, labels: dict[str, str], across: str, freed: str = ""
+) -> str:
+    # across names the occasions, such as "waves" or "the answers to Child gender".
+    model = model_phrase(test.kind, [labels[s] for s in test.factors])
+    if test.problem:
+        return f"Invariance of {model} across {across} could not be tested: {test.problem}."
+    sentences = [
+        f"Invariance of {model} across {across} was tested in steps, each holding one more set "
+        "of parameters equal."
+    ]
+    if freed:
+        sentences.append(f"Freed parameters: {freed}.")
+    previous = None
+    for step in sorted(test.steps, key=lambda s: STEPS.index(s.step)):
+        before = previous.fit if previous and not previous.problem else {}
+        sentences.append(step_sentence(step, before))
+        previous = step
+    return " ".join(sentences)
+
+
+def step_sentence(step: InvarianceStep, before: dict[str, float | None]) -> str:
+    name = STEP_PHRASES.get(step.step, "The configural model")
+    if step.problem:
+        return f"{name} gave no usable model: {step.problem}."
+    values = step.fit
+    found = [f"χ²({values['df']:g}) = {number(values['chisq'], 2)}"] + [
+        f"{FIT_INDICES[key]} = {bounded(values[key], FINE)}"
+        for key in ("cfi", "rmsea", "srmr")
+        if values.get(key) is not None
+    ]
+    if step.chisq_diff is None:
+        return f"{name} gave {', '.join(found)}."
+    change = [
+        f"Δχ²({step.df_diff:g}) = {number(step.chisq_diff, 2)}",
+        p_text(step.p_diff),
+        *[
+            f"Δ{FIT_INDICES[key]} = {bounded(values[key] - before[key], FINE)}"
+            for key in ("cfi", "rmsea")
+            if values.get(key) is not None and before.get(key) is not None
+        ],
+    ]
+    return f"{name} gave {', '.join(found)}; against the step before, {', '.join(change)}."
