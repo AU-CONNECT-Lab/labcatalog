@@ -178,7 +178,8 @@ def write_model(
         "data": f"{name}.csv",
         "syntax": "; ".join(model_syntax(model, items, factors)),
         "estimator": model_estimator(model, estimator),
-        "higher": "g" if model.kind == SECOND_ORDER else "",
+        # Hierarchical ω: the share of all items' sum that the general factor explains.
+        "composite": f"g <~ {' + '.join(items.values())}" if model.kind == SECOND_ORDER else "",
     }
     path = folder / "models.csv"
     pd.DataFrame([entry]).to_csv(path, mode="a", header=not path.exists(), index=False)

@@ -15,9 +15,9 @@ add <- function(model, what, factor = "", item = "", value = NA, message = "") {
                                           item = item, value = value, message = message)
 }
 
-# wlsmv treats the items as ordered categories, ml as continuous; higher names a second-order
-# factor, whose omega is then hierarchical.
-fit_one <- function(model, syntax, data, estimator, higher) {
+# wlsmv treats the items as ordered categories, ml as continuous; composite, when given, is
+# the one composite to take omega of, such as all items of a second-order model.
+fit_one <- function(model, syntax, data, estimator, composite) {
   ordinal <- estimator == "wlsmv"
   # Small samples often leave empty response cells; lavaan warns but the fit stands.
   fit <- withCallingHandlers(
@@ -47,7 +47,7 @@ fit_one <- function(model, syntax, data, estimator, higher) {
   std <- std[std$op == "=~", ]
   for (i in seq_len(nrow(std))) add(model, "loading", std$lhs[i], std$rhs[i], std$est.std[i])
   omega <- suppressWarnings(
-    if (higher == "") semTools::compRelSEM(fit) else semTools::compRelSEM(fit, higher = higher)
+    if (composite == "") semTools::compRelSEM(fit) else semTools::compRelSEM(fit, W = composite)
   )
   for (name in names(omega)) add(model, "omega", name, value = omega[[name]])
 }
@@ -58,7 +58,7 @@ for (i in seq_len(nrow(models))) {
   model <- models$model[i]
   data <- read.csv(file.path(folder, models$data[i]))
   tryCatch(
-    fit_one(model, models$syntax[i], data, models$estimator[i], models$higher[i]),
+    fit_one(model, models$syntax[i], data, models$estimator[i], models$composite[i]),
     error = function(e) add(model, "problem", message = conditionMessage(e))
   )
 }
