@@ -52,6 +52,7 @@ from labcatalog.reports.export import (
     VARIABLES,
     export_plan,
     layouts,
+    named_plan,
     write_export,
 )
 from labcatalog.reports.tables import PaperTable
@@ -307,58 +308,174 @@ def ask_panel(
 def export_dialog(
     result: CatalogResult, found: dict[str, list[str]], view: BrowseView, cfa: CfaView
 ) -> None:
-    plan = export_plan(result, found, view.chosen)
+    config = result.project.config
     names = {i: s.abbreviation or s.name for i, s in result.project.instruments.items()}
-    left_out = [names[i] for i in view.chosen if not any(i in ids for ids in plan.values())]
-
+    # The datasets the filters show start ticked.
+    shown = set(export_plan(result, found, view.chosen))
+    state: dict = {"ticked": set(), "plan": {}}
     root = result.project.root
-    group = result.project.config.ids.group
+    group = config.ids.group
     labels = {
         BY_DATASET: "One file per dataset",
         BY_ID: "One table, a row per person (ID)",
         BY_GROUP: f"One table, a row per {group.name if group else 'group'}",
     }
 
+    def chosen_ids() -> list[str]:
+        return [i for i in result.project.instruments if i in (instruments.value or [])]
+
+    def instruments_next() -> None:
+        if not chosen_ids():
+            ui.notify("Choose at least one instrument")
+            return
+        given = named_plan(result, chosen_ids(), [])
+        state["ticked"] = {d for d in given if d in shown} or set(given)
+        datasets_step.refresh()
+        stepper.next()
+
+    def tick(names_: list[str], on: bool) -> None:
+        state["ticked"] = state["ticked"] | set(names_) if on else state["ticked"] - set(names_)
+        datasets_step.refresh()
+
+    @ui.refreshable
+    def datasets_step() -> None:
+        if not chosen_ids():
+            return
+        given = named_plan(result, chosen_ids(), [])
+        ordered = views.dataset_order(result, list(given))
+        waves = unique(
+            (dataset_by_name(config, d).study, dataset_by_name(config, d).wave) for d in ordered
+        )
+        reporters = unique(dataset_by_name(config, d).reporter for d in ordered)
+        cells: dict[tuple, list[str]] = {}
+        for d in ordered:
+            c = dataset_by_name(config, d)
+            cells.setdefault((c.study, c.wave, c.reporter), []).append(d)
+        ticked = state["ticked"]
+        with ui.grid(columns=f"auto repeat({len(reporters)}, minmax(8rem, 1fr))").classes(
+            "gap-x-6 gap-y-1 items-start"
+        ):
+            ui.label()
+            for reporter in reporters:
+                column = [d for d in ordered if dataset_by_name(config, d).reporter == reporter]
+                ui.checkbox(
+                    reporter,
+                    value=set(column) <= ticked,
+                    on_change=lambda e, c=column: tick(c, e.value),
+                ).props("dense").classes("font-medium")
+            for study, wave in waves:
+                row = [
+                    d
+                    for d in ordered
+                    if (dataset_by_name(config, d).study, dataset_by_name(config, d).wave)
+                    == (study, wave)
+                ]
+                ui.checkbox(
+                    views.wave_name(result, study, wave),
+                    value=set(row) <= ticked,
+                    on_change=lambda e, r=row: tick(r, e.value),
+                ).props("dense").classes("font-medium")
+                for reporter in reporters:
+                    with ui.column().classes("gap-0"):
+                        for d in cells.get((study, wave, reporter), []):
+                            ui.checkbox(
+                                d,
+                                value=d in ticked,
+                                on_change=lambda e, d=d: tick([d], e.value),
+                            ).props("dense").tooltip(", ".join(names[i] for i in given[d]))
+        missing = [names[i] for i in chosen_ids() if not any(i in given[d] for d in ticked)]
+        if missing:
+            note(f"No ticked dataset has {', '.join(missing)}.")
+
+    def datasets_next() -> None:
+        if not state["ticked"]:
+            ui.notify("Tick at least one dataset")
+            return
+        state["plan"] = named_plan(result, chosen_ids(), sorted(state["ticked"]))
+        format_step.refresh()
+        saved.clear()
+        export.set_visibility(True)
+        opener.set_visibility(False)
+        stepper.next()
+
+    @ui.refreshable
+    def format_step() -> None:
+        plan = state["plan"]
+        if not plan:
+            return
+        with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0"):
+            for dataset, ids in plan.items():
+                ui.label(dataset).classes("font-medium")
+                ui.label(", ".join(names[i] for i in ids))
+        state["layout"] = ui.radio(
+            {key: labels[key] for key in layouts(result, plan)}, value=BY_DATASET
+        ).props("dense")
+        note(
+            f"Writes a new folder in outputs/ with {VARIABLES}, which describes every variable, "
+            "and the data: the ID and date columns, the chosen items as they are in the data and "
+            f"the scores labcatalog computes; and the statistics: {SCORE_STATISTICS} and "
+            f"{ITEM_STATISTICS} with each score's and item's n, mean, SD and range in each "
+            "dataset. Open answers are listed but not exported. In one table, each column starts "
+            "with its dataset's name."
+        )
+
     async def go() -> None:
-        done = await computed(write_export, result, plan, layout.value, cfa.fits)
+        done = await computed(write_export, result, state["plan"], state["layout"].value, cfa.fits)
         saved.clear()
         with saved:
             note(f"Saved to {portable_path(done.folder, root).as_posix()}")
             for name, n in done.left_out.items():
                 note(f"Left out {n} rows of {name}: their key repeats in that file.")
+        state["folder"] = done.folder
         export.set_visibility(False)
         opener.set_visibility(True)
-        opener.on_click(lambda: open_path(done.folder))
 
-    with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
-        ui.label("Export").classes("text-xl font-medium")
-        if plan:
-            ui.label(
-                f"Writes a new folder in outputs/ with {VARIABLES}, which describes every "
-                "variable, and the data: the ID and date columns, the chosen items as they are "
-                "in the data and the scores labcatalog computes; and the statistics: "
-                f"{SCORE_STATISTICS} and {ITEM_STATISTICS} with each score's and item's n, mean, "
-                "SD and range in each dataset. Open answers are listed but not exported. In one "
-                "table, each column starts with its dataset's name."
-            )
-            with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0"):
-                for dataset, ids in plan.items():
-                    ui.label(dataset).classes("font-medium")
-                    ui.label(", ".join(names[i] for i in ids))
-            layout = ui.radio(
-                {key: labels[key] for key in layouts(result, plan)}, value=BY_DATASET
-            ).props("dense")
-        else:
-            ui.label("None of the chosen instruments is in a dataset the filters show.")
-        if left_out:
-            note(f"Chosen but not in the filtered datasets: {', '.join(left_out)}")
-        saved = ui.column().classes("gap-0")
-        with ui.row().classes("w-full justify-end"):
-            ui.button("Close", on_click=dialog.close).props("flat no-caps")
-            opener = ui.button("Open folder", icon="folder_open").props("no-caps")
-            opener.set_visibility(False)
-            export = ui.button("Export", on_click=go).props("no-caps")
-            export.set_enabled(bool(plan))
+    def navigation(on_next: Callable, back: bool = True) -> None:
+        with ui.stepper_navigation():
+            ui.button("Next", on_click=on_next)
+            if back:
+                ui.button("Back", on_click=stepper.previous).props("flat")
+            ui.button("Cancel", on_click=dialog.close).props("flat")
+
+    with ui.dialog() as dialog, ui.card().classes("w-[48rem] max-w-full"):
+        ui.label("Export").classes("text-lg font-medium")
+        with ui.stepper().props("flat animated").classes("w-full") as stepper:
+            with ui.step("Instruments"):
+                note("The instruments whose items and scores go into the export.")
+                instruments = (
+                    ui.select(
+                        {
+                            i: f"{names[i]}: {s.name}" if s.abbreviation else s.name
+                            for i, s in result.project.instruments.items()
+                        },
+                        value=[i for i in result.project.instruments if i in view.chosen],
+                        label="Instruments",
+                        multiple=True,
+                    )
+                    .props("use-chips")
+                    .classes("w-full")
+                )
+                navigation(instruments_next, back=False)
+            with ui.step("Datasets"):
+                note(
+                    "The datasets that give these instruments. Tick a wave or a reporter to take "
+                    "all of its datasets."
+                )
+                datasets_step()
+                navigation(datasets_next)
+            with ui.step("Format"):
+                format_step()
+                saved = ui.column().classes("gap-0")
+                with ui.stepper_navigation():
+                    export = ui.button("Export", icon="download", on_click=go)
+                    opener = ui.button(
+                        "Open folder",
+                        icon="folder_open",
+                        on_click=lambda: open_path(state["folder"]),
+                    )
+                    opener.set_visibility(False)
+                    ui.button("Back", on_click=stepper.previous).props("flat")
+                    ui.button("Close", on_click=dialog.close).props("flat")
     dialog.open()
 
 

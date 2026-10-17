@@ -4,13 +4,14 @@ An export collects the variables, data and statistics of chosen instruments into
 
 ## In the window
 
-1. On the **Instruments** page, narrow the list with the filters and tick the instruments you want.
-2. Press **Export**. The dialog lists which datasets and instruments will be exported.
-3. Choose how the data are laid out:
+1. On the **Instruments** page, tick the instruments you want and press **Export**. The dialog has three steps.
+2. **Instruments**: the ticked instruments. Add or remove any here.
+3. **Datasets**: every dataset that gives one of these instruments, laid out by wave and reporter. The datasets the page's filters show start ticked. Tick a wave or a reporter to take all of its datasets; hover over a dataset to see which of the instruments it has.
+4. **Format**: the list of what will be exported, and how the data are laid out:
    - **One file per dataset**: a CSV file for each dataset, as in the data.
    - **One table, a row per person (ID)**: one wide table across datasets. Each column starts with its dataset's name.
    - **One table, a row per group**: the same, with one row per group, such as a family. Shown when the project has a group.
-4. Press **Export**, then **Open folder**.
+5. Press **Export**, then **Open folder**.
 
 ## On the command line
 

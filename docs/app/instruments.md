@@ -25,7 +25,7 @@ On an instrument's page, **Complete this instrument** beside what is missing ope
 
 ### Export
 
-Tick instruments in the table and press **Export** to write their variables, data and statistics to `outputs/`. See [Export Variables and Data](../how-to/export-data.md).
+Tick instruments in the table and press **Export** to write their variables, data and statistics to `outputs/`. The dialog asks for the instruments, then the datasets by wave and reporter, then the layout. See [Export Variables and Data](../how-to/export-data.md).
 
 ## An instrument's page
 
