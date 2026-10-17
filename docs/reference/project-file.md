@@ -81,6 +81,7 @@ A list with one entry per data file.
 | `id_column` | text | The ID column, when it is not `defaults.id_column`. |
 | `group_column` | text | A column with each row's group, when the group is not read from the ID. |
 | `date_column` | text | A column with the date each row was collected. |
+| `wave_column` | text | In a file that holds several waves, the column naming each row's wave; the dataset reads only the rows of its own `wave`. |
 | `snapshot_date` | date | The date the file was exported. |
 | `missing_codes` | list | Missing codes for this dataset only. |
 | `custom` | mapping | Values of custom fields that apply to datasets. |

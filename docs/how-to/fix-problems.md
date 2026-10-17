@@ -44,6 +44,7 @@ On the Problems page, **Fix** at the end of a row opens a panel for that problem
 | `id_whitespace`, `id_missing`, `id_duplicate`, `id_pattern` | An ID has stray spaces, is empty, appears twice in one file, or does not match `ids.pattern`. | Fix the IDs in your cleaning script. |
 | `column_missing` | The map names a column the data file does not have. | Pick the column's new name in the Fix panel, or take the row out of the map. |
 | `column_unmapped` | The data file has a column the map does not list. | In the Fix panel, add it to the map as not an item, or as the item it holds. |
+| `wave_unclaimed` | A file shared by several waves has rows for a wave no dataset reads. | Add a dataset for that wave, or make the wave in the data match the dataset's `wave`. |
 | `score_mismatch` | A score in the data differs from the score labcatalog computes. | Check the scoring rule: reversed items, `missing_rule`, `min_valid`. |
 | `same_answer` | People gave the same answer to every item of a score. | Look at them; they may have answered without reading. If their answers are real, record the warning as fine. |
 | `possible_identifier` | A column's name suggests it holds names, emails, phone numbers, addresses or birth dates. | Remove it from the data the catalog reads. |

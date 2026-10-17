@@ -42,8 +42,21 @@ datasets:
 | `id_column` | The column with participant IDs, when it is not `defaults.id_column`. |
 | `group_column` | A column with each person's group, when the group is not read from the ID. |
 | `date_column` | A column with the date each row was collected, for the "collected by month" chart. |
+| `wave_column` | In a file that holds several waves, the column naming each row's wave. |
 | `snapshot_date` | The date the file was exported, shown as "data as of". |
 | `missing_codes` | Missing codes for this file only, in place of the project's. |
+
+### One file with several waves
+
+When one file holds every wave, one row per person per wave, give each wave its own dataset that points at the same file, and name the column that says which wave a row belongs to:
+
+```yaml
+datasets:
+  - {name: parent_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: parent, source: csv, path: data/parent_long.csv, wave_column: wave}
+  - {name: parent_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_long.csv, wave_column: wave}
+```
+
+Each dataset reads only the rows whose `wave` column matches its own `wave`, written the same way (`1` matches `1`, not `01` or `T1`). Everything else treats it as a file of its own: each dataset has its own column map in `maps/`, where the wave column is listed like the ID column, with no instrument. If the file has rows for a wave that no dataset reads, `labcatalog check` warns with `wave_unclaimed`. Problems point to the row's line in the shared file.
 
 ## Modalities
 
