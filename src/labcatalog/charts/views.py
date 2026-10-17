@@ -125,6 +125,11 @@ def option_range(instrument: Instrument) -> tuple[float, float]:
     return min(values), max(values)
 
 
+def has_options(instrument: Instrument) -> bool:
+    # Item means on the answer scale need a scale; an instrument of numbers has none.
+    return any(r.options for r in instrument.response_sets)
+
+
 def ids_of(result: CatalogResult, dataset: str) -> pd.Series:
     loaded = result.datasets[dataset]
     return loaded.frame[loaded.id_column].astype(str)
@@ -266,6 +271,8 @@ def item_responses(result: CatalogResult, instrument_id: str) -> list[go.Figure]
 def subscale_radars(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     # The subscales side by side first, then each subscale's items; every wave on each.
     instrument = result.project.instruments[instrument_id]
+    if not has_options(instrument):
+        return None
     subscales = subscales_of(instrument)
     names = series_names(result, instrument_datasets(result, instrument_id))
     panels = []
@@ -1023,7 +1030,7 @@ def standardized_scores(
 def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     # One panel per wave: that wave's item means in colour, the other waves faint behind it.
     instrument = result.project.instruments[instrument_id]
-    if instrument.kind == "demographics":
+    if instrument.kind == "demographics" or not has_options(instrument):
         # Codes such as 1 = Girl, 2 = Boy have no mean worth drawing.
         return None
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
@@ -1060,7 +1067,7 @@ def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None
 def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
     # One panel per subscale: every person's answers faint, the mean of everyone in colour.
     instrument = result.project.instruments[instrument_id]
-    if instrument.kind == "demographics":
+    if instrument.kind == "demographics" or not has_options(instrument):
         return None
     columns = {
         v.item_id: v
