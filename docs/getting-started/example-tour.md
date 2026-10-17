@@ -4,7 +4,7 @@ labcatalog comes with a fictional project, the Mock Family Study: three yearly w
 
 ## Open the example
 
-The window opens the example the first time you start it, and **Open example** in the header opens it at any time. It is the window's own copy, so changes you make while trying things out never touch the installed package; **Reset the example** on the Settings page puts it back as installed.
+The window opens the example the first time you start it, and **Open example**, under **Open** in the header, opens it at any time. It is the window's own copy, so changes you make while trying things out never touch the installed package; **Reset the example** on the Settings page puts it back as installed.
 
 To have the example in a folder of your own instead, copy it there and open it:
 

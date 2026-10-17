@@ -1,6 +1,6 @@
 # Settings
 
-The Settings page holds the settings of your computer, not of the project: they apply to every project you open and are not shared with anyone else who opens one. Settings that change the numbers are in `labcatalog.yaml` instead (see [Statistics](../statistics/index.md)).
+The Settings page, opened with the gear at the top right of the window, holds the settings of your computer, not of the project: they apply to every project you open and are not shared with anyone else who opens one. Settings that change the numbers are in `labcatalog.yaml` instead (see [Statistics](../statistics/index.md)).
 
 ![The Settings page](../images/app/settings.png)
 

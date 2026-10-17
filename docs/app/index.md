@@ -1,10 +1,10 @@
 # Using the App
 
-Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to open a project directly. The pages are listed on the left; this section describes them one by one.
+Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to open a project directly. The pages are listed across the top, in groups: browsing the catalog (Overview, Instruments, Studies, Datasets), writing it up (Analysis, Methods), changing the project (Prepare, Import, Edit) and Problems. The gear at the top right opens Settings. This section describes the pages one by one.
 
 ## Opening a project
 
-The window opens the project that was open when it last closed, or the example project the first time. **Open project** in the header chooses a project folder, the one with `labcatalog.yaml` in it, and **Open example** opens the example. The header then shows the project's name (hover over it for the folder) and the date the data are as of, from the datasets' `snapshot_date`.
+The window opens the project that was open when it last closed, or the example project the first time. **Open** in the header has two choices: **Open project** chooses a project folder, the one with `labcatalog.yaml` in it, and **Open example** opens the example. The header then shows the project's name (hover over it for the folder) and the date the data are as of, from the datasets' `snapshot_date`.
 
 ## Refreshing after a change
 
