@@ -18,7 +18,7 @@ For each reporter, how many rows had come in by each week since each wave starte
 
 ## Scores in each wave
 
-Every score's mean in each wave, as a share of its possible range, so scores on different scales can be compared. One row per score, one dot per wave.
+Every score's mean in each wave, as a share of its possible range, so scores on different scales can be compared. One row per score, one dot per wave. **Instruments** picks which instruments are shown; a project with more than 15 starts with the first 15.
 
 ## How the scores relate
 

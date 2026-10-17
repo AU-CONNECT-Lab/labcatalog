@@ -42,4 +42,6 @@ IDENTIFIER_NAME_PATTERNS = (
 )
 
 CHART_MIN_R = 0.3
+# Instruments the overview's Scores in each wave starts with; the rest are a pick away.
+CHART_LEVEL_INSTRUMENTS = 15
 CHART_PEOPLE_PER_PAGE = 200

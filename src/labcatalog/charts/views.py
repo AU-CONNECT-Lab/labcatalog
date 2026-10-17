@@ -608,11 +608,24 @@ def collection_pace(result: CatalogResult) -> go.Figure | None:
     return plots.collection_pace(facets, waves, colors)
 
 
-def score_levels(result: CatalogResult) -> go.Figure | None:
+def level_instruments(result: CatalogResult) -> dict[str, str]:
+    found = {
+        s.instrument_id for s in result.catalog.scores if summary_of(result, s.key).mean is not None
+    }
+    return {
+        i: result.project.instruments[i].abbreviation or i
+        for i in instrument_order(result)
+        if i in found
+    }
+
+
+def score_levels(result: CatalogResult, instruments: list[str] | None = None) -> go.Figure | None:
     # Scores differ in range, so each mean is shown as its place within the possible range.
     config = result.project.config
     found: dict[tuple[str, str], dict[Member, ResolvedScore]] = {}
     for s in result.catalog.scores:
+        if instruments is not None and s.instrument_id not in instruments:
+            continue
         d = dataset_by_name(config, s.dataset)
         if summary_of(result, s.key).mean is not None:
             found.setdefault((d.study, d.wave), {})[(s.instrument_id, s.score_id, d.reporter)] = s

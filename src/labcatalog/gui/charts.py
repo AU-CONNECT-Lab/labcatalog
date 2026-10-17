@@ -187,11 +187,43 @@ def overview_section(result: CatalogResult) -> None:
     if pace is not None:
         with panel("Collection pace", "Rows with a date, by week since each wave started"):
             show(pace)
-    levels = views.score_levels(result)
-    if levels is not None:
-        with panel("Scores in each wave", "Mean score as a share of its possible range"):
-            show(levels)
+    score_levels(result)
     score_relations(result)
+
+
+def score_levels(result: CatalogResult) -> None:
+    instruments = views.level_instruments(result)
+    if not instruments:
+        return
+    # Each instrument adds a block of rows, so a large project starts with the first few.
+    picked = list(instruments)[: defaults.CHART_LEVEL_INSTRUMENTS]
+
+    @ui.refreshable
+    def levels() -> None:
+        show(views.score_levels(result, picked), "Pick at least one instrument.")
+
+    def changed(value) -> None:
+        picked[:] = value or []
+        chooser.props(f'display-value="{len(picked)} of {len(instruments)} instruments"')
+        levels.refresh()
+
+    with panel("Scores in each wave", "Mean score as a share of its possible range") as tools:
+        with tools:
+            chooser = (
+                ui.select(
+                    instruments,
+                    multiple=True,
+                    value=list(picked),
+                    label="Instruments",
+                    on_change=lambda e: changed(e.value),
+                )
+                .props(
+                    f'dense outlined clearable display-value="{len(picked)} of '
+                    f'{len(instruments)} instruments"'
+                )
+                .classes("w-64")
+            )
+        levels()
 
 
 def wave_picker(choices: dict[str, str], value: str, changed) -> None:

@@ -248,3 +248,12 @@ def test_network_pins_nodes_on_recolour_and_tightens_with_many_nodes():
     assert many["force"]["edgeLength"][1] < few["force"]["edgeLength"][1]
     assert many["force"]["gravity"] > few["force"]["gravity"]
     assert few["label"]["show"] and not many["label"]["show"]
+
+
+def test_score_levels_show_only_the_chosen_instruments(result):
+    everything = views.level_instruments(result)
+    assert "example_mood" in everything and "example_demographics" not in everything
+    fig = views.score_levels(result, ["example_mood"])
+    mood = {s.score_id for s in result.catalog.scores if s.instrument_id == "example_mood"}
+    assert len(fig.layout.yaxis.ticktext) == len(mood)
+    assert views.score_levels(result, []) is None
