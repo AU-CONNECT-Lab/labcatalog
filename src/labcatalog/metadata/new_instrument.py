@@ -130,10 +130,14 @@ def given_in(project: Project, instrument_id: str) -> list[str]:
     ]
 
 
+def free_columns_of(project: Project, dataset: str) -> list[str]:
+    config = dataset_by_name(project.config, dataset)
+    return free_columns(project, dataset, [str(c) for c in read_data(project, config).columns])
+
+
 def guess_columns(project: Project, dataset: str, items: list[str]) -> dict[str, str]:
     # Data columns the map does not list yet, by name: the item's ID, then with a wave suffix.
-    config = dataset_by_name(project.config, dataset)
-    left = free_columns(project, dataset, [str(c) for c in read_data(project, config).columns])
+    left = free_columns_of(project, dataset)
     found = {}
     for item in items:
         column = next((c for c in left if c == item), None)

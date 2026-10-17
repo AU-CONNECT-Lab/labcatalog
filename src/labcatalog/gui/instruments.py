@@ -12,7 +12,7 @@ from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, preferences
+from labcatalog.gui import charts, new_instrument, preferences
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
@@ -157,6 +157,11 @@ def browser(
         with panel("Instruments", f"{len(found)} of {len(index.instruments)} shown") as tools:
             with tools:
                 chosen_bar()
+                ui.button(
+                    "Add an instrument",
+                    icon="add",
+                    on_click=lambda: new_instrument.open_wizard(result, wizard_done(view, cfa)),
+                ).props("flat dense no-caps").classes("lc-quiet-btn")
             shown = table(*list_table(result, found), pagination=PAGE_SIZE)
         shown.set_selection("multiple")
         shown.selected = [row for row in shown.rows if row["id"] in view.chosen]
@@ -195,6 +200,15 @@ def browser(
         with ui.column().classes("grow min-w-0 gap-4"):
             ask_panel(result, view, changed, on_open)
             results()
+
+
+def wizard_done(view: BrowseView, cfa: CfaView) -> Callable[[str], Awaitable[None]]:
+    async def done(instrument_id: str) -> None:
+        ui.notify(f"Saved {instrument_id}")
+        view.instrument = instrument_id
+        await cfa.reload()
+
+    return done
 
 
 def ask_panel(
@@ -440,7 +454,7 @@ def detail(
     cfa: CfaView,
     view: BrowseView,
 ) -> None:
-    about(result, instrument)
+    about(result, instrument, wizard_done(view, cfa))
     datasets = administered_in(result, instrument.id)
     changes = file_history(result.project.root, result.project.instrument_files[instrument.id])
     shown = {
@@ -597,7 +611,9 @@ def history(project: Project, instrument_id: str, changes: list[Change]) -> None
                 ui.code(change.diff, language="diff").classes("w-full")
 
 
-def about(result: CatalogResult, instrument: Instrument) -> None:
+def about(
+    result: CatalogResult, instrument: Instrument, done: Callable[[str], Awaitable[None]]
+) -> None:
     variables = [v for v in result.catalog.variables if v.instrument_id == instrument.id]
     facts = [
         instrument.construct_name,
@@ -629,9 +645,14 @@ def about(result: CatalogResult, instrument: Instrument) -> None:
                 ui.label(instrument.license)
             if missing := gaps(instrument):
                 ui.label("Missing").classes("lc-fact-key")
-                with ui.row().classes("gap-1"):
+                with ui.row().classes("gap-1 items-center"):
                     for gap in missing:
                         ui.label(gap).classes("lc-pill lc-warn")
+                    ui.button(
+                        "Complete this instrument",
+                        icon="edit_note",
+                        on_click=lambda: new_instrument.open_wizard(result, done, instrument.id),
+                    ).props("flat dense no-caps").classes("lc-quiet-btn")
 
 
 def reference_row(project: Project, reference: Reference) -> None:

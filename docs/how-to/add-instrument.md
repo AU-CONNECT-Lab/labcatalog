@@ -6,7 +6,12 @@ There are four ways to add an instrument. Which one fits depends on what you sta
 |---|---|
 | A new data file and its codebook (REDCap, Qualtrics, SPSS, or a document) | A codebook import, which also writes the column map |
 | Only a PDF of the instrument | A draft from a language model |
+| The items and a data file that has their columns | **Add an instrument** on the Instruments page |
 | Nothing but the items | The Edit page, or write the file by hand |
+
+## Add it step by step
+
+**Add an instrument** on the Instruments page asks for the instrument's name and answer options, takes the items pasted one per line, offers a total score, and finds the item columns in the datasets you choose. It writes the instrument file, the column map rows and the administrations in one go, after showing what each file gains. See [Instruments](../app/instruments.md#add-an-instrument). The same steps fill in an instrument that is missing a description, scores or a reference: open its page and press **Complete this instrument**.
 
 ## Import a codebook
 
