@@ -1,6 +1,6 @@
 # Add an Instrument
 
-There are four ways to add an instrument. Which one fits depends on what you start from:
+There are five ways to add an instrument. Which one fits depends on what you start from:
 
 | You have | Use |
 |---|---|
