@@ -247,7 +247,7 @@ def score_relations(result: CatalogResult) -> None:
     with panel(
         "How the scores relate",
         f"{coefficient} between scores measured in one wave, linked at |r| ≥ "
-        f"{defaults.CHART_MIN_R:g}. Hover a score to see its links, drag to move, scroll to zoom.",
+        f"{defaults.CHART_MIN_R:g}. Hover a score to color its links (red positive, blue negative), drag to move, scroll to zoom.",
     ) as tools:
         with tools:
             chooser = (

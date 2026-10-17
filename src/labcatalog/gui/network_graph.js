@@ -1,7 +1,12 @@
 import "force-graph";
 
-// Screen pixels at which a label is fully shown; below it labels fade out, as in Obsidian.
-const LABEL_PX = 10;
+// Labels fade in between these screen sizes, so the fitted view shows dots and zooming in names them.
+const LABEL_FROM_PX = 8;
+const LABEL_PX = 12;
+const LABEL_SIZE = 3;
+// Links are hairlines in a neutral grey until a hover colours them by sign.
+const HAIRLINE_PX = 0.7;
+const HAIRLINE_ALPHA = 0.45;
 const FADE_MS = 220;
 const DIM = 0.12;
 // The fitted view never zooms in further than this, so a small network keeps room around it.
@@ -154,6 +159,7 @@ export default {
       this.colors = {
         ink: style.getPropertyValue("--lc-ink").trim(),
         muted: style.getPropertyValue("--lc-muted").trim(),
+        faint: style.getPropertyValue("--lc-faint").trim(),
         panel: style.getPropertyValue("--lc-panel").trim(),
         font: style.fontFamily,
       };
@@ -199,9 +205,9 @@ export default {
         ctx.stroke();
         ctx.globalAlpha = alpha;
       }
-      // Labels grow with the zoom and fade out below LABEL_PX; the hovered one and its neighbours stay.
-      const size = 4.2;
-      let shown = Math.max(0, Math.min(1, (size * scale - LABEL_PX * 0.6) / (LABEL_PX * 0.4)));
+      // Labels grow with the zoom and fade out when small; the hovered one and its neighbours stay.
+      const size = LABEL_SIZE;
+      let shown = Math.max(0, Math.min(1, (size * scale - LABEL_FROM_PX) / (LABEL_PX - LABEL_FROM_PX)));
       let font = size;
       if (focused) {
         shown = Math.max(shown * alpha, this.level);
@@ -228,19 +234,23 @@ export default {
       const t = l.target;
       if (typeof s !== "object" || typeof t !== "object") return;
       const touching = this.focus && (s.id === this.focus.id || t.id === this.focus.id);
-      let alpha = 0.5;
-      let width = l.width;
-      if (this.focus) {
-        alpha = touching ? 0.5 + 0.45 * this.level : 0.5 * (1 - (1 - DIM) * this.level);
-        if (touching) width += this.level;
+      const line = (color, alpha, px) => {
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = px / scale;
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y);
+        ctx.lineTo(t.x, t.y);
+        ctx.stroke();
+      };
+      const level = this.focus ? this.level : 0;
+      if (touching) {
+        // The grey hairline turns into the link's sign colour and strength.
+        line(this.colors.faint, HAIRLINE_ALPHA * (1 - level), HAIRLINE_PX);
+        line(l.color, 0.9 * level, HAIRLINE_PX + (l.width + 0.5 - HAIRLINE_PX) * level);
+      } else {
+        line(this.colors.faint, HAIRLINE_ALPHA * (1 - (1 - DIM) * level), HAIRLINE_PX);
       }
-      ctx.globalAlpha = alpha;
-      ctx.strokeStyle = l.color;
-      ctx.lineWidth = width / scale;
-      ctx.beginPath();
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(t.x, t.y);
-      ctx.stroke();
       ctx.globalAlpha = 1;
     },
   },

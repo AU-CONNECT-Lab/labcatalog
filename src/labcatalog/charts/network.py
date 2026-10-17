@@ -2,8 +2,8 @@ import numpy as np
 
 from labcatalog.charts.style import CORRELATION_SCALE, scale_color
 
-NODE_MIN = 2.5
-NODE_SPAN = 3.5
+NODE_MIN = 1.5
+NODE_SPAN = 6.0
 NETWORK_HEIGHT = 640
 UNSET = "Not set"
 UNSET_COLOR = "#9aa5b1"
@@ -28,7 +28,7 @@ def score_network(nodes: list[dict], links: list[dict], categories: list[tuple[s
                 "id": node["key"],
                 "name": node["label"],
                 "group": node["category"],
-                "size": round(NODE_MIN + NODE_SPAN * strength[i] / peak, 2),
+                "size": round(NODE_MIN + NODE_SPAN * (strength[i] / peak) ** 2, 2),
                 "tip": node["tip"],
             }
             for i, node in enumerate(nodes)
