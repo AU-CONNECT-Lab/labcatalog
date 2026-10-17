@@ -16,7 +16,7 @@ Each entry is one line; the button with the sliders opens its other fields, the 
 
 ### Text mode
 
-Every file can be edited as text. **Save** checks the file the same way loading the project does. If something is wrong, nothing is written, and each problem is listed under the editor with its line, which is also marked in the text. When the file is right, it is saved and the catalog reloads. **Reload from disk** throws away your changes.
+Every file can be edited as text. **Save** checks the file the same way loading the project does. If something is wrong, nothing is written, and each problem is listed under the editor with its line, which is also marked in the text. When the file is right, it is saved and the catalog reloads. A tag that the field's `choices` in `labcatalog.yaml` do not list yet, typed in any of the modes, is shown before saving; **Add and save** adds it to the choices and saves both files. **Reload from disk** throws away your changes.
 
 ### Table mode
 

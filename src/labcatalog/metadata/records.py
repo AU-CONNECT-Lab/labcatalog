@@ -444,7 +444,8 @@ def stored(cell: Any, column: Column) -> Any:
     if column.kind == "list":
         parts = [part.strip() for part in text.split(",") if part.strip()]
         undeclared = [part for part in parts if column.choices and part not in column.choices]
-        if undeclared:
+        # A new tag is offered for declaring when the file is saved (editing.new_tags).
+        if undeclared and not column.key.startswith(f"{CUSTOM}{NESTED}"):
             raise EditError(
                 f"{column.label}: {', '.join(undeclared)} not declared in custom_fields"
             )

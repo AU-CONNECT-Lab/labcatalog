@@ -121,14 +121,40 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             ui.notify(str(err), type="negative")
             return None
 
+    async def declared(text: str | None) -> str | None:
+        # New tags go into the field's choices in labcatalog.yaml, once the user agrees.
+        if text is None or editing.check_text(view.path, text):
+            return text
+        tags = editing.new_tags(root, text)
+        if not tags:
+            return text
+        with frame, ui.dialog() as dialog, ui.card():
+            ui.label(f"Add these tags to {defaults.CONFIG_FILENAME}?")
+            for name, values in tags.items():
+                label = next((f.label or f.name for f in fields if f.name == name), name)
+                ui.label(f"{label}: {', '.join(values)}").classes("lc-note")
+            with ui.row():
+                ui.button("Add and save", on_click=lambda: dialog.submit(True))
+                ui.button("Keep editing", on_click=lambda: dialog.submit(False)).props("flat")
+        if not await dialog:
+            return None
+        if view.path == defaults.CONFIG_FILENAME:
+            return editing.declare_tags(text, tags)
+        try:
+            editing.save_tags(root, tags)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative", multi_line=True)
+            return None
+        return text
+
     async def save() -> None:
-        text = await edited_text()
+        text = await declared(await edited_text())
         if text is not None and write(text):
             ui.notify(f"Saved {view.path}")
             await on_saved()
 
     async def move() -> None:
-        text = await edited_text()
+        text = await declared(await edited_text())
         if text is None or not write(text):
             return
         try:

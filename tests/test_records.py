@@ -167,8 +167,12 @@ def test_custom_fields_get_columns_and_a_table_of_their_own(mock_project):
     ]
     assert editing.check_text(MOOD, written) == []
     scores[1]["custom:topics"] = "sleep, naps"
-    with pytest.raises(EditError, match="Topics: naps not declared"):
-        records.write_rows(text, "scores", tables["scores"], scores)
+    with_naps = records.write_rows(text, "scores", tables["scores"], scores)
+    assert editing.new_tags(mock_project, with_naps) == {"topics": ["naps"]}
+    editing.save_tags(mock_project, {"topics": ["naps"]})
+    config = (mock_project / "labcatalog.yaml").read_text(encoding="utf-8")
+    assert "naps]" in config
+    assert editing.new_tags(mock_project, with_naps) == {}
     [row] = records.read_rows(text, "custom", tables["custom"])
     assert row["custom:domain"] == "emotion"
     row["custom:domain"] = ""

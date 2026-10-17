@@ -108,6 +108,41 @@ def save_freed(root: Path, freed: list[FreedParameter]) -> None:
     save_file(root, opened, out.getvalue())
 
 
+def new_tags(root: Path, text: str) -> dict[str, list[str]]:
+    # Tags typed into a file that their field's declaration does not list yet.
+    fields = {f.name: f for f in custom_fields(root) if f.type == "tags" and f.choices}
+    data = records.load(text)
+    if not isinstance(data, dict):
+        return {}
+    blocks = [data.get("custom")]
+    for key in ("scores", "administrations", "datasets"):
+        blocks += [entry.get("custom") for entry in data.get(key) or [] if isinstance(entry, dict)]
+    found: dict[str, list[str]] = {}
+    for block in blocks:
+        for name, value in (block or {}).items():
+            if name not in fields:
+                continue
+            for tag in [value] if isinstance(value, str) else value or []:
+                if tag not in fields[name].choices and tag not in found.get(name, []):
+                    found.setdefault(name, []).append(str(tag))
+    return found
+
+
+def declare_tags(config_text: str, tags: dict[str, list[str]]) -> str:
+    data = records.load(config_text)
+    for field in data.get("custom_fields") or []:
+        if field.get("name") in tags:
+            field["choices"].extend(tags[field["name"]])
+    out = io.StringIO()
+    records.round_trip().dump(data, out)
+    return out.getvalue()
+
+
+def save_tags(root: Path, tags: dict[str, list[str]]) -> None:
+    opened = open_file(root, defaults.CONFIG_FILENAME)
+    save_file(root, opened, declare_tags(opened.text, tags))
+
+
 def free_instrument_path(root: Path, instrument_id: str) -> Path:
     if not NEW_ID.fullmatch(instrument_id):
         raise EditError("Use lower-case letters, digits and underscores, starting with a letter")
