@@ -1,7 +1,9 @@
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
+from test_long_files import make_long
 
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import changes, new_dataset, studies
@@ -242,3 +244,44 @@ def test_problems_across_files_are_caught_before_writing(project_root):
     assert [i.message.split(" ", 1)[1] for i in issues] == [
         "(child_w9).wave: wave 9 is not listed for study mock_study"
     ]
+
+
+def test_a_file_of_every_wave_is_read_again_for_the_next_wave(project_root):
+    long = make_long(project_root)
+    fourth = long[long["wave"] == "3"].assign(wave="4")
+    pd.concat([long, fourth]).to_csv(project_root / "data/parent_long.csv", index=False)
+    project = load_project(project_root)
+    assert "parent_w3" in new_dataset.templates(project)
+    draft = new_dataset.suggest(project, "parent_w3")
+    assert (draft.name, draft.wave) == ("parent_w4", "4")
+    placement = new_dataset.place(project, draft, None)
+    assert (placement.copy_to, placement.data_path, placement.step) == (
+        None,
+        "data/parent_long.csv",
+        None,
+    )
+    dataset = new_dataset.dataset_config(project, draft, placement)
+    assert dataset.wave_column == "wave"
+    seen = new_dataset.wave_rows(project, dataset)
+    assert (seen.rows, seen.waves) == (len(fourth), ["1", "2", "3", "4"])
+    assert new_dataset.wave_rows(project, dataset.model_copy(update={"wave": "5"})).rows == 0
+
+    rows = new_dataset.template_rows(project, "parent_w3")
+    assert {"column": "eps_1_w3", "instrument": "example_parent_stress", "item": "eps_1"} in rows
+    found = new_dataset.changes(project, draft, placement, rows)
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    after = load_project(project_root)
+    assert not [i for i in validate_project(after) if "parent_w4" in i.message]
+    assert [e.column for e in after.maps["parent_w4"]] == [
+        e.column for e in after.maps["parent_w3"]
+    ]
+    assert (
+        "path: data/parent_long.csv, wave_column: wave"
+        in (project_root / "labcatalog.yaml")
+        .read_text(encoding="utf-8")
+        .split("name: parent_w4")[1]
+        .split("\n")[0]
+    )
+    assert len(load_datasets(after)["parent_w4"].frame) == len(fourth)
+    assert not (project_root / "data/parent_w4.csv").exists()

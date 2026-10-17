@@ -9,7 +9,7 @@ from nicegui import app, ui
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui.common import computed, note, path_input
+from labcatalog.gui.common import computed, note, path_input, show_status
 from labcatalog.metadata import changes, new_dataset
 from labcatalog.paths import expand_path, stored_path
 from labcatalog.pipeline import CatalogResult
@@ -76,6 +76,9 @@ def open_wizard(
             return kind.value == FOLDER
         return dataset_by_name(config, template.value).source == FOLDER
 
+    def long() -> bool:
+        return not blank() and bool(dataset_by_name(config, template.value).wave_column)
+
     def draft() -> new_dataset.Draft:
         described = None
         if blank():
@@ -115,9 +118,12 @@ def open_wizard(
             start_status.set_text(str(err))
             return
         start_status.set_text("")
-        table_box.visible, folder_box.visible = not folder(), folder()
+        table_box.visible = not folder() and not long()
+        folder_box.visible, long_box.visible = folder(), long()
         if folder() and not blank():
             await prefill_folder()
+        if long():
+            await show_rows()
         stepper.next()
 
     async def choose() -> None:
@@ -172,6 +178,31 @@ def open_wizard(
             more = f" and {len(seen.unmatched) - 5} more" if len(seen.unmatched) > 5 else ""
             note(f"Not counted ({len(seen.unmatched)}): {shown}{more}")
 
+    async def show_rows() -> bool:
+        # The rows the new dataset will read, so a wave written differently shows up here.
+        try:
+            placement = new_dataset.place(project, draft(), None)
+            dataset = new_dataset.dataset_config(project, draft(), placement)
+            seen = await computed(new_dataset.wave_rows, project, dataset)
+        except LabCatalogError as err:
+            show_status(rows_status, str(err), "bad")
+            return False
+        found = f"of {dataset.path} have {dataset.wave_column} {dataset.wave}"
+        if not seen.rows:
+            waves = ", ".join(seen.waves) or "none"
+            show_status(rows_status, f"No rows {found}; the waves in it are {waves}.", "warn")
+            return False
+        show_status(rows_status, f"{seen.rows} rows {found}", "ok")
+        state["placement"] = placement
+        return True
+
+    async def long_next() -> None:
+        if not await show_rows():
+            return
+        state["rows"] = new_dataset.template_rows(project, template.value)
+        columns.refresh()
+        stepper.next()
+
     async def folder_next() -> None:
         found = typed_folder()
         if found is None or not found.is_dir():
@@ -205,6 +236,9 @@ def open_wizard(
     async def file_next() -> None:
         if folder():
             await folder_next()
+            return
+        if long():
+            await long_next()
             return
         if state["source"] is None:
             file_status.set_text("Choose the data file first.")
@@ -330,7 +364,13 @@ def open_wizard(
         placement = state["placement"]
         if placement is None:
             return
-        if placement.copy_to is None:
+        if long():
+            column = dataset_by_name(config, template.value).wave_column
+            note(
+                f"Reads the rows of {placement.data_path} where {column} is {wave.value}; "
+                "nothing is copied."
+            )
+        elif placement.copy_to is None:
             note(f"Reads the files where they are, in {placement.data_path}; nothing is copied.")
         else:
             note(f"Copied the data to {placement.copy_to}.")
@@ -380,7 +420,9 @@ def open_wizard(
                         "Pick the dataset this one repeats, usually the same file from the last "
                         "wave. The new one takes its modality, study, reporter, ID and date "
                         "columns, and its cleaning step if it has one. A folder of files takes its "
-                        "folder and files rule, with the wave changed where the rule names it."
+                        "folder and files rule, with the wave changed where the rule names it. A "
+                        "file with a wave column, which holds every wave, is read again for the "
+                        "new wave."
                     )
                     template = ui.select(
                         {n: views.dataset_label(result, n) for n in names},
@@ -466,7 +508,13 @@ def open_wizard(
                         .classes("w-full")
                     )
                     preview()
-                folder_box.visible = False
+                with ui.column().classes("gap-2 w-full") as long_box:
+                    note(
+                        "The dataset it repeats reads one file that holds every wave, so this one "
+                        "reads the same file and keeps the rows of its own wave."
+                    )
+                    rows_status = ui.label()
+                folder_box.visible = long_box.visible = False
                 file_status = ui.label().classes("lc-note")
                 log = ui.column().classes("w-full")
                 with ui.stepper_navigation():

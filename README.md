@@ -8,9 +8,26 @@ It works with questionnaires and with features from other modalities (EEG, fMRI,
 
 ## How it works
 
-![Your data, prepared by your own scripts, described in plain files and checked, then browsed, analyzed and written up](docs/images/workflow.png)
+![Your data, prepared by your own scripts, described in plain files and checked, then used to browse, analyze and write up](docs/images/workflow.png)
 
-Each step has its own page in the window, so the whole loop runs without a terminal. The files stay plain YAML and CSV in your project folder, readable and versioned like any other code.
+Each step has its own page in the window, so the whole loop runs without a terminal. The files stay plain YAML and CSV in your project folder, readable and versioned like any other code:
+
+![The files labcatalog reads from your project folder and the files it writes there](docs/images/file-flow.png)
+
+| In your project folder | What it holds | Step |
+| --- | --- | --- |
+| `raw/` | exports as they come off the platform or device | 1 Your data |
+| `scripts/` | your cleaning and extraction scripts | 2 Prepare |
+| `data/` | cleaned data files, one per dataset | 2 Prepare |
+| `labcatalog.yaml` | settings, studies and waves, one entry per data file | 3 Describe |
+| `instruments/` | one YAML file per instrument | 3 Describe |
+| `studies/` | one YAML file per study: which instruments each dataset has | 3 Describe |
+| `maps/` | one CSV per data file: which column is which item | 3 Describe |
+| `references/` | `references.bib` and the instruments' PDFs | 3 Describe |
+| `accepted_warnings.yaml` | warnings you have looked at and marked as fine | 4 Check |
+| `outputs/` | tables, figures, scripts and data you saved | 5 Use |
+| `freezes/` | records of which data a result used | 5 Use |
+| `database/` | every dataset and its statistics in one DuckDB file | 5 Use |
 
 ## A look around
 

@@ -117,6 +117,7 @@ DATASETS = Table(
         Column("source", "Source", "choice", ("csv", "folder")),
         Column("path", "Path"),
         Column("files", "Files"),
+        Column("wave_column", "Wave column"),
         Column("id_column", "ID column"),
         Column("group_column", "Group column"),
         Column("date_column", "Date column"),

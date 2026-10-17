@@ -76,16 +76,22 @@ class FolderPreview:
 
 
 @dataclass
+class WaveRows:
+    rows: int
+    waves: list[str]
+
+
+@dataclass
 class Brought:
     created: list[str] = field(default_factory=list)
     run: StepRun | None = None
 
 
 def templates(project: Project) -> list[str]:
-    # Datasets the wizard can repeat: a folder, or one file cleaned by at most one step that reads one.
+    # Repeatable: a folder, a file of every wave, or one file cleaned by at most one step.
     usable = []
     for d in project.config.datasets:
-        if d.source == "folder":
+        if d.source == "folder" or d.wave_column:
             usable.append(d.name)
             continue
         try:
@@ -121,6 +127,19 @@ def suggest_blank(project: Project, study: str) -> Draft:
 
 def is_folder(draft: Draft) -> bool:
     return draft.files is not None
+
+
+def repeats_long_file(project: Project, draft: Draft) -> bool:
+    # A file with a wave column holds the next wave too, so the new dataset reads it again.
+    return draft.blank is None and bool(dataset_by_name(project.config, draft.template).wave_column)
+
+
+def wave_rows(project: Project, dataset: DatasetConfig) -> WaveRows:
+    frame = read_data(project, dataset)
+    if dataset.wave_column not in frame:
+        raise EditError(f"{dataset.path} has no column {dataset.wave_column}")
+    values = frame[dataset.wave_column]
+    return WaveRows(int((values == dataset.wave).sum()), sorted(set(values)))
 
 
 def folder_files(folder: Path) -> list[str]:
@@ -160,7 +179,9 @@ def check_draft(project: Project, draft: Draft) -> None:
         raise EditError("Wave: fill it in")
 
 
-def place(project: Project, draft: Draft, source: Path) -> Placement:
+def place(project: Project, draft: Draft, source: Path | None) -> Placement:
+    if repeats_long_file(project, draft):
+        return Placement(None, dataset_by_name(project.config, draft.template).path)
     if is_folder(draft):
         # A path typed relative, or with ~ or a variable, is kept as typed.
         path = portable_path(source, project.root) if source.is_absolute() else source
@@ -271,6 +292,14 @@ def match_columns(project: Project, dataset: DatasetConfig) -> list[dict[str, st
             "item": row["item"] if (row["instrument"], row["item"]) in known else "",
         }
         for row in rows
+    ]
+
+
+def template_rows(project: Project, template: str) -> list[dict[str, str]]:
+    # A file of every wave holds the next wave in the template's own columns.
+    return [
+        {"column": e.column, "instrument": e.instrument or "", "item": e.item or ""}
+        for e in project.maps.get(template, [])
     ]
 
 
