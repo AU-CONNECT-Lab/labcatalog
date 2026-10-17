@@ -61,6 +61,7 @@ def test_a_long_file_gives_what_one_file_per_wave_gives(long_project):
     root, wide = long_project
     long_result, wide_result = run_catalog(root), run_catalog(wide)
     assert rounded(long_result.summary.model_dump()) == rounded(wide_result.summary.model_dump())
+
     def by_person(result, name):
         # parent_w3 repeats an ID, so rows are ordered by every column, not the ID alone.
         found = result.scores[name].assign(pid=result.datasets[name].frame["pid"])
@@ -72,9 +73,7 @@ def test_a_long_file_gives_what_one_file_per_wave_gives(long_project):
     def problems(result):
         # Messages name their first few people in file order, which the shuffle changes.
         return sorted(
-            (i.code, i.level, re.sub(r"\d{4}[PC]", "ID", i.message))
-            for i in result.report.issues
-            if i.code != "column_unmapped"
+            (i.code, i.level, re.sub(r"\d{4}[PC]", "ID", i.message)) for i in result.report.issues
         )
 
     assert problems(long_result) == problems(wide_result)
