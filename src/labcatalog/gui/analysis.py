@@ -203,6 +203,11 @@ def correlation_section(
             code = analysis_script.correlation_code(variables, stats.correlation)
             frame = data.frame()
             found, engine = await analysis_tables.compute(result, sample, frame, code)
+            if stats.correlation == "spearman" and engine != analysis_tables.R_NOTE:
+                engine += (
+                    " Spearman's p uses the t approximation here; in R, as in JASP, it is exact "
+                    "when there are no ties."
+                )
             texts = analysis_tables.section_files(result, sample, frame, code)
             described, matrix = analysis_script.read_correlations(
                 found, [v.column for v in variables]

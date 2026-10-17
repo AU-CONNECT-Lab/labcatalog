@@ -121,21 +121,26 @@ print(table1)
 """
 R_CORRELATIONS = """\
 # Correlations: n, M and SD of each variable (psych::describe), then {coefficient} for each
-# pair on everyone with both values (psych::corr.test, p values not adjusted).
+# pair on everyone with both values (cor.test, p values not adjusted; Spearman's p is exact
+# when there are no ties).
 variables <- c({columns})
 descriptives <- data.frame(variable = variables,
                            psych::describe(d[variables])[c("n", "mean", "sd")], row.names = NULL)
 print(descriptives)
-test <- psych::corr.test(d[variables], method = "{method}", adjust = "none")
-pairs <- which(lower.tri(test$r), arr.ind = TRUE)
-correlations <- data.frame(x = variables[pairs[, "col"]], y = variables[pairs[, "row"]],
-                           n = if (is.matrix(test$n)) test$n[pairs] else test$n,
-                           r = test$r[pairs], p = test$p[pairs])
+pairs <- t(combn(variables, 2))
+correlations <- do.call(rbind, lapply(seq_len(nrow(pairs)), function(i) {{
+  x <- pairs[i, 1]
+  y <- pairs[i, 2]
+  n <- sum(complete.cases(d[[x]], d[[y]]))
+  test <- if (n > 2) suppressWarnings(cor.test(d[[x]], d[[y]], method = "{method}"))
+  data.frame(x = x, y = y, n = n, r = if (is.null(test)) NA else unname(test$estimate),
+             p = if (is.null(test)) NA else test$p.value)
+}}))
 print(correlations)
 """
 PYTHON_CORRELATIONS = """\
 # Correlations: n, M and SD of each variable, then {coefficient} for each pair on everyone
-# with both values (scipy, p values not adjusted).
+# with both values (scipy, p values not adjusted; Spearman's p uses the t approximation).
 variables = [{columns}]
 descriptives = pd.DataFrame(dict(variable=variables, n=d[variables].count().to_numpy(),
                                  mean=d[variables].mean().to_numpy(),

@@ -22,6 +22,9 @@ GROUP_WIDTH = 110
 FIGURE_MIN_WIDTH = 360
 
 
+R_NOTE = "Computed in R."
+
+
 def rscript() -> str | None:
     return preferences.load().get(preferences.RSCRIPT) or None
 
@@ -38,7 +41,7 @@ async def compute(
         found, _ = await computed(script.run_code, result, sample, frame, code, None)
         return found, f"R failed, so this was computed in Python: {err}"
     if engine == script.R:
-        return found, "Computed in R."
+        return found, R_NOTE
     return found, "Computed in Python; set Rscript on the Settings page to compute in R."
 
 

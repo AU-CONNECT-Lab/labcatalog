@@ -377,6 +377,32 @@ out <- list(r = test$estimate, p = test$p.value)
     assert (matrix[1][0].r, matrix[1][0].p) == pytest.approx((jasp["r"], jasp["p"]), rel=1e-6)
 
 
+@pytest.mark.skipif(not ready(ANALYSIS_PACKAGES), reason="R with psych is not installed")
+def test_spearman_p_is_exact_in_r_without_ties(result, sample, tmp_path):
+    data = script.AnalysisData(result, sample)
+    x, y = data.score(EPS), data.score(EMS)
+    frame = data.frame()
+    # Without ties JASP's cor.test gives the exact p, which the t approximation misses.
+    frame[x.column] += [i * 1e-6 for i in range(len(frame))]
+    frame[y.column] -= [i * 1e-7 for i in range(len(frame))]
+    code = script.correlation_code([x, y], "spearman")
+    found, _ = script.run_code(result, sample, frame, code, rscript())
+    _, matrix = script.read_correlations(found, [x.column, y.column])
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspRegression"],
+        f"""
+test <- cor.test(d[["{x.column}"]], d[["{y.column}"]], method = "spearman")
+out <- list(r = test$estimate, p = test$p.value)
+""",
+        frame,
+    )
+    assert (matrix[1][0].r, matrix[1][0].p) == pytest.approx((jasp["r"], jasp["p"]), rel=1e-6)
+    found, _ = script.run_code(result, sample, frame, code, None)
+    _, approximated = script.read_correlations(found, [x.column, y.column])
+    assert approximated[1][0].p != pytest.approx(jasp["p"], rel=1e-4)
+
+
 def test_item_rest_r_and_alpha_without_the_item_match_jasp(result, tmp_path):
     summary = next(s for s in result.summary.scores if s.key == EMS)
     score = next(s for s in result.catalog.scores if s.key == EMS)
