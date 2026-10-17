@@ -4,7 +4,7 @@ labcatalog runs without R and without a language model. R adds factor models and
 
 ## R and the packages it needs
 
-With R, labcatalog runs the analyses on the Analysis and Methods pages and the factor models in R, and in Python only when R is not set or fails. Confirmatory factor analysis and ω also have a Python version, but measurement invariance across waves needs R.
+With R, labcatalog runs the analyses on the Analysis and Methods pages and the factor models in R, and in Python only when R is not set or fails. Confirmatory factor analysis and ω also have a Python version, but measurement invariance (across waves, reporters or groups) needs R.
 
 1. Install R from [CRAN](https://cran.r-project.org/).
 2. In R, install the packages labcatalog uses:
