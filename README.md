@@ -14,16 +14,21 @@ Each step has its own page in the window, so the whole loop runs without a termi
 
 ## A look around
 
-<table>
-  <tr>
-    <td width="50%"><img src="docs/images/app/instrument.png" alt="An instrument's page"><br><b>Instruments</b>: items, options and scores of each instrument, with reliability, item analysis and factor structure in every wave.</td>
-    <td width="50%"><img src="docs/images/app/analysis.png" alt="The Analysis page"><br><b>Analysis</b>: correlations, regressions, group comparisons and multilevel models on the sample you pick, in R or Python, with the code to rerun them.</td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/images/app/methods.png" alt="The Methods page"><br><b>Methods</b>: the Participants and Measures paragraphs and APA tables for a wave, ready to paste.</td>
-    <td width="50%"><img src="docs/images/app/problems.png" alt="The Problems page"><br><b>Problems</b>: every place the data and the metadata disagree, each with a plain explanation and a way to fix it.</td>
-  </tr>
-</table>
+**Instruments**: items, options and scores of each instrument, with reliability, item analysis and factor structure in every wave.
+
+![An instrument's page](docs/images/app/instrument.png)
+
+**Analysis**: correlations, regressions, group comparisons and multilevel models on the sample you pick, in R or Python, with the code to rerun them.
+
+![The Analysis page](docs/images/app/analysis.png)
+
+**Methods**: the Participants and Measures paragraphs and APA tables for a wave, ready to paste.
+
+![The Methods page](docs/images/app/methods.png)
+
+**Problems**: every place the data and the metadata disagree, each with a plain explanation and a way to fix it.
+
+![The Problems page](docs/images/app/problems.png)
 
 ## Install
 
