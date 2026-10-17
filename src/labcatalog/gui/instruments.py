@@ -659,6 +659,9 @@ def detail(
 def definition(result: CatalogResult, instrument: Instrument) -> None:
     reverse = sum(item.reverse for item in instrument.items)
     counted = f"{len(instrument.items)} items" + (f", {reverse} reverse-keyed" if reverse else "")
+    if instrument.items:
+        with panel("Structure", "Scores and their items; hover for the wording"):
+            charts.show_tree(instrument)
     with ui.row().classes("w-full gap-4 items-start"):
         with ui.column().classes("min-w-0").style("flex: 1 1 480px"), panel("Items", counted):
             table(*item_table(result, instrument))

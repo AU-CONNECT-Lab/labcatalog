@@ -7,6 +7,7 @@ import webview
 from nicegui import app, ui
 
 from labcatalog import defaults
+from labcatalog.charts import mindmap
 from labcatalog.exceptions import EditError, LabCatalogError
 from labcatalog.gui import edit_form, preferences, theme
 from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
@@ -28,6 +29,8 @@ class EditView:
     line: int | None = None
     # Set by the page, so other pages can open a file in it.
     open: Callable[[str, int | None], None] | None = None
+    # Whether the instrument's structure above the editor is open.
+    structure: bool = True
 
 
 @dataclass
@@ -439,6 +442,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         "A draft from a PDF, kept out of the catalog. Check it against the PDF "
                         "and add its reference, then move it to instruments/."
                     ).classes("lc-status lc-warn")
+                if editing.is_instrument_file(view.path):
+                    structure_panel()
                 if view.mode == FORM:
                     form_mode(shown.form)
                 elif view.mode == TEXT:
@@ -450,6 +455,56 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         note(str(err))
                 if shown.problems is None:
                     shown.problems = ui.column().classes("gap-1")
+
+    async def current_text() -> str:
+        if shown.form is not None:
+            return shown.form.text(shown.opened.text)
+        if shown.editor is not None:
+            return shown.editor.value
+        if shown.grid is not None and shown.edited:
+            rows = await shown.grid.get_client_data(method="filtered_sorted")
+            return records.write_rows(shown.opened.text, view.mode, table(), rows)
+        return shown.opened.text
+
+    def structure_panel() -> None:
+        state = {"text": None}
+        with (
+            ui.expansion("Structure", icon="account_tree", value=view.structure)
+            .bind_value_to(view, "structure")
+            .props("dense")
+            .classes("w-full")
+        ):
+            status = ui.label().classes("lc-note")
+            note("Follows your edits; hover over an item for its wording.")
+            # A long instrument scrolls inside, so the editor stays in reach.
+            with ui.element("div").classes("w-full").style("max-height: 360px; overflow-y: auto"):
+                chart = ui.echart({}).classes("w-full")
+
+        async def follow() -> None:
+            if not view.structure:
+                return
+            try:
+                text = await current_text()
+            except LabCatalogError as err:
+                status.set_text(str(err))
+                return
+            if text == state["text"]:
+                return
+            state["text"] = text
+            try:
+                instrument = editing.instrument_from_text(text)
+            except EditError as err:
+                status.set_text(f"Showing the last version that could be read. {err}")
+                return
+            status.set_text("")
+            option = mindmap.instrument_tree(instrument)
+            chart.options.clear()
+            chart.options.update(theme.echart_for_page(option))
+            chart.style(f"height:{mindmap.tree_height(option)}px")
+            chart.update()
+
+        # Polled rather than hooked to every widget, so the three modes are followed alike.
+        ui.timer(1.0, follow)
 
     view.open = jump
     with ui.element("div").classes("w-full") as frame:

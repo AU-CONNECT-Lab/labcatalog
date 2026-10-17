@@ -2,9 +2,10 @@ import io
 import re
 import tempfile
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
-from pydantic import BaseModel
+import yaml
+from pydantic import BaseModel, ValidationError
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
@@ -106,6 +107,23 @@ def save_freed(root: Path, freed: list[FreedParameter]) -> None:
     out = io.StringIO()
     records.round_trip().dump(data, out)
     save_file(root, opened, out.getvalue())
+
+
+def is_instrument_file(relative: str) -> bool:
+    path = PurePosixPath(relative)
+    return path.suffix in defaults.YAML_SUFFIXES and FOLDERS.get(path.parent.name) is Instrument
+
+
+def instrument_from_text(text: str) -> Instrument:
+    # For a preview while the file is being edited, so only the first problem is told.
+    try:
+        return Instrument.model_validate(yaml.safe_load(text))
+    except yaml.YAMLError as err:
+        raise EditError(f"Not valid YAML yet: {str(err).splitlines()[0]}") from None
+    except ValidationError as err:
+        first = err.errors()[0]
+        where = ".".join(str(part) for part in first["loc"])
+        raise EditError(f"{where}: {first['msg']}" if where else first["msg"]) from None
 
 
 def new_tags(root: Path, text: str) -> dict[str, list[str]]:

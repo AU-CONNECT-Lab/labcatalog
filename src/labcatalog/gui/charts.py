@@ -3,10 +3,11 @@ import plotly.graph_objects as go
 from nicegui import ui
 
 from labcatalog import defaults
-from labcatalog.charts import network, views
+from labcatalog.charts import mindmap, network, views
 from labcatalog.gui import theme
 from labcatalog.gui.common import apa, caption, col, note, panel, table
 from labcatalog.pipeline import CatalogResult
+from labcatalog.schema import Instrument
 
 TABLE_MIN = 360
 
@@ -282,6 +283,15 @@ def show_network(option: dict | None, empty: str) -> ui.echart | None:
         ui.echart(theme.echart_for_page(option))
         .classes("w-full")
         .style(f"height:{network.NETWORK_HEIGHT}px")
+    )
+
+
+def show_tree(instrument: Instrument) -> ui.echart:
+    option = mindmap.instrument_tree(instrument)
+    return (
+        ui.echart(theme.echart_for_page(option))
+        .classes("w-full")
+        .style(f"height:{mindmap.tree_height(option)}px")
     )
 
 
