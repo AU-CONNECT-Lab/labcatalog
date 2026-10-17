@@ -155,6 +155,15 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-engine { font-size: 0.78rem; color: var(--lc-faint); }
 
 .lc-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 12px; padding: 4px 0; }
+/* The Edit page's form: one line per entry, its other fields folded below it. */
+.lc-form-wide { grid-column: 1 / -1; }
+.lc-form-entry { border-top: 1px solid var(--lc-rule-soft); padding: 8px 0; }
+.lc-form-entry:first-child { border-top: none; }
+.lc-form-number { width: 1.5rem; flex-shrink: 0; padding-top: 10px; text-align: right; font-size: 0.8rem; color: var(--lc-faint); }
+.lc-form-details { padding-left: 2rem; }
+.lc-form-bar { position: sticky; top: 96px; z-index: 5; background: var(--lc-panel); padding: 8px 0; }
+/* Hidden overflow would make the panel the bar's scroll box; clip keeps the window as it. */
+.lc-panel:has(.lc-form-bar) { overflow: clip; }
 
 /* The outcome of a check, as a tinted box that wraps. */
 .lc-status { padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }

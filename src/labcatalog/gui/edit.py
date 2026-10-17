@@ -7,21 +7,23 @@ import webview
 from nicegui import app, ui
 
 from labcatalog import defaults
-from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import preferences, theme
+from labcatalog.exceptions import EditError, LabCatalogError
+from labcatalog.gui import edit_form, preferences, theme
 from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
 from labcatalog.pipeline import run_instrument_draft
 
 TEXT = "text"
+# Fields to click and fill, the page's default; text and tables sit behind Advanced.
+FORM = "form"
 WIDE = {"text", "label", "path", "instrument", "datasets", "administration"}
 
 
 @dataclass
 class EditView:
     path: str | None = None
-    mode: str = TEXT
+    mode: str = FORM
     # The line to show once the file opens, as when coming from the Problems page.
     line: int | None = None
     # Set by the page, so other pages can open a file in it.
@@ -34,6 +36,7 @@ class Shown:
     opened: editing.Opened
     editor: ui.codemirror | None = None
     grid: ui.aggrid | None = None
+    form: edit_form.Form | None = None
     problems: ui.column | None = None
     edited: bool = False
 
@@ -47,6 +50,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     shown = Shown(editing.open_file(root, view.path))
 
     def changed() -> bool:
+        if shown.form is not None:
+            return shown.form.edited
         if shown.editor is not None:
             return shown.editor.value != shown.opened.text
         return shown.edited
@@ -65,7 +70,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
 
     def choose(path: str) -> None:
         if path != view.path:
-            leave(partial(go, path, TEXT))
+            leave(partial(go, path, FORM))
 
     def switch(mode: str) -> None:
         if mode != view.mode:
@@ -100,13 +105,17 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             ui.notify(str(err), type="negative", multi_line=True)
             return False
         shown.edited = False
+        if shown.form is not None:
+            shown.form.edited = False
         return True
 
     async def edited_text() -> str | None:
         if shown.editor is not None:
             return shown.editor.value
-        rows = await shown.grid.get_client_data(method="filtered_sorted")
         try:
+            if shown.form is not None:
+                return shown.form.text(shown.opened.text)
+            rows = await shown.grid.get_client_data(method="filtered_sorted")
             return records.write_rows(shown.opened.text, view.mode, table(), rows)
         except LabCatalogError as err:
             ui.notify(str(err), type="negative")
@@ -128,7 +137,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             ui.notify(str(err), type="negative")
             return
         ui.notify(f"Moved to {path}")
-        go(path, TEXT)
+        go(path, FORM)
         await on_saved()
 
     async def add_row() -> None:
@@ -160,6 +169,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
 
     def reload() -> None:
         shown.edited = False
+        if shown.form is not None:
+            shown.form.edited = False
         page.refresh()
 
     def table() -> records.Table:
@@ -193,7 +204,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     ui.notify(str(err), type="negative")
                     return
                 dialog.close()
-                go(path, TEXT)
+                go(path, FORM)
 
             with ui.row():
                 ui.button("Create", on_click=make)
@@ -246,7 +257,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     f"Drafted by {meta.model} in {meta.latency_ms / 1000:.0f} s, "
                     f"{meta.input_tokens} tokens in and {meta.output_tokens} out"
                 )
-                leave(partial(go, drafted.path.relative_to(root).as_posix(), TEXT))
+                leave(partial(go, drafted.path.relative_to(root).as_posix(), FORM))
 
             with ui.row().classes("items-center gap-3"):
                 ui.button("Choose the PDF", icon="picture_as_pdf", on_click=pick).props(
@@ -289,6 +300,21 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             save_buttons()
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
 
+    def form_mode(form: edit_form.Form) -> None:
+        with ui.row().classes("lc-form-bar w-full items-center gap-3"):
+            save_buttons()
+            ui.button("Discard changes", icon="undo", on_click=reload).props("flat no-caps")
+        # Right under Save, since the form runs long.
+        shown.problems = ui.column().classes("gap-1")
+        edit_form.render(form)
+
+    def opened_form(opened: editing.Opened) -> edit_form.Form | None:
+        try:
+            form = edit_form.open_form(root, view.path, opened.text)
+        except EditError:
+            return None
+        return form if form.sections else None
+
     def table_mode(opened: editing.Opened) -> None:
         rows = records.read_rows(opened.text, view.mode, table())
         shown.grid = (
@@ -329,9 +355,11 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     @ui.refreshable
     def page() -> None:
         shown.opened = opened = editing.open_file(root, view.path)
-        shown.editor = shown.grid = None
+        shown.editor = shown.grid = shown.form = shown.problems = None
         tables = records.tables_for(view.path, fields)
-        if view.mode not in tables:
+        if view.mode == FORM:
+            shown.form = opened_form(opened)
+        if view.mode not in (FORM, *tables) or (view.mode == FORM and shown.form is None):
             view.mode = TEXT
         with ui.row().classes("w-full no-wrap items-start gap-4"):
             with ui.column().classes("w-64 shrink-0 lc-sticky"), panel("Files"):
@@ -361,26 +389,36 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     "was if something is wrong; then the catalog reloads.",
                 ) as tools,
             ):
-                if tables:
-                    with tools:
+                with tools:
+                    if view.mode == FORM:
+                        ui.button("Advanced", icon="code", on_click=lambda: switch(TEXT)).props(
+                            "flat dense no-caps"
+                        )
+                    elif tables:
                         ui.toggle(
                             {TEXT: "Text", **{key: t.label for key, t in tables.items()}},
                             value=view.mode,
                             on_change=lambda e: switch(e.value),
                         ).props("dense no-caps")
+                        ui.button("Form", icon="edit_note", on_click=lambda: switch(FORM)).props(
+                            "flat dense no-caps"
+                        )
                 if editing.is_draft(view.path):
                     ui.label(
                         "A draft from a PDF, kept out of the catalog. Check it against the PDF "
                         "and add its reference, then move it to instruments/."
                     ).classes("lc-status lc-warn")
-                if view.mode == TEXT:
+                if view.mode == FORM:
+                    form_mode(shown.form)
+                elif view.mode == TEXT:
                     text_mode(opened)
                 else:
                     try:
                         table_mode(opened)
                     except LabCatalogError as err:
                         note(str(err))
-                shown.problems = ui.column().classes("gap-1")
+                if shown.problems is None:
+                    shown.problems = ui.column().classes("gap-1")
 
     view.open = jump
     with ui.element("div").classes("w-full") as frame:
