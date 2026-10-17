@@ -1,7 +1,7 @@
 import pandas as pd
 import pytest
 
-from labcatalog.charts import views
+from labcatalog.charts import matrices, views
 from labcatalog.gui import analysis as page
 from labcatalog.gui import common
 from labcatalog.gui.common import p_value
@@ -115,11 +115,12 @@ def test_the_heatmap_is_a_lower_triangle_and_the_dots_a_full_matrix(result):
     matrix = analysis.correlation_matrix(analysis.table(result, sample, keys))
     labels = ["A", "B", "C"]
     heat = views.correlation_chart(result, keys, matrix, labels).data[0]
-    assert (list(heat.x), list(heat.y)) == (["1", "2"], ["2. B", "3. C"])
+    assert (list(heat.x), list(heat.y)) == (["1. A", "2. B"], ["2. B", "3. C"])
     assert heat.z[0][0] == pytest.approx(matrix[1][0].r) and heat.z[0][1] is None
     dotted = views.correlation_chart(result, keys, matrix, labels, "dots")
     assert len([s for s in dotted.layout.shapes if s.type == "circle"]) == 6
     assert list(dotted.layout.xaxis.ticktext) == labels and dotted.layout.xaxis.side == "top"
+    assert dotted.layout.xaxis.tickangle == matrices.COLUMN_ANGLE
     names = views.instrument_names(result)
     instruments = [views.score_of(result, k).instrument_id for k in keys]
     assert [t.name for t in dotted.data if t.name] == [names[i] for i in instruments]

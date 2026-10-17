@@ -234,7 +234,7 @@ def dot_matrix(
         automargin=True,
     )
     fig.update_xaxes(
-        side="top", range=[low, size - 0.5], tickangle=-90, constrain="domain", **ticks
+        side="top", range=[low, size - 0.5], tickangle=COLUMN_ANGLE, constrain="domain", **ticks
     )
     fig.update_yaxes(
         range=[size - 0.5, low], scaleanchor="x", scaleratio=1, constrain="domain", **ticks
@@ -244,14 +244,16 @@ def dot_matrix(
     # Row and column labels are the same, so one length sets the room left of and above the cells.
     label_px = LABEL_CHAR * max(len(label) for label in labels)
     left = int(max(100, label_px + 12))
+    # Slanted column labels rise 0.71 of their length and the last one reaches past the cells.
+    slant = int(0.71 * label_px)
     side = int(min(MAX_CELL, max(MIN_CELL, CELL_ROOM / size)) * (size - low + 0.5))
     # A legend placed on the whole figure only reserves room below the plot, not beside it.
     legend_rows = -(-len(set(groups)) // 3)
     return base_layout(
         fig,
-        int(side + label_px + 60 + 76 + 24 * legend_rows),
-        width=left + side + 20,
-        margin=dict(l=left, r=20, t=40, b=76),
+        int(side + slant + 60 + 76 + 24 * legend_rows),
+        width=left + side + slant + 20,
+        margin=dict(l=left, r=slant + 20, t=40, b=76),
         legend=dict(
             orientation="h",
             x=0.01,
