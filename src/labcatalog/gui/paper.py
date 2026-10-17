@@ -1,7 +1,9 @@
 import base64
 import json
 import urllib.parse
+from collections.abc import Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import plotly.graph_objects as go
 from nicegui import ui
@@ -14,6 +16,7 @@ from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult, run_interpretation
 from labcatalog.reports import outputs, tables
 from labcatalog.reports.tables import PaperTable
+from labcatalog.stats import mplus
 
 IMAGE_WIDTH = 900
 IMAGE_KINDS = ("png", "svg")
@@ -124,12 +127,18 @@ def save_button(
     papers: dict[str, PaperTable] | None = None,
     chart: Chart | None = None,
     texts: dict[str, str] | None = None,
+    later_texts: Callable[[], dict[str, str]] | None = None,
 ) -> None:
+    # later_texts builds files only when saving, such as Mplus inputs with their data.
     async def save() -> None:
         files = {}
         for paper_name, shown in (papers or {}).items():
             files |= tables.files(paper_name, shown)
-        files |= {n: text.encode("utf-8") for n, text in (texts or {}).items()}
+        if later_texts is not None:
+            texts_now = {**(texts or {}), **await computed(later_texts)}
+        else:
+            texts_now = texts or {}
+        files |= {n: text.encode("utf-8") for n, text in texts_now.items()}
         if chart is not None and chart.plot is not None:
             for kind in IMAGE_KINDS:
                 files[f"{name}.{kind}"] = await image(chart, kind)
@@ -141,12 +150,32 @@ def save_button(
             ui.button("Open folder", icon="folder_open", on_click=lambda: open_path(folder)).props(
                 "flat dense no-caps"
             )
+            if any(n.endswith(".inp") for n in files):
+                mplus_button(folder)
 
     with ui.row().classes("items-center gap-2"):
         ui.button("Save to outputs", icon="save", on_click=save).props(
             "flat dense no-caps"
         ).classes("lc-quiet-btn")
         saved = ui.row().classes("items-center gap-2")
+
+
+def mplus_button(folder: Path) -> None:
+    program = preferences.load().get(preferences.MPLUS)
+    if not program:
+        return
+
+    async def run() -> None:
+        status.set_text("Running Mplus")
+        try:
+            found = await computed(mplus.run, program, folder)
+        except LabCatalogError as err:
+            status.set_text(str(err))
+            return
+        status.set_text(f"Mplus wrote {len(found)} .out files beside the inputs.")
+
+    ui.button("Run in Mplus", icon="play_arrow", on_click=run).props("flat dense no-caps")
+    status = ui.label().classes("lc-note")
 
 
 def result_actions(

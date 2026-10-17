@@ -50,6 +50,10 @@ class RError(LabCatalogError):
     pass
 
 
+class MplusError(LabCatalogError):
+    pass
+
+
 class DataladError(LabCatalogError):
     exit_code = EXIT_ISSUES
 

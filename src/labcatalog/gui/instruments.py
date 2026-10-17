@@ -1,6 +1,6 @@
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
-from functools import cache
+from functools import cache, partial
 from pathlib import Path
 
 from nicegui import app, ui
@@ -63,6 +63,7 @@ from labcatalog.reports.export import (
 )
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument, Reference, Text
+from labcatalog.stats import mplus
 from labcatalog.stats.cfa import (
     GENERAL,
     GENERAL_KINDS,
@@ -76,6 +77,7 @@ from labcatalog.stats.cfa import (
     R,
     scores_of,
 )
+from labcatalog.stats.cfa import build_models as cfa_models
 from labcatalog.stats.invariance import (
     REPORTERS,
     WAVES,
@@ -1130,7 +1132,12 @@ def factor_structure(
                 paper_table(shown)
             labels = {s.id: s.label for s in instrument.scores}
             results_text(results.cfa_text(fits, labels, common.decimals), list(papers.values()))
-            save_button(result, f"cfa_{instrument.id}_{dataset}", papers)
+            save_button(
+                result,
+                f"cfa_{instrument.id}_{dataset}",
+                papers,
+                later_texts=partial(mplus_inputs, result, instrument, dataset),
+            )
             if cfa.message:
                 note(cfa.message)
             elif result.project.config.stats.cfa_estimator != estimator:
@@ -1140,6 +1147,15 @@ def factor_structure(
                     "This project's stats: cfa_estimator is wlsmv; set Rscript on the Settings "
                     "page to fit the items as ordered categories in lavaan.",
                 )
+
+
+def mplus_inputs(result: CatalogResult, instrument: Instrument, dataset: str) -> dict[str, str]:
+    models = [
+        m
+        for m in cfa_models(result.project, result.catalog, result.datasets)
+        if (m.instrument_id, m.dataset) == (instrument.id, dataset)
+    ]
+    return mplus.cfa_files(models, result.project.config.stats.cfa_estimator, instrument.name)
 
 
 def general_note(fits: list[CfaFit]) -> str:

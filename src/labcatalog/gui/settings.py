@@ -1,5 +1,6 @@
 import os
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 from nicegui import ui
 
@@ -11,6 +12,7 @@ from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
 
 RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
+MPLUS_EXAMPLE = r"C:\Program Files\Mplus\Mplus.exe"
 
 
 def render(
@@ -25,6 +27,7 @@ def render(
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("grow min-w-0 gap-4"):
             r_section(on_rscript)
+            mplus_section()
             datalad.datalad_section(on_datalad)
             models_section(on_model)
         with ui.column().classes("w-96 shrink-0 gap-4"):
@@ -82,6 +85,39 @@ def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
             else:
                 show_status(status, f"{found.version}, with every package labcatalog uses.", "ok")
             await on_rscript()
+
+        button.on_click(save)
+        path.on("keydown.enter", save)
+
+
+def mplus_section() -> None:
+    with panel("Mplus", "Factor models as Mplus inputs"):
+        note(
+            "Save to outputs under a factor model's tables also writes each model as an Mplus "
+            "input (.inp) with its data (.dat). With the path to Mplus set here, a Run in Mplus "
+            "button runs them; the results are in the .out files beside them. The numbers on the "
+            "pages still come from R or Python."
+        )
+        with ui.row().classes("w-full items-start no-wrap gap-2 mt-1"):
+            path = path_input(
+                "Mplus",
+                preferences.load().get(preferences.MPLUS, ""),
+                f"The Mplus program, for example {MPLUS_EXAMPLE}",
+            )
+            button = ui.button("Save and check")
+        status = ui.label()
+        status.visible = False
+
+        def save() -> None:
+            value = (path.value or "").strip().strip('"')
+            path.value = value
+            preferences.save({preferences.MPLUS: value})
+            if not value:
+                show_status(status, "No Mplus set: inputs are written but not run.", "warn")
+            elif Path(value).is_file():
+                show_status(status, "Found Mplus.", "ok")
+            else:
+                show_status(status, f"No file at {value}.", "bad")
 
         button.on_click(save)
         path.on("keydown.enter", save)

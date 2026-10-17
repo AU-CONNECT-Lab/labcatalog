@@ -35,4 +35,4 @@ The number of decimal places is a setting of your computer, on the Settings page
 
 ## Get the code
 
-Every analysis has a **Code** section with R and Python code that reproduces it from the data files, and the Analysis page's **Script** section writes one script for the whole page. Use them to rerun an analysis outside labcatalog, extend it, or share it with a co-author or reviewer.
+Every analysis has a **Code** section with R and Python code that reproduces it from the data files, and the Analysis page's **Script** section writes one script for the whole page. The factor models on the instrument pages are saved as Mplus inputs as well; see [Instruments](../app/instruments.md). Use them to rerun an analysis outside labcatalog, extend it, or share it with a co-author or reviewer.
