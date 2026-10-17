@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from labcatalog.charts import style, views
+from labcatalog.charts import network, style, views
 from labcatalog.charts.style import STATUS_COLORS
 from labcatalog.gui import charts as gui_charts
 from labcatalog.pipeline import run_catalog
@@ -233,3 +233,18 @@ def test_network_colours_the_instruments_shown_in_palette_order(result):
     assert weakest["lineStyle"]["color"] != style.scale_color(
         weakest["value"], style.CORRELATION_SCALE, -1, 1
     )
+
+
+def test_network_pins_nodes_on_recolour_and_tightens_with_many_nodes():
+    def option(n: int, pinned: bool = False) -> dict:
+        nodes = [{"key": f"s{i}", "label": f"S{i}", "category": 0, "tip": ""} for i in range(n)]
+        links = [{"source": 0, "target": 1, "r": 0.5, "tip": ""}]
+        return network.score_network(nodes, links, [("All", "#000")], pinned)["series"][0]
+
+    few, many = option(10), option(90)
+    assert not any(n["fixed"] for n in few["data"])
+    assert all(n["fixed"] for n in option(10, pinned=True)["data"])
+    assert few["links"][0] == {**few["links"][0], "source": "s0", "target": "s1"}
+    assert many["force"]["edgeLength"][1] < few["force"]["edgeLength"][1]
+    assert many["force"]["gravity"] > few["force"]["gravity"]
+    assert few["label"]["show"] and not many["label"]["show"]

@@ -733,7 +733,12 @@ def network_colorings(result: CatalogResult) -> dict[str, str]:
 
 
 def score_network(
-    result: CatalogResult, study: str, wave: str, instruments: list[str], color_by: str
+    result: CatalogResult,
+    study: str,
+    wave: str,
+    instruments: list[str],
+    color_by: str,
+    pinned: bool = False,
 ) -> dict | None:
     p = score_panel(result, study, wave, instruments)
     if p is None:
@@ -776,7 +781,7 @@ def score_network(
         }
         for i, j in pairs
     ]
-    return network.score_network(nodes, links, categories)
+    return network.score_network(nodes, links, categories, pinned)
 
 
 def network_groups(

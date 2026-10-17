@@ -224,9 +224,11 @@ def score_relations(result: CatalogResult) -> None:
 
     drawn: dict = {"chart": None}
 
-    def graph() -> None:
+    def graph(recolored: bool = False) -> None:
         study, wave = picked["wave"].split("|")
-        option = views.score_network(result, study, wave, picked["instruments"], picked["color"])
+        option = views.score_network(
+            result, study, wave, picked["instruments"], picked["color"], recolored
+        )
         chart = drawn["chart"]
         # Updating the same chart keeps every node where it is, so the layout only drifts.
         if option is not None and chart is not None:
@@ -242,7 +244,7 @@ def score_relations(result: CatalogResult) -> None:
         picked[key] = value or []
         if key == "instruments":
             chooser.props(f'display-value="{shown()}"')
-        graph()
+        graph(recolored=key == "color")
 
     def shown() -> str:
         return f"{len(picked['instruments'])} of {len(instruments)} instruments"
