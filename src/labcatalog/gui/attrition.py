@@ -6,7 +6,7 @@ from labcatalog.charts import views
 from labcatalog.gui import paper
 from labcatalog.gui.analysis import pick_menu
 from labcatalog.gui.analysis_tables import INDENT, code_view, compute, decimal, later, section_files
-from labcatalog.gui.common import col, fmt, note, p_value, section
+from labcatalog.gui.common import col, fmt, note, p_value, panel
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.measures import series
 from labcatalog.reports.tables import PaperTable
@@ -21,81 +21,84 @@ NOTE = (
 
 
 def render(result: CatalogResult, view, study: str, wave: str) -> None:
-    section("Attrition")
-    second = attrition.next_wave(result, study, wave)
-    if second is None:
-        note("Pick an earlier wave above to compare those who returned with those who did not.")
-        return
-    names = attrition.wave_files(result, study, wave)
-    choices = script.measures(result, names)
-    if not choices:
-        return
-    view.attrition = [k for k in view.attrition if k in choices] or script.default_measures(
-        result, names
-    )
-
-    @ui.refreshable
-    def body() -> None:
-        if not view.attrition:
-            note("Pick at least one variable.")
+    with panel("Attrition", "Those who returned at the next wave against those who did not"):
+        second = attrition.next_wave(result, study, wave)
+        if second is None:
+            note("Pick an earlier wave above to compare those who returned with those who did not.")
             return
-
-        async def fill() -> Callable:
-            found_plan = attrition.plan(result, study, wave, view.attrition)
-            if found_plan is None:
-                return lambda: note(
-                    f"Fewer than two {attrition.unit(result)} either returned at Wave {second} "
-                    "or did not."
-                )
-            sample, frame, code = found_plan.sample, found_plan.frame, found_plan.code
-            found, engine = await compute(result, sample, frame, code)
-            texts = section_files(result, sample, frame, code)
-            compared = attrition.read(found, found_plan.labels)
-            text = sentence(found_plan, compared)
-            shown = PaperTable(
-                f"Wave {wave} Characteristics of Those Who Did and Did Not Return at Wave {second}",
-                *attrition_table(found_plan, compared),
-                NOTE.format(t_test=attrition.T_TESTS[result.project.config.stats.t_test]),
-            )
-
-            def content() -> None:
-                ui.label(text).classes("lc-prose")
-                paper.copy_text(text)
-                paper.paper_table(shown)
-                note(engine)
-                paper.save_button(
-                    result, f"attrition_{study}_w{wave}", {"attrition": shown}, texts=texts
-                )
-                code_view(texts)
-
-            return content
-
-        later(fill)
-
-    def choose(value: list[str] | None) -> None:
-        view.attrition = value or []
-        body.refresh()
-
-    note(
-        f"Wave {wave} values of the {attrition.unit(result)} who took part again at Wave "
-        f"{second} against those who did not; anyone in any Wave {second} file counts as "
-        "returned."
-    )
-    with ui.row().classes("w-full items-center gap-2 no-wrap"):
-        chosen = (
-            ui.select(
-                choices,
-                multiple=True,
-                value=view.attrition,
-                label="Variables",
-                with_input=True,
-                on_change=lambda e: choose(e.value),
-            )
-            .props("dense outlined use-chips")
-            .classes("grow")
+        names = attrition.wave_files(result, study, wave)
+        choices = script.measures(result, names)
+        if not choices:
+            return
+        view.attrition = [k for k in view.attrition if k in choices] or script.default_measures(
+            result, names
         )
-        pick_menu(chosen, views.menu_groups(result, names, script.measures))
-    body()
+
+        @ui.refreshable
+        def body() -> None:
+            if not view.attrition:
+                note("Pick at least one variable.")
+                return
+
+            async def fill() -> Callable:
+                found_plan = attrition.plan(result, study, wave, view.attrition)
+                if found_plan is None:
+                    return lambda: note(
+                        f"Fewer than two {attrition.unit(result)} either returned at Wave {second} "
+                        "or did not."
+                    )
+                sample, frame, code = found_plan.sample, found_plan.frame, found_plan.code
+                found, engine = await compute(result, sample, frame, code)
+                texts = section_files(result, sample, frame, code)
+                compared = attrition.read(found, found_plan.labels)
+                text = sentence(found_plan, compared)
+                shown = PaperTable(
+                    f"Wave {wave} Characteristics of Those Who Did and Did Not Return at Wave {second}",
+                    *attrition_table(found_plan, compared),
+                    NOTE.format(t_test=attrition.T_TESTS[result.project.config.stats.t_test]),
+                )
+
+                def content() -> None:
+                    ui.label(text).classes("lc-prose")
+                    paper.copy_text(text)
+                    paper.paper_table(shown)
+                    paper.result_actions(
+                        result,
+                        f"attrition_{study}_w{wave}",
+                        {"attrition": shown},
+                        texts=texts,
+                        engine=engine,
+                    )
+                    code_view(texts)
+
+                return content
+
+            later(fill)
+
+        def choose(value: list[str] | None) -> None:
+            view.attrition = value or []
+            body.refresh()
+
+        note(
+            f"Wave {wave} values of the {attrition.unit(result)} who took part again at Wave "
+            f"{second} against those who did not; anyone in any Wave {second} file counts as "
+            "returned."
+        )
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            chosen = (
+                ui.select(
+                    choices,
+                    multiple=True,
+                    value=view.attrition,
+                    label="Variables",
+                    with_input=True,
+                    on_change=lambda e: choose(e.value),
+                )
+                .props("dense outlined use-chips")
+                .classes("grow")
+            )
+            pick_menu(chosen, views.menu_groups(result, names, script.measures))
+        body()
 
 
 def statistic(test: attrition.Test) -> str:

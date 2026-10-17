@@ -151,6 +151,7 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 
 /* A row of actions under a result: buttons on the left, how it was computed on the right. */
 .lc-actions { padding-top: 4px; }
+.q-btn.lc-fix-btn { min-height: 26px; padding: 0 10px; font-size: 0.8rem; }
 .lc-engine { font-size: 0.78rem; color: var(--lc-faint); }
 
 .lc-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); gap: 12px; padding: 4px 0; }
@@ -248,13 +249,13 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-facts { align-items: baseline; column-gap: 24px; row-gap: 6px; padding-top: 12px; border-top: 1px solid var(--lc-rule-soft); }
 .lc-fact-key { font-size: 0.8rem; font-weight: 600; color: var(--lc-faint); padding-top: 2px; }
 .lc-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
-  gap: 10px 24px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 40px;
   padding-top: 12px;
   border-top: 1px solid var(--lc-rule-soft);
 }
-.lc-stat { font-size: 1.05rem; font-weight: 600; color: var(--lc-ink); font-variant-numeric: tabular-nums; }
+.lc-stat { white-space: nowrap; font-size: 1.05rem; font-weight: 600; color: var(--lc-ink); font-variant-numeric: tabular-nums; }
 .q-tabs.lc-subnav { border-bottom: 1px solid var(--lc-border); }
 .q-tabs.lc-subnav .q-tab { min-height: 40px; padding: 0 1rem; }
 .q-tabs.lc-subnav .q-tab__label { font-size: 0.92rem; }

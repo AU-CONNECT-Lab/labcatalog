@@ -176,7 +176,7 @@ class Window:
                     if i:
                         ui.separator().props("vertical")
                     nav |= {name: ui.tab(name, label=label) for name, label in group}
-                ui.tab(SETTINGS).classes("hidden")
+                ui.tab(SETTINGS, label="Settings").classes("hidden")
                 with nav["problems"]:
                     self.badge = ui.label().classes("lc-pill ml-2")
                     self.badge.visible = False

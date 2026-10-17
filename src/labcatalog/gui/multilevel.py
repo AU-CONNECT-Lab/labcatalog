@@ -7,7 +7,7 @@ from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import charts, paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
-from labcatalog.gui.common import apa, code_tabs, col, computed, note, p_value, section
+from labcatalog.gui.common import apa, code_tabs, col, computed, note, p_value, panel
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
@@ -32,155 +32,156 @@ SINGULAR = (
 
 
 def render(result: CatalogResult, view) -> None:
-    section("Multilevel model")
-    outcomes = analysis.of_instruments(ml.outcome_choices(result), view.instruments)
-    if not outcomes:
-        note("Needs a score or number of the chosen measures in at least one dataset.")
-        return
-    if view.multilevel is None or view.multilevel.outcome not in outcomes:
-        view.multilevel = ml.default_model(result, list(outcomes))
-    labels = {name: views.dataset_label(result, name) for name in result.datasets}
-    covariates = analysis.of_instruments(ml.covariate_choices(result, labels), view.instruments)
-    # Covariates of measures no longer chosen leave the model too.
-    kept = [k for k in view.multilevel.covariates if k in covariates]
-    view.multilevel = replace(view.multilevel, covariates=kept)
-    model: ml.Model = view.multilevel
-    group = ml.group_name(result)
-    note(
-        "Waves within people, people within groups, or both, fitted the way JASP's linear "
-        "mixed models are. This section picks its own waves and keeps everyone with at least "
-        "one; the Sample above does not apply."
-    )
-
-    @ui.refreshable
-    def body() -> None:
-        found = ml.problem(result, model)
-        if found:
-            note(found)
+    with panel("Multilevel model", "Change across waves, with people and groups as levels"):
+        outcomes = analysis.of_instruments(ml.outcome_choices(result), view.instruments)
+        if not outcomes:
+            note("Needs a score or number of the chosen measures in at least one dataset.")
             return
-        long = ml.long_frame(result, model)
-        label = outcomes[model.outcome]
-
-        async def fill() -> Callable:
-            fitted, engine = await fit(result, model, long, label)
-            r_text, python_text = ml.scripts(result, model, long, label)
-            texts = {
-                ml.DATA_FILE: long.frame.to_csv(index=False),
-                R_FILE: r_text,
-                PYTHON_FILE: python_text,
-            }
-            papers = {
-                "multilevel_fixed": PaperTable(
-                    f"Fixed Effects for {label}", *fixed_table(fitted), fixed_note(fitted, long)
-                ),
-                "multilevel_random": PaperTable(
-                    "Random Effects",
-                    *random_table(fitted),
-                    random_note(model, long),
-                ),
-                "multilevel_summary": PaperTable(
-                    "Model Summary", *summary_table(fitted), summary_note(fitted)
-                ),
-            }
-
-            def content() -> None:
-                if fitted.singular:
-                    ui.label(SINGULAR).classes("text-negative")
-                if model.by_person and fitted.groups == fitted.people:
-                    ui.label(ONE_EACH.format(group=long.group)).classes("text-negative")
-                for text in fitted.notes:
-                    ui.label(f"Warning: {text}").classes("text-negative")
-                for shown in papers.values():
-                    paper.paper_table(shown)
-                fig = views.trajectories(long, fitted, label)
-                drawn = paper.Chart(charts.show(fig), fig)
-                note(trajectory_note(long))
-                note(engine)
-                paper.save_button(result, "multilevel", papers, drawn, texts)
-                with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
-                    note(
-                        f"Runs in a folder that holds {ml.DATA_FILE}, one row per person and "
-                        "wave, which JASP can open too; Save to outputs writes all three."
-                    )
-                    code_tabs({"r": r_text, "python": python_text})
-
-            return content
-
-        later(fill)
-
-    def change(**fields) -> None:
-        view.multilevel = replace(view.multilevel, **fields)
-        nonlocal model
-        model = view.multilevel
-        body.refresh()
-
-    def choose_outcome(value: str) -> None:
-        names = ml.occasions(result, value)
-        study = result.project.config.datasets
-        first = next(d.study for d in study if d.name == names[0])
-        change(
-            outcome=value,
-            datasets=[n for n in names if any(d.name == n and d.study == first for d in study)],
+        if view.multilevel is None or view.multilevel.outcome not in outcomes:
+            view.multilevel = ml.default_model(result, list(outcomes))
+        labels = {name: views.dataset_label(result, name) for name in result.datasets}
+        covariates = analysis.of_instruments(ml.covariate_choices(result, labels), view.instruments)
+        # Covariates of measures no longer chosen leave the model too.
+        kept = [k for k in view.multilevel.covariates if k in covariates]
+        view.multilevel = replace(view.multilevel, covariates=kept)
+        model: ml.Model = view.multilevel
+        group = ml.group_name(result)
+        note(
+            "Waves within people, people within groups, or both, fitted the way JASP's linear "
+            "mixed models are. This section picks its own waves and keeps everyone with at least "
+            "one; the Sample above does not apply."
         )
-        waves.set_options({n: labels[n] for n in ml.occasions(result, value)}, value=model.datasets)
 
-    with ui.row().classes("w-full items-center gap-4"):
-        ui.select(
-            outcomes,
-            value=model.outcome,
-            label="Outcome",
-            with_input=True,
-            on_change=lambda e: choose_outcome(e.value),
-        ).props("dense outlined").classes("w-96")
-        waves = (
+        @ui.refreshable
+        def body() -> None:
+            found = ml.problem(result, model)
+            if found:
+                note(found)
+                return
+            long = ml.long_frame(result, model)
+            label = outcomes[model.outcome]
+
+            async def fill() -> Callable:
+                fitted, engine = await fit(result, model, long, label)
+                r_text, python_text = ml.scripts(result, model, long, label)
+                texts = {
+                    ml.DATA_FILE: long.frame.to_csv(index=False),
+                    R_FILE: r_text,
+                    PYTHON_FILE: python_text,
+                }
+                papers = {
+                    "multilevel_fixed": PaperTable(
+                        f"Fixed Effects for {label}", *fixed_table(fitted), fixed_note(fitted, long)
+                    ),
+                    "multilevel_random": PaperTable(
+                        "Random Effects",
+                        *random_table(fitted),
+                        random_note(model, long),
+                    ),
+                    "multilevel_summary": PaperTable(
+                        "Model Summary", *summary_table(fitted), summary_note(fitted)
+                    ),
+                }
+
+                def content() -> None:
+                    if fitted.singular:
+                        ui.label(SINGULAR).classes("text-negative")
+                    if model.by_person and fitted.groups == fitted.people:
+                        ui.label(ONE_EACH.format(group=long.group)).classes("text-negative")
+                    for text in fitted.notes:
+                        ui.label(f"Warning: {text}").classes("text-negative")
+                    for shown in papers.values():
+                        paper.paper_table(shown)
+                    fig = views.trajectories(long, fitted, label)
+                    drawn = paper.Chart(charts.show(fig), fig)
+                    note(trajectory_note(long))
+                    paper.result_actions(result, "multilevel", papers, drawn, texts, engine)
+                    with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
+                        note(
+                            f"Runs in a folder that holds {ml.DATA_FILE}, one row per person and "
+                            "wave, which JASP can open too; Save to outputs writes all three."
+                        )
+                        code_tabs({"r": r_text, "python": python_text})
+
+                return content
+
+            later(fill)
+
+        def change(**fields) -> None:
+            view.multilevel = replace(view.multilevel, **fields)
+            nonlocal model
+            model = view.multilevel
+            body.refresh()
+
+        def choose_outcome(value: str) -> None:
+            names = ml.occasions(result, value)
+            study = result.project.config.datasets
+            first = next(d.study for d in study if d.name == names[0])
+            change(
+                outcome=value,
+                datasets=[n for n in names if any(d.name == n and d.study == first for d in study)],
+            )
+            waves.set_options(
+                {n: labels[n] for n in ml.occasions(result, value)}, value=model.datasets
+            )
+
+        with ui.row().classes("w-full items-center gap-4"):
             ui.select(
-                {n: labels[n] for n in ml.occasions(result, model.outcome)},
-                multiple=True,
-                value=model.datasets,
-                label="Waves",
-                on_change=lambda e: change(datasets=e.value or []),
+                outcomes,
+                value=model.outcome,
+                label="Outcome",
+                with_input=True,
+                on_change=lambda e: choose_outcome(e.value),
+            ).props("dense outlined").classes("w-96")
+            waves = (
+                ui.select(
+                    {n: labels[n] for n in ml.occasions(result, model.outcome)},
+                    multiple=True,
+                    value=model.datasets,
+                    label="Waves",
+                    on_change=lambda e: change(datasets=e.value or []),
+                )
+                .props("dense outlined use-chips")
+                .classes("min-w-96 grow")
             )
-            .props("dense outlined use-chips")
-            .classes("min-w-96 grow")
-        )
-    ui.select(
-        covariates,
-        multiple=True,
-        value=[k for k in model.covariates if k in covariates],
-        label="Covariates (one dataset's value, or each wave's own)",
-        with_input=True,
-        on_change=lambda e: change(covariates=e.value or []),
-    ).props("dense outlined use-chips").classes("w-full")
-    with ui.row().classes("w-full items-center gap-6"):
         ui.select(
-            TIME_UNITS,
-            value=model.time,
-            label="Time counts",
-            on_change=lambda e: change(time=e.value),
-        ).props("dense outlined").classes("w-56")
-        ui.switch(
-            "Waves within people",
-            value=model.by_person,
-            on_change=lambda e: change(by_person=e.value),
-        )
-        if group:
+            covariates,
+            multiple=True,
+            value=[k for k in model.covariates if k in covariates],
+            label="Covariates (one dataset's value, or each wave's own)",
+            with_input=True,
+            on_change=lambda e: change(covariates=e.value or []),
+        ).props("dense outlined use-chips").classes("w-full")
+        with ui.row().classes("w-full items-center gap-6"):
+            ui.select(
+                TIME_UNITS,
+                value=model.time,
+                label="Time counts",
+                on_change=lambda e: change(time=e.value),
+            ).props("dense outlined").classes("w-56")
             ui.switch(
-                f"People within each {group}",
-                value=model.by_group,
-                on_change=lambda e: change(by_group=e.value),
+                "Waves within people",
+                value=model.by_person,
+                on_change=lambda e: change(by_person=e.value),
             )
-        ui.switch(
-            "Random slope of time for each person",
-            value=model.slope,
-            on_change=lambda e: change(slope=e.value),
-        )
-        if any(ml.each_wave(k) for k in model.covariates):
+            if group:
+                ui.switch(
+                    f"People within each {group}",
+                    value=model.by_group,
+                    on_change=lambda e: change(by_group=e.value),
+                )
             ui.switch(
-                "Split each-wave covariates into person mean and deviation",
-                value=model.split,
-                on_change=lambda e: change(split=e.value),
+                "Random slope of time for each person",
+                value=model.slope,
+                on_change=lambda e: change(slope=e.value),
             )
-    body()
+            if any(ml.each_wave(k) for k in model.covariates):
+                ui.switch(
+                    "Split each-wave covariates into person mean and deviation",
+                    value=model.split,
+                    on_change=lambda e: change(split=e.value),
+                )
+        body()
 
 
 def trajectory_note(long: ml.Long) -> str:

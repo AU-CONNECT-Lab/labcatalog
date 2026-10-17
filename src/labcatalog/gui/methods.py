@@ -5,7 +5,7 @@ from nicegui import ui
 from labcatalog.charts import views
 from labcatalog.gui import analysis_tables, attrition
 from labcatalog.gui.analysis import sample_text
-from labcatalog.gui.common import col, heading, note, section, sorted_waves, unique
+from labcatalog.gui.common import col, empty, note, page_head, panel, sorted_waves, unique
 from labcatalog.gui.datasets import methods_of, paragraphs
 from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView
 from labcatalog.gui.paper import copy_text, paper_table, save_button
@@ -32,7 +32,7 @@ def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
         if any(d.study == name for d in config.datasets)
     }
     if not studies:
-        note("No study has datasets yet.")
+        empty("No study has datasets yet.")
         return
     if view.study not in studies:
         view.study = next(iter(studies))
@@ -42,17 +42,23 @@ def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
         waves = sorted_waves(d.wave for d in config.datasets if d.study == view.study)
         if view.wave not in waves:
             view.wave = waves[0]
-        if len(waves) > 1:
-            with ui.row().classes("items-center gap-3"):
+        with page_head(
+            "Methods",
+            "Text and tables for a paper's Methods section; Table 1 and Measures describe the "
+            "chosen wave.",
+        ):
+            if len(studies) > 1:
+                ui.toggle(
+                    studies, value=view.study, on_change=lambda e: choose_study(e.value)
+                ).props("dense no-caps")
+            if len(waves) > 1:
                 ui.toggle(
                     {w: views.wave_name(result, view.study, w) for w in waves},
                     value=view.wave,
                     on_change=lambda e: choose_wave(e.value),
                 ).props("dense no-caps")
-                note("Table 1 and Measures describe this wave.")
         participants_part(result, view)
         procedure(result, view.study)
-        section("Measures")
         measures_body(result, view, cfa)
 
     def choose_study(value: str) -> None:
@@ -63,23 +69,20 @@ def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
         view.wave = value
         body.refresh()
 
-    if len(studies) > 1:
-        ui.toggle(studies, value=view.study, on_change=lambda e: choose_study(e.value)).props(
-            "no-caps"
-        )
     body()
 
 
 def participants_part(result: CatalogResult, view: MethodsView) -> None:
     study = view.study
-    section("Participants")
     text = participants.paragraph(result.project, result.summary, study)
-    ui.label(text).classes("lc-prose")
-    copy_text(text)
-    note(
+    with panel(
+        "Participants",
         "Change the wording with participants: in labcatalog.yaml or in the study's file in "
-        "studies/."
-    )
+        "studies/.",
+    ) as tools:
+        ui.label(text).classes("lc-prose")
+    with tools:
+        copy_text(text)
     group = result.summary.group_name
     counted = (
         "n is the number of people with data from each reporter; returning are those also in "
@@ -99,14 +102,16 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
             "n is the number of people in each modality's files at each wave, with their "
             "share of that wave's n for the same reporter.",
         )
-    for table in shown.values():
-        paper_table(table)
-    save_button(result, f"participants_{study}", shown)
+    with panel("Participants by wave", "Who took part at each wave and who came back"):
+        for table in shown.values():
+            paper_table(table)
+        with ui.row().classes("lc-actions w-full"):
+            save_button(result, f"participants_{study}", shown)
     datasets = [
         d.name for d in result.project.config.datasets if (d.study, d.wave) == (study, view.wave)
     ]
     sample = analysis.build_sample(result, datasets, intersect=False)
-    note(sample_text(result, sample, "with data in this wave"))
+    ui.label(sample_text(result, sample, "with data in this wave")).classes("lc-note px-1")
     analysis_tables.table_one_section(result, sample, view)
     attrition.render(result, view, study, view.wave)
 
@@ -173,17 +178,23 @@ def retention_table(result: CatalogResult, study: str) -> tuple[list[dict], list
 
 
 def procedure(result: CatalogResult, study: str) -> None:
-    section("Procedure")
     found = methods_of(result, study)
-    if not found:
-        note(
-            "Write how each modality's data were collected under methods: in the study's file in studies/."
-        )
     labels = result.project.config.vocab.modality_labels
-    for modality, text in found.items():
-        heading(labels.get(modality, modality.capitalize()))
-        paragraphs(text)
-        copy_text(" ".join(text.split()))
+    with panel("Procedure", "How each modality's data were collected"):
+        if not found:
+            note(
+                "Write how each modality's data were collected under methods: in the study's "
+                "file in studies/."
+            )
+        for modality, text in found.items():
+            subhead(labels.get(modality, modality.capitalize()), " ".join(text.split()))
+            paragraphs(text)
+
+
+def subhead(title: str, text: str) -> None:
+    with ui.row().classes("lc-subhead items-center no-wrap"):
+        ui.label(title).classes("grow")
+        copy_text(text)
 
 
 # Module level, so a finished CFA can add ω without redrawing the page.
@@ -196,15 +207,24 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
     )
     order = list(result.project.instruments)
     used.sort(key=lambda pair: (order.index(pair[0]), datasets.index(pair[1])))
-    if not used:
-        note("No instruments in this wave.")
-        return
-    note(
+    with panel(
+        "Measures",
         "Each instrument's paragraph with α and ω from that dataset; change the wording with "
-        "measures: and description: as the instrument's page says."
-    )
-    if cfa.status in (CFA_UNSET, CFA_RUNNING):
-        note("ω fills in when the factor models finish.")
+        "measures: and description: as the instrument's page says.",
+    ) as tools:
+        if not used:
+            note("No instruments in this wave.")
+            return
+        if cfa.status in (CFA_UNSET, CFA_RUNNING):
+            ui.label("ω fills in when the factor models finish.").classes("lc-status lc-info")
+        texts = measure_paragraphs(result, used, cfa)
+    with tools:
+        copy_text("\n\n".join(texts))
+
+
+def measure_paragraphs(
+    result: CatalogResult, used: list[tuple[str, str]], cfa: CfaView
+) -> list[str]:
     texts = []
     for instrument_id, dataset in used:
         instrument = result.project.instruments[instrument_id]
@@ -218,9 +238,9 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
             fits if cfa.status == CFA_DONE else [],
         )
         texts.append(text)
-        heading(f"{instrument.name} ({dataset})")
+        ui.label(f"{instrument.name} ({dataset})").classes("lc-subhead")
         ui.label(text).classes("lc-prose")
-    copy_text("\n\n".join(texts))
+    return texts
 
 
 def cfa_changed() -> None:

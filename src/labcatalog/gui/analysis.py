@@ -7,8 +7,8 @@ from nicegui import ui
 from labcatalog.charts import matrices, views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import analysis_tables, charts, group_invariance, multilevel
-from labcatalog.gui.common import apa, col, fmt, note, p_value, panel, section
-from labcatalog.gui.paper import Chart, paper_table, save_button
+from labcatalog.gui.common import apa, col, empty, fmt, note, p_value, panel
+from labcatalog.gui.paper import Chart, paper_table, result_actions
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis, analysis_script
@@ -48,7 +48,7 @@ def default_totals(result: CatalogResult, view: AnalysisView, choices: dict[str,
 def render(result: CatalogResult, view: AnalysisView) -> None:
     names = views.dataset_order(result, [d.name for d in result.project.config.datasets])
     if not names:
-        note("No datasets yet.")
+        empty("No datasets yet.")
         return
     view.datasets = [n for n in view.datasets if n in names] or first_wave(result, names)
     measures = views.analysis_instruments(result)
@@ -65,10 +65,11 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         counted["label"].set_text(sample_text(result, sample, where))
         choices = variables(view)(result, view.datasets)
         if len(choices) < 2:
-            note(
-                "Pick datasets and measures with at least two scores or numbers between them "
-                "for correlations."
-            )
+            with panel("Correlation table"):
+                note(
+                    "Pick datasets and measures with at least two scores or numbers between "
+                    "them for correlations."
+                )
         else:
             correlation_section(result, sample, view, choices)
             pair_section(result, sample, view, choices)
@@ -114,7 +115,7 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("w-72 shrink-0 lc-sticky"):
             sidebar()
-        with ui.column().classes("grow min-w-0 gap-0"):
+        with ui.column().classes("grow min-w-0 gap-4"):
             tools()
             models()
 
@@ -241,8 +242,9 @@ def correlation_section(
                     chart()
                     with charts.rest_column():
                         paper_table(shown)
-                        note(engine)
-                        save_button(result, "correlations", {"correlations": shown}, drawn, texts)
+                result_actions(
+                    result, "correlations", {"correlations": shown}, drawn, texts, engine
+                )
                 analysis_tables.code_view(texts)
 
             return content
@@ -253,22 +255,22 @@ def correlation_section(
         view.scores = value or []
         body.refresh()
 
-    section("Correlation table")
-    with ui.row().classes("w-full items-center gap-2 no-wrap"):
-        scores = (
-            ui.select(
-                choices,
-                multiple=True,
-                value=view.scores,
-                label="Variables",
-                with_input=True,
-                on_change=lambda e: set_scores(e.value),
+    with panel("Correlation table", "Every pair of the chosen variables"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            scores = (
+                ui.select(
+                    choices,
+                    multiple=True,
+                    value=view.scores,
+                    label="Variables",
+                    with_input=True,
+                    on_change=lambda e: set_scores(e.value),
+                )
+                .props("dense outlined use-chips")
+                .classes("grow")
             )
-            .props("dense outlined use-chips")
-            .classes("grow")
-        )
-        pick_menu(scores, views.menu_groups(result, view.datasets, variables(view)))
-    body()
+            pick_menu(scores, views.menu_groups(result, view.datasets, variables(view)))
+        body()
 
 
 def pick_menu(select: ui.select, groups: dict[str, list[str]]) -> None:
@@ -347,8 +349,7 @@ def pair_section(
             def content() -> None:
                 drawn = Chart(charts.show(fig), fig)
                 paper_table(shown)
-                note(engine)
-                save_button(result, "regression", {"regression": shown}, drawn, texts)
+                result_actions(result, "regression", {"regression": shown}, drawn, texts, engine)
                 analysis_tables.code_view(texts)
 
             return content
@@ -363,25 +364,29 @@ def pair_section(
         view.y = value
         body.refresh()
 
-    section("Regression")
-    with ui.row().classes("w-full items-center gap-4"):
-        xs = (
+    with panel("Regression", "The outcome Y on each predictor X, one at a time"):
+        with ui.row().classes("w-full items-center gap-4"):
+            xs = (
+                ui.select(
+                    choices,
+                    multiple=True,
+                    value=view.xs,
+                    label="X",
+                    with_input=True,
+                    on_change=lambda e: choose_xs(e.value),
+                )
+                .props("dense outlined use-chips")
+                .classes("min-w-96 grow")
+            )
+            pick_menu(xs, views.menu_groups(result, view.datasets, variables(view)))
             ui.select(
                 choices,
-                multiple=True,
-                value=view.xs,
-                label="X",
+                value=view.y,
+                label="Y",
                 with_input=True,
-                on_change=lambda e: choose_xs(e.value),
-            )
-            .props("dense outlined use-chips")
-            .classes("min-w-96 grow")
-        )
-        pick_menu(xs, views.menu_groups(result, view.datasets, variables(view)))
-        ui.select(
-            choices, value=view.y, label="Y", with_input=True, on_change=lambda e: choose_y(e.value)
-        ).props("dense outlined").classes("w-96")
-    body()
+                on_change=lambda e: choose_y(e.value),
+            ).props("dense outlined").classes("w-96")
+        body()
 
 
 def fit_table(

@@ -155,14 +155,13 @@ def detail(
     on_edit: Callable[[str, int | None], None],
 ) -> None:
     facts(result, summary)
-    dataset = dataset_by_name(result.project.config, summary.dataset)
-
     with ui.row().classes("w-full no-wrap items-start gap-4"):
-        with ui.column().classes("grow min-w-0"):
+        with ui.column().classes("grow min-w-0 gap-4"):
             with panel("Instruments", "People who answered all, some or none of the items"):
                 shown = table(*completeness_table(result, summary))
                 shown.classes("cursor-pointer")
                 shown.on("rowClick", lambda e: on_instrument(e.args[1]["id"]))
+            main_panels(result, summary, on_edit)
         with ui.column().classes("w-80 shrink-0 gap-4"):
             with panel("Missing values", "Cells of each kind"):
                 table(*missing_table(summary))
@@ -173,6 +172,13 @@ def detail(
                         [{"month": m, "n": n} for m, n in summary.collected_by_month.items()],
                     )
 
+
+def main_panels(
+    result: CatalogResult,
+    summary: DatasetSummary,
+    on_edit: Callable[[str, int | None], None],
+) -> None:
+    dataset = dataset_by_name(result.project.config, summary.dataset)
     methods = methods_of(result, dataset.study).get(dataset.modality)
     if methods:
         with panel("Methods"):

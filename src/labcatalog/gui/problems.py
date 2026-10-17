@@ -51,7 +51,7 @@ CODE_CELL = r"""
 """
 FIX_CELL = r"""
 <q-td :props="props" class="text-right whitespace-nowrap">
-  <q-btn flat dense no-caps no-wrap size="sm" class="lc-quiet-btn lc-fix-btn" label="Fix"
+  <q-btn flat dense no-caps no-wrap class="lc-quiet-btn lc-fix-btn" label="Fix"
          @click="$parent.$emit('fix', props.row)" />
 </q-td>
 """

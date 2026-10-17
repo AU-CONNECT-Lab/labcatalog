@@ -7,7 +7,7 @@ from labcatalog.charts import plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, paper, preferences
-from labcatalog.gui.common import apa, code_tabs, col, computed, fmt, note, p_value, section
+from labcatalog.gui.common import apa, code_tabs, col, computed, fmt, note, p_value, panel
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis
@@ -110,8 +110,9 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
 
             def content() -> None:
                 paper.paper_table(shown)
-                note(engine)
-                paper.save_button(result, "table1", {"table1": shown}, texts=texts)
+                paper.result_actions(
+                    result, "table1", {"table1": shown}, texts=texts, engine=engine
+                )
                 code_view(texts)
 
             return content
@@ -122,22 +123,22 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
         view.measures = value or []
         body.refresh()
 
-    section("Table 1")
-    with ui.row().classes("w-full items-center gap-2 no-wrap"):
-        chosen = (
-            ui.select(
-                choices,
-                multiple=True,
-                value=view.measures,
-                label="Variables",
-                with_input=True,
-                on_change=lambda e: set_measures(e.value),
+    with panel("Table 1", "Descriptive statistics of the sample"):
+        with ui.row().classes("w-full items-center gap-2 no-wrap"):
+            chosen = (
+                ui.select(
+                    choices,
+                    multiple=True,
+                    value=view.measures,
+                    label="Variables",
+                    with_input=True,
+                    on_change=lambda e: set_measures(e.value),
+                )
+                .props("dense outlined use-chips")
+                .classes("grow")
             )
-            .props("dense outlined use-chips")
-            .classes("grow")
-        )
-        page.pick_menu(chosen, views.menu_groups(result, sample.datasets, script.measures))
-    body()
+            page.pick_menu(chosen, views.menu_groups(result, sample.datasets, script.measures))
+        body()
 
 
 def table_one_table(
@@ -189,12 +190,12 @@ def group_section(
 ) -> None:
     labels = {name: views.dataset_label(result, name) for name in sample.datasets}
     groups = script.group_choices(result, sample.datasets, labels)
-    section("Group comparison")
     if not groups or not scores:
-        note(
-            "Needs a demographics item with answer options and a score or number in the chosen "
-            "datasets."
-        )
+        with panel("Group comparison"):
+            note(
+                "Needs a demographics item with answer options and a score or number in the "
+                "chosen datasets."
+            )
         return
     if view.group not in groups:
         view.group = next(iter(groups))
@@ -236,8 +237,7 @@ def group_section(
                     with charts.rest_column():
                         for shown in papers.values():
                             paper.paper_table(shown)
-                        note(engine)
-                        paper.save_button(result, "groups", papers, drawn, texts)
+                paper.result_actions(result, "groups", papers, drawn, texts, engine)
                 code_view(texts)
 
             return content
@@ -252,22 +252,23 @@ def group_section(
         view.outcome = value
         body.refresh()
 
-    with ui.row().classes("w-full items-center gap-4"):
-        ui.select(
-            groups,
-            value=view.group,
-            label="Groups",
-            with_input=True,
-            on_change=lambda e: choose_group(e.value),
-        ).props("dense outlined").classes("min-w-96 grow")
-        ui.select(
-            scores,
-            value=view.outcome,
-            label="Outcome",
-            with_input=True,
-            on_change=lambda e: choose_outcome(e.value),
-        ).props("dense outlined").classes("w-96")
-    body()
+    with panel("Group comparison", "An outcome across the groups of a demographics item"):
+        with ui.row().classes("w-full items-center gap-4"):
+            ui.select(
+                groups,
+                value=view.group,
+                label="Groups",
+                with_input=True,
+                on_change=lambda e: choose_group(e.value),
+            ).props("dense outlined").classes("min-w-96 grow")
+            ui.select(
+                scores,
+                value=view.outcome,
+                label="Outcome",
+                with_input=True,
+                on_change=lambda e: choose_outcome(e.value),
+            ).props("dense outlined").classes("w-96")
+        body()
 
 
 def group_figure(frame, group, outcome, comparison: Comparison, link: str):
@@ -363,12 +364,6 @@ def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
 def script_section(
     result: CatalogResult, sample: analysis.Sample, view, scores: dict[str, str]
 ) -> None:
-    section("Script")
-    note(
-        "The tables above as one R script and one Python script, for the choices made when "
-        f"you press the button. Saving puts the data beside them as {script.DATA_FILE}, "
-        "so either script runs in that folder."
-    )
 
     def write() -> None:
         found = script.page_script(
@@ -394,8 +389,17 @@ def script_section(
             paper.save_button(result, "script", texts=texts)
             code_tabs({"r": r_text, "python": python_text})
 
-    ui.button("Write script", icon="code", on_click=write).classes("w-fit")
-    holder = ui.column().classes("w-full gap-2")
+    with panel(
+        "Script",
+        "The tables above as one R script and one Python script, for the choices made when "
+        f"you press the button. Saving puts the data beside them as {script.DATA_FILE}, "
+        "so either script runs in that folder.",
+    ) as tools:
+        holder = ui.column().classes("w-full gap-2")
+    with tools:
+        ui.button("Write script", icon="code", on_click=write).props("flat no-caps").classes(
+            "lc-quiet-btn"
+        )
 
 
 def decimal(value: float | None) -> str:

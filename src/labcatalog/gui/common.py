@@ -51,7 +51,7 @@ def panel(title: str, subtitle: str = "") -> Iterator[ui.row]:
                 ui.label(title).classes("lc-panel-title")
                 if subtitle:
                     ui.label(subtitle).classes("lc-panel-subtitle")
-            tools = ui.row().classes("items-center no-wrap gap-3")
+            tools = ui.row().classes("shrink-0 items-center no-wrap gap-3")
         with ui.column().classes("lc-panel-body w-full gap-2"):
             yield tools
 

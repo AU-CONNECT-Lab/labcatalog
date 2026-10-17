@@ -91,8 +91,25 @@ def save_button(
             )
 
     with ui.row().classes("items-center gap-2"):
-        ui.button("Save to outputs", icon="save", on_click=save).props("flat dense no-caps")
+        ui.button("Save to outputs", icon="save", on_click=save).props(
+            "flat dense no-caps"
+        ).classes("lc-quiet-btn")
         saved = ui.row().classes("items-center gap-2")
+
+
+def result_actions(
+    result: CatalogResult,
+    name: str,
+    papers: dict[str, PaperTable] | None = None,
+    chart: Chart | None = None,
+    texts: dict[str, str] | None = None,
+    engine: str = "",
+) -> None:
+    # One line under a result: saving on the left, how it was computed on the right.
+    with ui.row().classes("lc-actions w-full items-center gap-2"):
+        save_button(result, name, papers, chart, texts)
+        ui.space()
+        ui.label(engine).classes("lc-engine")
 
 
 def without_empty(
