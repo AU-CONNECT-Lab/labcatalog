@@ -240,6 +240,9 @@ def standardized(rows: list[dict]) -> go.Figure:
     fig.update_xaxes(title_text="Participants, grouped by score", showgrid=True, zeroline=True)
     fig.update_yaxes(title_text="Standardized value", showgrid=True, zeroline=True, zerolinewidth=2)
     fig.update_layout(template="plotly_white", hovermode="closest")
-    base_layout(fig, 400, margin=dict(t=40, b=60, l=60, r=60))
-    fig.update_layout(hoverlabel=dict(bgcolor="rgb(40, 40, 40)", font=dict(size=10, color="white")))
-    return fig
+    return base_layout(
+        fig,
+        400,
+        margin=dict(t=30, b=60, l=60, r=20),
+        legend=dict(orientation="h", x=1, xanchor="right", y=1.01, yanchor="bottom"),
+    )

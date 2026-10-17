@@ -101,7 +101,11 @@ def base_layout(fig: go.Figure, height: int, **extra) -> go.Figure:
         plot_bgcolor="white",
         paper_bgcolor="white",
         font=dict(family=FONT, color=INK),
-        hoverlabel=dict(font=dict(family=FONT, size=11), bordercolor="#d8dee6"),
+        hoverlabel=dict(
+            bgcolor="rgb(40, 40, 40)",
+            bordercolor="rgb(40, 40, 40)",
+            font=dict(family=FONT, size=11, color="white"),
+        ),
         **extra,
     )
     return fig

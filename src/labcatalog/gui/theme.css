@@ -242,6 +242,8 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .q-tab-panels > .q-panel.scroll { overflow: visible; }
 /* A side column that stays in view and scrolls on its own; 112px clears the header. */
 .lc-sticky { position: sticky; top: 112px; max-height: calc(100vh - 128px); overflow-y: auto; }
+/* Unshrunk, so a long panel overflows the column and scrolls instead of being clipped. */
+.lc-sticky > * { flex-shrink: 0; }
 
 /* An expansion drawn as a panel whose header is the title bar. */
 .q-expansion-item.lc-expansion > .q-expansion-item__container > .q-item {
