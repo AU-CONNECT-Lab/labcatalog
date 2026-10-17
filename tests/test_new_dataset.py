@@ -155,7 +155,7 @@ def test_a_folder_of_files_is_read_in_place(project_root):
     config = (project_root / "labcatalog.yaml").read_text(encoding="utf-8")
     assert (
         "  - {name: scans_w1, modality: fmri, study: mock_study, wave: 1, reporter: child, "
-        "source: folder, path: bids, files: sub-{id}/ses-1/func/*_bold.nii.gz, snapshot_date: "
+        "source: folder, path: bids, files: 'sub-{id}/ses-1/func/*_bold.nii.gz', snapshot_date: "
     ) in config
     after = load_project(project_root)
     scans = load_datasets(after)["scans_w1"]

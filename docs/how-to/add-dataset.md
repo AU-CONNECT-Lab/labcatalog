@@ -19,9 +19,9 @@ studies:
 Press **Add a dataset** on the Datasets page, or on a study's Datasets tab on the Studies page. The window copies the file in, matches its columns to the catalogued items, and shows the changes to `labcatalog.yaml`, the column map and the study file before writing them. A new wave is added to the study without dates, to fill in afterwards on the Studies page. It starts in one of two ways:
 
 - **Repeat a dataset**: for a file like one you already have, such as the same questionnaire in the next wave. The new dataset takes that one's study, modality, reporter and columns, and its cleaning step runs on the new file.
-- **A new kind of file**: for the first dataset of a study, or a new reporter or modality. You choose the study, wave, modality and reporter, and after the file, its ID and date columns. The file is copied into `data/` as it is.
+- **A new kind of file**: for the first dataset of a study, or a new reporter or modality. You choose the study, wave, modality and reporter. A table is copied into `data/` as it is, and you pick its ID and date columns after the file. A folder of files, such as scans, stays where it is: you give the folder and which files to count, and the window shows how many people and files match.
 
-See [Datasets](../app/datasets.md#add-a-dataset). For a folder dataset, a file that needs a cleaning step of its own, or a dataset made by a more involved prepare step, follow the steps below.
+See [Datasets](../app/datasets.md#add-a-dataset). For a file that needs a cleaning step of its own, or a dataset made by a more involved prepare step, follow the steps below.
 
 ## Add a CSV dataset
 
@@ -38,7 +38,7 @@ If the modality or the reporter is new, add it to `vocab.modalities` or `vocab.r
 
 ## Add a folder dataset
 
-For data that are files rather than a table, such as scans in a BIDS folder, a folder dataset counts each person's files:
+For data that are files rather than a table, such as scans in a BIDS folder, a folder dataset counts each person's files. The Add a dataset window writes it for you (**A new kind of file**, then **A folder of files**); by hand, it is one line:
 
 ```yaml
   - {name: fmri_w2, modality: fmri, study: my_study, wave: 2, reporter: child, source: folder, path: /data/bids, files: "sub-{id}/ses-2/func/*_bold.nii.gz"}

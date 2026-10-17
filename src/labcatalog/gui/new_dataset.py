@@ -8,13 +8,17 @@ from nicegui import app, ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui.common import computed, note
+from labcatalog.gui.common import computed, note, path_input
 from labcatalog.metadata import changes, new_dataset
 from labcatalog.pipeline import CatalogResult
 
 DATA_FILES = "Data files (*.csv)"
 REPEAT = "repeat"
 BLANK = "blank"
+TABLE = "table"
+FOLDER = "folder"
+DATA_STEP = "Data"
+CHECK_STEP = "Check and add"
 
 
 def open_wizard(
@@ -39,6 +43,7 @@ def open_wizard(
         "columns": [],
         "id_column": None,
         "date_column": None,
+        "paths": [],
     }
 
     def cleanup() -> None:
@@ -63,6 +68,9 @@ def open_wizard(
     def blank() -> bool:
         return mode.value == BLANK
 
+    def folder() -> bool:
+        return blank() and kind.value == FOLDER
+
     def draft() -> new_dataset.Draft:
         described = None
         if blank():
@@ -72,6 +80,7 @@ def open_wizard(
                 reporter.value,
                 state["id_column"],
                 state["date_column"] or None,
+                (files.value or "").strip() if folder() else None,
             )
         return new_dataset.Draft(
             "" if blank() else template.value,
@@ -91,6 +100,7 @@ def open_wizard(
             start_status.set_text(str(err))
             return
         start_status.set_text("")
+        table_box.visible, folder_box.visible = not folder(), folder()
         stepper.next()
 
     async def choose() -> None:
@@ -101,7 +111,77 @@ def open_wizard(
             state["source"] = Path(selection[0])
             chosen.set_text(str(state["source"]))
 
+    async def choose_folder() -> None:
+        selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)
+        if selection:
+            folder_path.set_value(selection[0])
+            await scan_folder()
+
+    async def scan_folder() -> None:
+        state["paths"] = []
+        text = (folder_path.value or "").strip()
+        if text and Path(text).is_dir():
+            state["paths"] = await computed(new_dataset.folder_files, Path(text))
+        state["source"] = Path(text) if text else None
+        preview.refresh()
+
+    @ui.refreshable
+    def preview() -> None:
+        text = (folder_path.value or "").strip()
+        if not text:
+            return
+        if not Path(text).is_dir():
+            ui.label("No folder there.").classes("lc-bad-text")
+            return
+        rule = (files.value or "").strip()
+        if not rule:
+            note(f"{len(state['paths'])} files in the folder. Now say which ones to count.")
+            return
+        try:
+            seen = new_dataset.preview_folder(state["paths"], rule)
+        except LabCatalogError as err:
+            ui.label(str(err)).classes("lc-bad-text")
+            return
+        status = "lc-ok" if seen.people else "lc-warn"
+        ui.label(f"{seen.files} files of {seen.people} people match").classes(f"lc-status {status}")
+        if seen.unmatched:
+            shown = ", ".join(seen.unmatched[:5])
+            more = f" and {len(seen.unmatched) - 5} more" if len(seen.unmatched) > 5 else ""
+            note(f"Not counted ({len(seen.unmatched)}): {shown}{more}")
+
+    async def folder_next() -> None:
+        if state["source"] is None or not state["source"].is_dir():
+            file_status.set_text("Choose the folder first.")
+            return
+        try:
+            seen = new_dataset.preview_folder(state["paths"], (files.value or "").strip())
+            if not seen.people:
+                raise LabCatalogError("No file matches; check the files rule")
+            state["placement"] = new_dataset.place(project, draft(), state["source"])
+            found = new_dataset.changes(project, draft(), state["placement"], [])
+        except LabCatalogError as err:
+            file_status.set_text(str(err))
+            return
+        issues = changes.check(project, found)
+        if issues:
+            file_status.set_text("; ".join(str(i) for i in issues))
+            return
+        file_status.set_text("")
+        state["changes"] = found
+        review.refresh()
+        # A folder has no columns to match.
+        stepper.set_value(CHECK_STEP)
+
+    def check_back() -> None:
+        if folder():
+            stepper.set_value(DATA_STEP)
+        else:
+            stepper.previous()
+
     async def file_next() -> None:
+        if folder():
+            await folder_next()
+            return
         if state["source"] is None:
             file_status.set_text("Choose the data file first.")
             return
@@ -226,7 +306,10 @@ def open_wizard(
         placement = state["placement"]
         if placement is None:
             return
-        note(f"Copied the data to {placement.copy_to}.")
+        if placement.copy_to is None:
+            note(f"Reads the files where they are, in {placement.data_path}; nothing is copied.")
+        else:
+            note(f"Copied the data to {placement.copy_to}.")
         if placement.step is not None:
             note(
                 f"Cleaned with a new prepare step, {placement.step.name}, the same as the one "
@@ -281,11 +364,15 @@ def open_wizard(
                         on_change=lambda e: suggest(e.value),
                     ).classes("w-96")
                 with ui.column().classes("gap-2") as describing:
+                    kind = ui.toggle(
+                        {TABLE: "A table", FOLDER: "A folder of files"}, value=TABLE
+                    ).props("dense no-caps")
                     note(
-                        "Say what the file is: the first dataset of a study, or a kind of file "
-                        "the project has not had before. The ID and date columns are chosen "
-                        "after the file. The file is copied into data/ as it is, with no "
-                        "cleaning step."
+                        "Say what the data are: the first dataset of a study, or a kind the "
+                        "project has not had before. A table is copied into data/ as it is, with "
+                        "no cleaning step, and its ID and date columns are chosen after the file. "
+                        "A folder of files, such as scans or recordings, stays where it is; each "
+                        "person's row counts their files."
                     )
                     with ui.row().classes("gap-3"):
                         own_study = ui.select(
@@ -317,16 +404,44 @@ def open_wizard(
                 with ui.stepper_navigation():
                     ui.button("Next", on_click=start_next)
                     ui.button("Cancel", on_click=cancel).props("flat")
-            with ui.step("Data file"):
-                note(
-                    "Choose the file as it came from the survey platform or the lab's pipeline. "
-                    "labcatalog copies it into the project; the file you chose stays where it is."
-                )
-                with ui.row().classes("items-center gap-3"):
-                    ui.button("Choose the file", icon="upload_file", on_click=choose).props(
-                        "flat"
-                    ).classes("lc-quiet-btn")
-                    chosen = ui.label().classes("lc-note")
+            with ui.step(DATA_STEP):
+                with ui.column().classes("gap-2 w-full") as table_box:
+                    note(
+                        "Choose the file as it came from the survey platform or the lab's "
+                        "pipeline. labcatalog copies it into the project; the file you chose "
+                        "stays where it is."
+                    )
+                    with ui.row().classes("items-center gap-3"):
+                        ui.button("Choose the file", icon="upload_file", on_click=choose).props(
+                            "flat"
+                        ).classes("lc-quiet-btn")
+                        chosen = ui.label().classes("lc-note")
+                with ui.column().classes("gap-2 w-full") as folder_box:
+                    note(
+                        "Choose the folder, then say which files to count, with {id} where the "
+                        "path holds the person's ID: * stands for any part of a name and **/ for "
+                        "any folders in between."
+                    )
+                    with ui.row().classes("w-full items-center gap-3 no-wrap"):
+                        folder_path = path_input(
+                            "Folder", "", "Type or paste the path, or choose it"
+                        )
+                        folder_path.on("blur", scan_folder)
+                        folder_path.on("keydown.enter", scan_folder)
+                        ui.button(
+                            "Choose the folder", icon="folder_open", on_click=choose_folder
+                        ).props("flat").classes("lc-quiet-btn")
+                    files = (
+                        ui.input(
+                            "Files",
+                            placeholder="sub-{id}/ses-1/func/*_bold.nii.gz",
+                            on_change=lambda: preview.refresh(),
+                        )
+                        .props("outlined dense")
+                        .classes("w-full")
+                    )
+                    preview()
+                folder_box.visible = False
                 file_status = ui.label().classes("lc-note")
                 log = ui.column().classes("w-full")
                 with ui.stepper_navigation():
@@ -340,12 +455,12 @@ def open_wizard(
                     ui.button("Next", on_click=columns_next)
                     ui.button("Back", on_click=stepper.previous).props("flat")
                     ui.button("Cancel", on_click=cancel).props("flat")
-            with ui.step("Check and add"):
+            with ui.step(CHECK_STEP):
                 review()
                 review_status = ui.label().classes("lc-bad-text")
                 with ui.stepper_navigation():
                     ui.button("Add the dataset", icon="check", on_click=finish)
-                    ui.button("Back", on_click=stepper.previous).props("flat")
+                    ui.button("Back", on_click=check_back).props("flat")
                     ui.button("Cancel", on_click=cancel).props("flat")
     # Closing the window halfway leaves no copied files behind.
     ui.context.client.on_disconnect(cleanup)
