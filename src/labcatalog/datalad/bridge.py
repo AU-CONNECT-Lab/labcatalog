@@ -8,7 +8,7 @@ from labcatalog.datalad.annex import group_by_dataset
 from labcatalog.exceptions import DataladError
 from labcatalog.paths import expand_path, portable_path
 
-INSTALL = "uv tool install git-annex and uv tool install datalad"
+INSTALL = ("uv tool install git-annex", "uv tool install datalad")
 
 
 @dataclass

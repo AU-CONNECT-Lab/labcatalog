@@ -173,6 +173,18 @@ def copy_command(text: str) -> None:
     ui.notify("Copied")
 
 
+def path_input(label: str, value: str, hint: str) -> ui.input:
+    found = ui.input(label, value=value).props("outlined dense clearable").classes("grow")
+    found.props["hint"] = hint
+    return found
+
+
+def show_status(label: ui.label, text: str, kind: str) -> None:
+    label.set_text(text)
+    label.classes(replace=f"lc-status lc-{kind}")
+    label.visible = True
+
+
 def code_tabs(code: dict[str, str]) -> None:
     with ui.tabs().props("dense no-caps align=left") as tabs:
         ui.tab("r", label="R")

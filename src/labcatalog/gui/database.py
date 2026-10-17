@@ -23,5 +23,6 @@ def database_button(result: CatalogResult) -> None:
     button = (
         ui.button("Build database", icon="storage", on_click=build)
         .props("flat no-caps")
+        .classes("lc-quiet-btn")
         .tooltip(f"Writes every dataset, its variables and statistics to {defaults.DATABASE_FILE}")
     )

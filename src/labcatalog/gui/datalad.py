@@ -16,7 +16,16 @@ from labcatalog.datalad.freeze import (
 )
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
-from labcatalog.gui.common import col, computed, heading, note, section, table
+from labcatalog.gui.common import (
+    col,
+    command,
+    computed,
+    note,
+    panel,
+    path_input,
+    show_status,
+    table,
+)
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult, run_freeze, run_push_freeze
 
@@ -46,39 +55,42 @@ def get_button(
 
 
 def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
-    section("DataLad")
     example = Path.home() / ".local" / "bin" / "datalad.exe"
-    note(
-        "When the data are in DataLad datasets, labcatalog records which version it read, "
-        "freezes tag that version, and prepare steps can run through datalad run. Install "
-        f"DataLad and git-annex yourself, for example with {INSTALL}, then give the path to "
-        f"datalad, for example {example}."
-    )
-    path = (
-        ui.input("datalad", value=preferences.load().get(preferences.DATALAD, ""))
-        .props("outlined dense clearable")
-        .classes("w-full mt-2")
-    )
-    status = ui.label().classes("lc-note")
+    with panel("DataLad", "Versions of the data, freezes and datalad run"):
+        note(
+            "When the data are in DataLad datasets, labcatalog records which version it read, "
+            "freezes tag that version, and prepare steps can run through datalad run. Install "
+            "DataLad and git-annex yourself, for example by typing these in a terminal:"
+        )
+        for line in INSTALL:
+            command(line)
+        with ui.row().classes("w-full items-start no-wrap gap-2 mt-1"):
+            path = path_input(
+                "datalad", preferences.load().get(preferences.DATALAD, ""), f"For example {example}"
+            )
+            button = ui.button("Save and check")
+        status = ui.label()
+        status.visible = False
 
     async def save() -> None:
         value = (path.value or "").strip().strip('"')
         path.value = value
         preferences.save({preferences.DATALAD: value})
         if not value:
-            status.set_text("No DataLad set.")
+            show_status(status, "No DataLad set.", "warn")
             return
         use_folder(value)
-        status.set_text("Checking DataLad")
+        show_status(status, "Checking DataLad", "info")
         try:
             found = await computed(datalad_status, value)
         except LabCatalogError as err:
-            status.set_text(str(err))
+            show_status(status, str(err), "bad")
             return
-        status.set_text(f"{found.datalad}, with git-annex {found.annex}.")
+        show_status(status, f"{found.datalad}, with git-annex {found.annex}.", "ok")
         await on_datalad()
 
-    ui.button("Save and check", on_click=save).classes("mt-2")
+    button.on_click(save)
+    path.on("keydown.enter", save)
 
 
 def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]]) -> None:
@@ -153,7 +165,9 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                 ui.button("Freeze", on_click=go)
         dialog.open()
 
-    ui.button("Freeze", icon="ac_unit", on_click=open_dialog).props("flat no-caps")
+    ui.button("Freeze", icon="ac_unit", on_click=open_dialog).props("flat no-caps").classes(
+        "lc-quiet-btn"
+    )
 
 
 # Only a freeze with a DataLad tag has its data to open.
@@ -169,7 +183,6 @@ def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) 
     found = list_freezes(root)
     if not found:
         return
-    heading("Freezes")
     columns = [
         col("frozen", "Frozen"),
         col("name", "Name"),
@@ -188,7 +201,8 @@ def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) 
         }
         for f in found
     ]
-    shown = table(columns, rows).classes(remove="w-full")
+    with panel("Freezes", "Records of the data a result used"):
+        shown = table(columns, rows)
     if on_open:
         shown.add_slot("body-cell-open", OPEN_CELL)
         shown.on("open_freeze", lambda e: on_open(e.args["name"]))
