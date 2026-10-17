@@ -10,7 +10,7 @@ from labcatalog.codebook import core as codebook
 from labcatalog.codebook.core import ImportResult
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import pipeline_table, problems
-from labcatalog.gui.common import col, computed, heading, note, open_path, section, table
+from labcatalog.gui.common import col, computed, empty, note, open_path, panel, table
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
 
@@ -29,11 +29,13 @@ def render(
     project = result.project
     names = codebook.unmapped_datasets(project)
     if not names:
-        note(
-            f"Every dataset already has a column map in {defaults.MAPS_DIR}/. To import a "
-            f"codebook for a new data file, add the file under datasets in "
-            f"{defaults.CONFIG_FILENAME}, then press Refresh."
-        )
+        with panel("From a codebook", INTRO):
+            empty(
+                f"Every dataset already has a column map in {defaults.MAPS_DIR}/. To import a "
+                f"codebook for a new data file, add the file under datasets in "
+                f"{defaults.CONFIG_FILENAME}, then press Refresh.",
+                "task_alt",
+            )
         pipeline_table.render(project, view.pipeline)
         return
     if view.dataset not in names:
@@ -86,7 +88,7 @@ def render(
     @ui.refreshable
     def steps() -> None:
         paths = codebook.codebook_paths(project, view.dataset)
-        section("1. Codebook files")
+        ui.label("1. Codebook files").classes("lc-subhead")
         if not any(path.exists() for path in paths.values()):
             note(
                 "labcatalog lists every column of the data file and guesses its instrument "
@@ -96,23 +98,23 @@ def render(
                 "options and type, with Qualtrics blocks as instruments. An SPSS file (.sav) of "
                 "the same data gives the wording and options from its variable and value labels."
             )
-            with ui.row().classes("items-center gap-4 mt-2"):
+            with ui.row().classes("items-center gap-2 mt-1"):
                 ui.button("Create the three files", icon="note_add", on_click=create)
                 ui.button(
                     "Create from a REDCap data dictionary",
                     icon="description",
                     on_click=lambda: create_from("CSV files (*.csv)"),
-                ).props("outline")
+                ).props("flat no-caps").classes("lc-quiet-btn")
                 ui.button(
                     "Create from a Qualtrics survey file",
                     icon="description",
                     on_click=lambda: create_from("Qualtrics survey files (*.qsf)"),
-                ).props("outline")
+                ).props("flat no-caps").classes("lc-quiet-btn")
                 ui.button(
                     "Create from an SPSS file",
                     icon="description",
                     on_click=lambda: create_from("SPSS data files (*.sav)"),
-                ).props("outline")
+                ).props("flat no-caps").classes("lc-quiet-btn")
             return
         with ui.row().classes("items-center gap-4 mt-2"):
             for path in paths.values():
@@ -127,19 +129,21 @@ def render(
         )
         with ui.expansion("What goes in each column").classes("w-full"):
             for name, columns in codebook.COLUMNS.items():
-                heading(name)
+                ui.label(name).classes("lc-subhead")
                 table(
                     [col("column", "Column"), col("meaning", "Meaning", sortable=False)],
                     [{"column": c, "meaning": m} for c, m in columns.items()],
                 )
 
-        section("2. Fill them in with an AI (optional)")
+        ui.label("2. Fill them in with an AI (optional)").classes("lc-subhead")
         note(
             "The prompt holds the format, the data file's column names (no data) and the "
             "instruments already in the project. Paste it into ChatGPT, Claude or your "
             "school's Copilot together with your codebook, then paste the answer here."
         )
-        ui.button("Copy AI prompt", icon="content_copy", on_click=copy_prompt).classes("mt-2")
+        ui.button("Copy AI prompt", icon="content_copy", on_click=copy_prompt).props(
+            "flat no-caps"
+        ).classes("lc-quiet-btn w-fit")
         ui.textarea("The AI's answer").bind_value(view, "answer").props(
             "outlined autogrow"
         ).classes("w-full mt-2")
@@ -147,24 +151,28 @@ def render(
             "flat no-caps"
         )
 
-        section("3. Import")
+        ui.label("3. Import").classes("lc-subhead")
         note(
             f"Checks the three files, then writes instruments/ and {defaults.MAPS_DIR}/"
             f"{view.dataset}.csv. Instruments already in the project are only mapped."
         )
-        ui.button("Check and import", icon="upload", on_click=import_files).classes("mt-2")
+        ui.button("Check and import", icon="upload", on_click=import_files).classes("w-fit")
         if view.issues:
-            problems.issue_table(view.issues, project.root, on_edit).classes("mt-2")
+            problems.issue_table(view.issues, project.root, on_edit)
 
-    note(
-        "Describe a new data file's columns in three CSV files; labcatalog checks them and "
-        "writes the instrument files and the column map."
-    )
-    ui.select(names, value=view.dataset, label="Dataset", on_change=lambda e: pick(e.value)).props(
-        "dense outlined"
-    ).classes("w-64 mt-2")
-    steps()
+    with panel("From a codebook", INTRO) as tools:
+        steps()
+    with tools:
+        ui.select(
+            names, value=view.dataset, label="Dataset", on_change=lambda e: pick(e.value)
+        ).props("dense outlined").classes("w-64")
     pipeline_table.render(project, view.pipeline)
+
+
+INTRO = (
+    "Describe a new data file's columns in three CSV files; labcatalog checks them and writes "
+    "the instrument files and the column map."
+)
 
 
 def file_link(root: Path, path: Path) -> None:

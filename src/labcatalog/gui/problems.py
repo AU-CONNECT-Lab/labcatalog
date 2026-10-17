@@ -5,7 +5,17 @@ from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.data.check import CheckReport
-from labcatalog.gui.common import col, keyed, note, open_path, split_location, table
+from labcatalog.gui.common import (
+    col,
+    empty,
+    help_button,
+    keyed,
+    note,
+    open_path,
+    panel,
+    split_location,
+    table,
+)
 from labcatalog.issues import Issue, summarize_issues
 from labcatalog.metadata import accepted, editing
 
@@ -41,7 +51,7 @@ CODE_CELL = r"""
 """
 FIX_CELL = r"""
 <q-td :props="props" class="text-right whitespace-nowrap">
-  <q-btn flat dense no-caps no-wrap color="primary" icon="build" label="Fix"
+  <q-btn flat dense no-caps no-wrap size="sm" class="lc-quiet-btn lc-fix-btn" label="Fix"
          @click="$parent.$emit('fix', props.row)" />
 </q-td>
 """
@@ -55,16 +65,23 @@ def render(
     shown_again: Callable[[], Awaitable[None]],
 ) -> None:
     issues = report.issues
-    with ui.row().classes("w-full items-center gap-4"):
-        ui.label(summarize_issues(issues)).classes("text-lg")
-        ui.space()
+    with panel(
+        summarize_issues(issues), "Fix says what a problem means and who usually fixes it"
+    ) as tools:
+        if not issues:
+            empty("No problems found.", "check_circle")
+        shown = issue_table(issues, root, edit, fix)
+        shown.visible = bool(issues)
+    with tools:
+        help_button(
+            "Fix opens a panel that says what the problem means and who usually fixes it. "
+            "Project files open on the Edit page at the line named; data files open in their "
+            "own app."
+        )
         level = ui.toggle(LEVEL_FILTERS, value="all").props("dense no-caps")
-        search = ui.input(placeholder="Search").props("dense clearable").classes("w-64")
-    note(
-        "Fix opens a panel that says what the problem means and who usually fixes it. Project "
-        "files open on the Edit page at the line named; data files open in their own app."
-    )
-    shown = issue_table(issues, root, edit, fix)
+        search = ui.input(placeholder="Search").props("outlined dense clearable").classes("w-64")
+        with search.add_slot("prepend"):
+            ui.icon("search").classes("lc-faint")
     search.bind_value_to(shown, "filter")
     level.on_value_change(
         lambda e: shown.update_rows(
@@ -84,19 +101,20 @@ def accepted_section(
         accepted.withdraw(root, issue)
         await shown_again()
 
-    with ui.expansion(
-        f"{len(hidden)} warning(s) accepted as fine, in {defaults.ACCEPTED_FILENAME}"
-    ).classes("w-full mt-4"):
+    with panel(
+        "Accepted warnings",
+        f"{len(hidden)} warning(s) accepted as fine, in {defaults.ACCEPTED_FILENAME}",
+    ):
         for issue in hidden:
             entry = next(e for e in entries if accepted.matches(issue, e))
-            with ui.row().classes("w-full items-start no-wrap gap-4 lc-group"):
+            with ui.row().classes("lc-item w-full items-start no-wrap gap-4"):
                 with ui.column().classes("grow gap-0 min-w-0"):
                     ui.label(issue.message)
                     note(f"{issue.location or ''} · {issue.code}")
                     note(f"{entry.by}, {entry.date}: {entry.reason}")
                 ui.button("Show again", on_click=lambda i=issue: show_again(i)).props(
                     "flat dense no-caps"
-                )
+                ).classes("lc-quiet-btn")
 
 
 def issue_table(

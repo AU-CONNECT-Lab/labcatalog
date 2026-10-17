@@ -9,7 +9,7 @@ from nicegui import app, ui
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences, theme
-from labcatalog.gui.common import LINE_SUFFIX, computed, heading, note
+from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
 from labcatalog.pipeline import run_instrument_draft
@@ -285,7 +285,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         )
         mark(view.line)
         view.line = None
-        with ui.row().classes("items-center gap-3"):
+        with ui.row().classes("lc-actions items-center gap-3"):
             save_buttons()
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
 
@@ -298,7 +298,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             .on("cellValueChanged", lambda: setattr(shown, "edited", True))
             .on("rowDragEnd", lambda: setattr(shown, "edited", True))
         )
-        with ui.row().classes("items-center gap-3"):
+        with ui.row().classes("lc-actions items-center gap-3"):
             save_buttons()
             if not table().single:
                 ui.button("Add row", icon="add", on_click=add_row).props("flat no-caps")
@@ -333,15 +333,17 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         tables = records.tables_for(view.path, fields)
         if view.mode not in tables:
             view.mode = TEXT
-        with ui.row().classes("w-full no-wrap items-start gap-6"):
-            with ui.column().classes("gap-0 w-60 shrink-0"):
+        with ui.row().classes("w-full no-wrap items-start gap-4"):
+            with ui.column().classes("w-64 shrink-0 lc-sticky"), panel("Files"):
                 for group, members in editing.editable_files(root).items():
                     if not members:
                         continue
-                    heading(group)
+                    ui.label(group).classes("lc-facet")
                     for path in members:
-                        item = ui.item(Path(path).name, on_click=partial(choose, path)).props(
-                            "dense clickable"
+                        item = (
+                            ui.item(Path(path).name, on_click=partial(choose, path))
+                            .props("dense clickable")
+                            .classes("lc-pick")
                         )
                         if path == view.path:
                             item.classes("lc-info font-medium")
@@ -351,24 +353,26 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 ui.button("New instrument from a PDF", icon="picture_as_pdf", on_click=draft).props(
                     "flat dense no-caps"
                 )
-            with ui.column().classes("grow min-w-0 gap-2"):
-                with ui.row().classes("items-center gap-4"):
-                    ui.label(opened.path).classes("font-medium")
-                    if tables:
+            with (
+                ui.column().classes("grow min-w-0"),
+                panel(
+                    opened.path,
+                    "Saving checks the file the way loading the project does and keeps it as it "
+                    "was if something is wrong; then the catalog reloads.",
+                ) as tools,
+            ):
+                if tables:
+                    with tools:
                         ui.toggle(
                             {TEXT: "Text", **{key: t.label for key, t in tables.items()}},
                             value=view.mode,
                             on_change=lambda e: switch(e.value),
                         ).props("dense no-caps")
-                note(
-                    "Saving checks the file the way loading the project does and keeps it as it "
-                    "was if something is wrong; then the catalog reloads."
-                )
                 if editing.is_draft(view.path):
-                    note(
+                    ui.label(
                         "A draft from a PDF, kept out of the catalog. Check it against the PDF "
                         "and add its reference, then move it to instruments/."
-                    )
+                    ).classes("lc-status lc-warn")
                 if view.mode == TEXT:
                     text_mode(opened)
                 else:

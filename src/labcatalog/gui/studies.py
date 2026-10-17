@@ -173,9 +173,14 @@ def render(
             with ui.column().classes("w-64 shrink-0"), panel("Studies"):
                 with ui.column().classes("w-full gap-0"):
                     for study in names:
-                        item = ui.item(
-                            config.studies[study].label or study, on_click=partial(choose, study)
-                        ).props("dense clickable")
+                        item = (
+                            ui.item(
+                                config.studies[study].label or study,
+                                on_click=partial(choose, study),
+                            )
+                            .props("dense clickable")
+                            .classes("lc-pick")
+                        )
                         if study == view.study:
                             item.classes("lc-info font-medium")
                 ui.button("New study", icon="add", on_click=lambda: leave(create)).props(

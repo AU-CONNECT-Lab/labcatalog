@@ -6,7 +6,7 @@ from nicegui import app, ui
 
 from labcatalog.codebook.derivatives import Derived, Request, command_line, derive
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui.common import computed, note, open_path, section
+from labcatalog.gui.common import computed, note, open_path, panel
 from labcatalog.paths import portable_path
 from labcatalog.project import Project
 
@@ -77,45 +77,43 @@ def render(project: Project, form: PipelineForm) -> None:
             return
         written_dialog(project.root, done, command_line(request, project.root))
 
-    section("From a pipeline's table")
-    note(
-        "A pipeline's table of measures, a .tsv with a bids_name or participant_id column and a "
-        ".json sidecar of the same name, becomes one instrument per value of Split by, and a "
+    with panel(
+        "From a pipeline's table",
+        "A pipeline's table of measures, a .tsv with a bids_name or participant_id column and "
+        "a .json sidecar of the same name, becomes one instrument per value of Split by, and a "
         "data file and a column map for each wave. Running it again keeps your edits to the "
-        "instruments."
-    )
-    with ui.row().classes("items-center gap-4 mt-2"):
-        ui.button("Choose table", icon="table_view", on_click=choose).props("outline")
-        chosen = ui.label(
-            portable_path(Path(form.table), project.root).as_posix() if form.table else ""
-        ).classes("lc-note")
-    with ui.row().classes("items-start gap-4 mt-2"):
-        ui.input("Name", placeholder="fnirs_qc").bind_value(form, "name").props(
-            "dense outlined"
-        ).classes("w-48")
-        ui.select(list(config.studies), label="Study").bind_value(form, "study").props(
-            "dense outlined"
-        ).classes("w-48")
-        ui.select(config.vocab.modalities, label="Modality").bind_value(form, "modality").props(
-            "dense outlined"
-        ).classes("w-48")
-        ui.select(config.vocab.reporters, label="Reporter").bind_value(form, "reporter").props(
-            "dense outlined"
-        ).classes("w-48")
-    with ui.row().classes("items-start gap-4"):
-        ui.input("Split by", placeholder="task").bind_value(form, "split").props(
-            "dense outlined"
-        ).classes("w-48").tooltip("Entities whose values become separate instruments")
-        ui.input("Columns", placeholder="raw_* motion_*").bind_value(form, "columns").props(
-            "dense outlined"
-        ).classes("w-64").tooltip("Patterns of the columns to take; every numeric column if empty")
-        ui.input("Wave", placeholder="from ses-").bind_value(form, "wave").props(
-            "dense outlined"
-        ).classes("w-36").tooltip("Only for a table without sessions")
-        ui.input("Instrument name", placeholder="the Name").bind_value(form, "label").props(
-            "dense outlined"
-        ).classes("w-64")
-    ui.button("Write the files", icon="upload", on_click=write).classes("mt-2")
+        "instruments.",
+    ):
+        with ui.row().classes("items-center gap-3"):
+            ui.button("Choose table", icon="table_view", on_click=choose).props(
+                "flat no-caps"
+            ).classes("lc-quiet-btn")
+            chosen = ui.label(
+                portable_path(Path(form.table), project.root).as_posix()
+                if form.table
+                else "No table chosen"
+            ).classes("lc-note")
+        with ui.element("div").classes("lc-form w-full"):
+            field(ui.input("Name", placeholder="fnirs_qc"), form, "name")
+            field(ui.select(list(config.studies), label="Study"), form, "study")
+            field(ui.select(config.vocab.modalities, label="Modality"), form, "modality")
+            field(ui.select(config.vocab.reporters, label="Reporter"), form, "reporter")
+            field(ui.input("Split by", placeholder="task"), form, "split").tooltip(
+                "Entities whose values become separate instruments"
+            )
+            field(ui.input("Columns", placeholder="raw_* motion_*"), form, "columns").tooltip(
+                "Patterns of the columns to take; every numeric column if empty"
+            )
+            field(ui.input("Wave", placeholder="from ses-"), form, "wave").tooltip(
+                "Only for a table without sessions"
+            )
+            field(ui.input("Instrument name", placeholder="the Name"), form, "label")
+        ui.button("Write the files", icon="upload", on_click=write).classes("w-fit")
+
+
+def field(element: ui.input | ui.select, form: PipelineForm, name: str) -> ui.element:
+    # Labels stay above the box, so the placeholders show while it is empty.
+    return element.bind_value(form, name).props("dense outlined stack-label")
 
 
 def written_dialog(root: Path, done: Derived, command: str) -> None:
