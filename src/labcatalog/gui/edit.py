@@ -396,7 +396,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         if view.mode not in (FORM, *tables) or (view.mode == FORM and shown.form is None):
             view.mode = TEXT
         with ui.row().classes("w-full no-wrap items-start gap-4"):
-            with ui.column().classes("w-64 shrink-0 lc-sticky"), panel("Files"):
+            with ui.column().classes("w-64 shrink-0 lc-sticky lc-side"), panel("Files"):
                 for group, members in editing.editable_files(root).items():
                     if not members:
                         continue

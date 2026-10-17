@@ -1,13 +1,18 @@
 :root {
-  --lc-ink: #1f2328;
-  --lc-muted: #57606a;
-  --lc-faint: #8b949e;
-  --lc-rule: #e3e6ea;
-  --lc-rule-soft: #eff1f3;
-  --lc-border: #d0d7de;
-  --lc-surface: #f6f8fa;
-  --lc-accent: #1d4e89;
-  --lc-accent-soft: #e8eef5;
+  --lc-ink: #1f1f21;
+  --lc-muted: #6e6e73;
+  --lc-faint: #8b8b90;
+  --lc-rule: #ececec;
+  --lc-rule-soft: #f1f1ef;
+  --lc-border: #d8d8da;
+  --lc-surface: #f4f4f2;
+  --lc-hover: rgba(20, 20, 30, 0.04);
+  --lc-accent: #1d1d1f;
+  --lc-accent-soft: rgba(20, 20, 30, 0.06);
+  --lc-on-accent: #fff;
+  --lc-card: 0 1px 2px rgba(20, 20, 30, 0.04), 0 6px 20px rgba(20, 20, 30, 0.05);
+  --lc-card-hover: 0 2px 4px rgba(20, 20, 30, 0.05), 0 10px 28px rgba(20, 20, 30, 0.09);
+  --lc-lift: 0 1px 2px rgba(20, 20, 30, 0.06), 0 2px 8px rgba(20, 20, 30, 0.05);
   --lc-ok: #1a7f37;
   --lc-ok-soft: #e9f5ec;
   --lc-warn: #9a6700;
@@ -15,11 +20,11 @@
   --lc-bad: #cf222e;
   --lc-bad-soft: #fdecec;
   --lc-panel: #fff;
-  --lc-header: rgba(255, 255, 255, 0.92);
-  --lc-scroll: rgba(31, 35, 40, 0.16);
-  --lc-scroll-hover: rgba(31, 35, 40, 0.28);
-  --lc-shadow: rgba(31, 35, 40, 0.12);
-  --lc-tooltip: #1f2328;
+  --lc-header: rgba(244, 244, 242, 0.9);
+  --lc-scroll: rgba(20, 20, 30, 0.16);
+  --lc-scroll-hover: rgba(20, 20, 30, 0.28);
+  --lc-shadow: rgba(20, 20, 30, 0.12);
+  --lc-tooltip: #1d1d1f;
   --lc-tooltip-ink: #fff;
   --lc-mark: #fff8c5;
   --lc-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
@@ -30,35 +35,42 @@
 
 /* Quasar marks the body when dark mode is on; the tokens above change, the rules below stay. */
 body.body--dark {
-  --lc-ink: #e6edf3;
-  --lc-muted: #9198a1;
-  --lc-faint: #6e7681;
-  --lc-rule: #30363d;
-  --lc-rule-soft: #262c33;
-  --lc-border: #3d444d;
-  --lc-surface: #0d1117;
-  --lc-accent: #4493f8;
-  --lc-accent-soft: rgba(56, 139, 253, 0.15);
+  --lc-ink: #ececee;
+  --lc-muted: #a1a1a6;
+  --lc-faint: #76767b;
+  --lc-rule: #2e2e32;
+  --lc-rule-soft: #28282b;
+  --lc-border: #3d3d42;
+  --lc-surface: #151517;
+  --lc-hover: rgba(255, 255, 255, 0.05);
+  --lc-accent: #ececee;
+  --lc-accent-soft: rgba(255, 255, 255, 0.08);
+  --lc-on-accent: #151517;
+  --lc-card: 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --lc-card-hover: 0 0 0 1px rgba(255, 255, 255, 0.12);
+  --lc-lift: 0 0 0 1px rgba(255, 255, 255, 0.07);
   --lc-ok: #3fb950;
   --lc-ok-soft: rgba(46, 160, 67, 0.15);
   --lc-warn: #d29922;
   --lc-warn-soft: rgba(187, 128, 9, 0.15);
   --lc-bad: #f85149;
   --lc-bad-soft: rgba(248, 81, 73, 0.15);
-  --lc-panel: #161b22;
-  --lc-header: rgba(13, 17, 23, 0.92);
-  --lc-scroll: rgba(230, 237, 243, 0.16);
-  --lc-scroll-hover: rgba(230, 237, 243, 0.28);
-  --lc-shadow: rgba(1, 4, 9, 0.5);
-  --lc-tooltip: #e6edf3;
-  --lc-tooltip-ink: #0d1117;
+  --lc-panel: #1f1f22;
+  --lc-header: rgba(21, 21, 23, 0.9);
+  --lc-scroll: rgba(236, 236, 238, 0.16);
+  --lc-scroll-hover: rgba(236, 236, 238, 0.28);
+  --lc-shadow: rgba(0, 0, 0, 0.5);
+  --lc-tooltip: #ececee;
+  --lc-tooltip-ink: #151517;
   --lc-mark: rgba(187, 128, 9, 0.3);
-  --q-dark: #161b22;
-  --q-dark-page: #0d1117;
+  --q-dark: #1f1f22;
+  --q-dark-page: #151517;
 }
-/* Lighter primary text on dark; only an !important in the first layer beats Quasar's. */
+/* The near-black primary turns light on dark; only an !important in the first layer beats Quasar's. */
 @layer theme {
   body.body--dark .text-primary { color: var(--lc-accent) !important; }
+  body.body--dark .bg-primary { background: var(--lc-accent) !important; }
+  body.body--dark .bg-primary.text-white { color: var(--lc-on-accent) !important; }
 }
 
 /* ---- Base ---- */
@@ -73,12 +85,15 @@ html body, html body.body--dark {
 button, input, textarea, select { font-family: inherit; }
 code, pre, .font-mono { font-family: var(--lc-mono); }
 
+/* Links share the ink, so a faint underline marks them. */
 .q-page a:not(.q-btn), .lc-link {
   color: var(--lc-accent);
-  text-decoration: none;
+  text-decoration: underline;
+  text-decoration-color: var(--lc-border);
+  text-underline-offset: 3px;
   cursor: pointer;
 }
-.q-page a:not(.q-btn):hover, .lc-link:hover { text-decoration: underline; }
+.q-page a:not(.q-btn):hover, .lc-link:hover { text-decoration-color: currentColor; }
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-thumb {
@@ -139,7 +154,7 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .q-tab-panel.lc-page { padding: 1.5rem 1.5rem 4rem; gap: 16px; }
 
 .lc-page-head { padding: 0 2px 2px; }
-.lc-page-title { font-size: 1.15rem; font-weight: 600; line-height: 1.3; color: var(--lc-ink); }
+.lc-page-title { font-size: 1.35rem; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; color: var(--lc-ink); }
 .lc-page-summary { font-size: 0.85rem; color: var(--lc-muted); }
 .q-btn.lc-help-btn { color: var(--lc-faint); }
 .q-btn.lc-help-btn:hover { color: var(--lc-accent); }
@@ -166,13 +181,13 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-panel:has(.lc-form-bar) { overflow: clip; }
 
 /* The outcome of a check, as a tinted box that wraps. */
-.lc-status { padding: 4px 10px; border-radius: 6px; font-size: 0.85rem; }
+.lc-status { padding: 4px 10px; border-radius: 10px; font-size: 0.85rem; }
 
 .lc-command {
   padding: 2px 4px 2px 10px;
   background: var(--lc-surface);
   border: 1px solid var(--lc-rule-soft);
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 0.8rem;
   overflow-wrap: anywhere;
 }
@@ -193,19 +208,19 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 /* ---- Dashboard ---- */
 .lc-tile, .lc-panel {
   background: var(--lc-panel);
-  border: 1px solid var(--lc-border);
-  border-radius: 8px;
+  border-radius: 16px;
+  box-shadow: var(--lc-card);
 }
 .lc-tile {
-  padding: 14px 16px 16px;
+  padding: 16px 18px 18px;
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition: box-shadow 0.15s;
 }
-.lc-tile:hover { border-color: var(--lc-accent); box-shadow: 0 1px 6px var(--lc-shadow); }
+.lc-tile:hover { box-shadow: var(--lc-card-hover); }
 .lc-tile-icon {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 1.15rem;
 }
 .lc-tile-label { font-size: 0.88rem; font-weight: 600; color: var(--lc-muted); }
@@ -222,10 +237,12 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-tile-detail { margin-top: 4px; font-size: 0.82rem; color: var(--lc-muted); }
 
 .lc-panel { overflow: hidden; }
-.lc-panel-head { padding: 12px 16px; border-bottom: 1px solid var(--lc-rule-soft); }
-.lc-panel-title { font-size: 0.98rem; font-weight: 600; color: var(--lc-ink); }
+/* A panel inside a panel is outlined, so cards do not stack shadows. */
+.lc-panel .lc-panel { border: 1px solid var(--lc-rule); border-radius: 12px; box-shadow: none; }
+.lc-panel-head { padding: 14px 20px; border-bottom: 1px solid var(--lc-rule); }
+.lc-panel-title { font-size: 1rem; font-weight: 600; color: var(--lc-ink); }
 .lc-panel-subtitle { font-size: 0.8rem; color: var(--lc-faint); }
-.lc-panel-body { padding: 8px 16px 12px; }
+.lc-panel-body { padding: 10px 20px 16px; }
 
 .lc-facet {
   margin-top: 0.6rem;
@@ -244,6 +261,14 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-sticky { position: sticky; top: 112px; max-height: calc(100vh - 128px); overflow-y: auto; }
 /* Unshrunk, so a long panel overflows the column and scrolls instead of being clipped. */
 .lc-sticky > * { flex-shrink: 0; }
+/* A side column sits on the page itself: no card, and the chosen entry lifts as a white block. */
+.lc-side > .lc-panel { background: transparent; box-shadow: none; border-radius: 0; overflow: visible; }
+.lc-side > .lc-panel > .lc-panel-head { padding: 0 4px 6px; border-bottom: none; }
+.lc-side > .lc-panel > .lc-panel-body { padding: 0 4px 12px; }
+.lc-side .q-item.lc-pick { align-self: stretch; color: var(--lc-muted); font-weight: 500; }
+.lc-side .q-item.lc-pick:hover { background: var(--lc-hover); color: var(--lc-ink); }
+.lc-side .q-item.lc-pick.lc-info { background: var(--lc-panel); color: var(--lc-ink); font-weight: 600; box-shadow: var(--lc-lift); }
+.lc-side .q-item.lc-pick .q-focus-helper { display: none; }
 
 /* The score network: a canvas, its legend underneath and its tooltip. */
 .lc-network { position: relative; width: 100%; }
@@ -272,7 +297,7 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-crumb-sep { color: var(--lc-faint); }
 .lc-crumb { font-weight: 600; color: var(--lc-ink); }
 .lc-summary { padding: 16px 20px; }
-.lc-summary-title { font-size: 1.4rem; font-weight: 600; line-height: 1.25; color: var(--lc-ink); }
+.lc-summary-title { font-size: 1.4rem; font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; color: var(--lc-ink); }
 .lc-facts { align-items: baseline; column-gap: 24px; row-gap: 6px; padding-top: 12px; border-top: 1px solid var(--lc-rule-soft); }
 .lc-fact-key { font-size: 0.8rem; font-weight: 600; color: var(--lc-faint); padding-top: 2px; }
 .lc-stats {
@@ -309,44 +334,48 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-panel-body:has(> .lc-item) { padding: 0; }
 .lc-step-run { font-family: var(--lc-mono); font-size: 0.8rem; color: var(--lc-muted); overflow-wrap: anywhere; }
 .lc-step-files { font-size: 0.82rem; }
-.lc-log { font-family: var(--lc-mono); font-size: 0.8rem; background: var(--lc-surface); border: 1px solid var(--lc-rule-soft); border-radius: 6px; }
+.lc-log { font-family: var(--lc-mono); font-size: 0.8rem; background: var(--lc-surface); border: 1px solid var(--lc-rule-soft); border-radius: 10px; }
 .lc-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .lc-dot.lc-ok { background: var(--lc-ok); }
 .lc-dot.lc-warn { background: var(--lc-warn); }
 .lc-dot.lc-bad { background: var(--lc-bad); }
 
 /* A list of things to pick, like the Edit page's files and the Studies page's studies. */
-.q-item.lc-pick { min-height: 32px; padding: 4px 10px; border-radius: 6px; color: var(--lc-ink); }
+.q-item.lc-pick { min-height: 32px; padding: 4px 10px; border-radius: 10px; color: var(--lc-ink); }
 
 /* ---- Floating layers ---- */
 .q-menu {
   border: 1px solid var(--lc-rule);
-  border-radius: 6px;
+  border-radius: 10px;
   box-shadow: 0 8px 24px var(--lc-shadow);
 }
 .q-tooltip {
   padding: 5px 9px;
   background: var(--lc-tooltip);
   color: var(--lc-tooltip-ink);
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.8rem;
 }
-.q-dialog .q-card { border-radius: 8px; box-shadow: 0 8px 24px var(--lc-shadow); }
+.q-dialog .q-card { border-radius: 16px; box-shadow: 0 10px 40px var(--lc-shadow); }
 
 /* ---- Controls ---- */
-.q-btn { font-weight: 600; letter-spacing: 0; border-radius: 6px; }
+.q-btn { font-weight: 500; letter-spacing: 0; border-radius: 999px; }
+.q-btn.bg-primary:hover { filter: brightness(0.85); }
 .q-btn.lc-quiet-btn {
   background: var(--lc-panel);
-  border: 1px solid var(--lc-rule);
+  border: 1px solid var(--lc-border);
   color: var(--lc-muted);
-  font-weight: 500;
 }
-.q-btn.lc-quiet-btn:hover { border-color: var(--lc-faint); color: var(--lc-ink); }
+.q-btn.lc-quiet-btn:hover { background: var(--lc-surface); color: var(--lc-ink); }
 .q-btn.lc-quiet-btn .q-focus-helper { display: none; }
 
-.q-field--outlined .q-field__control { border-radius: 6px; background: var(--lc-panel); }
+.q-field--outlined .q-field__control { border-radius: 10px; background: var(--lc-panel); }
 .q-field--outlined .q-field__control:before { border-color: var(--lc-rule); }
-.q-field--outlined .q-field__control:hover:before { border-color: var(--lc-faint); }
+.q-field--outlined .q-field__control:hover:before { border-color: var(--lc-border); }
+/* A quiet focus: a firmer hairline and a faint ring instead of Quasar's 2px primary border. */
+.q-field--outlined.q-field--focused .q-field__control:after { border-width: 1px; border-color: var(--lc-faint); }
+.q-field--outlined.q-field--focused .q-field__control { box-shadow: 0 0 0 3px var(--lc-accent-soft); }
+.q-checkbox__bg { border-radius: 4px; }
 .q-field .q-chip, .q-chip.lc-filter-chip {
   background: var(--lc-accent-soft);
   color: var(--lc-accent);
@@ -384,7 +413,7 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .nicegui-code {
   background: var(--lc-surface);
   border: 1px solid var(--lc-rule-soft);
-  border-radius: 6px;
+  border-radius: 10px;
 }
 .nicegui-code pre, .nicegui-code code { font-size: 0.8rem; line-height: 1.55; }
 .nicegui-code.lc-wrap pre, .nicegui-code.lc-wrap code { white-space: pre-wrap; overflow-wrap: anywhere; }

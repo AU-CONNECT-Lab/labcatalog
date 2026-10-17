@@ -66,6 +66,7 @@ def instrument_tree(instrument: Instrument) -> dict:
                     "position": "left",
                     "verticalAlign": "middle",
                     "fontSize": 12,
+                    "color": LABEL_INK,
                     "backgroundColor": "#ffffff",
                     "padding": [1, 3],
                 },

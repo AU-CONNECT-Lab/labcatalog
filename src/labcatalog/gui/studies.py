@@ -170,7 +170,7 @@ def render(
         if view.study not in names:
             view.study = names[0] if names else None
         with ui.row().classes("w-full no-wrap items-start gap-6"):
-            with ui.column().classes("w-64 shrink-0"), panel("Studies"):
+            with ui.column().classes("w-64 shrink-0 lc-side"), panel("Studies"):
                 with ui.column().classes("w-full gap-0"):
                     for study in names:
                         item = (

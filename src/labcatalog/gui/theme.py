@@ -6,7 +6,7 @@ from nicegui import app, ui
 
 CSS = Path(__file__).with_name("theme.css")
 CLEAR = "rgba(0,0,0,0)"
-ACCENT = "#1d4e89"
+ACCENT = "#1d1d1f"
 OK = "#1a7f37"
 WARN = "#9a6700"
 BAD = "#cf222e"
@@ -18,7 +18,7 @@ SYSTEM = "system"
 APPEARANCES = {LIGHT: "Light", DARK: "Dark", SYSTEM: "Same as the system"}
 DEFAULT_APPEARANCE = LIGHT
 # Matches --lc-panel in dark mode, so a white plot area turns into the panel it sits on.
-DARK_PANEL = (0x16, 0x1B, 0x22)
+DARK_PANEL = (0x1F, 0x1F, 0x22)
 # Below this spread between channels a color counts as grey: ink, grid lines, white.
 NEUTRAL_CHROMA = 0.17
 NAMED = {"white": (255, 255, 255), "black": (0, 0, 0), "gray": (128, 128, 128)}

@@ -158,7 +158,7 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
                 ticks(title, group, labels, view.instruments, set_instruments)
 
     with ui.row().classes("w-full no-wrap items-start gap-4"):
-        with ui.column().classes("w-72 shrink-0 lc-sticky"):
+        with ui.column().classes("w-72 shrink-0 lc-sticky lc-side"):
             sidebar()
         with ui.column().classes("grow min-w-0 gap-4"):
             with (

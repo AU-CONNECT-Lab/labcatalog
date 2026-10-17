@@ -231,7 +231,7 @@ def browser(
         changed()
 
     with ui.row().classes("w-full no-wrap items-start gap-4"):
-        with ui.column().classes("w-64 shrink-0"), panel("Filters") as tools:
+        with ui.column().classes("w-64 shrink-0 lc-side"), panel("Filters") as tools:
             with tools:
                 ui.button("Clear", on_click=clear).props("flat dense no-caps")
             ui.input(

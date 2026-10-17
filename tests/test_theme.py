@@ -32,7 +32,7 @@ def test_dark_figures_flip_greys_and_keep_hues(monkeypatch):
     }
     shown = for_page(figure)
     assert shown["data"][0]["marker"]["color"][0] == "#3498db"
-    assert shown["data"][0]["marker"]["line"]["color"] == "rgba(22,27,34,1)"
+    assert shown["data"][0]["marker"]["line"]["color"] == "rgba(31,31,34,1)"
     assert shown["layout"]["plot_bgcolor"] == "rgba(0,0,0,0)"
     ink = theme.parse_color(shown["layout"]["font"]["color"])[0]
     grid = theme.parse_color(shown["layout"]["xaxis"]["gridcolor"])[0]
