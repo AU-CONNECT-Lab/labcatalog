@@ -13,7 +13,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 | Measurement invariance across waves, reporters and groups, score tests | lavaan, semTools | not available |
 | Multilevel models | lme4, lmerTest, performance | statsmodels |
 | Mediation, with up to two moderators | lavaan; modsem for latent interactions | not available |
-| Multiple imputation, pooled correlations | mice, miceadds | not available |
+| Multiple imputation, pooled correlations, regressions and group comparisons | mice, miceadds | not available |
 
 ## Settings that change the numbers
 

@@ -287,10 +287,15 @@ def correlation_section(
             coefficient = CORRELATIONS[method]
             if imputed:
                 plan = missing.imputation_plan(result, view, data)
-                code = imputation.correlation_code(variables, method, plan)
                 frame = data.frame()
                 try:
-                    found, engine = await missing.pooled(result, sample, frame, code)
+                    found, engine, code = await missing.pooled(
+                        result,
+                        sample,
+                        frame,
+                        plan,
+                        lambda file: imputation.correlation_code(variables, method, plan, file),
+                    )
                 except LabCatalogError as err:
                     message = str(err)
                     return lambda: note(message)
@@ -477,10 +482,16 @@ def pair_section(
                 return lambda: note("Too few people have an X value and the Y value.")
             if imputed:
                 plan = missing.imputation_plan(result, view, data)
-                code = imputation.regression_code(list(usable.values()), y, plan)
                 frame = data.frame()
+                predictors = list(usable.values())
                 try:
-                    found, engine = await missing.pooled(result, sample, frame, code)
+                    found, engine, code = await missing.pooled(
+                        result,
+                        sample,
+                        frame,
+                        plan,
+                        lambda file: imputation.regression_code(predictors, y, plan, file),
+                    )
                 except LabCatalogError as err:
                     message = str(err)
                     return lambda: note(message)

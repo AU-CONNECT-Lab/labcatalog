@@ -11,6 +11,7 @@ from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis, imputation
 from labcatalog.stats import analysis_script as script
+from labcatalog.stats.analysis import item_variable
 from labcatalog.stats.analysis_script import MissingData
 
 PATTERN_NOTE = (
@@ -111,9 +112,10 @@ def imputation_panel(
         data = script.AnalysisData(result, sample)
         plan = imputation_plan(result, view, data)
         frame = data.frame()
-        code = imputation.summary_code(plan)
         try:
-            found, _ = await computed(script.run_code, result, sample, frame, code, path)
+            found, _, code = await pooled(
+                result, sample, frame, plan, lambda file: imputation.summary_code(plan, file)
+            )
         except LabCatalogError as err:
             out.clear()
             with out:
@@ -121,6 +123,7 @@ def imputation_panel(
             return
         columns, events = imputation.read_summary(found)
         texts = analysis_tables.section_files(result, sample, frame, code)
+        texts[IMPUTED_FILE] = found["imputed_long"].to_csv(index=False)
         shown = PaperTable(
             "Imputed and Observed Values",
             *summary_table(columns),
@@ -147,7 +150,7 @@ def imputation_panel(
             "data. Run shows the imputed values beside the observed ones."
         )
         ui.select(
-            choices,
+            imputable(result, view),
             multiple=True,
             value=imputed_keys(result, view),
             label="Imputed (scores item by item)",
@@ -245,6 +248,7 @@ def pattern_table(missing: MissingData) -> tuple[list[dict], list[dict]]:
 
 
 IMPUTED_NOTE = "Imputed and pooled in R with mice and miceadds."
+IMPUTED_FILE = "imputed.csv"
 NO_R = (
     "Multiple imputation runs in R: set the path to Rscript on the Settings page, or choose "
     "Available cases."
@@ -264,12 +268,29 @@ def method_switch(result: CatalogResult, view, on_change: Callable[[], None]) ->
     method_toggle(imputation.METHODS, method, choose, "Missing values")
 
 
+def imputable(result: CatalogResult, view) -> dict[str, str]:
+    # Scores and numbers of the chosen datasets, and the answer options of their demographics.
+    labels = {name: page.views.dataset_label(result, name) for name in view.datasets}
+    return {
+        **page.views.variable_choices(result, view.datasets),
+        **script.group_choices(result, view.datasets, labels),
+    }
+
+
 def imputed_keys(result: CatalogResult, view) -> list[str]:
-    # By default, every score of the chosen datasets, imputed item by item.
-    options = page.views.variable_choices(result, view.datasets)
-    if view.imputed is None:
-        return [k for k in options if not k.startswith(analysis.ITEM_PREFIX)]
-    return [k for k in view.imputed if k in options]
+    # By default, the questionnaires: scores made of answer options, and demographics.
+    options = imputable(result, view)
+    if view.imputed is not None:
+        return [k for k in view.imputed if k in options]
+    types = {(v.dataset, v.column): v.type for v in result.catalog.variables}
+    scores = {s.key: s for s in result.catalog.scores}
+    return [
+        k
+        for k in options
+        if k not in scores
+        or all(types.get((scores[k].dataset, c)) == script.CHOICE for c in scores[k].columns)
+        if k in scores or item_variable(result, k).type == script.CHOICE
+    ]
 
 
 def auxiliary_keys(result: CatalogResult, view) -> list[str]:
@@ -299,10 +320,16 @@ def outside(result: CatalogResult, view, keys: list[str], labels: dict[str, str]
 
 
 async def pooled(
-    result: CatalogResult, sample: analysis.Sample, frame, code: script.Code
-) -> tuple[dict, str]:
+    result: CatalogResult,
+    sample: analysis.Sample,
+    frame,
+    found: imputation.ImputationPlan,
+    build: Callable[[str], script.Code],
+) -> tuple[dict, str, script.Code]:
+    # Runs with the window's kept imputation; the code shown and saved keeps it beside itself.
     path = analysis_tables.rscript()
     if not path:
         raise LabCatalogError(NO_R)
-    found, _ = await computed(script.run_code, result, sample, frame, code, path)
-    return found, IMPUTED_NOTE
+    run = build(imputation.cache_path(frame, found).as_posix())
+    outputs, _ = await computed(script.run_code, result, sample, frame, run, path)
+    return outputs, IMPUTED_NOTE, build(imputation.file_name(frame, found))

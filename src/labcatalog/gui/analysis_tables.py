@@ -6,7 +6,7 @@ from nicegui import ui
 from labcatalog.charts import plot_code, plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
-from labcatalog.gui import charts, common, paper, preferences
+from labcatalog.gui import charts, common, missing, paper, preferences
 from labcatalog.gui.common import (
     apa,
     code_tabs,
@@ -21,7 +21,7 @@ from labcatalog.gui.common import (
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
-from labcatalog.stats import analysis
+from labcatalog.stats import analysis, imputation
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats.analysis_script import AnalysisData, Code, Comparison
 
@@ -236,16 +236,43 @@ def group_section(
 
     @ui.refreshable
     def body() -> None:
+        imputed = missing.imputing(result, view)
+        wanted = [view.group, view.outcome]
+        if imputed and (lacking := missing.outside(result, view, wanted, {**groups, **scores})):
+            note(lacking)
+            return
+
         async def fill() -> Callable:
             data = AnalysisData(result, sample)
             group = data.item(view.group)
             outcome = data.variable(view.outcome)
-            frame = data.frame()
-            t_test = view.t_test or result.project.config.stats.t_test
-            plan = script.comparison_plan(frame, group, outcome, t_test)
-            if plan is None:
-                return lambda: note("Fewer than two groups have two or more people with a value.")
-            found, engine = await compute(result, sample, frame, plan.code)
+            if imputed:
+                found_plan = missing.imputation_plan(result, view, data)
+                frame = data.frame()
+
+                def build(file: str) -> script.ComparisonPlan | None:
+                    return imputation.comparison_plan(frame, group, outcome, found_plan, file)
+
+                plan = build("")
+                if plan is None:
+                    return lambda: note("Fewer than two groups have two or more people.")
+                try:
+                    found, engine, code = await missing.pooled(
+                        result, sample, frame, found_plan, lambda file: build(file).code
+                    )
+                except LabCatalogError as err:
+                    message = str(err)
+                    return lambda: note(message)
+                plan = script.ComparisonPlan(plan.kind, code, plan.left_out)
+            else:
+                frame = data.frame()
+                t_test = view.t_test or result.project.config.stats.t_test
+                plan = script.comparison_plan(frame, group, outcome, t_test)
+                if plan is None:
+                    return lambda: note(
+                        "Fewer than two groups have two or more people with a value."
+                    )
+                found, engine = await compute(result, sample, frame, plan.code)
             comparison = script.read_comparison(found, plan)
             figure = plot_code.groups(group.label, outcome.label, len(comparison.groups))
             texts = section_files(result, sample, frame, plan.code, figure)
@@ -260,7 +287,7 @@ def group_section(
                 "group_test": PaperTable(
                     f"{TESTS[comparison.test]} of {outcome.label}",
                     *test_table(comparison),
-                    test_note(comparison),
+                    imputed_note(comparison, found_plan.m) if imputed else test_note(comparison),
                 ),
             }
 
@@ -307,6 +334,7 @@ def group_section(
                 with_input=True,
                 on_change=lambda e: choose_outcome(e.value),
             ).props("dense outlined").classes("w-96")
+            missing.method_switch(result, view, body.refresh)
             method_toggle(
                 {k: TESTS[k] for k in ("welch", "student")},
                 view.t_test or result.project.config.stats.t_test,
@@ -340,6 +368,18 @@ def group_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
         for g in comparison.groups
     ]
     return columns, rows
+
+
+def imputed_note(comparison: Comparison, m: int) -> str:
+    pooled = f"Pooled over {m} imputed data sets, on everyone whose group is known"
+    if comparison.test != script.ANOVA:
+        first, second = comparison.groups[0], comparison.groups[1]
+        return (
+            f"{pooled}: Student's t from the group coefficient (Rubin's rules), and d, Cohen's "
+            f"d with the pooled SD, averaged over the data sets. The difference is {first.label} "
+            f"minus {second.label}, with its 95% confidence interval."
+        )
+    return f"{pooled}: F from the Wald test of the groups (D1), and η² and ω² averaged over them."
 
 
 def test_note(comparison: Comparison) -> str:
