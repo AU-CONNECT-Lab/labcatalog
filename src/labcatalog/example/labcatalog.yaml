@@ -62,8 +62,10 @@ studies:
       - {name: Wave 3 data freeze, date: 2027-01-31}
   mock_study_2:
     label: Mock Study 2
-    description: A smaller fictional two-wave study of children's sleep. Parents answer questionnaires about their child's sleep and their own stress, children about their mood, and children wear a sleep watch for a week after each visit. Its IDs are written like the first study's, but they are other people.
-    # Its own people: 1001P here is not 1001P of Mock Family Study.
+    description: A smaller fictional two-wave study of children's sleep. Parents answer questionnaires about their child's sleep and their own stress, children about their mood, and children wear a sleep watch for a week after each visit. Its IDs are written another way than the first study's, and its families are other people.
+    # Its IDs are written S2-1001P, so the study gives its own pattern in place of ids.pattern.
+    id_pattern: '^S2-\d{4}[PC]$'
+    # Its own people: family 1001 here is not family 1001 of Mock Family Study.
     roster: {path: data/participants_mock_study_2.csv, id_column: pid, group_column: family_id, role_column: role, instrument: example_participants}
     waves:
       baseline: {start: 2025-09-08, end: 2025-12-12}

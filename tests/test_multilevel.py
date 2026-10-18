@@ -396,8 +396,8 @@ def test_waves_of_two_studies_pool_with_the_study_as_a_fixed_effect(both):
     assert ml.problem(both, model) is None
     long = ml.long_frame(both, model)
     frame = long.frame
-    # IDs repeat across the studies, but their people are their own.
-    assert {"mock_study/1001C", "mock_study_2/1001C"} <= set(frame[ml.PERSON])
+    # Each study's people are their own, keyed by study.
+    assert {"mock_study/1001C", "mock_study_2/S2-1001C"} <= set(frame[ml.PERSON])
     assert frame.groupby(frame[ml.PERSON].str.split("/").str[0])[ml.TIME].max().to_dict() == {
         "mock_study": 2,
         "mock_study_2": 1,

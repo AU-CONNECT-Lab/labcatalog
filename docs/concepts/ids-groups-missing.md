@@ -20,7 +20,7 @@ A study whose IDs are written another way gives its own pattern, which its datas
 ```yaml
 studies:
   mock_study_2:
-    id_pattern: '^S2-\d{4}$'
+    id_pattern: '^S2-\d{4}[PC]$'
 ```
 
 ### Correcting IDs
