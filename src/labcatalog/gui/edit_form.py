@@ -81,6 +81,12 @@ def list_section(rows: list[dict], section: forms.Section, touch: Callable[[], N
         touch()
         body.refresh()
 
+    # A column other columns take their choices from redraws the entries when it changes.
+    drivers = {driver for driver, _ in section.follows.values()}
+
+    def changed_by(column: Column) -> Callable[[], None]:
+        return changed if column.key in drivers else touch
+
     def add() -> None:
         new = {c.key: records.shown(None, c) for c in columns}
         first = columns[0]
@@ -111,7 +117,9 @@ def list_section(rows: list[dict], section: forms.Section, touch: Callable[[], N
                 with ui.row().classes("w-full items-start gap-2 no-wrap"):
                     ui.label(str(n + 1)).classes("lc-form-number")
                     for column in primary:
-                        widget(row, column, section, touch).classes(width(column, section))
+                        widget(row, column, section, changed_by(column)).classes(
+                            width(column, section)
+                        )
                     with ui.row().classes("shrink-0 gap-0 no-wrap"):
                         if rest:
                             more = icon_button("tune", "More fields")
@@ -124,7 +132,7 @@ def list_section(rows: list[dict], section: forms.Section, touch: Callable[[], N
                     details = ui.element("div").classes("lc-form lc-form-details w-full")
                     with details:
                         for column in rest:
-                            widget(row, column, section, touch)
+                            widget(row, column, section, changed_by(column))
                     details.set_visibility(False)
                     more.on_click(lambda d=details: d.set_visibility(not d.visible))
 
@@ -234,7 +242,7 @@ def widget(row: dict, column: Column, section: forms.Section, touch: Callable[[]
             value=None if value == "" else value,
             on_change=lambda e: set_value("" if e.value is None else e.value),
         ).props("dense outlined")
-    options = list(dict.fromkeys(section.options.get(key, ()) or column.choices))
+    options = list(dict.fromkeys(section.options_for(row, key) or column.choices))
     if column.kind == "list":
         chosen = [part.strip() for part in str(value).split(",") if part.strip()]
         return ui.select(

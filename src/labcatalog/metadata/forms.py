@@ -1,4 +1,5 @@
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
@@ -6,7 +7,7 @@ from ruamel.yaml.comments import CommentedMap
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig
-from labcatalog.exceptions import MetadataError
+from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.metadata import records
 from labcatalog.metadata.bibliography import load_bibliography
 from labcatalog.metadata.completeness import DEMOGRAPHICS, QUESTIONNAIRE
@@ -55,6 +56,17 @@ class Section:
     fixed: tuple[str, ...] = ()
     # What one entry is called, for the Add button.
     noun: str = "row"
+    # Values to pick from that follow another column of the row: column to (that column, its
+    # value to the values).
+    follows: dict[str, tuple[str, dict[str, tuple[str, ...]]]] = field(default_factory=dict)
+
+    def options_for(self, row: dict, key: str) -> tuple[str, ...]:
+        if key in self.follows:
+            driver, values = self.follows[key]
+            found = values.get(row.get(driver), ())
+            if found:
+                return found
+        return self.options.get(key, ())
 
 
 def sections(root: Path, relative: str, text: str) -> list[Section]:
@@ -123,6 +135,18 @@ def study_sections(
 ) -> list[Section]:
     instruments = tuple(sorted(p.stem for p in (root / defaults.INSTRUMENTS_DIR).glob("*.yaml")))
     datasets = tuple(d.name for d in config.datasets) if config else ()
+    contents = instrument_contents(root)
+    entries = {
+        records.entry_label(n, entry): entry
+        for n, entry in enumerate(records.load(text).get("administrations") or [])
+    }
+
+    def per_entry(values: Callable[[CommentedMap], tuple[str, ...]]):
+        return ("administration", {label: values(entry) for label, entry in entries.items()})
+
+    def instrument(entry: CommentedMap) -> CommentedMap:
+        return contents.get(str(entry.get("instrument")), CommentedMap())
+
     return [
         Section(
             "administrations",
@@ -141,8 +165,25 @@ def study_sections(
             {"dataset": datasets},
             primary=("administration", "item", "dataset", "dropped"),
             noun="change",
+            follows={
+                "item": per_entry(lambda e: ids(instrument(e).get("items"))),
+                "response_set": per_entry(lambda e: ids(instrument(e).get("response_sets"))),
+                "dataset": per_entry(lambda e: tuple(str(d) for d in e.get("datasets") or ())),
+            },
         ),
     ]
+
+
+def instrument_contents(root: Path) -> dict[str, CommentedMap]:
+    # A file that does not read yet offers nothing to pick; the study form still opens.
+    found = {}
+    for path in sorted((root / defaults.INSTRUMENTS_DIR).glob("*.yaml")):
+        try:
+            data = records.load(path.read_text(encoding="utf-8"))
+        except EditError:
+            continue
+        found[str(data.get("id", path.stem))] = data
+    return found
 
 
 def config_sections(config: ProjectConfig | None, tables: dict[str, Table]) -> list[Section]:

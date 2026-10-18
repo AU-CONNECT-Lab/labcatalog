@@ -27,6 +27,18 @@ def test_settings_and_study_forms_offer_the_projects_lists(mock_project):
     assert "child_w1" in administrations.options["datasets"]
 
 
+def test_a_change_offers_the_items_and_datasets_of_its_administration(mock_project):
+    study = next((mock_project / "studies").glob("*.yaml")).relative_to(mock_project).as_posix()
+    overrides = forms.sections(mock_project, study, opened(mock_project, study))[1]
+    mood = next(c for c in overrides.table.columns[0].choices if c.endswith("example_mood"))
+    row = {"administration": mood}
+    assert "ems_1" in overrides.options_for(row, "item")
+    assert not any(i.startswith("eps") for i in overrides.options_for(row, "item"))
+    assert overrides.options_for(row, "dataset") == ("child_w1", "child_w2", "child_w3")
+    assert overrides.options_for(row, "response_set") == ("frequency",)
+    assert "parent_w1" in overrides.options_for({"administration": ""}, "dataset")
+
+
 def test_an_untouched_form_writes_the_file_back_as_it_was(mock_project):
     for relative in (MOOD, "labcatalog.yaml"):
         text = opened(mock_project, relative)
