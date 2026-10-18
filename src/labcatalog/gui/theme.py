@@ -5,6 +5,9 @@ from pathlib import Path
 from nicegui import app, ui
 
 CSS = Path(__file__).with_name("theme.css")
+# Pictures that ship with the app, such as the overview banner.
+ASSETS_URL = "/lc-assets"
+BANNER = f"{ASSETS_URL}/banner.svg"
 CLEAR = "rgba(0,0,0,0)"
 ACCENT = "#1d1d1f"
 OK = "#1a7f37"
@@ -30,6 +33,7 @@ dark = False  # Whether figures are drawn for a dark page; the window sets it.
 
 def install() -> None:
     app.colors(primary=ACCENT, positive=OK, warning=WARN, negative=BAD)
+    app.add_static_files(ASSETS_URL, Path(__file__).parent / "assets")
     ui.add_css(CSS, shared=True)
     ui.button.default_props("unelevated no-caps")
     ui.input.default_props("outlined dense")

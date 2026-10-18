@@ -249,11 +249,13 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
 }
 body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
-.lc-banner-map {
+.lc-banner-art {
   position: absolute;
-  inset: 0;
-  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 40%, #000 60%);
-  mask-image: linear-gradient(to right, transparent 0%, transparent 40%, #000 60%);
+  top: 0;
+  right: 0;
+  height: 100%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 35%);
+  mask-image: linear-gradient(to right, transparent 0%, #000 35%);
 }
 .lc-banner-words {
   position: relative;
@@ -267,8 +269,6 @@ body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.0
 .lc-banner-text { font-size: 0.92rem; line-height: 1.5; }
 .lc-banner-facts { font-size: 0.85rem; margin-top: 4px; }
 .lc-banner-number { font-weight: 600; color: #f2f2f4; }
-.lc-banner-legend { position: absolute; top: 14px; right: 18px; font-size: 0.72rem; color: #8b8b90; }
-.lc-banner-swatch { width: 7px; height: 7px; border-radius: 50%; }
 .lc-lifted { position: relative; margin-top: -72px; padding: 0 20px; }
 /* Next up and Coming up stand side by side at the same height. */
 .lc-pair > * > .lc-panel { flex: 1 1 auto; }

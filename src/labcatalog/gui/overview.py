@@ -3,14 +3,11 @@ from collections.abc import Callable
 from nicegui import ui
 
 from labcatalog.charts import views
-from labcatalog.gui import charts
+from labcatalog.gui import charts, theme
 from labcatalog.gui.common import panel, sorted_waves, unique
-from labcatalog.gui.network_graph import StarMap
 from labcatalog.metadata.completeness import gaps
 from labcatalog.pipeline import CatalogResult
 
-# Where the banner's map sits, as shares of the banner: left, top, right, bottom.
-MAP_AREA = (0.5, 0.16, 0.97, 0.72)
 # Icon and colour of each kind of to-do row.
 TODO_LOOK = {
     views.ERRORS: ("error", "bad"),
@@ -86,17 +83,8 @@ def render(
 
 def banner(result: CatalogResult) -> None:
     found = views.banner(result)
-    spec = views.catalog_map(result, list(result.project.instruments))
     with ui.element("div").classes("lc-banner w-full"):
-        if spec is not None:
-            StarMap(spec, MAP_AREA).classes("lc-banner-map")
-            with ui.row().classes("lc-banner-legend gap-3"):
-                for group in spec["groups"]:
-                    with ui.row().classes("items-center gap-1 no-wrap"):
-                        ui.element("span").classes("lc-banner-swatch").style(
-                            f"background: {group['color']}"
-                        )
-                        ui.label(group["name"])
+        ui.element("img").props(f"src={theme.BANNER} alt=''").classes("lc-banner-art")
         with ui.column().classes("lc-banner-words gap-2"):
             if found.kicker:
                 ui.label(found.kicker).classes("lc-banner-kicker")

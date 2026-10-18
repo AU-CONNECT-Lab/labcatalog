@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+</head>
+<body style="margin: 0; background: #111114">
+<div id="preview"></div>
+<pre id="art" hidden></pre>
+<script>
+const SPEC = __SPEC__;
+const W = 900, H = 320;
+const LOOK = {
+  bright: 0.6, hub: 4.5, score: 2.4, item: 1.4, glow: 3, glowAlpha: 0.9,
+  linkAlpha: 0.2, crossAlpha: 0.1, crossPull: 0.03, stars: 320,
+};
+// A group colour too dark to show on the banner's black is swapped for a light slate.
+const lift = (c) => (d3.hsl(c).l < 0.3 ? "#9fb3c8" : c);
+
+function graph() {
+  const rand = d3.randomLcg(7);
+  const colors = SPEC.groups.map((g) => lift(g.color));
+  const nodes = SPEC.nodes.map((n) => ({
+    id: n.id,
+    kind: n.named ? "hub" : n.size > 2 ? "score" : "item",
+    color: colors[n.group],
+  }));
+  // A link with a tip joins scores of two instruments; the rest hang parts from their whole.
+  const links = SPEC.links.map((l) => ({
+    source: l.source,
+    target: l.target,
+    cross: !!l.tip,
+    len: l.tip ? 80 + rand() * 80 : 18 + rand() * 30,
+  }));
+  return { nodes, links };
+}
+
+function layout({ nodes, links }) {
+  const sim = d3.forceSimulation(nodes)
+    .randomSource(d3.randomLcg(11))
+    .force("link", d3.forceLink(links).id((d) => d.id).distance((l) => l.len).strength((l) => (l.cross ? LOOK.crossPull : 0.5)))
+    .force("charge", d3.forceManyBody().strength((d) => (d.kind === "hub" ? -90 : d.kind === "score" ? -30 : -12)).distanceMax(220))
+    .force("x", d3.forceX(0).strength(0.01))
+    .force("y", d3.forceY(0).strength(0.045))
+    .force("collide", d3.forceCollide((d) => (d.kind === "hub" ? 7 : 3)))
+    .stop();
+  for (let i = 0; i < 800; i++) sim.tick();
+}
+
+function svg({ nodes, links }) {
+  const xs = d3.extent(nodes, (d) => d.x), ys = d3.extent(nodes, (d) => d.y);
+  const pad = 26;
+  const k = Math.min((W - 2 * pad) / (xs[1] - xs[0]), (H - 2 * pad) / (ys[1] - ys[0]));
+  const ox = (W - k * (xs[1] - xs[0])) / 2, oy = (H - k * (ys[1] - ys[0])) / 2;
+  const X = (d) => (ox + (d.x - xs[0]) * k).toFixed(1), Y = (d) => (oy + (d.y - ys[0]) * k).toFixed(1);
+  const fill = (d) => d3.color(d.color).brighter(LOOK.bright).formatHex();
+  const r = (d) => (d.kind === "hub" ? LOOK.hub : d.kind === "score" ? LOOK.score : LOOK.item);
+  const rand = d3.randomLcg(99);
+  let stars = "";
+  for (let i = 0; i < LOOK.stars; i++) {
+    const big = rand() < 0.06;
+    const x = (rand() * W).toFixed(1), y = (rand() * H).toFixed(1);
+    const size = (big ? 0.9 + rand() * 0.6 : 0.25 + rand() * 0.6).toFixed(2);
+    const alpha = (big ? 0.5 + rand() * 0.4 : 0.12 + rand() * 0.4).toFixed(2);
+    stars += `<circle cx="${x}" cy="${y}" r="${size}" fill="#fff" opacity="${alpha}"/>`;
+  }
+  const lines = links.map((l) => `<line x1="${X(l.source)}" y1="${Y(l.source)}" x2="${X(l.target)}" y2="${Y(l.target)}" stroke="#fff" stroke-opacity="${l.cross ? LOOK.crossAlpha : LOOK.linkAlpha}"/>`).join("");
+  const dots = nodes.map((d) => `<circle cx="${X(d)}" cy="${Y(d)}" r="${r(d)}" fill="${fill(d)}"/>`).join("");
+  const cores = nodes.filter((d) => d.kind === "hub").map((d) => `<circle cx="${X(d)}" cy="${Y(d)}" r="${(LOOK.hub * 0.45).toFixed(1)}" fill="#fff" fill-opacity="0.9"/>`).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
+<defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${LOOK.glow}"/></filter></defs>
+<g>${stars}</g>
+<g stroke-width="0.6">${lines}</g>
+<g filter="url(#glow)" opacity="${LOOK.glowAlpha}">${dots}</g>
+<g>${dots}</g>
+<g>${cores}</g>
+</svg>
+`;
+}
+
+const data = graph();
+layout(data);
+const art = svg(data);
+document.getElementById("art").textContent = art;
+document.getElementById("preview").innerHTML = art;
+</script>
+</body>
+</html>
