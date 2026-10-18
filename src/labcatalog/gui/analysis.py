@@ -458,6 +458,10 @@ def pair_section(
     @ui.refreshable
     def body() -> None:
         xs, y_key = [x for x in view.xs if x != view.y], view.y
+        imputed = missing.imputing(result, view)
+        if imputed and (lacking := missing.outside(result, view, [y_key, *xs], choices)):
+            note(lacking)
+            return
 
         async def fill() -> Callable:
             data = analysis_script.AnalysisData(result, sample)
@@ -471,8 +475,20 @@ def pair_section(
             }
             if not usable:
                 return lambda: note("Too few people have an X value and the Y value.")
-            code = analysis_script.regression_code(list(usable.values()), y)
-            found, engine = await analysis_tables.compute(result, sample, frame, code)
+            if imputed:
+                plan = missing.imputation_plan(result, view, data)
+                code = imputation.regression_code(list(usable.values()), y, plan)
+                frame = data.frame()
+                try:
+                    found, engine = await missing.pooled(result, sample, frame, code)
+                except LabCatalogError as err:
+                    message = str(err)
+                    return lambda: note(message)
+                who = f"fitted in each of {plan.m} imputed data sets and pooled, for everyone"
+            else:
+                code = analysis_script.regression_code(list(usable.values()), y)
+                found, engine = await analysis_tables.compute(result, sample, frame, code)
+                who = "on everyone with both values"
             figure = plot_code.regression(
                 {v.column: choices[x] for x, v in usable.items()}, choices[y_key]
             )
@@ -484,8 +500,8 @@ def pair_section(
                 f"Simple Regressions Predicting {choices[y_key]}",
                 columns,
                 rows,
-                "Each row is a separate regression of the outcome on one predictor, on everyone "
-                "with both values; r with its 95% confidence interval.",
+                f"Each row is a separate regression of the outcome on one predictor, {who}; r "
+                "with its 95% confidence interval.",
             )
 
             def content() -> None:
@@ -533,6 +549,7 @@ def pair_section(
                 with_input=True,
                 on_change=lambda e: choose_y(e.value),
             ).props("dense outlined").classes("w-96")
+            missing.method_switch(result, view, body.refresh)
         body()
 
 

@@ -78,3 +78,21 @@ def test_the_summary_sets_imputed_values_beside_the_observed_ones(result, sample
     for c in columns:
         assert c.missing == frame[c.column].isna().sum()
         assert (c.imputed_mean is None) == (c.missing == 0)
+
+
+@needs_mice
+def test_pooled_regressions_fit_every_imputed_data_set(result, sample):
+    data = script.AnalysisData(result, sample)
+    y, x = data.variable(MOOD), data.variable(STRESS)
+    plan = imputation.plan(data, [MOOD, STRESS, SLEEP], [], 5, 1)
+    frame = data.frame()
+    code = imputation.regression_code([x], y, plan)
+    found, _ = script.run_code(result, sample, frame, code, rscript())
+    [pooled] = script.read_regressions(found, {x.column: STRESS}).values()
+    available, _ = script.run_code(result, sample, frame, script.regression_code([x], y), None)
+    [seen] = script.read_regressions(available, {x.column: STRESS}).values()
+    assert pooled.correlation.n == len(frame) > seen.correlation.n
+    assert abs(pooled.slope - seen.slope) < 0.25 * abs(seen.slope)
+    assert pooled.correlation.low < pooled.correlation.r < pooled.correlation.high
+    r_squared = found["regressions"]["r_squared"].iloc[0]
+    assert abs(r_squared - pooled.correlation.r**2) < 0.05

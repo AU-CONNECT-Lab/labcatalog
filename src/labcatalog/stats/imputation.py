@@ -178,3 +178,36 @@ def read_summary(found: dict) -> tuple[list[ImputedColumn], list[str]]:
     ]
     events = [f"{r.dep}: {r.meth} {r.out}".strip() for r in found["imputation_events"].itertuples()]
     return columns, list(dict.fromkeys(events))
+
+
+R_REGRESSION = """\
+# Regression after multiple imputation: {y_label} on each X by itself, fitted in every imputed
+# data set and pooled with mice::pool (Rubin's rules), on everyone; r with its 95% CI from
+# miceadds::micombine.cor and R squared from mice::pool.r.squared.
+y <- {y}
+regressions <- do.call(rbind, lapply(c({xs}), function(x) {{
+  fits <- mice::as.mira(lapply(completed, function(data) lm(data[[y]] ~ data[[x]])))
+  coefs <- summary(mice::pool(fits))
+  pair <- miceadds::datlist_create(lapply(completed, function(data) data[c(x, y)]))
+  r <- miceadds::micombine.cor(pair, method = "pearson")[1, ]
+  data.frame(x = x, n = nrow(d), slope = coefs$estimate[2], slope_se = coefs$std.error[2],
+             intercept = coefs$estimate[1], intercept_se = coefs$std.error[1], r = r$r,
+             r_low = r$lower95, r_high = r$upper95,
+             r_squared = mice::pool.r.squared(fits)[1, "est"], p = coefs$p.value[2])
+}}))
+print(regressions)
+"""
+
+
+def regression_code(xs: list[Variable], y: Variable, found: ImputationPlan) -> Code:
+    available = analysis_script.regression_code(xs, y)
+    body = R_REGRESSION.format(
+        y=r_string(y.column), xs=quoted([v.column for v in xs]), y_label=y.label
+    )
+    return Code(
+        title="Regression after multiple imputation",
+        r=impute_r(found) + body,
+        python=PYTHON_IMPUTE + available.python,
+        outputs=("regressions",),
+        packages=PACKAGES,
+    )

@@ -28,7 +28,7 @@ One imputation model serves every section of the page. **Imputed** lists what it
 
 **Run** shows each imputed column's missing count with its observed and imputed *M* (*SD*), and anything `mice` reported doing, such as leaving out a column that another predicts exactly. The **Missing values** switch on a section (**Available cases** or **Multiple imputation**, starting from the project's setting) chooses whether that section uses it. A section's code holds the same imputation, with the same seed, so every section works on the same imputed data. A variable a section needs that the imputation leaves out is named, to add here.
 
-With multiple imputation, the correlation table gives each variable's *M* and *SD* averaged over the imputed data sets and each correlation pooled with `miceadds::micombine.cor` (Fisher's *z* and Rubin's rules), for everyone in the Sample.
+With multiple imputation, the correlation table gives each variable's *M* and *SD* averaged over the imputed data sets and each correlation pooled with `miceadds::micombine.cor` (Fisher's *z* and Rubin's rules), for everyone in the Sample. Each regression is fitted in every imputed data set and pooled with `mice::pool`, with *r* and its CI from `micombine.cor` and *R*² from `mice::pool.r.squared`; its chart still shows the observed values.
 
 ## Correlation table
 
