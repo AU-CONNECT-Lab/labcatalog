@@ -26,7 +26,7 @@ TITLES = {
 
 
 class TableEditor:
-    # One of the Edit page's tables, with rows added and ticked rows deleted.
+    # One of the Edit files tables, with rows added and ticked rows deleted.
     def __init__(self, table: records.Table, rows: list[dict]) -> None:
         self.table = table
         self.grid = ui.aggrid(grid_options(table, rows)).classes("w-full").style("height: 40vh")
@@ -81,7 +81,7 @@ def open_wizard(
             else new_instrument.Draft("")
         )
     except LabCatalogError as err:
-        ui.notify(f"{err}. Use the Edit page for this instrument.", type="negative")
+        ui.notify(f"{err}. Use Edit files on the Set up page for this instrument.", type="negative")
         return
     first = new_instrument.first_gap(project, instrument_id) if completing else "about"
     tables = records.INSTRUMENT_TABLES

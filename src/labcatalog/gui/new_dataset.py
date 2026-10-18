@@ -374,7 +374,7 @@ def open_wizard(
         note(
             f"{left} of {len(rows)} columns are not items of a catalogued instrument, such as the "
             "ID and dates; fill in instrument and item for any that are. Columns of an "
-            "instrument the catalog does not have yet come in through the Import page later."
+            "instrument the catalog does not have yet come in through Describe columns on the Set up page later."
         )
         state["grid"] = (
             ui.aggrid(

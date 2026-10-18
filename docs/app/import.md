@@ -1,8 +1,8 @@
-# Import
+# Describe Columns
 
-The Import page creates instrument files and a column map for a data file that has no column map yet. [Add an Instrument](../how-to/add-instrument.md) walks through it. If every dataset already has a map, the page says so: add the new data file under `datasets` in `labcatalog.yaml` and press **Refresh**.
+**Describe columns**, the second step of the Set up page, creates instrument files and a column map for a data file that has no column map yet. [Add an Instrument](../how-to/add-instrument.md) walks through it. If every dataset already has a map, the step says so: add the new data file under `datasets` in `labcatalog.yaml` (**Add the file in labcatalog.yaml** opens it in Edit files) and press **Refresh**.
 
-![The Import page for a dataset without a column map](../images/app/import.png)
+![The Describe columns step for a dataset without a column map](../images/app/import.png)
 
 Pick the **Dataset**, then:
 

@@ -94,7 +94,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         if line is None:
             return
         shown.editor.decorations = [{"kind": "line", "line": line, "class": "lc-mark"}]
-        # The editor mounts after the Edit tab shows.
+        # The editor mounts after the Edit files step shows.
         ui.timer(0.3, partial(shown.editor.reveal_line, line), once=True)
 
     def write(text: str) -> bool:

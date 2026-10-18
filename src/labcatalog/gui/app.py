@@ -261,7 +261,7 @@ class Window:
         try:
             result = await common.computed(run_catalog, root)
         except LabCatalogError as err:
-            # The project stays open so the Prepare page can make the missing data.
+            # The project stays open so Set up can make the missing data.
             ui.notify(str(err), type="negative", multi_line=True)
             result, self.error = None, str(err)
         else:

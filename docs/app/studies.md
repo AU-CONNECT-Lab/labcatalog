@@ -44,4 +44,4 @@ The study's datasets, as on the [Datasets](datasets.md) page. Click a row to ope
 
 ## Delete
 
-**Delete** removes the study from `labcatalog.yaml`, together with its datasets, their column maps in `maps/` and its study file. The window lists everything it will remove, and **Delete** works only after you type the study's ID. The data files stay where they are, and so do any prepare steps that make them; remove those on the [Edit](edit.md) page if they are no longer needed. labcatalog keeps no copy of what it removes, so to undo a deletion, restore the files from git or DataLad.
+**Delete** removes the study from `labcatalog.yaml`, together with its datasets, their column maps in `maps/` and its study file. The window lists everything it will remove, and **Delete** works only after you type the study's ID. The data files stay where they are, and so do any prepare steps that make them; remove those in the [Edit files](edit.md) step of the Set up page if they are no longer needed. labcatalog keeps no copy of what it removes, so to undo a deletion, restore the files from git or DataLad.

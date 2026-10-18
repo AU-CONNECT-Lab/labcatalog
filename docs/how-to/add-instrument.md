@@ -7,7 +7,7 @@ There are five ways to add an instrument. Which one fits depends on what you sta
 | A new data file and its codebook (REDCap, Qualtrics, SPSS, or a document) | A codebook import, which also writes the column map |
 | Only a PDF of the instrument | A draft from a language model |
 | The items and a data file that has their columns | **Add an instrument** on the Instruments page |
-| Nothing but the items | The Edit page, or write the file by hand |
+| Nothing but the items | Edit files on the Set up page, or write the file by hand |
 
 ## Add it step by step
 
@@ -19,7 +19,7 @@ A codebook import describes every column of one data file in three CSV files: `i
 
 In the window:
 
-1. Open the **Import** page and pick the dataset.
+1. Open the **Set up** page, go to its **Describe columns** step and pick the dataset.
 2. Create the three files. **Create the three files** lists the data file's columns and leaves the rest for you. If you have a codebook in a standard format, start from it instead: **Create from a REDCap data dictionary** (the CSV from REDCap's Data Dictionary page), **Create from a Qualtrics survey file** (the `.qsf` from Tools, Import/Export, Export Survey), or **Create from an SPSS file** (a `.sav` with variable and value labels). These fill in wording, options and item types.
 3. Fill in what is still empty. **Open folder** opens `codebook/<dataset>/`; edit the files in Excel or any editor and save them as CSV UTF-8. **What goes in each column** explains every column.
 4. Press **Check and import**. labcatalog lists every problem by file and line; fix them and press it again. When the files are right, it writes `instruments/<id>.yaml` for each new instrument and `maps/<dataset>.csv`.
@@ -41,17 +41,17 @@ If the codebook is a PDF or a document, a language model can fill in the three f
 
 ## Draft an instrument from its PDF
 
-With a language model set up on the Settings page (see [Set Up R and Language Models](r-and-models.md)), the **Edit** page can draft a whole instrument file, scores included, from the instrument's PDF:
+With a language model set up on the Settings page (see [Set Up R and Language Models](r-and-models.md)), the **Edit files** step of the Set up page can draft a whole instrument file, scores included, from the instrument's PDF:
 
-1. On the **Edit** page, press **New instrument from a PDF**, give the instrument an ID, choose the PDF and press **Draft**. When the PDF holds several instruments or versions, say which one to draft (for example "the short form"); otherwise the model drafts the one the PDF presents as the main one and names the others in its notes. The PDF's text, including the item wording, is sent to the model's provider.
-2. The draft is written to `drafts/<id>.yaml`, outside the catalog. Open it on the Edit page and check every item, option and score against the PDF.
+1. In the **Edit files** step of the Set up page, press **New instrument from a PDF**, give the instrument an ID, choose the PDF and press **Draft**. When the PDF holds several instruments or versions, say which one to draft (for example "the short form"); otherwise the model drafts the one the PDF presents as the main one and names the others in its notes. The PDF's text, including the item wording, is sent to the model's provider.
+2. The draft is written to `drafts/<id>.yaml`, outside the catalog. Open it in Edit files and check every item, option and score against the PDF.
 3. Press **Move to instruments**. The instrument is now in the catalog.
 
 You still map its columns and add its administration, as for any instrument. The references, the license and custom fields are always yours to fill in.
 
-## Use the Edit page or write the file by hand
+## Use Edit Files or write the file by hand
 
-On the **Edit** page, **New instrument** creates `instruments/<id>.yaml` with the required keys. Switch to the table view to fill in items, response sets and scores as tables, or edit the YAML as text. [Instruments](../concepts/instruments.md) describes every key.
+In the **Edit files** step of the Set up page, **New instrument** creates `instruments/<id>.yaml` with the required keys. Switch to the table view to fill in items, response sets and scores as tables, or edit the YAML as text. [Instruments](../concepts/instruments.md) describes every key.
 
 An editor works just as well. Start the file with this line, so that an editor with YAML support checks it and completes the keys as you type:
 

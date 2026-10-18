@@ -1,8 +1,8 @@
-# Edit
+# Edit Files
 
-The Edit page edits the project's files: `labcatalog.yaml`, the instrument files, the drafts, the study files and the column maps. The files are listed on the left; click one to open it.
+**Edit files**, the third step of the Set up page, edits the project's files: `labcatalog.yaml`, the instrument files, the drafts, the study files and the column maps. The files are listed on the left; click one to open it.
 
-![The Edit page with labcatalog.yaml open](../images/app/edit.png)
+![The Edit files step with labcatalog.yaml open](../images/app/edit.png)
 
 ## Form
 

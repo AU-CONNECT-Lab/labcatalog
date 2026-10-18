@@ -50,7 +50,7 @@ Its data are the ID and a `files` column with the number of matching files. Map 
 
 A new dataset needs a column map and an administration for each instrument in it.
 
-- If the file holds instruments that are already in the project, a codebook import is still the quickest way: the Import page matches items by their wording and reuses the instruments, and only writes the map. See [Add an Instrument](add-instrument.md).
+- If the file holds instruments that are already in the project, a codebook import is still the quickest way: The **Describe columns** step of the Set up page matches items by their wording and reuses the instruments, and only writes the map. See [Add an Instrument](add-instrument.md).
 - For a later wave with the same column names apart from a wave suffix, you can also copy the previous wave's map, rename it to `maps/<new dataset>.csv` and change the column names.
 
 Then add the new dataset to each administration in the study file:

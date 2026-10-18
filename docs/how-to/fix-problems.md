@@ -15,7 +15,7 @@ maps/child_w2.csv:14: error [map_row] instrument and item must be filled togethe
 - An **error** means labcatalog cannot trust the result: a value that is not allowed, an ID used twice, a key it does not know. Fix errors first.
 - A **warning** points to something worth a look that may be fine: people who gave the same answer to every item, a column the map does not describe.
 
-The location names the file, and where it can, the line or the entry: `datasets[3] (child_w1).reporter` is the `reporter` of the third dataset in `labcatalog.yaml`. On the Problems page, the location is a link that opens the file on the Edit page at that line.
+The location names the file, and where it can, the line or the entry: `datasets[3] (child_w1).reporter` is the `reporter` of the third dataset in `labcatalog.yaml`. On the Problems page, the location is a link that opens the file in the **Edit files** step of the Set up page at that line.
 
 The command line exits with status 1 when there are errors, so `labcatalog check` can stop a script or a CI job.
 
@@ -50,7 +50,7 @@ On the Problems page, **Fix** at the end of a row opens a panel for that problem
 | `same_answer` | People gave the same answer to every item of a score. | Look at them; they may have answered without reading. If their answers are real, record the warning as fine. |
 | `possible_identifier` | A column's name suggests it holds names, emails, phone numbers, addresses or birth dates. | Remove it from the data the catalog reads. |
 | `excluded_present` | Rows belong to someone on the exclusion list. | Remove them in your cleaning script. |
-| `prepare_outdated`, `prepare_output_missing` | A prepare step's inputs are newer than its outputs, or an output does not exist. | Run the step from the Fix panel or on the Prepare page. |
+| `prepare_outdated`, `prepare_output_missing` | A prepare step's inputs are newer than its outputs, or an output does not exist. | Run the step from the Fix panel or in the **Prepare data** step of the Set up page. |
 | `not_downloaded` | A file in a DataLad dataset has no content on this computer. | Get it; see [Using labcatalog with DataLad](datalad.md). |
 
 [Problem Codes](../reference/problem-codes.md) lists every code.

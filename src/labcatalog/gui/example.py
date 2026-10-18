@@ -11,7 +11,7 @@ def example_folder() -> Path:
 
 
 def example_copy() -> Path:
-    # The window's own copy, so trying the Edit or Prepare page never changes the installed package.
+    # The window's own copy, so trying the Set up page never changes the installed package.
     folder = example_folder()
     if not folder.exists():
         init_project(folder)

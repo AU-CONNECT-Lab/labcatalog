@@ -33,7 +33,7 @@ REVERSED = re.compile(r"\s*\(R\)\s*$", re.IGNORECASE)
 class Draft:
     id: str
     about: dict[str, str] = field(default_factory=lambda: {"kind": QUESTIONNAIRE})
-    # Rows as the Edit page's tables hold them, so the same writer puts them in the file.
+    # Rows as the Edit files tables hold them, so the same writer puts them in the file.
     options: list[dict[str, Any]] = field(default_factory=list)
     items: list[dict[str, Any]] = field(default_factory=list)
     scores: list[dict[str, Any]] = field(default_factory=list)
@@ -183,7 +183,7 @@ def instrument_change(project: Project, draft: Draft) -> Change:
 
 
 def starting_text(instrument_id: str) -> str:
-    # As the Edit page's New instrument writes it, so the lists keep the schema's order.
+    # As New instrument in Edit files writes it, so the lists keep the schema's order.
     lines = [MODELINE.format("instrument"), f"id: {instrument_id}"]
     lines += ["response_sets: []", "items: []", "scores: []"]
     return "\n".join(lines) + "\n"

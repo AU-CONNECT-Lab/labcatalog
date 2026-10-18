@@ -69,7 +69,7 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 
 ## Codebook import
 
-Problems found by **Check and import** on the Import page, or by `labcatalog codebook import`, all have the code `codebook`. The location is the codebook file and line, such as `codebook/parent_w1/items.csv:12`, and the message says what is wrong in that row.
+Problems found by **Check and import** in the **Describe columns** step of the Set up page, or by `labcatalog codebook import`, all have the code `codebook`. The location is the codebook file and line, such as `codebook/parent_w1/items.csv:12`, and the message says what is wrong in that row.
 
 ## Accepted warnings
 

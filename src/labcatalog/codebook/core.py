@@ -26,7 +26,7 @@ ITEMS = "items.csv"
 INSTRUMENTS = "instruments.csv"
 SCORES = "scores.csv"
 
-# What each column holds; the Import page shows these and the AI prompt quotes them.
+# What each column holds; the Describe columns step shows these and the AI prompt quotes them.
 COLUMNS: dict[str, dict[str, str]] = {
     ITEMS: {
         "column": "the data file's column name; already filled in, do not change it",

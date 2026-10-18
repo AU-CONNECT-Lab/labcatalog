@@ -1,8 +1,8 @@
-# Prepare
+# Prepare Data
 
-The Prepare page runs the prepare steps in `labcatalog.yaml`, the scripts that turn raw exports and pipeline outputs into the data the catalog reads. See [Register Prepare Steps](../how-to/prepare-steps.md) for how to write them. A project with no steps yet shows an example to copy.
+**Prepare data**, the first step of the Set up page, runs the prepare steps in `labcatalog.yaml`, the scripts that turn raw exports and pipeline outputs into the data the catalog reads. See [Register Prepare Steps](../how-to/prepare-steps.md) for how to write them. A project with no steps yet shows an example to copy.
 
-![The Prepare page listing the prepare steps](../images/app/prepare.png)
+![The Prepare data step listing the prepare steps](../images/app/prepare.png)
 
 ## The steps
 

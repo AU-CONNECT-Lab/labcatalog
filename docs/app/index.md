@@ -1,6 +1,6 @@
 # Using the App
 
-Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to open a project directly. The pages are listed across the top, in groups: browsing the catalog (Overview, Instruments, Studies, Datasets), writing it up (Analysis, Methods), changing the project (Prepare, Import, Edit) and Problems. The gear at the top right opens Settings. This section describes the pages one by one.
+Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to open a project directly. The pages are listed across the top, in groups: browsing the catalog (Overview, Instruments, Studies, Datasets), writing it up (Analysis, Methods), setting up the project (Set up) and Problems. The gear at the top right opens Settings. This section describes the pages one by one.
 
 ## Opening a project
 
@@ -16,8 +16,12 @@ The factor models take longer than the rest, so they run in the background after
 
 The **Problems** tab shows how many problems the project has, in red when any is an error.
 
-- If the metadata have errors, the window opens the Problems page, and the catalog pages say "The project files have errors. Fix them, then press Refresh." Fix the files on the Edit page or in an editor.
-- If the data cannot be read, for example because a data file does not exist yet, the catalog pages show the error. The Prepare and Edit pages still work, so you can run the steps that make the data.
+- If the metadata have errors, the window opens the Problems page, and the catalog pages say "The project files have errors. Fix them, then press Refresh." Fix the files in the **Edit files** step of the Set up page or in an editor.
+- If the data cannot be read, for example because a data file does not exist yet, the catalog pages show the error. The Set up page still works, so you can run the prepare steps that make the data.
+
+## The Set up page
+
+Set up holds the work of building a project, in the order it is usually done. A row of numbered steps runs across the top: **Prepare data**, **Describe columns** and **Edit files**. Click a step to open it; a step with something left to do says so next to its name, such as "3 to run" for prepare steps that are not up to date or "1 to describe" for a dataset with no column map. **Next** at the bottom of each step opens the one after it, and from the last step the Problems page. Switching steps keeps unsaved changes in Edit files.
 
 ## The pages
 
@@ -29,8 +33,6 @@ The **Problems** tab shows how many problems the project has, in red when any is
 | [Datasets](datasets.md) | Each data file: who is in it, completeness, missing values; freezes. |
 | [Analysis](analysis.md) | Correlations, regression, group comparisons and multilevel models. |
 | [Methods](methods.md) | Draft text and tables for a methods section. |
-| [Prepare](prepare.md) | Run the scripts that make the data. |
-| [Import](import.md) | Create instruments and a column map from a codebook. |
-| [Edit](edit.md) | Edit the project's files as text or tables. |
+| Set up | Three steps in order: [Prepare data](prepare.md) runs the scripts that make the data, [Describe columns](import.md) creates instruments and a column map from a codebook, [Edit files](edit.md) edits the project's files. |
 | [Problems](problems.md) | Every mismatch between metadata and data. |
 | [Settings](settings.md) | R, DataLad, the language model, charts and tables. |
