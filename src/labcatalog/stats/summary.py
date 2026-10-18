@@ -134,6 +134,8 @@ class RetainedScore(BaseModel):
 
 class Summary(BaseModel):
     variables: list[VariableSummary]
+    # The roster's own described columns, under the dataset name roster.
+    roster: list[VariableSummary] = []
     scores: list[ScoreSummary]
     datasets: list[DatasetSummary]
     retention: list[WaveRetention]

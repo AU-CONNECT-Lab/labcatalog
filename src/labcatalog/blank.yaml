@@ -54,5 +54,5 @@ datasets: []
 # Placeholders: name, abbreviation, cite, named, construct, reporter, n_items, scale, description, items, reverse, scoring, alpha, omega.
 # An instrument can have its own template (measures:) and a sentence or two about what it measures (description:).
 # Optional: the template of each study's Participants paragraph on the Methods page:
-#   participants: "{waves} {counts} {retention} {modalities}"
-# Placeholders: study, n_waves, waves, counts, retention, modalities. A study can have its own (participants:) in its file in studies/.
+#   participants: "{waves} {counts} {demographics} {retention} {modalities}"
+# Placeholders: study, n_waves, waves, counts, demographics (a sentence with blanks for gender and age, to fill in by hand), retention, modalities. A study can have its own (participants:) in its file in studies/.

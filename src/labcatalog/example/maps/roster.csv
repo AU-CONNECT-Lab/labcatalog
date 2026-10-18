@@ -1,0 +1,6 @@
+column,instrument,item
+pid,,
+family_id,,
+role,,
+birth_year,example_participants,birth_year
+gender,example_participants,gender

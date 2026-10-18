@@ -58,6 +58,18 @@ roster:
 
 The roster is a CSV file with one row per person: their ID, their group in a column you name, and any other columns you keep there, such as their role or birth year. Every dataset takes its people's groups from it, so a file that holds only a child's ID, such as an EEG file, still knows the child's family. Most labs already keep such a list, from recruitment or a demographics form; it can be made by one of your [prepare steps](../how-to/prepare-steps.md) like any other file. `from_id` and a roster's `group_column` are two ways of giving the same thing, so a project uses one of them.
 
+The roster's other columns can be described like any data: name a `kind: demographics` instrument as `roster.instrument` and map the columns to its items in `maps/roster.csv`, listing the ID and group columns with no instrument, as in a dataset's map:
+
+```yaml
+roster:
+  path: data/participants.csv
+  id_column: pid
+  group_column: family_id
+  instrument: example_participants
+```
+
+The roster's values are then checked against the instrument's options and ranges, the instrument's page shows their distribution in the roster, and the Analysis page offers them for the people of every chosen file, for example the gender of the children in `child_w1` and of the parents in `parent_w1`, in Table 1, group comparisons and covariates. The instrument is not given in any dataset, so dataset pages do not list it.
+
 With a roster, `labcatalog check` also reports IDs in the data that the roster does not list (`id_not_in_roster`), people the roster lists twice (`id_duplicate`) or without a group (`group_missing`), and, for information, people in the roster who are in no dataset yet (`roster_unused`).
 
 Groups are used in three places:

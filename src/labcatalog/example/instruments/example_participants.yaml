@@ -1,0 +1,18 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: example_participants
+name: Example Participant Roster
+abbreviation: Roster
+kind: demographics
+construct_name: Demographics
+description: What the study keeps once for every person in the roster, whether parent or child.
+response_sets:
+  - id: gender
+    options:
+      - {value: 1, label: Woman or girl}
+      - {value: 2, label: Man or boy}
+      - {value: 3, label: Another gender}
+items:
+  - {id: birth_year, label: "Birth year", text: "Year of birth.", type: number, min: 1950, max: 2024}
+  - {id: gender, label: "Gender", text: "Gender.", response_set: gender}
+custom:
+  domain: family

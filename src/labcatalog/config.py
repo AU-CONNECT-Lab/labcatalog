@@ -47,6 +47,8 @@ class RosterConfig(StrictModel):
     path: str
     id_column: str | None = None
     group_column: str | None = None
+    # The demographics instrument that describes the other columns, mapped in maps/roster.csv.
+    instrument: str | None = None
 
 
 class WaveConfig(StrictModel):
@@ -179,3 +181,18 @@ def missing_labels_for(config: ProjectConfig, dataset: DatasetConfig) -> dict[st
 
 def id_column_for(config: ProjectConfig, dataset: DatasetConfig) -> str:
     return dataset.id_column or config.defaults.id_column
+
+
+def roster_dataset(config: ProjectConfig) -> DatasetConfig:
+    # The roster read like a dataset, belonging to no study or wave.
+    roster = config.roster
+    return DatasetConfig(
+        name=defaults.ROSTER,
+        modality="",
+        study="",
+        wave="",
+        reporter="",
+        source="csv",
+        path=roster.path,
+        id_column=roster.id_column,
+    )

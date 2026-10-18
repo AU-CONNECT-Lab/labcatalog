@@ -106,7 +106,7 @@ def roster_records(project: Project) -> list[FileRecord]:
     path = portable_path(roster.path, project.root).as_posix()
     return [
         FileRecord(
-            dataset="roster", path=path, sha256=file_sha256(roster.path), rows=len(roster.frame)
+            dataset=defaults.ROSTER, path=path, sha256=file_sha256(roster.path), rows=len(roster.frame)
         )
     ]
 

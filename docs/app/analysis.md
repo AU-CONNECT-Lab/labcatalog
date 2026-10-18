@@ -28,7 +28,7 @@ Choose one or more predictors (**X**) and an outcome (**Y**). Each predictor get
 
 ## Group comparison
 
-Choose the **Groups**, an answer-option item of a demographics instrument, and the **Outcome**. Groups with fewer than two people are left out. With two groups, the test is Welch's *t* test, or Student's when `stats.t_test` is `student`, with Cohen's *d* and the mean difference, each with a 95% CI. With three or more, it is a one-way ANOVA with η² and ω². The page shows a table of *n*, *M* and *SD* per group, the test table, and a box plot with every person as a point.
+Choose the **Groups**, an answer-option item of a demographics instrument (the roster's items are offered for every chosen file), and the **Outcome**. Groups with fewer than two people are left out. With two groups, the test is Welch's *t* test, or Student's when `stats.t_test` is `student`, with Cohen's *d* and the mean difference, each with a 95% CI. With three or more, it is a one-way ANOVA with η² and ω². The page shows a table of *n*, *M* and *SD* per group, the test table, and a box plot with every person as a point.
 
 ## Measurement model
 

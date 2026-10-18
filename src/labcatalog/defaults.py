@@ -13,6 +13,8 @@ CODEBOOK_DIR = "codebook"
 SCORING_DIR = "scoring"
 DRAFTS_DIR = "drafts"
 DATA_DIR = "data"
+# The roster's name where it is read like a dataset: its column map is maps/roster.csv.
+ROSTER = "roster"
 BIB_FILENAME = "references.bib"
 OUTPUTS_DIR = "outputs"
 FREEZES_DIR = "freezes"

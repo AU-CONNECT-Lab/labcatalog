@@ -35,11 +35,11 @@ from labcatalog.paths import expand_path
 from labcatalog.project import Project, load_config, load_project, references_root, write_schemas
 from labcatalog.reports.codegen import label_snippets, scoring_snippets
 from labcatalog.reports.tables import PaperTable
-from labcatalog.sources import LoadedDataset, load_datasets
+from labcatalog.sources import LoadedDataset, load_datasets, load_roster_dataset
 from labcatalog.stats import invariance
 from labcatalog.stats.cfa import CfaFit, build_models, fit_models
 from labcatalog.stats.invariance import InvarianceTest
-from labcatalog.stats.summary import Summary, summarize
+from labcatalog.stats.summary import Summary, summarize, summarize_variable
 
 
 @dataclass
@@ -54,6 +54,8 @@ class CatalogResult:
     manifest: Manifest | None = None
     # Row-level data stays for the charts that plot people rather than summaries.
     datasets: dict[str, LoadedDataset] = field(default_factory=dict)
+    # The roster, when an instrument describes its columns.
+    roster: LoadedDataset | None = None
     scores: dict[str, pd.DataFrame] = field(default_factory=dict)
 
 
@@ -86,16 +88,25 @@ def run_catalog(root: Path) -> CatalogResult:
     datasets = load_datasets(project)
     scores = compute_scores(catalog, datasets)
     report = check_project(project, catalog, datasets, scores)
+    roster = load_roster_dataset(project)
+    summary = summarize(catalog, datasets, scores, project.config)
+    if roster is not None:
+        summary.roster = [
+            summarize_variable(roster, v, project.config)
+            for v in catalog.roster_variables
+            if v.column in roster.frame
+        ]
     return CatalogResult(
         report=reported(root, [*issues, *report.issues]),
         project=project,
         catalog=catalog,
-        summary=summarize(catalog, datasets, scores, project.config),
+        summary=summary,
         snippets=scoring_snippets(catalog),
         label_snippets=label_snippets(project.config, catalog),
         manifest=build_manifest(project, datasets),
         datasets=datasets,
         scores=scores,
+        roster=roster,
     )
 
 

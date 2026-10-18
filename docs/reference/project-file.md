@@ -61,6 +61,7 @@ A CSV file listing everyone once, one row per person. Optional.
 | `path` | | The file, relative to the project folder. |
 | `id_column` | `defaults.id_column` | The column with each person's ID. |
 | `group_column` | none | The column with each person's group, named by `ids.group.name`. Every dataset takes its groups from here; a project gives `ids.group.from_id` or this, not both. |
+| `instrument` | none | A demographics instrument describing the roster's other columns, mapped to them in `maps/roster.csv`. The Analysis page offers its items for the people of every file. |
 
 ## studies
 

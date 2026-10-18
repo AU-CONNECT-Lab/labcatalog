@@ -105,12 +105,49 @@ def item_key(variable: ResolvedVariable) -> str:
 
 
 def item_variable(result: CatalogResult, key: str) -> ResolvedVariable:
-    return next(v for v in result.catalog.variables if item_key(v) == key)
+    dataset = key.rsplit("@", 1)[1]
+    return next(v for v in items_for(result, dataset) if item_key(v) == key)
+
+
+def items_for(result: CatalogResult, dataset: str) -> list[ResolvedVariable]:
+    return result.catalog.variables_for(dataset) + roster_items(result, dataset)
+
+
+def roster_items(result: CatalogResult, dataset: str) -> list[ResolvedVariable]:
+    # The roster's columns for the people of one file, as if the file held them.
+    config = result.datasets[dataset].config
+    update = {
+        "dataset": dataset,
+        "study": config.study,
+        "wave": config.wave,
+        "reporter": config.reporter,
+        "modality": config.modality,
+    }
+    return [v.model_copy(update=update) for v in result.catalog.roster_variables]
+
+
+def from_roster(result: CatalogResult, variable: ResolvedVariable) -> bool:
+    roster = result.project.config.roster
+    return roster is not None and roster.instrument == variable.instrument_id
+
+
+def roster_numbers(result: CatalogResult, dataset: str, column: str) -> pd.Series:
+    # Each row's value in the roster, found by its ID; someone listed twice has none.
+    roster, loaded = result.roster, result.datasets[dataset]
+    ids = roster.frame[roster.id_column]
+    once = (~ids.duplicated(keep=False)).to_numpy()
+    table = pd.Series(roster.numbers(column).to_numpy()[once], index=ids[once])
+    found = table.reindex(loaded.frame[loaded.id_column]).to_numpy()
+    return pd.Series(found, index=loaded.frame.index)
 
 
 def item_numbers(result: CatalogResult, variable: ResolvedVariable) -> pd.Series:
     # Only answers that count: a listed option, or a number within the item's range.
-    numbers = result.datasets[variable.dataset].numbers(variable.column)
+    numbers = (
+        roster_numbers(result, variable.dataset, variable.column)
+        if from_roster(result, variable)
+        else result.datasets[variable.dataset].numbers(variable.column)
+    )
     if variable.type == CHOICE:
         return numbers.where(numbers.isin([float(o.value) for o in variable.response_options]))
     return numbers.where(numbers_in_range(numbers, variable))
@@ -121,8 +158,9 @@ def number_items(result: CatalogResult, datasets: list[str]) -> list[ResolvedVar
     return [
         v
         for name in datasets
-        for v in result.catalog.variables_for(name)
-        if v.type == NUMBER and v.column in result.datasets[name].frame.columns
+        for v in items_for(result, name)
+        if v.type == NUMBER
+        and (from_roster(result, v) or v.column in result.datasets[name].frame.columns)
     ]
 
 

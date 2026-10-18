@@ -34,7 +34,7 @@ Both paragraphs come from templates with placeholders in braces. To change the w
 
 ```yaml
 measures: "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}"
-participants: "{waves} {counts} {retention} {modalities}"
+participants: "{waves} {counts} {demographics} {retention} {modalities}"
 ```
 
 An instrument can have its own `measures` template, and a study its own `participants` template in its file in `studies/`.
@@ -42,8 +42,10 @@ An instrument can have its own `measures` template, and a study its own `partici
 | Template | Placeholders |
 |---|---|
 | `measures` | `name`, `abbreviation`, `cite`, `named`, `construct`, `reporter`, `n_items`, `scale`, `description`, `items`, `reverse`, `scoring`, `alpha`, `omega` |
-| `participants` | `study`, `n_waves`, `waves`, `counts`, `retention`, `modalities` |
+| `participants` | `study`, `n_waves`, `waves`, `counts`, `demographics`, `retention`, `modalities` |
 
 `counts`, `retention` and `modalities` name each reporter ("191 parent and 182 child respondents"); in a study with one reporter they leave the word out ("30 respondents").
+
+`demographics` gives a sentence for each reporter with blanks, `[ ]`, for the shares of women or girls and of men or boys and the mean age and its SD. labcatalog leaves these to you: which people and which wave they describe, and where age and gender come from, differ from one study to the next. Fill them in after copying the paragraph, or write your own sentence in the template in place of `{demographics}`.
 
 `labcatalog validate` reports a placeholder it does not know.

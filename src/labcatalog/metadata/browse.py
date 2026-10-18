@@ -85,12 +85,15 @@ def build_index(project: Project) -> BrowseIndex:
         for entry in entries:
             if entry.instrument:
                 columns.setdefault(entry.instrument, set()).add(entry.column)
+    roster = project.config.roster.instrument if project.config.roster else None
     for instrument_id, instrument in project.instruments.items():
         if instrument_id not in administered:
+            # The roster's instrument is in the data, though in no dataset.
+            unused = [] if instrument_id == roster else [NOT_GIVEN]
             custom = {
                 **score_values(instrument),
                 **instrument.custom,
-                "status": [*status[instrument_id], NOT_GIVEN],
+                "status": [*status[instrument_id], *unused],
             }
             values = {n: as_set(custom.get(n)) for n in names}
             rows.append(Administered(instrument_id, None, values))

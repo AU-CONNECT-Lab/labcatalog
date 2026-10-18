@@ -4,7 +4,7 @@ from typing import Protocol
 
 import pandas as pd
 
-from labcatalog.config import DatasetConfig, id_column_for
+from labcatalog.config import DatasetConfig, id_column_for, roster_dataset
 from labcatalog.data import id_map
 from labcatalog.data.ids import group_ids
 from labcatalog.exceptions import DataSourceError
@@ -82,6 +82,20 @@ def load_roster(project: Project) -> Roster | None:
         if column and column not in frame:
             raise DataSourceError(f"roster: no column '{column}' in {path}")
     return Roster(frame, id_column, roster.group_column, path)
+
+
+def load_roster_dataset(project: Project) -> LoadedDataset | None:
+    # Only a roster an instrument describes is read for its other columns.
+    roster = load_roster(project)
+    if roster is None or not project.config.roster.instrument:
+        return None
+    return LoadedDataset(
+        config=roster_dataset(project.config),
+        frame=roster.frame,
+        id_column=roster.id_column,
+        group=None,
+        source_path=roster.path,
+    )
 
 
 def load_dataset(

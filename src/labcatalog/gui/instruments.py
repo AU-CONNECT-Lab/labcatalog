@@ -1610,6 +1610,12 @@ def sample_table(result: CatalogResult, instrument: Instrument) -> tuple[list[di
         if v.instrument_id == instrument.id
     }
     summaries = {(v.dataset, v.column): v for v in result.summary.variables}
+    # The roster's instrument shows the roster itself.
+    roster = [v for v in result.catalog.roster_variables if v.instrument_id == instrument.id]
+    if roster:
+        datasets.append(defaults.ROSTER)
+        columns_by_item |= {(v.item_id, v.dataset): v.column for v in roster}
+        summaries |= {(v.dataset, v.column): v for v in result.summary.roster}
     sets = {response_set.id: response_set for response_set in instrument.response_sets}
     columns = [
         col("item", "Item", sortable=False),

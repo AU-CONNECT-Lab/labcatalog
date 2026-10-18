@@ -389,19 +389,24 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 administered.setdefault(dataset_name, {})[administration.instrument] = (
                     administration
                 )
-    dataset_names = {dataset.name for dataset in config.datasets}
+    expected_in = {d.name: administered.get(d.name, {}) for d in config.datasets}
+    # The roster's map is checked like a dataset's, against the instrument that describes it.
+    if config.roster and config.roster.instrument:
+        instrument_id = config.roster.instrument
+        expected_in[defaults.ROSTER] = {
+            instrument_id: Administration(instrument=instrument_id, datasets=[defaults.ROSTER])
+        }
     issues = [
         unknown(f"no dataset named '{name}' in {CONFIG}", f"{defaults.MAPS_DIR}/{name}.csv")
         for name in project.maps
-        if name not in dataset_names
+        if name not in expected_in
     ]
-    for dataset in config.datasets:
-        expected = administered.get(dataset.name, {})
-        entries = project.maps.get(dataset.name)
-        location = f"{defaults.MAPS_DIR}/{dataset.name}.csv"
+    for name, expected in expected_in.items():
+        entries = project.maps.get(name)
+        location = f"{defaults.MAPS_DIR}/{name}.csv"
         if entries is None:
             if expected:
-                message = f"dataset {dataset.name} has administrations but no {location}"
+                message = f"dataset {name} has administrations but no {location}"
                 issues.append(problem("map_missing", message, CONFIG))
             continue
         seen_columns: dict[str, int] = {}
@@ -414,9 +419,7 @@ def check_variable_maps(project: Project) -> list[Issue]:
                     f"column {entry.column} is already listed on line {seen_columns[entry.column]}"
                 )
                 lines = [seen_columns[entry.column], entry.line]
-                issues.append(
-                    problem("duplicate_id", message, where, dataset=dataset.name, lines=lines)
-                )
+                issues.append(problem("duplicate_id", message, where, dataset=name, lines=lines))
                 continue
             seen_columns[entry.column] = entry.line
             if entry.instrument is None:
@@ -441,15 +444,11 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 first = seen_items[key]
                 message = f"{entry.instrument} {entry.item} is already mapped to {first.column}"
                 lines = [first.line, entry.line]
-                issues.append(
-                    problem("duplicate_id", message, where, dataset=dataset.name, lines=lines)
-                )
+                issues.append(problem("duplicate_id", message, where, dataset=name, lines=lines))
             seen_items[key] = entry
         # One issue per instrument, so a single typo upstream does not flood the list.
         for name, lines in stray_rows.items():
-            message = (
-                f"instrument '{name}' is not administered in {dataset.name} ({len(lines)} rows)"
-            )
+            message = f"instrument '{name}' is not administered in {name} ({len(lines)} rows)"
             issues.append(unknown(message, f"{location}:{lines[0]}"))
         for instrument_id, administration in expected.items():
             instrument = project.instruments.get(instrument_id)
@@ -458,7 +457,7 @@ def check_variable_maps(project: Project) -> list[Issue]:
             dropped = {
                 override.item
                 for override in administration.overrides
-                if override.dropped and override.dataset in (None, dataset.name)
+                if override.dropped and override.dataset in (None, name)
             }
             mapped = {item for (inst, item) in seen_items if inst == instrument_id}
             unmapped = [
@@ -475,7 +474,7 @@ def check_variable_maps(project: Project) -> list[Issue]:
                         message,
                         location,
                         level="warning",
-                        dataset=dataset.name,
+                        dataset=name,
                         instrument=instrument_id,
                         items=unmapped,
                     )
@@ -514,6 +513,9 @@ def check_data_settings(project: Project) -> list[Issue]:
         if dataset.source != "folder" and dataset.files is not None:
             message = f"{where}.files: only folder datasets take files"
             issues.append(problem("invalid_value", message, CONFIG))
+    roster_instrument = config.roster.instrument if config.roster else None
+    if roster_instrument and roster_instrument not in project.instruments:
+        issues.append(unknown(f"roster.instrument: no instrument '{roster_instrument}'", CONFIG))
     group_column = config.roster.group_column if config.roster else None
     if group_column and group is None:
         message = "roster.group_column: declare ids.group (its name) first"

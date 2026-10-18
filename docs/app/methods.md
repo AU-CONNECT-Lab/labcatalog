@@ -12,7 +12,7 @@ The Methods page drafts the parts of a methods section that the catalog already 
 
 ## Table 1
 
-Choose the **Variables**; by default, the demographics items and each instrument's total score. The table describes everyone with data in the chosen wave, one column per dataset: *M* (*SD*) for numbers and scores, *n* (%) for each answer option, and Cronbach's α for scores.
+Choose the **Variables**; by default, the demographics items and each instrument's total score. The table describes everyone with data in the chosen wave, one column per dataset: *M* (*SD*) for numbers and scores, *n* (%) for each answer option, and Cronbach's α for scores. The items of the instrument describing the roster count as demographics: in each dataset's column they describe that dataset's people, such as the parents' gender under the parent file and the children's under the child file.
 
 ## Attrition
 

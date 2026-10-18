@@ -416,8 +416,9 @@ class AnalysisData:
 
     def column_name(self, dataset: str, column: str) -> str:
         # A column name that two files share gets the dataset added, whatever is selected.
-        shared = any(
-            v.column == column and v.dataset != dataset for v in self.result.catalog.variables
+        catalog = self.result.catalog
+        shared = any(v.column == column and v.dataset != dataset for v in catalog.variables) or any(
+            v.column == column for v in catalog.roster_variables
         )
         return f"{column}_{dataset}" if shared else column
 
@@ -452,7 +453,7 @@ def demographic_items(result: CatalogResult, datasets: list[str]) -> list[Resolv
     return [
         v
         for name in datasets
-        for v in result.catalog.variables_for(name)
+        for v in analysis.items_for(result, name)
         if instruments[v.instrument_id].kind == "demographics" and v.type in (CHOICE, NUMBER)
     ]
 
@@ -508,7 +509,7 @@ def measure_variables(
         for name in data.sample.datasets:
             if key.startswith(ITEM_PREFIX):
                 full = f"{key}@{name}"
-                if any(item_key(v) == full for v in data.result.catalog.variables_for(name)):
+                if any(item_key(v) == full for v in analysis.items_for(data.result, name)):
                     found.append(data.item(full))
             elif any(s.key == f"{key}@{name}" for s in data.result.catalog.scores_for(name)):
                 found.append(data.score(f"{key}@{name}", items))

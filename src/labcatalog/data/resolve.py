@@ -2,7 +2,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.config import DatasetConfig
+from labcatalog.config import DatasetConfig, roster_dataset
 from labcatalog.project import Project
 from labcatalog.schema import Administration, Instrument, ItemType, ResponseOption, Text
 
@@ -62,6 +62,8 @@ class ResolvedScore(BaseModel):
 class Catalog(BaseModel):
     variables: list[ResolvedVariable]
     scores: list[ResolvedScore]
+    # The roster's described columns; not given in any dataset, so kept apart.
+    roster_variables: list[ResolvedVariable] = []
 
     def variables_for(self, dataset: str) -> list[ResolvedVariable]:
         return [variable for variable in self.variables if variable.dataset == dataset]
@@ -84,7 +86,17 @@ def resolve_catalog(project: Project) -> Catalog:
                 scores.extend(
                     resolve_scores(instrument, administration, dataset, resolved, columns)
                 )
-    return Catalog(variables=variables, scores=scores)
+    return Catalog(variables=variables, scores=scores, roster_variables=resolve_roster(project))
+
+
+def resolve_roster(project: Project) -> list[ResolvedVariable]:
+    roster = project.config.roster
+    instrument = project.instruments.get(roster.instrument) if roster and roster.instrument else None
+    if instrument is None:
+        return []
+    administration = Administration(instrument=instrument.id, datasets=[defaults.ROSTER])
+    columns = mapped_columns(project, defaults.ROSTER, instrument.id)
+    return resolve_items(instrument, administration, roster_dataset(project.config), columns)
 
 
 def mapped_columns(project: Project, dataset: str, instrument_id: str) -> dict[str, str]:

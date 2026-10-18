@@ -31,7 +31,7 @@ Open `my_example` in a file browser or editor. The parts you will meet in every 
 
 ## Browse instruments
 
-The **Instruments** page lists the thirteen instruments. Use the filters at the top to narrow the list by wave, reporter or domain, then click **Example Mood Scale**. Its page shows the items and response options, the scores and how they are computed, their reliability in each wave, and how the scores change across waves. Under **One dataset**, pick `child_w1` to see item statistics, the R and Python code that computes the scores, and a draft Measures paragraph.
+The **Instruments** page lists the fourteen instruments, one of them describing the roster. Use the filters at the top to narrow the list by wave, reporter or domain, then click **Example Mood Scale**. Its page shows the items and response options, the scores and how they are computed, their reliability in each wave, and how the scores change across waves. Under **One dataset**, pick `child_w1` to see item statistics, the R and Python code that computes the scores, and a draft Measures paragraph.
 
 ## Look at a dataset
 

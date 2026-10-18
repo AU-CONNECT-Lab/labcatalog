@@ -31,10 +31,12 @@ ids:
     name: family
 
 # Everyone in the study once, one row per person: each person's family comes from its group column, which you name. Every dataset, including those holding only a child's ID, takes its families from here.
+# The instrument describes the roster's other columns (mapped in maps/roster.csv); the Analysis page offers them for the people of every file.
 roster:
   path: data/participants.csv
   id_column: pid
   group_column: family_id
+  instrument: example_participants
 
 # Score correlations link a parent and a child through their family. The other three are the defaults:
 # factor models with the items as ordered categories (wlsmv) or continuous (ml); two groups compared

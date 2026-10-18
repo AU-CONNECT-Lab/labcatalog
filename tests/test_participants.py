@@ -19,6 +19,9 @@ def test_default_paragraph_gives_waves_counts_and_retention(mock_project):
     assert "At Wave 2, 155 of 192 parent respondents (81%) and 169 of 217 child" in text
     assert "12 parent and 19 child respondents were new. Data from EEG" in text
     assert "Data from questionnaires" not in text
+    # Gender and age are left blank for the author to fill in.
+    assert "took part. Of the parent respondents, [ ]% were" in text
+    assert text.count("mean age was [ ] years (SD = [ ])") == 2
     assert text.endswith(
         "Data from salivary cortisol were available for 131 of 217 child respondents at Wave 1 "
         "(60%) and 101 of 174 at Wave 3 (58%)."

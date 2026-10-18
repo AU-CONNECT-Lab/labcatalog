@@ -16,7 +16,7 @@ from labcatalog.datalad.check import check_git_annex
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
-from labcatalog.sources import LoadedDataset, load_roster
+from labcatalog.sources import LoadedDataset, load_roster, load_roster_dataset
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
 PHONE = re.compile(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
@@ -45,6 +45,7 @@ def check_project(
             *id_map.check(project.root, {d.name for d in project.config.datasets}),
             *check_ids(project, datasets),
             *check_roster(project, datasets),
+            *check_roster_columns(project, catalog),
             *check_exclusions(project, datasets),
             *check_identifier_columns(project, datasets),
             *check_dates(project, datasets),
@@ -222,6 +223,16 @@ def id_problems(
         message = f"{len(repeated)} ID(s) appear more than once: {examples(repeated)}"
         issues.append(problem("id_duplicate", message, where, rows=rows_of(duplicated), **details))
     return clean, issues
+
+
+def check_roster_columns(project: Project, catalog: Catalog) -> list[Issue]:
+    # The roster's other columns are held to their instrument like a dataset's.
+    roster = load_roster_dataset(project)
+    if roster is None:
+        return []
+    found = {defaults.ROSTER: roster}
+    described = Catalog(variables=catalog.roster_variables, scores=[])
+    return [*check_columns(project, found), *check_values(project, described, found)]
 
 
 def check_roster(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:

@@ -3,8 +3,9 @@ from labcatalog.project import Project
 from labcatalog.reports.measures import number, series
 from labcatalog.stats.summary import ModalityCount, Summary, WaveRetention, wave_order
 
-DEFAULT_TEMPLATE = "{waves} {counts} {retention} {modalities}"
-PLACEHOLDERS = ("study", "n_waves", "waves", "counts", "retention", "modalities")
+DEFAULT_TEMPLATE = "{waves} {counts} {demographics} {retention} {modalities}"
+PLACEHOLDERS = ("study", "n_waves", "waves", "counts", "demographics", "retention", "modalities")
+BLANK = "[ ]"
 
 
 def template_for(project: Project, study: str) -> str:
@@ -46,6 +47,7 @@ def placeholder_values(project: Project, summary: Summary, study: str) -> dict[s
             )
             for wave in waves
         ),
+        "demographics": demographics(list(dict.fromkeys(r.reporter for r in rows)), named),
         "retention": " ".join(
             returned(waves[i - 1], wave, rows, named) for i, wave in enumerate(waves) if i
         ),
@@ -92,6 +94,15 @@ def modalities(summary: Summary, study: str, vocab: Vocab, named: bool) -> str:
         label = vocab.modality_label(modality)
         sentences.append(f"Data from {label} were available for {series(parts)}.")
     return " ".join(sentences)
+
+
+def demographics(reporters: list[str], named: bool) -> str:
+    # Blanks to fill in by hand: which people and which wave they describe is the author's call.
+    return " ".join(
+        f"Of the {respondents(reporter, named)}, {BLANK}% were women or girls/men or boys, and their mean age "
+        f"was {BLANK} years (SD = {BLANK})."
+        for reporter in reporters
+    )
 
 
 def respondents(reporter: str, named: bool) -> str:
