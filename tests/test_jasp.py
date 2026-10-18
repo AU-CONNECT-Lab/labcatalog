@@ -11,7 +11,7 @@ import pytest
 
 from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats import analysis, attrition, cfa, group_invariance, invariance
+from labcatalog.stats import agreement, analysis, attrition, cfa, group_invariance, invariance
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import multilevel as ml
 from labcatalog.stats.rbridge import (
@@ -526,3 +526,83 @@ def test_table_one_matches_jasp_descriptives(result, sample, tmp_path, engine):
         shown = table[(table["variable"] == v.label) & (table["dataset"] == v.dataset)]
         expected = [jasp[f"share{i}_{j}"] for j in range(len(v.options))]
         assert shown["percent"].tolist() == pytest.approx(expected, rel=1e-10), v.label
+
+
+def agreement_sample(result):
+    return analysis.build_sample(result, ["child_w1", "parent_child_w1"], True)
+
+
+@pytest.mark.parametrize("engine", engines())
+def test_kappas_match_jasp_rater_agreement(result, tmp_path, engine):
+    sample = agreement_sample(result)
+    data = script.AnalysisData(result, sample)
+    found = agreement.choices(result, sample.datasets, {n: n for n in sample.datasets})
+    # The child and the parent on one item, and the child on another as a third rater.
+    keys = [k for k in found if ".ewt_1@" in k] + [k for k in found if ".ewt_2@child" in k]
+    raters = [data.variable(k) for k in keys]
+    frame = data.frame()
+    code = agreement.agreement_code(raters)
+    pairs = agreement.read_agreement(
+        script.run_code(result, sample, frame, code, engine)[0], raters
+    )
+    columns = ", ".join(f'"{v.column}"' for v in raters)
+    # jaspReliability's raterAgreement: psych::cohen.kappa on all raters at once, quadratic weights.
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspReliability"],
+        f"""
+found <- psych::cohen.kappa(d[c({columns})], w.exp = 2)
+out <- list()
+for (i in 1:3) {{
+  confid <- found[[i + 1]]$confid
+  out[[paste0("kappa", i)]] <- confid[1, 2]
+  out[[paste0("kappa_low", i)]] <- confid[1, 1]
+  out[[paste0("kappa_high", i)]] <- confid[1, 3]
+  out[[paste0("weighted", i)]] <- confid[2, 2]
+  out[[paste0("weighted_low", i)]] <- confid[2, 1]
+  out[[paste0("weighted_high", i)]] <- confid[2, 3]
+}}
+out$average <- found$av.kappa
+""",
+        frame,
+    )
+    assert len(pairs.kappas) == 3
+    for i, pair in enumerate(pairs.kappas, start=1):
+        for name in agreement.KAPPA_FIELDS:
+            assert getattr(pair, name) == pytest.approx(jasp[f"{name}{i}"], rel=1e-8), name
+    assert pairs.light == pytest.approx(jasp["average"], rel=1e-8)
+
+
+@pytest.mark.skipif(not ready(ANALYSIS_PACKAGES), reason="R with psych is not installed")
+def test_intraclass_correlations_match_jasp(result, tmp_path):
+    sample = agreement_sample(result)
+    data = script.AnalysisData(result, sample)
+    totals = [data.variable(f"example_worries_temper.ewt_total@{n}") for n in sample.datasets]
+    frame = data.frame()
+    code = agreement.agreement_code(totals)
+    found = agreement.read_agreement(
+        script.run_code(result, sample, frame, code, rscript())[0], totals
+    )
+    columns = ", ".join(f'"{v.column}"' for v in totals)
+    # jaspReliability's intraclassCorrelation: psych::ICC with its defaults, on the rows with a
+    # rating, as a JASP data file of the ratings holds.
+    rated = frame.dropna(how="all", subset=[v.column for v in totals])
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspReliability"],
+        f"""
+found <- psych::ICC(d[c({columns})])
+out <- list(n = found$n.obs)
+for (i in 1:6) {{
+  out[[paste0("icc", i)]] <- found$results$ICC[i]
+  out[[paste0("low", i)]] <- found$results[["lower bound"]][i]
+  out[[paste0("high", i)]] <- found$results[["upper bound"]][i]
+}}
+""",
+        rated,
+    )
+    assert found.n == jasp["n"] < len(frame)
+    for i, row in enumerate(found.icc, start=1):
+        assert (row.icc, row.low, row.high) == pytest.approx(
+            (jasp[f"icc{i}"], jasp[f"low{i}"], jasp[f"high{i}"]), rel=1e-6
+        ), row.type

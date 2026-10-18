@@ -64,13 +64,13 @@ def test_kappa_is_the_same_in_r_and_python(result, sample):
 
 
 @needs_r
-def test_intraclass_correlations_use_everyone_all_raters_rated(result, sample):
+def test_intraclass_correlations_use_everyone_with_a_rating(result, sample):
     data = script.AnalysisData(result, sample)
     totals = [data.variable(f"example_worries_temper.ewt_total@{n}") for n in (CHILD, PARENT)]
     frame = data.frame()
     found, _ = script.run_code(result, sample, frame, agreement.agreement_code(totals), rscript())
     found_agreement = agreement.read_agreement(found, totals)
-    assert found_agreement.n == frame[[v.column for v in totals]].dropna().shape[0]
+    assert found_agreement.n == frame[[v.column for v in totals]].dropna(how="all").shape[0]
     assert [r.type for r in found_agreement.icc] == list(agreement.ICC_TYPES)
     assert all(r.low < r.icc < r.high for r in found_agreement.icc)
 
@@ -86,7 +86,7 @@ def test_the_paragraph_names_the_icc_or_the_kappas():
         ],
     )
     assert results.agreement_text(icc) == (
-        "Agreement between the two raters, on the 50 people both rated, was ICC(2,1) = .71, "
+        "Agreement between the two raters, on the 50 people rated by either, was ICC(2,1) = .71, "
         "95% CI [.55, .82] (two-way random effects, absolute agreement, single rater); for the "
         "mean of the raters, ICC(2,k) = .83, 95% CI [.71, .90]."
     )

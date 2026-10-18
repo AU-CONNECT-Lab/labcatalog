@@ -116,7 +116,7 @@ def table(found: Agreement, names: dict[str, str], by_study: bool = False) -> Pa
             }
             for r in found.icc
         ]
-        text = f"On the {found.n} people rated by all {found.raters} raters (psych::ICC)."
+        text = f"On the {found.n} people with a rating (psych::ICC, as JASP gives it)."
         if by_study:
             text += (
                 " Within studies: each rating less its study's mean rating, so a difference "
@@ -169,7 +169,7 @@ def study_table(found: Agreement, names: dict[str, str], studies: dict[float, st
                     "mean": interval(mean.icc, mean.low, mean.high),
                 }
             )
-        text = "Each study on its own, on its people rated by all raters (psych::ICC)."
+        text = "Each study on its own, on its people with a rating (psych::ICC)."
         return PaperTable("Intraclass Correlations in Each Study", columns, rows, text)
     columns = [
         col("study", "Study"),

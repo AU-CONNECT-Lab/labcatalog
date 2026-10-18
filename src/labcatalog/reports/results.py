@@ -155,9 +155,9 @@ def pooled_agreement_text(agreement: Agreement, digits: int) -> str:
     if agreement.kind == ICC:
         rows = {r.type: r for r in agreement.icc}
         single, mean = rows["ICC2"], rows["ICC2k"]
-        whom = "both" if k == 2 else "all of them"
+        whom = "either" if k == 2 else "any of them"
         return (
-            f"Agreement {among}, on the {agreement.n} people {whom} rated, was "
+            f"Agreement {among}, on the {agreement.n} people rated by {whom}, was "
             f"{interval('ICC(2,1)', single.icc, single.low, single.high, digits, bounded)} "
             "(two-way random effects, absolute agreement, single rater); for the mean of the "
             f"raters, {interval('ICC(2,k)', mean.icc, mean.low, mean.high, digits, bounded)}."

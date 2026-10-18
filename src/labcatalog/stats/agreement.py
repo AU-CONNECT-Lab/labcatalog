@@ -28,10 +28,11 @@ ICC_TYPES = {
 
 R_ICC = """\
 # Rater agreement: the intraclass correlations of the {k} raters with their 95% CIs
-# (psych::ICC), on everyone all of them rated.
+# (psych::ICC with its variance components from lme4, as JASP gives them), on everyone with a
+# rating.
 raters <- c({columns})
-ratings <- na.omit(d[raters])
-found <- psych::ICC(ratings, lmer = FALSE)$results
+ratings <- d[rowSums(!is.na(d[raters])) > 0, raters]
+found <- psych::ICC(ratings)$results
 icc <- data.frame(type = found$type, icc = found$ICC, low = found[["lower bound"]],
                   high = found[["upper bound"]], f = found$F, df1 = found$df1, df2 = found$df2,
                   p = found$p, n = nrow(ratings))
@@ -39,21 +40,22 @@ print(icc)
 """
 R_STUDY_ICC = """\
 # Rater agreement pooled over studies: the intraclass correlations of the {k} raters with their
-# 95% CIs (psych::ICC), on everyone all of them rated, within studies: each rating less its
-# study's mean rating, so a difference between the studies does not count as agreement. Then
-# each study on its own.
+# 95% CIs (psych::ICC with its variance components from lme4, as JASP gives them), on everyone
+# with a rating, within studies: each rating less its study's mean rating, so a difference
+# between the studies does not count as agreement. Then each study on its own.
 raters <- c({columns})
-keep <- complete.cases(d[raters])
+keep <- rowSums(!is.na(d[raters])) > 0
 ratings <- d[keep, raters]
 study <- d$study[keep]
-centred <- ratings - ave(rowMeans(ratings), study)
-found <- psych::ICC(centred, lmer = FALSE)$results
+means <- tapply(unlist(ratings), rep(study, length(raters)), mean, na.rm = TRUE)
+centred <- ratings - means[as.character(study)]
+found <- psych::ICC(centred)$results
 icc <- data.frame(type = found$type, icc = found$ICC, low = found[["lower bound"]],
                   high = found[["upper bound"]], f = found$F, df1 = found$df1, df2 = found$df2,
                   p = found$p, n = nrow(ratings))
 print(icc)
 study_icc <- do.call(rbind, lapply(sort(unique(study)), function(k) {{
-  part <- psych::ICC(ratings[study == k, ], lmer = FALSE)$results
+  part <- psych::ICC(ratings[study == k, ])$results
   data.frame(study = k, type = part$type, icc = part$ICC, low = part[["lower bound"]],
              high = part[["upper bound"]], f = part$F, df1 = part$df1, df2 = part$df2,
              p = part$p, n = sum(study == k))
@@ -148,7 +150,7 @@ class KappaPair:
 class Agreement:
     kind: str
     raters: int
-    # Everyone all raters rated, for the ICC.
+    # Everyone with a rating, for the ICC.
     n: int = 0
     icc: list[IccRow] | None = None
     kappas: list[KappaPair] | None = None
@@ -199,7 +201,7 @@ def agreement_code(variables: list[Variable], by_study: bool = False) -> Code:
         r=(R_STUDY_ICC if by_study else R_ICC).format(k=len(variables), columns=columns),
         python=PYTHON_ICC,
         outputs=("icc", *(("study_icc",) if by_study else ())),
-        packages=("psych",),
+        packages=("psych", "lme4"),
     )
 
 
