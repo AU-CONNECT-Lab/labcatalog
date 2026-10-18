@@ -922,10 +922,16 @@ def item_table(result: CatalogResult, instrument: Instrument) -> tuple[list[dict
         if v.instrument_id == instrument.id
     }
     several_sets = len(instrument.response_sets) > 1
+    fields = [
+        f
+        for f in result.project.config.custom_fields
+        if f.applies_to == "item" and any(f.name in i.custom for i in instrument.items)
+    ]
     columns = [
         col("n", "#", numeric=True),
         col("item", "Item"),
         col("text", "Text", sortable=False),
+        *[col(f"custom_{f.name}", f.label or f.name.capitalize()) for f in fields],
         col("reverse", "Reverse"),
         *([col("options", "Options")] if several_sets else []),
         *[col(f"d{i}", name) for i, name in enumerate(datasets)],
@@ -935,6 +941,7 @@ def item_table(result: CatalogResult, instrument: Instrument) -> tuple[list[dict
             "n": n,
             "item": item.id,
             "text": text_of(item.text),
+            **{f"custom_{f.name}": as_text(item.custom.get(f.name)) for f in fields},
             "reverse": "yes" if item.reverse else "",
             "options": (item.response_set or instrument.default_response_set or "")
             if item.type == "choice"

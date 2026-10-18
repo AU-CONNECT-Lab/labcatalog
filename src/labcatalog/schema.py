@@ -38,6 +38,7 @@ class Item(StrictModel):
     max: float | None = None
     reverse: bool = False
     subscales: list[str] = []
+    custom: dict[str, Any] = {}
 
 
 class Score(StrictModel):

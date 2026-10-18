@@ -232,3 +232,13 @@ def test_dragged_rows_move_their_entries(mock_project):
     ids = [line.split(",")[0] for line in written.splitlines() if ", text: " in line]
     assert ids[:2] == ["  - {id: ems_9", "  - {id: ems_1"] and len(ids) == 9
     assert editing.check_text(MOOD, written) == []
+
+
+def test_item_fields_get_columns_in_the_items_table(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    field = "  - {name: format, applies_to: item, type: choice, choices: [statement, question]}\n"
+    config.write_text(text.replace("custom_fields:\n", "custom_fields:\n" + field), "utf-8")
+    tables = records.tables_for(MOOD, editing.custom_fields(mock_project))
+    assert tables["items"].columns[-1].key == "custom:format"
+    assert tables["items"].columns[-1].choices == ("", "statement", "question")

@@ -136,7 +136,12 @@ TABLES = {
 
 
 # The custom fields that apply to each table's rows.
-OWNERS = {"scores": "score", "administrations": "administration", "datasets": "dataset"}
+OWNERS = {
+    "scores": "score",
+    "items": "item",
+    "administrations": "administration",
+    "datasets": "dataset",
+}
 
 
 def tables_for(relative: str, fields: Iterable[CustomFieldDef] = ()) -> dict[str, Table]:
@@ -144,7 +149,8 @@ def tables_for(relative: str, fields: Iterable[CustomFieldDef] = ()) -> dict[str
     if path.suffix not in defaults.YAML_SUFFIXES:
         return {}
     base = TABLES[""] if path.name == defaults.CONFIG_FILENAME else TABLES.get(path.parent.name, {})
-    columns = {owner: [] for owner in [*OWNERS.values(), "instrument"]}
+    # Study fields sit in labcatalog.yaml's studies, which has no table.
+    columns = {owner: [] for owner in [*OWNERS.values(), "instrument", "study"]}
     for field in fields:
         columns[field.applies_to].append(custom_column(field))
     tables = {

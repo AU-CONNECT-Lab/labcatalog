@@ -316,12 +316,16 @@ def check_custom_fields(project: Project) -> list[Issue]:
         check("instrument", instrument.custom, "", location)
         for n, score in enumerate(instrument.scores, start=1):
             check("score", score.custom, f"scores[{n}] ({score.id}).", location)
+        for n, item in enumerate(instrument.items, start=1):
+            check("item", item.custom, f"items[{n}] ({item.id}).", location)
     for name, content in project.studies.items():
         for n, administration in enumerate(content.administrations, start=1):
             where = f"administrations[{n}]."
             check("administration", administration.custom, where, project.study_files[name])
     for n, dataset in enumerate(config.datasets, start=1):
         check("dataset", dataset.custom, f"datasets[{n}] ({dataset.name}).", CONFIG)
+    for name, study in config.studies.items():
+        check("study", study.custom, f"studies.{name}.", CONFIG)
     return issues
 
 

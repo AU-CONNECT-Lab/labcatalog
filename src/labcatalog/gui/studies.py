@@ -8,7 +8,7 @@ from nicegui import ui
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import charts, new_dataset
-from labcatalog.gui.common import cited, computed, note, panel, table
+from labcatalog.gui.common import as_text, cited, computed, note, panel, table
 from labcatalog.gui.datasets import dataset_table
 from labcatalog.issues import Issue
 from labcatalog.metadata import changes, records, studies
@@ -306,6 +306,15 @@ def detail(
             note(
                 f"Reference is the key in {defaults.BIB_FILENAME} of how to cite the study's data."
             )
+            fields = [
+                f
+                for f in project.config.custom_fields
+                if f.applies_to == "study" and f.name in found.custom
+            ]
+            for f in fields:
+                ui.label(f"{f.label or f.name.capitalize()}: {as_text(found.custom[f.name])}")
+            if fields:
+                note(f"Custom fields are set under studies in {defaults.CONFIG_FILENAME}.")
         waves = waves_panel(project, study, touched)
         milestones = milestones_panel(found, touched)
         charts.collection_pace(result, study)

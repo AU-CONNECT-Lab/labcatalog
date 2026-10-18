@@ -46,6 +46,7 @@ name: Example Mood Scale
 | `response_set` | text | | Its response set, when not the default. |
 | `min`, `max` | number | | The allowed range of a `number` item. |
 | `reverse` | true or false | `false` | Reverse-scored. |
+| `custom` | mapping | | Values of custom fields that apply to items. |
 
 ## scores
 

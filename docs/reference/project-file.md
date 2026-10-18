@@ -75,6 +75,7 @@ A mapping from each study's ID to:
 | `reference` | text | The key in `references.bib` of how to cite the study's data. |
 | `waves` | mapping | Each wave's key to its `start` and `end` dates (both optional). |
 | `milestones` | list | Dates to show on the Overview timeline, each with a `name` and a `date`. |
+| `custom` | mapping | Values of custom fields that apply to studies. |
 
 ## datasets
 
@@ -108,7 +109,7 @@ A list of fields your lab adds to instruments, scores, administrations or datase
 |---|---|
 | `name` | The key under `custom`. |
 | `label` | How it reads in the window. |
-| `applies_to` | `instrument`, `score`, `administration` or `dataset`. |
+| `applies_to` | `instrument`, `score`, `item`, `administration`, `dataset` or `study`. |
 | `type` | `text`, `number`, `date`, `choice` or `tags`. |
 | `choices` | The allowed values of a `choice` or `tags` field. |
 

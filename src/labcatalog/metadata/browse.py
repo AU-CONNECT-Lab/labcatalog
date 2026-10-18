@@ -71,7 +71,8 @@ def build_index(project: Project) -> BrowseIndex:
                     "status": status[instrument.id],
                 }
                 custom = {
-                    **score_values(instrument),
+                    **part_values(instrument),
+                    **config.studies[dataset.study].custom,
                     **dataset.custom,
                     **instrument.custom,
                     **administration.custom,
@@ -91,7 +92,7 @@ def build_index(project: Project) -> BrowseIndex:
             # The roster's instrument is in the data, though in no dataset.
             unused = [] if instrument_id == roster else [NOT_GIVEN]
             custom = {
-                **score_values(instrument),
+                **part_values(instrument),
                 **instrument.custom,
                 "status": [*status[instrument_id], *unused],
             }
@@ -193,16 +194,16 @@ def text_matches(
 
 def search_text(instrument: Instrument) -> str:
     parts = [instrument.id, instrument.name, instrument.abbreviation, instrument.construct_name]
-    custom = {**score_values(instrument), **instrument.custom}
+    custom = {**part_values(instrument), **instrument.custom}
     parts += [value for values in custom.values() for value in as_set(values)]
     return "\n".join(part for part in parts if part).lower()
 
 
-def score_values(instrument: Instrument) -> dict[str, list[str]]:
-    # A score's field values also describe its instrument, so a filter finds instruments with such a score.
+def part_values(instrument: Instrument) -> dict[str, list[str]]:
+    # Its scores' and items' field values also describe an instrument, so a filter finds it by them.
     found: dict[str, set[str]] = {}
-    for score in instrument.scores:
-        for name, value in score.custom.items():
+    for part in [*instrument.scores, *instrument.items]:
+        for name, value in part.custom.items():
             found.setdefault(name, set()).update(as_set(value))
     return {name: sorted(values) for name, values in found.items()}
 

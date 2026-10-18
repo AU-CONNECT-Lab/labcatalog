@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
-from labcatalog.metadata.browse import as_set, score_values
+from labcatalog.metadata.browse import as_set, part_values
 from labcatalog.project import Project
 
 SYSTEM = """You help a researcher find questions in their lab's catalog of questionnaires. You \
@@ -75,7 +75,7 @@ def catalog_text(project: Project) -> str:
             lines.append(f"Construct: {instrument.construct_name}")
         if instrument.description:
             lines.append(f"Description: {instrument.description}")
-        custom = {**score_values(instrument), **instrument.custom}
+        custom = {**part_values(instrument), **instrument.custom}
         labels = sorted({value for values in custom.values() for value in as_set(values)})
         if labels:
             lines.append(f"Labels: {', '.join(labels)}")

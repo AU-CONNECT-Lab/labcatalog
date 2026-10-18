@@ -183,3 +183,52 @@ def test_modality_values_read_as_their_labels(mock_project):
     index = index_for(mock_project)
     facets = {f.name: f for f in index.facets}
     assert facets["modality"].values["fmri"] == "fMRI"
+
+
+def add_part_fields(root):
+    # An item field on one mood item and a study field on the mock study.
+    edit(
+        root / "labcatalog.yaml",
+        "custom_fields:\n",
+        "custom_fields:\n"
+        "  - {name: format, applies_to: item, type: choice, choices: [statement, question]}\n"
+        "  - {name: funder, applies_to: study, type: choice, choices: [nih, nsf]}\n",
+    )
+    edit(
+        root / "labcatalog.yaml",
+        "    reference: mockstudy2026\n",
+        "    reference: mockstudy2026\n    custom: {funder: nih}\n",
+    )
+    edit(
+        root / "instruments" / "example_mood.yaml",
+        "{id: ems_1, text: I felt happy., reverse: true}",
+        "{id: ems_1, text: I felt happy., reverse: true, custom: {format: statement}}",
+    )
+    edit(
+        root / "labcatalog.yaml",
+        "facets: [study, wave, coverage, reporter, target, modality, domain, topics, status]",
+        "facets: [study, wave, coverage, reporter, target, modality, domain, topics, format, "
+        "funder, status]",
+    )
+
+
+def test_item_and_study_fields_find_their_instruments(mock_project):
+    add_part_fields(mock_project)
+    index = index_for(mock_project)
+    assert list(matches(index, {"format": {"statement"}})) == ["example_mood"]
+    given = {row.instrument_id for row in index.rows if row.dataset is not None}
+    assert set(matches(index, {"funder": {"nih"}})) == given
+    assert "statement" in index.text["example_mood"]
+
+
+def test_item_and_study_fields_are_held_to_their_declaration(mock_project):
+    add_part_fields(mock_project)
+    edit(mock_project / "labcatalog.yaml", "custom: {funder: nih}", "custom: {funder: nasa}")
+    edit(
+        mock_project / "instruments" / "example_mood.yaml",
+        "{format: statement}",
+        "{domain: emotion}",
+    )
+    messages = [i.message for i in run_validate(mock_project)]
+    assert any(m.startswith("studies.mock_study.custom.funder:") for m in messages)
+    assert "items[1] (ems_1).custom.domain: declared for instrument, not item" in messages
