@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -63,7 +64,9 @@ def get_button(
 
 
 def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
-    example = Path.home() / ".local" / "bin" / "datalad.exe"
+    example = (
+        Path.home() / ".local" / "bin" / ("datalad.exe" if sys.platform == "win32" else "datalad")
+    )
     with panel("DataLad", "Versions of the data, freezes and datalad run"):
         note(
             "When the data are in DataLad datasets, labcatalog records which version it read, "

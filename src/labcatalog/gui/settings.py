@@ -1,4 +1,5 @@
 import os
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
@@ -18,8 +19,15 @@ from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.mediation import DEFAULT_WORKERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
 
-RSCRIPT_EXAMPLE = r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe"
-MPLUS_EXAMPLE = r"C:\Program Files\Mplus\Mplus.exe"
+# Where each program usually is on this kind of computer, shown under its path box.
+RSCRIPT_EXAMPLE = {
+    "win32": r"C:\Program Files\R\R-4.5.2\bin\Rscript.exe",
+    "darwin": "/usr/local/bin/Rscript",
+}.get(sys.platform, "/usr/bin/Rscript")
+MPLUS_EXAMPLE = {
+    "win32": r"C:\Program Files\Mplus\Mplus.exe",
+    "darwin": "/Applications/Mplus/mplus",
+}.get(sys.platform, "/opt/mplus/mplus")
 
 
 def render(
