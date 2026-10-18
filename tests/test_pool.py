@@ -139,6 +139,28 @@ def test_r_and_python_agree_within_studies(result, sample):
     )
 
 
+def test_each_study_has_its_own_correlations_too(result, sample):
+    one = analysis.build_sample(result, ["child_w1"], True)
+    x = analysis.values(result, one, "example_mood.ems_total@child_w1")
+    y = analysis.values(result, one, "example_mood.ems_sadness@child_w1")
+    alone = analysis.correlate(x, y)
+    data = script.AnalysisData(result, sample)
+    variables = [data.variable(TOTAL), data.variable(SADNESS)]
+    code = script.correlation_code(variables, "pearson", by_study=True)
+    pair = tuple(v.column for v in variables)
+    paths = [None, rscript()] if rscript() else [None]
+    for path in paths:
+        found, _ = script.run_code(result, sample, data.frame(), code, path)
+        each = script.read_study_correlations(found)
+        assert sorted(each) == [1.0, 2.0]
+        for study in each.values():
+            assert (study[pair].n, study[pair].r, study[pair].p) == (
+                alone.n,
+                pytest.approx(alone.r),
+                pytest.approx(alone.p),
+            )
+
+
 MOOD = "example_mood@child_w1+pilot_w1"
 
 

@@ -20,7 +20,7 @@ Choosing datasets of more than one study pools the studies. Each study's people 
 
 The analyses allow for the study, so that a difference between the studies' means does not show up as a correlation:
 
-- The correlation table gives each pair's correlation within studies: the correlation of what is left of the two variables once each study's mean is taken out, with the *p* value of the variable's coefficient in a linear model with the study. For Spearman's ρ, the same on the ranks of each pair.
+- The correlation table gives each pair's correlation within studies: the correlation of what is left of the two variables once each study's mean is taken out, with the *p* value of the variable's coefficient in a linear model with the study. For Spearman's ρ, the same on the ranks of each pair. Below it, **Correlations in Each Study** gives each pair's correlation in each study on its own, with its *n*, beside the correlation within studies.
 - Each regression includes the study as a fixed effect, a dummy for each study but the first. The slope is the slope within studies, the intercept is the first study's, and *r* is the correlation within studies, so the table gives no interval for it.
 - Missing data and the group comparison work as for one study.
 - Invariance offers each instrument that every chosen study has in one chosen dataset, and **Study** as the groups: a multigroup model with one group per study, which tests whether the instrument measures the same thing in each study before their scores are put together.

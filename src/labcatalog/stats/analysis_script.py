@@ -223,6 +223,34 @@ for i, x in enumerate(variables):
 correlations = pd.DataFrame(rows, columns=["x", "y", "n", "r", "p"])
 print(correlations)
 """
+R_EACH_STUDY_CORRELATIONS = """# The same pairs in each study on its own (cor.test).
+study_correlations <- do.call(rbind, lapply(levels(study), function(k) {{
+  s <- d[!is.na(study) & study == k, , drop = FALSE]
+  do.call(rbind, lapply(seq_len(nrow(pairs)), function(i) {{
+    x <- pairs[i, 1]
+    y <- pairs[i, 2]
+    n <- sum(complete.cases(s[[x]], s[[y]]))
+    test <- if (n > 2) suppressWarnings(cor.test(s[[x]], s[[y]], method = "{method}"))
+    data.frame(study = as.numeric(k), x = x, y = y, n = n,
+               r = if (is.null(test)) NA else unname(test$estimate),
+               p = if (is.null(test)) NA else test$p.value)
+  }}))
+}}))
+print(study_correlations)
+"""
+PYTHON_EACH_STUDY_CORRELATIONS = """# The same pairs in each study on its own (scipy).
+study_rows = []
+for k, part in d.groupby("study"):
+    for i, x in enumerate(variables):
+        for y in variables[i + 1:]:
+            both = part[[x, y]].dropna()
+            test = stats.{function}(both[x], both[y]) if len(both) > 2 else None
+            study_rows.append(dict(study=k, x=x, y=y, n=len(both),
+                                   r=np.nan if test is None else test.statistic,
+                                   p=np.nan if test is None else test.pvalue))
+study_correlations = pd.DataFrame(study_rows, columns=["study", "x", "y", "n", "r", "p"])
+print(study_correlations)
+"""
 R_MISSING = """# Missing data: how many people have and lack each variable, then each pattern of what people
 # have (1) and lack (0), the most common first.
 variables <- c({columns})
@@ -792,15 +820,19 @@ def correlation_code(
         rank=".rank()" if spearman else "",
     )
     r, python = (
-        (R_STUDY_CORRELATIONS, PYTHON_STUDY_CORRELATIONS)
+        (
+            R_STUDY_CORRELATIONS + R_EACH_STUDY_CORRELATIONS,
+            PYTHON_STUDY_CORRELATIONS + PYTHON_EACH_STUDY_CORRELATIONS,
+        )
         if by_study
         else (R_CORRELATIONS, PYTHON_CORRELATIONS)
     )
+    each = ("study_correlations",) if by_study else ()
     return Code(
         title="Correlations",
         r=r.format(**fields),
         python=python.format(**fields),
-        outputs=("descriptives", "correlations"),
+        outputs=("descriptives", "correlations", *each),
         packages=("psych",),
     )
 
@@ -963,6 +995,18 @@ def read_correlations(
         for i, a in enumerate(columns)
     ]
     return described, matrix
+
+
+def read_study_correlations(
+    found: dict[str, pd.DataFrame],
+) -> dict[float, dict[tuple[str, str], analysis.Correlation]]:
+    # Study number to each pair's correlation in that study alone.
+    each: dict[float, dict[tuple[str, str], analysis.Correlation]] = {}
+    for row in found["study_correlations"].itertuples():
+        found_pair = analysis.Correlation(int(row.n), none(row.r), none(row.p))
+        pairs = each.setdefault(float(row.study), {})
+        pairs[(row.x, row.y)] = pairs[(row.y, row.x)] = found_pair
+    return each
 
 
 def read_regressions(

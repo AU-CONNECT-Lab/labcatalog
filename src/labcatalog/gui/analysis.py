@@ -395,10 +395,25 @@ def correlation_section(
                 rows,
                 f"{coefficient}, {who}. {STARS_NOTE}",
             )
+            tables = {"correlations": shown}
+            if by_study and not imputed:
+                tables["study_correlations"] = PaperTable(
+                    "Correlations in Each Study",
+                    *study_table(
+                        analysis.study_options(result, sample),
+                        analysis_script.read_study_correlations(found),
+                        matrix,
+                        [v.column for v in variables],
+                        labels,
+                    ),
+                    f"{coefficient} in each study on its own, each pair on everyone with both "
+                    f"values; Within studies as in the table above. {STARS_NOTE}",
+                )
 
             def content() -> None:
                 chart()
-                paper_table(shown)
+                for table in tables.values():
+                    paper_table(table)
                 results_text(
                     results.correlation_text(
                         labels,
@@ -410,9 +425,7 @@ def correlation_section(
                     [shown],
                 )
                 measures_text(measure_paragraphs(result, keys))
-                result_actions(
-                    result, "correlations", {"correlations": shown}, drawn, texts, engine
-                )
+                result_actions(result, "correlations", tables, drawn, texts, engine)
                 code_part()
 
             return content
@@ -483,6 +496,33 @@ def correlation_table(
             row[f"c{j}"] = starred(matrix[i][j]) if j < i else ("—" if j == i else "")
         rows.append(row)
     return columns, rows
+
+
+def study_table(
+    studies: list[tuple[float, str]],
+    each: dict[float, dict[tuple[str, str], analysis.Correlation]],
+    matrix: list[list[analysis.Correlation]],
+    columns: list[str],
+    labels: list[str],
+) -> tuple[list[dict], list[dict]]:
+    # One row per pair: its r and n in each study, then within studies.
+    header = [col("pair", "Variables")]
+    for k, (_, label) in enumerate(studies):
+        header += [
+            col(f"r{k}", f"{label} r", numeric=True, sortable=False),
+            col(f"n{k}", "n", numeric=True, sortable=False),
+        ]
+    header.append(col("within", "Within studies r", numeric=True, sortable=False))
+    rows = []
+    for i in range(len(columns)):
+        for j in range(i):
+            row = {"pair": f"{labels[j]} with {labels[i]}", "within": starred(matrix[i][j])}
+            for k, (code, _) in enumerate(studies):
+                found = each.get(code, {}).get((columns[i], columns[j]))
+                row[f"r{k}"] = "" if found is None else starred(found)
+                row[f"n{k}"] = "" if found is None else found.n
+            rows.append(row)
+    return header, rows
 
 
 def pair_section(
