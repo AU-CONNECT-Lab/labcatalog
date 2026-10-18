@@ -110,7 +110,7 @@ def load_dataset(
             raise DataSourceError(f"{dataset.name}: no wave column '{dataset.wave_column}'")
         file_waves = set(frame[dataset.wave_column])
         # The index keeps each row's place in the file, so problems point at the right line.
-        frame = frame[frame[dataset.wave_column] == dataset.wave]
+        frame = frame[frame[dataset.wave_column] == dataset.wave_in_file()]
     if id_column not in frame:
         raise DataSourceError(f"{dataset.name}: no ID column '{id_column}'")
     if dataset.respondent_column and dataset.respondent_column not in frame:

@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from labcatalog.exceptions import DataSourceError
+from labcatalog.metadata import changes, new_dataset
 from labcatalog.metadata.fixes import evidence
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
@@ -119,3 +120,64 @@ def test_a_missing_wave_column_stops_loading(long_project):
     )
     with pytest.raises(DataSourceError, match="parent_w1: no wave column 'visit'"):
         load_datasets(load_project(root))
+
+
+def write_waves_as(root, written):
+    # The long file names its waves another way, and each dataset says which one is its own.
+    path = root / "data" / "parent_long.csv"
+    long = pd.read_csv(path, dtype=str, keep_default_na=False)
+    long["wave"] = long["wave"].map(written)
+    long.to_csv(path, index=False)
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    for wave, value in written.items():
+        old = "path: data/parent_long.csv, wave_column: wave,"
+        line = next(x for x in text.splitlines() if f"name: parent_w{wave}," in x)
+        text = text.replace(line, line.replace(old, f"{old} wave_value: {value},"))
+    config.write_text(text, encoding="utf-8")
+    return long
+
+
+def test_a_wave_written_another_way_reads_its_own_rows(long_project):
+    root, wide = long_project
+    write_waves_as(root, {w: f"T{w}" for w in WAVES})
+    long_result, wide_result = run_catalog(root), run_catalog(wide)
+    assert rounded(long_result.summary.model_dump()) == rounded(wide_result.summary.model_dump())
+    assert not [i for i in long_result.report.issues if i.code == "wave_unclaimed"]
+    assert long_result.datasets["parent_w2"].config.wave == "2"
+
+
+def test_a_wave_value_no_dataset_reads_is_reported_as_written(long_project):
+    root, _ = long_project
+    write_waves_as(root, {"1": "T1", "2": "T2", "3": "3"})
+    path = root / "data" / "parent_long.csv"
+    long = pd.read_csv(path, dtype=str, keep_default_na=False)
+    long.loc[long.index[:1], "wave"] = "2"
+    long.to_csv(path, index=False)
+    (found,) = [i for i in run_catalog(root).report.issues if i.code == "wave_unclaimed"]
+    assert found.details["waves"] == ["2"]
+
+
+def test_repeating_a_wave_written_another_way_suggests_the_next_value(long_project):
+    root, _ = long_project
+    long = write_waves_as(root, {w: f"T{w}" for w in WAVES})
+    fourth = long[long["wave"] == "T3"].assign(wave="T4")
+    pd.concat([long, fourth]).to_csv(root / "data" / "parent_long.csv", index=False)
+    project = load_project(root)
+    draft = new_dataset.suggest(project, "parent_w3")
+    assert (draft.name, draft.wave, draft.wave_value) == ("parent_w4", "4", "T4")
+    # From a wave_unclaimed fix, the value is how the file writes the wave.
+    seen = new_dataset.suggest(project, "parent_w3", "T4")
+    assert (seen.wave, seen.wave_value) == ("4", "T4")
+    placement = new_dataset.place(project, draft, None)
+    dataset = new_dataset.dataset_config(project, draft, placement)
+    assert new_dataset.wave_rows(project, dataset).rows == len(fourth)
+    rows = new_dataset.template_rows(project, "parent_w3")
+    changes.write(project, new_dataset.changes(project, draft, placement, rows))
+    line = next(
+        x
+        for x in (root / "labcatalog.yaml").read_text(encoding="utf-8").splitlines()
+        if "name: parent_w4" in x
+    )
+    assert "wave_column: wave, wave_value: T4," in line
+    assert len(load_datasets(load_project(root))["parent_w4"].frame) == len(fourth)

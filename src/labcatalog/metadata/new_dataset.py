@@ -35,6 +35,7 @@ BLANK_KEYS = (
     "path",
     "files",
     "wave_column",
+    "wave_value",
     "id_column",
     "date_column",
     "snapshot_date",
@@ -65,6 +66,8 @@ class Draft:
     # Written when the wave is new to the study.
     wave_start: date | None = None
     wave_end: date | None = None
+    # How a file of every wave writes this wave, when not as `wave`.
+    wave_value: str | None = None
 
 
 @dataclass
@@ -109,15 +112,23 @@ def templates(project: Project) -> list[str]:
     return usable
 
 
-def suggest(project: Project, template: str, wave: str | None = None) -> Draft:
+def suggest(project: Project, template: str, seen: str | None = None) -> Draft:
+    # `seen` is a wave the template's file holds and no dataset reads, as the file writes it.
     old = dataset_by_name(project.config, template)
-    if wave is None:
-        wave = str(int(old.wave) + 1) if old.wave.isdigit() else old.wave
+    wave = str(int(old.wave) + 1) if old.wave.isdigit() else old.wave
+    wave_value = None
+    if seen is not None and old.wave_value is None:
+        wave = seen
+    elif seen is not None:
+        wave_value = seen
+    elif old.wave_value is not None and old.wave_value.endswith(old.wave):
+        # T2 for wave 2 suggests T3 for wave 3.
+        wave_value = old.wave_value[: -len(old.wave)] + wave
     name = template
     if old.wave.isdigit() and template.endswith(old.wave):
         name = template[: -len(old.wave)] + wave
     files = suggest_files(project, template, wave) if old.source == "folder" else None
-    return Draft(template, name, wave, date.today(), files=files)
+    return Draft(template, name, wave, date.today(), files=files, wave_value=wave_value)
 
 
 def suggest_files(project: Project, template: str, wave: str) -> str:
@@ -147,7 +158,7 @@ def wave_rows(project: Project, dataset: DatasetConfig) -> WaveRows:
     if dataset.wave_column not in frame:
         raise EditError(f"{dataset.path} has no column {dataset.wave_column}")
     values = frame[dataset.wave_column]
-    return WaveRows(int((values == dataset.wave).sum()), sorted(set(values)))
+    return WaveRows(int((values == dataset.wave_in_file()).sum()), sorted(set(values)))
 
 
 def folder_files(folder: Path) -> list[str]:
@@ -271,12 +282,13 @@ def dataset_config(project: Project, draft: Draft, placement: Placement) -> Data
             id_column=own_id_column(project, draft.blank),
             date_column=draft.blank.date_column,
             wave_column=draft.blank.wave_column,
+            wave_value=draft.wave_value if draft.blank.wave_column else None,
             snapshot_date=draft.snapshot_date,
         )
     old = dataset_by_name(project.config, draft.template)
     fields = old.model_dump(exclude=set(OWN_FILE))
     fields.update(name=draft.name, wave=draft.wave, path=placement.data_path, files=draft.files)
-    fields.update(snapshot_date=draft.snapshot_date)
+    fields.update(snapshot_date=draft.snapshot_date, wave_value=draft.wave_value)
     return DatasetConfig(**fields)
 
 
@@ -372,8 +384,10 @@ def settings_change(project: Project, draft: Draft, placement: Placement) -> Cha
         for key, value in datasets[at].items():
             if key == "files" and is_folder(draft):
                 entry[key] = draft.files
-            elif key not in OWN_FILE:
+            elif key not in OWN_FILE and key != "wave_value":
                 entry[key] = value
+            if key == "wave_column" and draft.wave_value is not None:
+                entry["wave_value"] = records.as_text(draft.wave_value)
         numeric = isinstance(entry.get("wave"), int)
     else:
         # After the study's other datasets, or last when it has none yet.
@@ -472,7 +486,7 @@ def date_range(project: Project, dataset: DatasetConfig) -> tuple[date | None, d
         return None, None
     frame = read_data(project, dataset)
     if dataset.wave_column:
-        frame = frame[frame[dataset.wave_column] == dataset.wave]
+        frame = frame[frame[dataset.wave_column] == dataset.wave_in_file()]
     # A date column the new file lacks is reported by the checks; here it gives no dates.
     if dataset.date_column not in frame:
         return None, None

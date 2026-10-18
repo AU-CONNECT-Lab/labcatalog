@@ -53,6 +53,7 @@ def open_wizard(
         "id_column": None,
         "date_column": None,
         "wave_column": None,
+        "wave_value": first.wave_value or "",
         "paths": [],
         "prefilled": None,
         "wave_dates": (None, None),
@@ -69,6 +70,7 @@ def open_wizard(
     def suggest(template: str) -> None:
         draft = new_dataset.suggest(project, template)
         name.value, wave.value = draft.name, draft.wave
+        long_value.value = draft.wave_value or ""
 
     def switch(mode: str) -> None:
         repeating.visible, describing.visible = mode == REPEAT, mode == BLANK
@@ -76,6 +78,7 @@ def open_wizard(
             suggest(template.value)
         else:
             name.value, wave.value = "", new_dataset.suggest_blank(project, own_study.value).wave
+            state["wave_value"] = ""
 
     def blank() -> bool:
         return mode.value == BLANK
@@ -107,6 +110,7 @@ def open_wizard(
             described,
             (files.value or "").strip() if folder() else None,
             *state["wave_dates"],
+            state["wave_value"].strip() or None,
         )
 
     async def prefill_dates() -> None:
@@ -235,7 +239,7 @@ def open_wizard(
         except LabCatalogError as err:
             show_status(status, str(err), "bad")
             return False
-        found = f"of {dataset.path} have {dataset.wave_column} {dataset.wave}"
+        found = f"of {dataset.path} have {dataset.wave_column} {dataset.wave_in_file()}"
         if not seen.rows:
             waves = ", ".join(seen.waves) or "none"
             show_status(status, f"No rows {found}; the waves in it are {waves}.", "warn")
@@ -356,9 +360,18 @@ def open_wizard(
                     label="Wave column (optional)",
                     on_change=pick_wave_column,
                 ).classes("w-56")
+                ui.input(
+                    "Wave in the file (optional)",
+                    value=state["wave_value"],
+                    placeholder=wave.value,
+                    on_change=lambda e: state.update(wave_value=e.value or ""),
+                ).props("outlined dense").classes("w-56").on(
+                    "blur", lambda: show_rows(state["wave_status"])
+                )
             note(
                 "Pick a wave column when the file holds several waves, one row per person per "
-                f"wave; this dataset then reads the rows of wave {wave.value} only."
+                f"wave; this dataset then reads the rows of wave {wave.value} only. Give the wave "
+                "in the file when the column writes it another way, such as T1."
             )
             state["wave_status"] = ui.label()
             state["wave_status"].visible = False
@@ -439,8 +452,9 @@ def open_wizard(
             return
         if long():
             column = dataset_by_name(config, template.value).wave_column
+            written = state["wave_value"].strip() or wave.value
             note(
-                f"Reads the rows of {placement.data_path} where {column} is {wave.value}; "
+                f"Reads the rows of {placement.data_path} where {column} is {written}; "
                 "nothing is copied."
             )
         elif placement.copy_to is None:
@@ -588,6 +602,16 @@ def open_wizard(
                         "The dataset it repeats reads one file that holds every wave, so this one "
                         "reads the same file and keeps the rows of its own wave."
                     )
+                    long_value = (
+                        ui.input(
+                            "Wave in the file (optional)",
+                            value=state["wave_value"],
+                            on_change=lambda e: state.update(wave_value=e.value or ""),
+                        )
+                        .props("outlined dense")
+                        .classes("w-56")
+                    )
+                    long_value.on("blur", lambda: show_rows(rows_status))
                     rows_status = ui.label()
                 folder_box.visible = long_box.visible = False
                 file_status = ui.label().classes("lc-note")

@@ -93,6 +93,7 @@ A list with one entry per data file.
 | `respondent_column` | text | The column with the ID of whoever filled in each row, when that is not the person the row is about. Counts of respondents use it. |
 | `date_column` | text | A column with the date each row was collected. |
 | `wave_column` | text | In a file that holds several waves, the column naming each row's wave; the dataset reads only the rows of its own `wave`. |
+| `wave_value` | text | How the wave column writes this dataset's wave, such as `T1`, when not the same as `wave`. |
 | `snapshot_date` | date | The date the file was exported. |
 | `missing_codes` | list | Missing codes for this dataset only. |
 | `custom` | mapping | Values of custom fields that apply to datasets. |

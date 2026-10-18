@@ -103,7 +103,7 @@ def check_waves(project: Project, datasets: dict[str, LoadedDataset]) -> list[Is
             files.setdefault((loaded.source_path, loaded.config.wave_column), []).append(loaded)
     issues = []
     for (_, column), readers in files.items():
-        left = readers[0].file_waves - {loaded.config.wave for loaded in readers}
+        left = readers[0].file_waves - {loaded.config.wave_in_file() for loaded in readers}
         if left:
             waves = examples(sorted(repr(wave) if not wave.strip() else wave for wave in left))
             message = f"{column} has rows for wave(s) that no dataset reads: {waves}"
