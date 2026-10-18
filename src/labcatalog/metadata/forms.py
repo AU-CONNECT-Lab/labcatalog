@@ -27,8 +27,6 @@ ABOUT = Table(
         Column("instructions", "Instructions"),
         Column("default_response_set", "Default response set"),
         Column("license", "License"),
-        Column("items_public", "Items can be shared", "bool", default=False),
-        Column("sensitive", "Sensitive", "bool", default=False),
     ),
     single=True,
 )
