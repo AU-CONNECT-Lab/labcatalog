@@ -57,6 +57,18 @@ def paragraph(
     return " ".join(text.split())
 
 
+def paragraphs(
+    project: Project, catalog: Catalog, summary: Summary, pairs: list[tuple[str, str]]
+) -> list[str]:
+    # Each instrument as given in each dataset, in the order of the pairs; ω needs the factor models.
+    administered = {(v.instrument_id, v.dataset) for v in catalog.variables}
+    return [
+        paragraph(project, catalog, summary, project.instruments[instrument_id], dataset, [])
+        for instrument_id, dataset in dict.fromkeys(pairs)
+        if (instrument_id, dataset) in administered
+    ]
+
+
 def placeholder_values(
     project: Project,
     catalog: Catalog,

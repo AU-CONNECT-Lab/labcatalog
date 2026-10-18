@@ -88,6 +88,16 @@ def results_text(text: str, shown: list[PaperTable] | None = None) -> None:
         answer = ui.column().classes("w-full gap-1")
 
 
+def measures_text(texts: list[str]) -> None:
+    if not texts:
+        return
+    with ui.column().classes("w-full gap-1"):
+        ui.label("Measures paragraphs").classes("lc-facet")
+        for text in texts:
+            ui.label(text).classes("lc-prose")
+        copy_text("\n\n".join(texts))
+
+
 def copy_text(text: str) -> None:
     if wants_latex():
         copy_button("Copy as LaTeX", "Text", {"text/plain": tables.tex(text)})

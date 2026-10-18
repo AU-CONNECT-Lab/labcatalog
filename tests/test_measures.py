@@ -1,10 +1,12 @@
 import pytest
 import yaml
 
+from labcatalog.gui import analysis as analysis_page
 from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
 from labcatalog.reports import measures
+from labcatalog.stats import analysis
 from labcatalog.stats.cfa import ML, WLSMV, CfaFit
 
 
@@ -62,3 +64,20 @@ def test_unknown_placeholders_and_stray_braces_are_errors(mock_project):
     assert len(found) == 1 and "unknown placeholder {nmae}" in found[0].message
     assert measures.placeholder_problem("{name", measures.PLACEHOLDERS) is not None
     assert measures.placeholder_problem("a {{literal}} {name}", measures.PLACEHOLDERS) is None
+
+
+def test_the_analysis_page_gives_a_paragraph_per_instrument_it_uses(result):
+    keys = [
+        s.key
+        for s in result.catalog.scores
+        if (s.instrument_id, s.dataset)
+        in {("example_mood", "child_w1"), ("example_parent_stress", "parent_w1")}
+    ]
+    keys.append(analysis.item_key(analysis.roster_items(result, "child_w1")[0]))
+    texts = analysis_page.measure_paragraphs(result, keys)
+    # Two mood scores make one paragraph; the roster's columns have none.
+    assert len(texts) == 2
+    stress, mood = texts
+    assert stress.startswith("We used the Example Parenting Stress Scale")
+    assert mood.startswith("We used the Example Mood Scale") and "Cronbach's α" in mood
+    assert "ω" not in mood

@@ -16,9 +16,15 @@ from labcatalog.gui import (
     multilevel,
 )
 from labcatalog.gui.common import apa, col, empty, fmt, note, p_value, panel
-from labcatalog.gui.paper import Chart, paper_table, result_actions, results_text
+from labcatalog.gui.paper import (
+    Chart,
+    measures_text,
+    paper_table,
+    result_actions,
+    results_text,
+)
 from labcatalog.pipeline import CatalogResult
-from labcatalog.reports import results
+from labcatalog.reports import measures, results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.stats import analysis, analysis_script
 from labcatalog.stats import multilevel as ml
@@ -174,6 +180,11 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
             section()
 
 
+def measure_paragraphs(result: CatalogResult, keys: list[str]) -> list[str]:
+    pairs = [(analysis.instrument_of(k), k.rsplit("@", 1)[1]) for k in keys]
+    return measures.paragraphs(result.project, result.catalog, result.summary, pairs)
+
+
 def ticks(
     title: str,
     group: list[str],
@@ -325,6 +336,7 @@ def correlation_section(
                     ),
                     [shown],
                 )
+                measures_text(measure_paragraphs(result, keys))
                 result_actions(
                     result, "correlations", {"correlations": shown}, drawn, texts, engine
                 )
@@ -439,6 +451,7 @@ def pair_section(
                     results.regression_text(fits, choices, choices[y_key], common.decimals),
                     [shown],
                 )
+                measures_text(measure_paragraphs(result, [y_key, *fits]))
                 result_actions(result, "regression", {"regression": shown}, drawn, texts, engine)
                 analysis_tables.code_view(texts, figure=True)
 

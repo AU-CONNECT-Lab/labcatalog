@@ -22,6 +22,8 @@ Choose the **Variables**; by default, every score of the chosen measures, withou
 
 The table lists each variable's *n*, *M* and *SD* and the correlation of every pair, with stars for *p* < .05, .01 and .001. Each pair uses everyone with both values. The coefficient is Pearson's *r*, or Spearman's ρ when `stats.correlation` is `spearman`. With three or more variables, a chart above the table shows the correlations as a **Heatmap** or as **Dots**.
 
+Below the Results paragraph, **Measures paragraphs** give one paragraph for each instrument of the chosen variables in each dataset, as the instrument's page writes it, with Cronbach's α from that dataset; **Copy text** copies them all. McDonald's ω is on the instrument's page and the Methods page, which run the factor models. The Regression tab gives the same paragraphs for its outcome and predictors.
+
 ## Regression
 
 Choose one or more predictors (**X**) and an outcome (**Y**). Each predictor gets its own simple regression on everyone with both values. The table gives *n*, *r* with its 95% CI, *p*, the slope and intercept with their standard errors, and *R*². The chart plots the outcome against each predictor with its fit line, the distributions on the margins and the residuals in an inset. Hover over a point to see the person's ID.
