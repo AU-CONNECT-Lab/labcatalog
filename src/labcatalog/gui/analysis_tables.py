@@ -334,7 +334,6 @@ def group_section(
                 with_input=True,
                 on_change=lambda e: choose_outcome(e.value),
             ).props("dense outlined").classes("w-96")
-            missing.method_switch(result, view, body.refresh)
             method_toggle(
                 {k: TESTS[k] for k in ("welch", "student")},
                 view.t_test or result.project.config.stats.t_test,

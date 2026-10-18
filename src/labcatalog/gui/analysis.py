@@ -128,6 +128,8 @@ def render(
     @ui.refreshable
     def section() -> None:
         sample = recount()
+        if view.part not in missing.IMPUTED_PARTS and missing.imputing(result, view):
+            note(missing.not_imputed(PARTS[view.part], view.part))
         if view.part == "multilevel":
             multilevel.render(result, view)
             return
@@ -195,6 +197,11 @@ def render(
 
     def pick(part: str) -> None:
         view.part = part
+        tabs.set_value(part)
+        section.refresh()
+
+    def set_missing() -> None:
+        sidebar.refresh()
         section.refresh()
 
     @ui.refreshable
@@ -206,6 +213,7 @@ def render(
                 value=view.intersect,
                 on_change=lambda e: set_intersect(e.value),
             ).props("dense")
+            missing.sample_switch(result, view, set_missing, lambda: pick("missing"))
             for title, group in wave_groups(result, names).items():
                 ticks(title, group, {n: n for n in group}, view.datasets, set_datasets)
             labels = views.instrument_names(result)
@@ -219,7 +227,7 @@ def render(
             with (
                 ui.tabs(value=view.part, on_change=lambda e: pick(e.value))
                 .props("dense no-caps align=left")
-                .classes("lc-subnav w-full")
+                .classes("lc-subnav w-full") as tabs
             ):
                 for name, label in PARTS.items():
                     ui.tab(name, label=label)
@@ -474,7 +482,6 @@ def correlation_section(
                 view.correlation or result.project.config.stats.correlation,
                 set_method,
             )
-            missing.method_switch(result, view, body.refresh)
         body()
 
 
@@ -655,7 +662,6 @@ def pair_section(
                 with_input=True,
                 on_change=lambda e: choose_y(e.value),
             ).props("dense outlined").classes("w-96")
-            missing.method_switch(result, view, body.refresh)
         body()
 
 

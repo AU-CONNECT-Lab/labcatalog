@@ -143,11 +143,12 @@ def imputation_panel(
     with panel("Multiple imputation", "One imputation model for every section that uses it"):
         default = imputation.METHODS[stats.missing]
         note(
-            "A section set to Multiple imputation (the project starts each from "
-            f"{default.lower()}) imputes the variables below with mice in R, each score item by "
-            "item and then scored again, and pools its results over the imputed data sets. "
-            "Every section's code holds this same imputation, so they all use the same imputed "
-            "data. Run shows the imputed values beside the observed ones."
+            "With Multiple imputation chosen under Missing values beside the Sample (the project "
+            f"starts from {default.lower()}), the correlation table, regression and group "
+            "comparison impute the variables below with mice in R, each score item by item and "
+            "then scored again, and pool their results over the imputed data sets. Every "
+            "section's code holds this same imputation, so they all use the same imputed data. "
+            "Run shows the imputed values beside the observed ones."
         )
         if analysis.pooling(result, view.datasets):
             note(
@@ -264,13 +265,41 @@ def imputing(result: CatalogResult, view) -> bool:
     return (view.missing_method or result.project.config.stats.missing) == imputation.IMPUTE
 
 
-def method_switch(result: CatalogResult, view, on_change: Callable[[], None]) -> None:
+# The sections that use the imputation; the rest say what they do instead.
+IMPUTED_PARTS = ("missing", "correlation", "regression", "groups")
+INSTEAD = {
+    "mediation": "full-information maximum likelihood or complete cases, as chosen in it",
+    "multilevel": "everyone with values, as mixed models allow",
+    "panel": "full-information maximum likelihood",
+    "measurement": "the people who answered every item",
+}
+
+
+def sample_switch(
+    result: CatalogResult,
+    view,
+    on_change: Callable[[], None],
+    open_missing: Callable[[], None],
+) -> None:
+    # One choice for the whole page; the imputation itself is set up on the Missing data tab.
     def choose(value: str) -> None:
         view.missing_method = value
         on_change()
 
     method = view.missing_method or result.project.config.stats.missing
     method_toggle(imputation.METHODS, method, choose, "Missing values")
+    if imputing(result, view):
+        m = view.imputations or result.project.config.stats.imputations
+        with ui.row().classes("items-center gap-1"):
+            note(
+                f"{m} imputed data sets, for the correlation table, regression and group comparison."
+            )
+            ui.button("Missing data", on_click=open_missing).props("flat dense no-caps size=sm")
+
+
+def not_imputed(title: str, part: str) -> str:
+    instead = INSTEAD.get(part, "the data as they are")
+    return f"{title} does not use the imputation: it uses {instead}."
 
 
 def imputable(result: CatalogResult, view) -> dict[str, str]:

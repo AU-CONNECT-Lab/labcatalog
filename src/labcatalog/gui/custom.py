@@ -13,7 +13,7 @@ from labcatalog.ai.custom import LANGUAGES, AnalysisDraft
 from labcatalog.config import SavedAnalysis
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
-from labcatalog.gui import analysis_tables, common, missing, paper, preferences, theme
+from labcatalog.gui import analysis_tables, common, paper, preferences, theme
 from labcatalog.gui.common import caption, computed, note, panel
 from labcatalog.metadata import editing
 from labcatalog.pipeline import CatalogResult, run_analysis_draft, run_analysis_fix
@@ -323,8 +323,6 @@ def render(
                             "flat dense size=sm"
                         ).tooltip("Remove")
         note(SENT)
-        if missing.imputing(result, view):
-            note("The script reads the data as they are, without the imputations.")
         if gone:
             note(f"Not in the chosen datasets any more: {', '.join(gone)}.")
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
