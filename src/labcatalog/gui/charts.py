@@ -2,11 +2,9 @@ import numpy as np
 import plotly.graph_objects as go
 from nicegui import ui
 
-from labcatalog import defaults
-from labcatalog.charts import mindmap, network, views
+from labcatalog.charts import mindmap, views
 from labcatalog.gui import theme
 from labcatalog.gui.common import apa, caption, col, note, panel, table
-from labcatalog.gui.network_graph import NetworkGraph
 from labcatalog.pipeline import CatalogResult
 from labcatalog.schema import Instrument
 
@@ -189,7 +187,6 @@ def overview_section(result: CatalogResult) -> None:
     if pace is not None:
         with panel("Collection pace", "Rows with a date, by week since each wave started"):
             show(pace)
-    score_relations(result)
 
 
 def wave_picker(choices: dict[str, str], value: str, changed) -> None:
@@ -206,77 +203,6 @@ def one_wave(choices: dict[str, str], render, tools: ui.row) -> None:
     with tools:
         wave_picker(choices, next(iter(choices)), grid.refresh)
     grid(next(iter(choices)))
-
-
-def score_relations(result: CatalogResult) -> None:
-    waves = views.correlation_waves(result)
-    if not waves:
-        return
-    instruments = views.correlated_instruments(result)
-    choices = {f"{study}|{wave}": views.wave_name(result, study, wave) for study, wave in waves}
-    picked = {
-        "wave": next(iter(choices)),
-        "instruments": list(instruments),
-        "color": "instrument",
-    }
-
-    drawn: dict = {"chart": None}
-
-    def graph() -> None:
-        study, wave = picked["wave"].split("|")
-        spec = views.score_network(result, study, wave, picked["instruments"], picked["color"])
-        chart = drawn["chart"]
-        # Updating the same graph keeps every node where it is, so the layout only drifts.
-        if spec is not None and chart is not None:
-            chart.show(spec)
-            return
-        holder.clear()
-        with holder:
-            drawn["chart"] = show_network(spec, "Pick instruments with at least two scores.")
-
-    def changed(key: str, value) -> None:
-        picked[key] = value or []
-        if key == "instruments":
-            chooser.props(f'display-value="{shown()}"')
-        graph()
-
-    def shown() -> str:
-        return f"{len(picked['instruments'])} of {len(instruments)} instruments"
-
-    coefficient = result.project.config.stats.coefficient()
-    with panel(
-        "How the scores relate",
-        f"{coefficient} between scores measured in one wave, linked at |r| ≥ "
-        f"{defaults.CHART_MIN_R:g}. Hover a score to color its links (red positive, blue negative), drag to move, scroll to zoom.",
-    ) as tools:
-        with tools:
-            chooser = (
-                ui.select(
-                    instruments,
-                    multiple=True,
-                    value=picked["instruments"],
-                    label="Instruments",
-                    on_change=lambda e: changed("instruments", e.value),
-                )
-                .props(f'dense outlined clearable display-value="{shown()}"')
-                .classes("w-64")
-            )
-            wave_picker(choices, picked["wave"], lambda value: changed("wave", value))
-            ui.select(
-                views.network_colorings(result),
-                value=picked["color"],
-                label="Color by",
-                on_change=lambda e: changed("color", e.value),
-            ).props("dense outlined").classes("w-56")
-        holder = ui.element("div").classes("w-full")
-        graph()
-
-
-def show_network(spec: dict | None, empty: str) -> NetworkGraph | None:
-    if spec is None:
-        note(empty)
-        return None
-    return NetworkGraph(spec, network.NETWORK_HEIGHT).classes("w-full")
 
 
 def show_tree(instrument: Instrument) -> ui.echart:

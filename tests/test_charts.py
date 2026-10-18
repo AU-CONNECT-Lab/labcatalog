@@ -127,15 +127,7 @@ def test_banner_names_the_study_and_counts_people_once(result):
 
 
 def test_overview_charts(result):
-    everything = list(views.correlated_instruments(result))
     assert views.collection_pace(result) is not None
-    assert views.correlation_waves(result) == [
-        ("mock_study", "1"),
-        ("mock_study", "2"),
-        ("mock_study", "3"),
-    ]
-    assert views.score_network(result, "mock_study", "1", everything, "instrument") is not None
-    assert views.score_network(result, "mock_study", "1", [], "instrument") is None
 
 
 def test_item_heatmap_and_table_keep_the_item_order_below_the_diagonal(result):
@@ -217,56 +209,6 @@ def test_number_items_get_one_distribution_per_wave(result):
     assert len(ticks) == 3 and all("n " in tick for tick in ticks)
     assert household.layout.xaxis.range[0] < 2 < 7 < household.layout.xaxis.range[1]
     assert views.number_distributions(result, "example_mood") == []
-
-
-def test_score_network_links_strong_pairs_and_colours_by_the_first_matching_tag(result):
-    everything = list(views.correlated_instruments(result))
-    assert list(views.network_colorings(result)) == [
-        "instrument",
-        "cluster",
-        "facet:reporter",
-        "facet:target",
-        "facet:modality",
-        "facet:domain",
-        "facet:topics",
-    ]
-    spec = views.score_network(result, "mock_study", "1", everything, "facet:topics")
-    names = [n["name"] for n in spec["nodes"]]
-    groups = [g["name"] for g in spec["groups"]]
-    assert groups == ["negative affect", "positive affect", "parenting", "sleep"]
-    strain = spec["nodes"][names.index("EPS strain")]
-    assert groups[strain["group"]] == "negative affect"
-    name_of = {n["id"]: n["name"] for n in spec["nodes"]}
-    linked = {frozenset((name_of[e["source"]], name_of[e["target"]])) for e in spec["links"]}
-    assert frozenset(("EMS total score", "EMS sadness")) not in linked
-    assert all(e["value"] >= 0.3 for e in spec["links"])
-    for color_by in views.network_colorings(result):
-        spec = views.score_network(result, "mock_study", "1", everything, color_by)
-        used = {n["group"] for n in spec["nodes"]}
-        assert used <= set(range(len(spec["groups"])))
-
-
-def test_network_colours_the_instruments_shown_in_palette_order(result):
-    everything = list(views.correlated_instruments(result))
-    spec = views.score_network(result, "mock_study", "1", everything, "instrument")
-    colors = [g["color"] for g in spec["groups"]]
-    assert colors == [style.group_color(k) for k in range(len(colors))]
-    # A weak link is drawn from the stronger part of the scale, not near white.
-    weakest = min(spec["links"], key=lambda e: e["value"])
-    assert weakest["color"] != style.scale_color(weakest["value"], style.CORRELATION_SCALE, -1, 1)
-
-
-def test_network_links_by_id_and_tightens_with_many_nodes():
-    def spec(n: int) -> dict:
-        nodes = [{"key": f"s{i}", "label": f"S{i}", "category": 0, "tip": ""} for i in range(n)]
-        links = [{"source": 0, "target": 1, "r": 0.5, "tip": ""}]
-        return network.score_network(nodes, links, [("All", "#000")])
-
-    few, many = spec(10), spec(90)
-    assert few["links"][0] == {**few["links"][0], "source": "s0", "target": "s1"}
-    assert many["force"]["length"][1] < few["force"]["length"][1]
-    assert many["force"]["gravity"] > few["force"]["gravity"]
-    assert many["force"]["repel"] < few["force"]["repel"]
 
 
 def test_catalog_map_hangs_items_from_their_smallest_score_and_links_scores_across_instruments(

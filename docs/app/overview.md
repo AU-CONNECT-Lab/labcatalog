@@ -4,9 +4,21 @@ The Overview page shows the project at a glance.
 
 ![The Overview page of the example project](../images/app/overview.png)
 
+## Banner
+
+The project's name, its study and the study's `description` (or the names of the studies, when there are several), and the number of instruments, datasets, waves and people. People are counted once across all datasets, by their ID. Behind it is a star map that comes with labcatalog; hover over a star to light it up with its neighbours. **Explore the map** opens the map of your own instruments on the Instruments page.
+
 ## Summary
 
-The number of instruments and datasets, the studies, waves and reporters, and the number of errors and warnings. Click the instruments to open the Instruments page, or the errors and warnings to open the Problems page.
+The number of instruments and datasets, the waves and reporters, and the number of errors and warnings. Click the instruments to open the Instruments page, the datasets to open the Datasets page, or the errors and warnings to open the Problems page.
+
+## Next up
+
+What needs doing now, most pressing first: the errors to fix before analysis, the instruments with details missing, each wave still collecting with its count against the wave before it, and the warnings worth a look. Click a row to go where it is fixed.
+
+## Coming up
+
+The next milestones of each study, with the days left until each. It shows when a study has `milestones` dated today or later.
 
 ## Timeline
 
@@ -15,13 +27,3 @@ Each wave as a bar from its start to its end date, with the number of people per
 ## Collection pace
 
 For each reporter, how many rows had come in by each week since each wave started, one line per wave. It needs a `date_column` on the datasets. Use it to see whether a wave is collecting faster or slower than the last.
-
-## How the scores relate
-
-A network of the scores measured in one wave: scores that correlate at |*r*| ≥ .30 are linked by thin grey lines, and a larger dot has stronger links. Hover over a score to color its links, red for positive and blue for negative, thicker for stronger, and fade the rest; drag a score and its neighbours follow, and scroll to zoom: names appear as you zoom in. Click a group in the legend to hide or show it. Above the chart:
-
-- **Instruments**: which instruments' scores to show.
-- **Wave**: which wave.
-- **Color by**: color the scores by instrument, by clusters of scores that correlate with each other, or by a filter such as reporter or a custom field.
-
-The coefficient is Pearson's *r*, or Spearman's ρ when `stats.correlation` is `spearman`. `stats.correlate_by: none` turns this chart off.

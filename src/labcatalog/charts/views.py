@@ -7,15 +7,12 @@ from datetime import date
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from scipy.cluster.hierarchy import fcluster, linkage
-from scipy.spatial.distance import squareform
 
 from labcatalog import defaults
 from labcatalog.charts import matrices, network, plots, scatter
 from labcatalog.charts.style import group_color, natural_key, pair_color, wave_color
 from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.data.resolve import ResolvedScore, as_text_dict
-from labcatalog.metadata.browse import as_set, facet_label, facet_names, value_order
 from labcatalog.metadata.completeness import gaps
 from labcatalog.metadata.studies import wave_status
 from labcatalog.pipeline import CatalogResult
@@ -780,127 +777,8 @@ def instrument_names(result: CatalogResult) -> dict[str, str]:
 # ---- scores against each other ----
 
 
-def correlation_waves(result: CatalogResult) -> list[tuple[str, str]]:
-    return [(c.study, c.wave) for c in result.summary.correlations if len(c.keys) > 1]
-
-
 def instrument_order(result: CatalogResult) -> list[str]:
     return list(result.project.instruments)
-
-
-def correlated_instruments(result: CatalogResult) -> dict[str, str]:
-    keys = {key for c in result.summary.correlations for key in c.keys}
-    found = {s.instrument_id for s in result.catalog.scores if s.key in keys}
-    return {
-        i: result.project.instruments[i].abbreviation or i
-        for i in instrument_order(result)
-        if i in found
-    }
-
-
-def score_panel(
-    result: CatalogResult, study: str, wave: str, instruments: list[str]
-) -> dict | None:
-    corr = next(c for c in result.summary.correlations if (c.study, c.wave) == (study, wave))
-    by_key = {s.key: s for s in result.catalog.scores}
-    order = instrument_order(result)
-
-    def rank(i: int) -> tuple:
-        s = by_key[corr.keys[i]]
-        instrument = result.project.instruments[s.instrument_id]
-        score = definition(result, s)
-        return (
-            order.index(s.instrument_id),
-            not is_total(instrument, score),
-            instrument.scores.index(score),
-        )
-
-    picked = [i for i, key in enumerate(corr.keys) if by_key[key].instrument_id in instruments]
-    if len(picked) < 2:
-        return None
-    idx = sorted(picked, key=rank)
-    resolved_scores = [by_key[corr.keys[i]] for i in idx]
-    definitions = [definition(result, s) for s in resolved_scores]
-    skip = {
-        (a, b)
-        for a in range(len(idx))
-        for b in range(a + 1, len(idx))
-        if nested(result, resolved_scores[a], resolved_scores[b])
-    }
-    return {
-        "title": wave_name(result, study, wave),
-        "r": [[corr.r[i][j] for j in idx] for i in idx],
-        "n": [[corr.n[i][j] for j in idx] for i in idx],
-        "scores": resolved_scores,
-        "labels": [
-            short_label(result.project.instruments[s.instrument_id], d)
-            for s, d in zip(resolved_scores, definitions, strict=True)
-        ],
-        "groups": [s.instrument_id for s in resolved_scores],
-        "skip": skip,
-    }
-
-
-def network_colorings(result: CatalogResult) -> dict[str, str]:
-    config = result.project.config
-    skipped = ("study", "wave", *defaults.CATALOG_FACETS)
-    facets = [n for n in facet_names(config) if n not in skipped]
-    return {
-        "instrument": "Instrument",
-        "cluster": "Cluster",
-        **{f"facet:{n}": facet_label(config, n) for n in facets},
-    }
-
-
-def score_network(
-    result: CatalogResult,
-    study: str,
-    wave: str,
-    instruments: list[str],
-    color_by: str,
-) -> dict | None:
-    p = score_panel(result, study, wave, instruments)
-    if p is None:
-        return None
-    z = matrices.as_matrix(p["r"])
-    labels = p["labels"]
-    pairs = [
-        (i, j)
-        for i in range(len(labels))
-        for j in range(i)
-        if (j, i) not in p["skip"] and np.isfinite(z[i, j]) and abs(z[i, j]) >= defaults.CHART_MIN_R
-    ]
-    degree = Counter(k for pair in pairs for k in pair)
-    which, categories, shown = network_groups(result, p, z, color_by)
-    names = instrument_names(result)
-    nodes = [
-        {
-            "key": p["scores"][i].key,
-            "label": label,
-            "category": which[i],
-            "tip": "<br>".join(
-                part
-                for part in (
-                    f"<b>{label}</b>",
-                    names[p["groups"][i]],
-                    shown[i],
-                    f"{degree[i]} links",
-                )
-                if part
-            ),
-        }
-        for i, label in enumerate(labels)
-    ]
-    links = [
-        {
-            "source": i,
-            "target": j,
-            "r": float(z[i, j]),
-            "tip": f"{labels[i]} and {labels[j]}<br>r = {z[i, j]:.2f}, n = {p['n'][i][j]}",
-        }
-        for i, j in pairs
-    ]
-    return network.score_network(nodes, links, categories)
 
 
 def catalog_map(result: CatalogResult, instrument_ids: list[str]) -> dict | None:
@@ -994,79 +872,6 @@ def catalog_map(result: CatalogResult, instrument_ids: list[str]) -> dict | None
         tip = f"{html.escape(names[a])} and {html.escape(names[b])}<br>r = {r:.2f} in {wave}"
         links.append({"source": a, "target": b, "r": float(r), "tip": tip})
     return network.catalog_map(nodes, links, groups)
-
-
-def network_groups(
-    result: CatalogResult, p: dict, z: np.ndarray, color_by: str
-) -> tuple[list[int], list[tuple[str, str]], list[str]]:
-    groups = p["groups"]
-    if color_by == "instrument":
-        order = instrument_order(result)
-        present = [i for i in order if i in groups]
-        names = instrument_names(result)
-        # Colours by place among the instruments shown, so neighbours in the palette stay apart.
-        categories = [(names[i], group_color(k)) for k, i in enumerate(present)]
-        return [present.index(g) for g in groups], categories, [""] * len(groups)
-    if color_by == "cluster":
-        found = score_clusters(z, p["skip"])
-        sizes = Counter(found)
-        kept = [c for c in dict.fromkeys(found) if sizes[c] > 1]
-        categories = [(f"Cluster {k}", group_color(k - 1)) for k in range(1, len(kept) + 1)]
-        if len(kept) < len(sizes):
-            categories.append(("Unclustered", network.UNSET_COLOR))
-        which = [kept.index(c) if c in kept else len(kept) for c in found]
-        return which, categories, [categories[w][0] for w in which]
-    config = result.project.config
-    name = color_by.removeprefix("facet:")
-    values = [score_facet(result, s, name) for s in p["scores"]]
-    seen = set().union(*values)
-    declared = value_order(config, name)
-    order = [v for v in declared if v in seen] + sorted(seen - set(declared))
-    # As in Obsidian's groups, a node with several values takes the first one in the declared order.
-    which = [next((k for k, v in enumerate(order) if v in vs), len(order)) for vs in values]
-    categories = [(v, group_color(k)) for k, v in enumerate(order)]
-    if len(order) in which:
-        categories.append((network.UNSET, network.UNSET_COLOR))
-    label = facet_label(config, name)
-    shown = [f"{label}: {', '.join(v for v in order if v in vs) or network.UNSET}" for vs in values]
-    return which, categories, shown
-
-
-def score_clusters(z: np.ndarray, skip: set[tuple[int, int]]) -> list[int]:
-    # Average linkage on 1 - |r|, cut where the average |r| between clusters falls below the link threshold.
-    d = 1.0 - np.abs(z)
-    d[~np.isfinite(d)] = 1.0
-    for a, b in skip:
-        d[a, b] = d[b, a] = 1.0
-    np.fill_diagonal(d, 0.0)
-    tree = linkage(squareform(d, checks=False), method="average")
-    return [int(c) for c in fcluster(tree, t=1.0 - defaults.CHART_MIN_R, criterion="distance")]
-
-
-def score_facet(result: CatalogResult, score: ResolvedScore, name: str) -> set[str]:
-    config = result.project.config
-    dataset = dataset_by_name(config, score.dataset)
-    administration = next(
-        a
-        for content in result.project.studies.values()
-        if content.study == dataset.study
-        for a in content.administrations
-        if a.instrument == score.instrument_id and score.dataset in a.datasets
-    )
-    known = {
-        "reporter": dataset.reporter,
-        "target": administration.target,
-        "modality": dataset.modality,
-    }
-    if name in known:
-        return as_set(known[name])
-    custom = {
-        **dataset.custom,
-        **result.project.instruments[score.instrument_id].custom,
-        **administration.custom,
-        **definition(result, score).custom,
-    }
-    return as_set(custom.get(name))
 
 
 def score_choices(result: CatalogResult) -> dict[str, str]:
