@@ -236,6 +236,16 @@ class Window:
                     self.disk_tip = ui.tooltip("")
                 self.disk_mark.on("click", self.reload)
                 self.disk_mark.visible = False
+                self.example_mark = ui.label("Example updated").classes(
+                    "lc-pill lc-warn cursor-pointer"
+                )
+                with self.example_mark:
+                    ui.tooltip(
+                        "The example has changed since this copy was made; click to reset the "
+                        "copy to the new version"
+                    )
+                self.example_mark.on("click", self.confirm_reset_example)
+                self.example_mark.visible = False
                 self.data_mark = ui.label().classes("lc-pill cursor-pointer")
                 with self.data_mark:
                     self.data_tip = ui.tooltip("")
@@ -379,6 +389,9 @@ class Window:
         self.home = None
         self.frozen_bar.visible = False
         await self.open_project(example.example_copy())
+
+    def confirm_reset_example(self) -> None:
+        settings.confirm_reset(self.reset_example)
 
     async def reset_example(self) -> None:
         folder = example.reset_example()
@@ -539,6 +552,7 @@ class Window:
         if result is not None and project is None:
             self.tabs.set_value("problems")
         self.show_scope()
+        self.example_mark.visible = example.outdated(self.root)
         self.data_mark.visible = False
         if project is not None and self.home is None:
             background_tasks.create(within(self.look, self.show_versions()))

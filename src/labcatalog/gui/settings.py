@@ -332,29 +332,32 @@ def tables_section() -> None:
         ).props("no-caps")
 
 
+def confirm_reset(on_reset_example: Callable[[], Awaitable[None]]) -> None:
+    with ui.dialog() as dialog, ui.card():
+        ui.label("Reset the example? Every change made to it is lost.")
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Cancel", on_click=dialog.close).props("flat")
+
+            async def reset() -> None:
+                dialog.close()
+                await on_reset_example()
+
+            ui.button("Reset", on_click=reset).props("color=negative")
+    dialog.open()
+
+
 def example_section(on_reset_example: Callable[[], Awaitable[None]]) -> None:
-    def confirm_reset() -> None:
-        with ui.dialog() as dialog, ui.card():
-            ui.label("Reset the example? Every change made to it is lost.")
-            with ui.row().classes("w-full justify-end"):
-                ui.button("Cancel", on_click=dialog.close).props("flat")
-
-                async def reset() -> None:
-                    dialog.close()
-                    await on_reset_example()
-
-                ui.button("Reset", on_click=reset).props("color=negative")
-        dialog.open()
-
     with panel(
         "Example project",
         "The window opens the project that was open when it last closed, or the example the "
         f"first time. The example is a copy in {example.example_folder()}, so changes made "
         "while trying it out stay there; Reset puts it back as installed.",
     ):
-        ui.button("Reset the example", icon="restart_alt", on_click=confirm_reset).props(
-            "flat"
-        ).classes("lc-quiet-btn w-fit")
+        ui.button(
+            "Reset the example",
+            icon="restart_alt",
+            on_click=lambda: confirm_reset(on_reset_example),
+        ).props("flat").classes("lc-quiet-btn w-fit")
 
 
 def models_section(on_model: Callable[[], None]) -> None:

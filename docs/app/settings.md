@@ -52,4 +52,4 @@ The project's in `labcatalog.yaml` (see [The Project File](../reference/project-
 
 ## Example project
 
-The example the window opens the first time, and with **Open example**, is a copy kept with these settings, so changes made while trying it out stay there. **Reset the example** puts it back as installed, after asking.
+The example the window opens the first time, and with **Open example**, is a copy kept with these settings, so changes made while trying it out stay there. **Reset the example** puts it back as installed, after asking. When labcatalog has been updated and its example has changed since the copy was made, the top of the window says **Example updated** while the copy is open; clicking it resets the copy to the new example, after asking.
