@@ -203,7 +203,9 @@ def test_a_real_dataset_and_its_clone_record_the_same_commit(mock_project, datal
 
     clone = mock_project.parent / "clone"
     datalad(mock_project.parent, "clone", str(mock_project), str(clone))
-    with pytest.raises(DataSourceError, match=r"parent_w1: the content of .* datalad get"):
+    with pytest.raises(
+        DataSourceError, match=r"roster: the content of .*participants.csv.* datalad get"
+    ):
         load_datasets(load_project(clone))
     states = {s.step.name: s for s in step_states(load_project(clone))}
     assert states["clean_parent_w1"].outputs[0].placeholder
