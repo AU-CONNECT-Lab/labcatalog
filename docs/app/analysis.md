@@ -9,10 +9,22 @@ The Analysis page runs the analyses most papers need on the datasets you choose:
 The Sample on the left applies to every tab except the multilevel model.
 
 - **Datasets**: the data files to analyze. By default, every dataset of the first wave of the first study.
-- **Only people in every selected dataset**: on (the default) keeps the people who are in all of them; off keeps everyone in any of them.
+- **Only people in every selected dataset**: on (the default) keeps the people who are in all of them; off keeps everyone in any of them. With datasets of several studies, it is every selected dataset of the person's own study.
 - **Measures**: the instruments whose scores and numbers appear in the lists below, the multilevel model included. By default, all of them. The **Select** menu next to it can choose all, all of one modality, or none.
 
 The note below says how many people are in the sample and how they were matched across files: by ID, or by group when `stats.correlate_by` names one. IDs belong to their study, so files of two studies share no one: with files of several studies, each person's ID is written with their study first, as `pilot/1001C`. Rows whose ID repeats within a file are left out. When a file holds several people of one group (two children of a family), that group is taken person by person, as described under [Groups](../concepts/ids-groups-missing.md#groups), and the note says how many groups that affects.
+
+### Several studies
+
+Choosing datasets of more than one study pools the studies. Each study's people are matched within that study, as above, and the studies' people are then put together, one row each. A variable is offered when every chosen study has it in exactly one chosen dataset, for example the mood total in wave 1 of one study and in the baseline of another; each person's value comes from their own study's file. Choose one wave of each study for the variables to pool. The group comparison also offers **Study** as the groups.
+
+The analyses allow for the study, so that a difference between the studies' means does not show up as a correlation:
+
+- The correlation table gives each pair's correlation within studies: the correlation of what is left of the two variables once each study's mean is taken out, with the *p* value of the variable's coefficient in a linear model with the study. For Spearman's ρ, the same on the ranks of each pair.
+- Each regression includes the study as a fixed effect, a dummy for each study but the first. The slope is the slope within studies, the intercept is the first study's, and *r* is the correlation within studies, so the table gives no interval for it.
+- Missing data and the group comparison work as for one study.
+
+The other tabs and multiple imputation do not take several studies yet: they say so, and the Missing values switch is not shown.
 
 The variable lists hold every score and number item of the chosen measures in the chosen datasets, labeled with their wave. Type in a list to filter it.
 

@@ -88,7 +88,9 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
                 chosen, page.views.menu_groups(result, view.datasets, page.variables(view))
             )
         body()
-    imputation_panel(result, sample, view, choices)
+    # The imputation does not take samples of several studies yet.
+    if not analysis.pooling(result, view.datasets):
+        imputation_panel(result, sample, view, choices)
 
 
 def imputation_panel(
@@ -256,10 +258,16 @@ NO_R = (
 
 
 def imputing(result: CatalogResult, view) -> bool:
+    # The imputation does not take samples of several studies yet.
+    if analysis.pooling(result, view.datasets):
+        return False
     return (view.missing_method or result.project.config.stats.missing) == imputation.IMPUTE
 
 
 def method_switch(result: CatalogResult, view, on_change: Callable[[], None]) -> None:
+    if analysis.pooling(result, view.datasets):
+        return
+
     def choose(value: str) -> None:
         view.missing_method = value
         on_change()

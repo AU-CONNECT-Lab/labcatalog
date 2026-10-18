@@ -1152,7 +1152,7 @@ def variable_choices(result: CatalogResult, datasets: list[str]) -> dict[str, st
             found[analysis.item_key(v)] = (
                 f"{instrument.abbreviation or instrument.id}: {text} ({names[name]})"
             )
-    return found
+    return analysis.pooled(result, datasets, found) if analysis.pooling(result, datasets) else found
 
 
 def wave_groups(
@@ -1218,14 +1218,17 @@ def menu_groups(
 ) -> dict[str, list[str]]:
     # Shortcuts to add a wave's or a modality's choices at once, where there is more than one.
     config = result.project.config
-    waves = wave_groups(result, datasets, choices)
+    offered = choices(result, datasets)
+    # A wave belongs to one study, so its variables are not the pooled ones.
+    pooled = analysis.pooling(result, datasets)
+    waves = {} if pooled else wave_groups(result, datasets, choices)
     found = {f"All in {wave}": keys for wave, keys in waves.items()} if len(waves) > 1 else {}
     by_modality: dict[str, list[str]] = {}
     for name in modality_order(result, datasets):
         by_modality.setdefault(dataset_by_name(config, name).modality, []).append(name)
     if len(by_modality) > 1:
         for modality, names in by_modality.items():
-            keys = list(choices(result, names))
+            keys = [k for k in choices(result, names) if k in offered]
             if keys:
                 found[f"All {config.vocab.modality_label(modality)}"] = keys
     return found
@@ -1243,6 +1246,7 @@ def total_choices(result: CatalogResult, datasets: list[str]) -> list[str]:
 
 
 def score_of(result: CatalogResult, key: str) -> ResolvedScore:
+    key = analysis.first_key(key)
     return next(s for s in result.catalog.scores if s.key == key)
 
 

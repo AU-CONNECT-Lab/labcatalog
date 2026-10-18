@@ -18,10 +18,13 @@ from labcatalog.stats.analysis import (
     CHOICE,
     ITEM_PREFIX,
     NUMBER,
+    STUDY_KEY,
+    first_key,
     instrument_of,
     item_key,
     item_variable,
     number_items,
+    parts,
 )
 from labcatalog.stats.cfa import is_total
 from labcatalog.stats.rbridge import install_command, package_check, run_r
@@ -156,6 +159,70 @@ for i, x in enumerate(variables):
 correlations = pd.DataFrame(rows, columns=["x", "y", "n", "r", "p"])
 print(correlations)
 """
+R_STUDY_CORRELATIONS = """\
+# Correlations pooled over studies: n, M and SD of each variable (psych::describe), then
+# {coefficient} for each pair within studies, on everyone with both values: the correlation of
+# what is left of each variable once the study means are taken out (lm on the study), and the
+# p value of the variable's coefficient in lm with the study (p values not adjusted).{ranks}
+variables <- c({columns})
+descriptives <- data.frame(variable = variables,
+                           psych::describe(d[variables])[c("n", "mean", "sd")], row.names = NULL)
+print(descriptives)
+study <- factor(d$study)
+within_study <- function(v, s) if (nlevels(s) > 1) resid(lm(v ~ s)) else v - mean(v)
+pairs <- t(combn(variables, 2))
+correlations <- do.call(rbind, lapply(seq_len(nrow(pairs)), function(i) {{
+  x <- pairs[i, 1]
+  y <- pairs[i, 2]
+  keep <- complete.cases(d[[x]], d[[y]])
+  n <- sum(keep)
+  s <- droplevels(study[keep])
+  xs <- {transform}(d[[x]][keep])
+  ys <- {transform}(d[[y]][keep])
+  ok <- n > nlevels(s) + 1 && sd(xs) > 0 && sd(ys) > 0
+  fit <- if (!ok) NULL else if (nlevels(s) > 1) lm(ys ~ xs + s) else lm(ys ~ xs)
+  coefs <- if (is.null(fit)) NULL else summary(fit)$coefficients
+  found <- !is.null(coefs) && "xs" %in% rownames(coefs)
+  data.frame(x = x, y = y, n = n,
+             r = if (found) cor(within_study(xs, s), within_study(ys, s)) else NA,
+             p = if (found) coefs["xs", 4] else NA)
+}}))
+print(correlations)
+"""
+PYTHON_STUDY_CORRELATIONS = """\
+# Correlations pooled over studies: n, M and SD of each variable, then {coefficient} for each
+# pair within studies, on everyone with both values: the correlation of what is left of each
+# variable once the study means are taken out (statsmodels OLS on the study), and the p value
+# of the variable's coefficient in OLS with the study (p values not adjusted).{ranks}
+variables = [{columns}]
+descriptives = pd.DataFrame(dict(variable=variables, n=d[variables].count().to_numpy(),
+                                 mean=d[variables].mean().to_numpy(),
+                                 sd=d[variables].std().to_numpy()))
+print(descriptives)
+
+
+def within_study(v, dummies):
+    if dummies.shape[1] == 0:
+        return v - v.mean()
+    return sm.OLS(v, sm.add_constant(dummies)).fit().resid
+
+
+rows = []
+for i, x in enumerate(variables):
+    for y in variables[i + 1:]:
+        both = d[[x, y, "study"]].dropna()
+        dummies = pd.get_dummies(both["study"].astype(int).astype(str), drop_first=True,
+                                 dtype=float)
+        xs, ys = both[x]{rank}.rename("xs"), both[y]{rank}
+        r = p = np.nan
+        if len(both) > dummies.shape[1] + 2 and xs.std() > 0 and ys.std() > 0:
+            fit = sm.OLS(ys, sm.add_constant(pd.concat([xs, dummies], axis=1))).fit()
+            r = np.corrcoef(within_study(xs, dummies), within_study(ys, dummies))[0, 1]
+            p = fit.pvalues["xs"]
+        rows.append(dict(x=x, y=y, n=len(both), r=r, p=p))
+correlations = pd.DataFrame(rows, columns=["x", "y", "n", "r", "p"])
+print(correlations)
+"""
 R_MISSING = """# Missing data: how many people have and lack each variable, then each pattern of what people
 # have (1) and lack (0), the most common first.
 variables <- c({columns})
@@ -214,6 +281,49 @@ for x in [{xs}]:
                      intercept=fit.params["const"], intercept_se=fit.bse["const"],
                      r=r.statistic, r_low=low, r_high=high, r_squared=fit.rsquared,
                      p=fit.pvalues[x]))
+regressions = pd.DataFrame(rows)
+print(regressions)
+"""
+R_STUDY_REGRESSION = """\
+# Regression pooled over studies: {y_label} on each X by itself with the study as a fixed
+# effect (lm with the study as a factor); the intercept is the first study's, and r is the
+# correlation within studies, of what is left of X and Y once the study means are taken out.
+y <- {y}
+study <- factor(d$study)
+regressions <- do.call(rbind, lapply(c({xs}), function(x) {{
+  keep <- complete.cases(d[[x]], d[[y]])
+  s <- droplevels(study[keep])
+  xs <- d[[x]][keep]
+  ys <- d[[y]][keep]
+  within_study <- function(v) if (nlevels(s) > 1) resid(lm(v ~ s)) else v - mean(v)
+  fit <- if (nlevels(s) > 1) lm(ys ~ xs + s) else lm(ys ~ xs)
+  coefs <- summary(fit)$coefficients
+  data.frame(x = x, n = nobs(fit), slope = coefs["xs", 1], slope_se = coefs["xs", 2],
+             intercept = coefs[1, 1], intercept_se = coefs[1, 2],
+             r = cor(within_study(xs), within_study(ys)), r_low = NA, r_high = NA,
+             r_squared = summary(fit)$r.squared, p = coefs["xs", 4])
+}}))
+print(regressions)
+"""
+PYTHON_STUDY_REGRESSION = """\
+# Regression pooled over studies: {y_label} on each X by itself with the study as a fixed
+# effect (statsmodels OLS with a dummy for each study but the first); the intercept is the
+# first study's, and r is the correlation within studies, of what is left of X and Y once the
+# study means are taken out.
+y = {y}
+rows = []
+for x in [{xs}]:
+    both = d[[x, y, "study"]].dropna()
+    dummies = pd.get_dummies(both["study"].astype(int).astype(str), drop_first=True, dtype=float)
+    fit = sm.OLS(both[y], sm.add_constant(pd.concat([both[x], dummies], axis=1))).fit()
+    if dummies.shape[1]:
+        rest = [sm.OLS(both[v], sm.add_constant(dummies)).fit().resid for v in (x, y)]
+    else:
+        rest = [both[v] - both[v].mean() for v in (x, y)]
+    rows.append(dict(x=x, n=len(both), slope=fit.params[x], slope_se=fit.bse[x],
+                     intercept=fit.params["const"], intercept_se=fit.bse["const"],
+                     r=np.corrcoef(rest[0], rest[1])[0, 1], r_low=np.nan, r_high=np.nan,
+                     r_squared=fit.rsquared, p=fit.pvalues[x]))
 regressions = pd.DataFrame(rows)
 print(regressions)
 """
@@ -407,16 +517,18 @@ class AnalysisData:
         self.columns: dict[str, pd.Series] = {}
 
     def variable(self, key: str) -> Variable:
-        return self.item(key) if key.startswith(ITEM_PREFIX) else self.score(key)
+        item = key.startswith(ITEM_PREFIX) or key == STUDY_KEY
+        return self.item(key) if item else self.score(key)
 
     def score(self, key: str, items: bool = False) -> Variable:
-        score = next(s for s in self.result.catalog.scores if s.key == key)
+        score = next(s for s in self.result.catalog.scores if s.key == first_key(key))
         instrument = self.result.project.instruments[score.instrument_id]
         definition = next(s for s in instrument.scores if s.id == score.score_id)
-        column = f"{score.score_id}_{score.dataset}"
+        column = f"{score.score_id}_{'_'.join(parts(key))}"
         self.columns[column] = analysis.values(self.result, self.sample, key)
         names = []
-        if items:
+        # A pooled score's items differ from file to file, so it has none.
+        if items and len(parts(key)) == 1:
             found = score_items(self.result.datasets[score.dataset], score)
             names = [self.column_name(score.dataset, c) for c in found.columns]
             for name, source in zip(names, found.columns, strict=True):
@@ -424,21 +536,29 @@ class AnalysisData:
         return Variable(
             key=key,
             label=f"{abbreviation(instrument)} {definition.label}",
-            dataset=score.dataset,
+            dataset=key.rsplit("@", 1)[1],
             kind=SCORE,
             column=column,
             items=names if len(names) > 1 else [],
         )
 
     def item(self, key: str) -> Variable:
+        if key == STUDY_KEY:
+            options = analysis.study_options(self.result, self.sample)
+            return Variable(STUDY_KEY, "Study", "", CHOICE, STUDY_KEY, options)
         variable = item_variable(self.result, key)
         options = [(float(o.value), o.label) for o in variable.response_options]
-        column = self.column_name(variable.dataset, variable.column)
+        names = parts(key)
+        column = (
+            self.column_name(variable.dataset, variable.column)
+            if len(names) == 1
+            else f"{variable.column}_{'_'.join(names)}"
+        )
         self.columns[column] = analysis.values(self.result, self.sample, key)
         return Variable(
             key=key,
             label=item_label(self.result, variable),
-            dataset=variable.dataset,
+            dataset=key.rsplit("@", 1)[1],
             kind=variable.type,
             column=column,
             options=options if variable.type == CHOICE else [],
@@ -461,6 +581,8 @@ class AnalysisData:
         # A group taken person by person repeats, so its people get their own IDs.
         if split:
             keys[PERSON_ID] = [p if p in split else "" for p in people]
+        if analysis.pooling(self.result, self.sample.datasets):
+            keys[STUDY_KEY] = analysis.study_numbers(self.result, self.sample).to_list()
         presence = {
             f"in_{name}": [int(p in self.sample.links.rows[name]) for p in people]
             for name in self.sample.datasets
@@ -551,11 +673,14 @@ def measure_variables(
 def group_choices(
     result: CatalogResult, datasets: list[str], labels: dict[str, str]
 ) -> dict[str, str]:
-    return {
+    found = {
         item_key(v): f"{item_label(result, v)} ({labels[v.dataset]})"
         for v in demographic_items(result, datasets)
         if v.type == CHOICE
     }
+    if not analysis.pooling(result, datasets):
+        return found
+    return {STUDY_KEY: "Study", **analysis.pooled(result, datasets, found)}
 
 
 def r_string(value: str) -> str:
@@ -651,27 +776,47 @@ def read_missing(found: dict[str, pd.DataFrame], columns: list[str]) -> MissingD
     return MissingData(counts, patterns)
 
 
-def correlation_code(variables: list[Variable], method: str = "pearson") -> Code:
+def correlation_code(
+    variables: list[Variable], method: str = "pearson", by_study: bool = False
+) -> Code:
     columns = ", ".join(r_string(v.column) for v in variables)
-    coefficient = "Spearman's rho" if method == "spearman" else "Pearson r"
-    function = "spearmanr" if method == "spearman" else "pearsonr"
-    fields = dict(columns=columns, method=method, coefficient=coefficient, function=function)
+    spearman = method == "spearman"
+    fields = dict(
+        columns=columns,
+        method=method,
+        coefficient="Spearman's rho" if spearman else "Pearson r",
+        function="spearmanr" if spearman else "pearsonr",
+        # Spearman's within studies is Pearson's on the ranks of each pair.
+        ranks="\n# Spearman's rho: the same on the ranks of each pair." if spearman else "",
+        transform="rank" if spearman else "as.numeric",
+        rank=".rank()" if spearman else "",
+    )
+    r, python = (
+        (R_STUDY_CORRELATIONS, PYTHON_STUDY_CORRELATIONS)
+        if by_study
+        else (R_CORRELATIONS, PYTHON_CORRELATIONS)
+    )
     return Code(
         title="Correlations",
-        r=R_CORRELATIONS.format(**fields),
-        python=PYTHON_CORRELATIONS.format(**fields),
+        r=r.format(**fields),
+        python=python.format(**fields),
         outputs=("descriptives", "correlations"),
         packages=("psych",),
     )
 
 
-def regression_code(xs: list[Variable], y: Variable) -> Code:
+def regression_code(xs: list[Variable], y: Variable, by_study: bool = False) -> Code:
     xs_text = ", ".join(r_string(v.column) for v in xs)
     fields = dict(y=r_string(y.column), xs=xs_text, y_label=y.label)
+    r, python = (
+        (R_STUDY_REGRESSION, PYTHON_STUDY_REGRESSION)
+        if by_study
+        else (R_REGRESSION, PYTHON_REGRESSION)
+    )
     return Code(
         title="Regression",
-        r=R_REGRESSION.format(**fields),
-        python=PYTHON_REGRESSION.format(**fields),
+        r=r.format(**fields),
+        python=python.format(**fields),
         outputs=("regressions",),
     )
 

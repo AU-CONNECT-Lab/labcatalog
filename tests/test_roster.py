@@ -256,8 +256,9 @@ def test_the_analysis_reads_roster_values_from_the_files_study(pilot_project):
 def test_people_of_two_studies_are_never_the_same(pilot_project):
     result = run_catalog(pilot_project)
     files = ["child_w1", "pilot_w1"]
-    assert analysis.build_sample(result, files, True).people == []
     union = analysis.build_sample(result, files, False).people
+    # Each study has one of the files, so every file of one's own study is that one.
+    assert analysis.build_sample(result, files, True).people == union
     # The example links by family; 1001C is in family 1001 of one study and 9001 of the other.
     assert {"mock_study/1001", "pilot/9001"} <= set(union)
     assert all(p.startswith(("mock_study/", "pilot/")) for p in union)

@@ -47,6 +47,8 @@ PARTS = {
     "multilevel": "Multilevel model",
     "panel": "Cross-lagged panel",
 }
+# What a sample of several studies can do so far: each person's own study's file, side by side.
+POOLED_PARTS = ("missing", "correlation", "regression", "groups")
 
 
 @dataclass
@@ -118,6 +120,13 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
     @ui.refreshable
     def section() -> None:
         sample = recount()
+        if analysis.pooling(result, view.datasets) and view.part not in POOLED_PARTS:
+            with panel(PARTS[view.part]):
+                note(
+                    "Not yet for datasets of several studies; choose the datasets of one study, "
+                    "or use Missing data, Correlation table, Regression or Group comparison."
+                )
+            return
         if view.part == "multilevel":
             multilevel.render(result, view)
             return
@@ -209,7 +218,7 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
 
 
 def measure_paragraphs(result: CatalogResult, keys: list[str]) -> list[str]:
-    pairs = [(analysis.instrument_of(k), k.rsplit("@", 1)[1]) for k in keys]
+    pairs = [(analysis.instrument_of(k), analysis.parts(k)[0]) for k in keys]
     return measures.paragraphs(result.project, result.catalog, result.summary, pairs)
 
 
@@ -271,6 +280,14 @@ def sample_text(result: CatalogResult, sample: analysis.Sample, where: str) -> s
     by = result.project.config.stats.correlate_by
     matched = "ID" if by in ("id", "none") else by
     text = f"{len(sample.people)} people {where}, matched across datasets by {matched}."
+    if analysis.pooling(result, sample.datasets):
+        studies = len(analysis.studies_of(result, sample.datasets))
+        text = (
+            f"{len(sample.people)} people of {studies} studies {where} of their study, matched "
+            f"by {matched} within each study. The variables are those every study has in one "
+            "chosen dataset, each person's from their own study, and the analyses allow for "
+            "the study."
+        )
     notes = analysis.group_notes(result, sample)
     return f"{text} {notes}" if notes else text
 
@@ -288,6 +305,7 @@ def correlation_section(
             return
         keys = list(view.scores)
         imputed = missing.imputing(result, view)
+        by_study = analysis.pooling(result, sample.datasets)
         if imputed and (lacking := missing.outside(result, view, keys, choices)):
             note(lacking)
             return
@@ -313,7 +331,7 @@ def correlation_section(
                     message = str(err)
                     return lambda: note(message)
             else:
-                code = analysis_script.correlation_code(variables, method)
+                code = analysis_script.correlation_code(variables, method, by_study)
                 frame = data.frame()
                 found, engine = await analysis_tables.compute(result, sample, frame, code)
             if method == "spearman" and engine != analysis_tables.R_NOTE and not imputed:
@@ -368,6 +386,9 @@ def correlation_section(
                 if imputed
                 else f"each pair on everyone with both values ({n})"
             )
+            if by_study:
+                who += ", within studies: what is left once each study's mean is taken out"
+
             shown = PaperTable(
                 "Correlations Among Variables",
                 columns,
@@ -477,6 +498,7 @@ def pair_section(
     def body() -> None:
         xs, y_key = [x for x in view.xs if x != view.y], view.y
         imputed = missing.imputing(result, view)
+        by_study = analysis.pooling(result, sample.datasets)
         if imputed and (lacking := missing.outside(result, view, [y_key, *xs], choices)):
             note(lacking)
             return
@@ -510,9 +532,15 @@ def pair_section(
                     return lambda: note(message)
                 who = f"fitted in each of {plan.m} imputed data sets and pooled, for everyone"
             else:
-                code = analysis_script.regression_code(list(usable.values()), y)
+                code = analysis_script.regression_code(list(usable.values()), y, by_study)
                 found, engine = await analysis_tables.compute(result, sample, frame, code)
                 who = "on everyone with both values"
+                if by_study:
+                    first = analysis.study_options(result, sample)[0][1]
+                    who += (
+                        f", with the study as a fixed effect (the intercept is {first}'s); r is "
+                        "within studies"
+                    )
             figure = plot_code.regression(
                 {v.column: choices[x] for x, v in usable.items()}, choices[y_key]
             )
