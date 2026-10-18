@@ -9,13 +9,14 @@ from labcatalog.config import id_pattern, missing_labels_for
 from labcatalog.data import id_map
 from labcatalog.data.ids import load_exclusions
 from labcatalog.data.prepare import step_states
-from labcatalog.data.resolve import Catalog, ResolvedVariable, numbers_in_range
+from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
 from labcatalog.data.scoring import raw_items, scorable
 from labcatalog.datalad.annex import fetch_advice
 from labcatalog.datalad.check import check_git_annex
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
+from labcatalog.schema import SCRIPT
 from labcatalog.sources import LoadedDataset, Roster, load_roster_datasets, load_rosters
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
@@ -51,6 +52,7 @@ def check_project(
             *check_dates(project, datasets),
             *check_same_answers(project, catalog, datasets),
             *check_score_agreement(project, catalog, datasets, scores),
+            *check_scores_files(project, catalog, datasets),
             *check_prepare_outputs(project),
             *check_git_annex(project),
         ]
@@ -468,32 +470,87 @@ def check_score_agreement(
 ) -> list[Issue]:
     issues = []
     for score in catalog.scores:
-        loaded = datasets[score.dataset]
-        column = score.existing_column
-        if column is None or column not in loaded.frame:
+        if score.method == SCRIPT:
             continue
-        raw = loaded.frame[column]
-        codes = list(missing_labels_for(project.config, loaded.config))
-        existing = loaded.numbers(column).where(~raw.isin(codes))
-        # Compare at the precision the lab's own script wrote.
-        places = raw.str.extract(r"\.(\d+)$", expand=False).str.len()
-        decimals = int(places.max()) if places.notna().any() else 0
-        computed = scores[score.dataset][score.key].round(decimals)
-        both = existing.notna() & computed.notna()
-        differ = both & (existing.round(decimals) != computed)
-        one_sided = existing.notna() != computed.notna()
+        loaded = datasets[score.dataset]
+        for column, raw in given_scores(loaded, score):
+            issues += score_agreement(project, loaded, score, scores, column, raw)
+    return issues
+
+
+def given_scores(loaded: LoadedDataset, score: ResolvedScore) -> list[tuple[str, pd.Series]]:
+    # A score the data file or the scores file also holds, to hold labcatalog's own against.
+    found = []
+    column = score.existing_column
+    if column is not None and column in loaded.frame:
+        found.append((column, loaded.frame[column]))
+    if loaded.scores is not None and score.score_id in loaded.scores:
+        name = f"{loaded.config.scores}, {score.score_id}"
+        found.append((name, loaded.scores[score.score_id].fillna("")))
+    return found
+
+
+def score_agreement(
+    project: Project,
+    loaded: LoadedDataset,
+    score: ResolvedScore,
+    scores: dict[str, pd.DataFrame],
+    column: str,
+    raw: pd.Series,
+) -> list[Issue]:
+    issues = []
+    codes = list(missing_labels_for(project.config, loaded.config))
+    existing = pd.to_numeric(raw, errors="coerce").where(~raw.isin(codes))
+    # Compare at the precision the lab's own script wrote.
+    places = raw.str.extract(r"\.(\d+)$", expand=False).str.len()
+    decimals = int(places.max()) if places.notna().any() else 0
+    computed = scores[score.dataset][score.key].round(decimals)
+    both = existing.notna() & computed.notna()
+    differ = both & (existing.round(decimals) != computed)
+    one_sided = existing.notna() != computed.notna()
+    where = location(project, loaded)
+    if differ.any():
+        message = (
+            f"{score.key}: {differ.sum()} row(s) differ from {column}, "
+            f"for example {examples(loaded.frame.loc[differ, loaded.id_column])}"
+        )
+        issues.append(problem("score_mismatch", message, where))
+    if one_sided.any():
+        message = f"{score.key}: {one_sided.sum()} row(s) have a score on only one side ({column})"
+        issues.append(problem("score_coverage", message, where, "warning"))
+    return issues
+
+
+def check_scores_files(
+    project: Project, catalog: Catalog, datasets: dict[str, LoadedDataset]
+) -> list[Issue]:
+    # Scores a script computes need its file, a column each, and the data's own IDs.
+    issues = []
+    for name, loaded in datasets.items():
         where = location(project, loaded)
-        if differ.any():
+        scripted = [s for s in catalog.scores_for(name) if s.method == SCRIPT]
+        path = loaded.config.scores
+        if path is not None and loaded.scores is None:
             message = (
-                f"{score.key}: {differ.sum()} row(s) differ from {column}, "
-                f"for example {examples(loaded.frame.loc[differ, loaded.id_column])}"
+                f"{name}: the scores file {path} is not there yet; run the step that writes it"
             )
-            issues.append(problem("score_mismatch", message, where))
-        if one_sided.any():
-            message = (
-                f"{score.key}: {one_sided.sum()} row(s) have a score on only one side ({column})"
-            )
-            issues.append(problem("score_coverage", message, where, "warning"))
+            issues.append(problem("scores_missing", message, where, "warning", dataset=name))
+            continue
+        for score in scripted:
+            if path is None:
+                message = f"{score.key}: computed by a script, but {name} names no scores file"
+            elif score.score_id not in loaded.scores:
+                message = f"{score.key}: the scores file {path} has no column {score.score_id}"
+            else:
+                continue
+            issues.append(problem("scores_missing", message, where, "warning", dataset=name))
+        if loaded.score_ids:
+            stray = sorted(loaded.score_ids - set(loaded.frame[loaded.id_column]))
+            if stray:
+                message = (
+                    f"{name}: {len(stray)} ID(s) of {path} are not in the data: {examples(stray)}"
+                )
+                issues.append(problem("scores_unmatched", message, where, "warning", dataset=name))
     return issues
 
 

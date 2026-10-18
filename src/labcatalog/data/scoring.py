@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 from labcatalog.data.resolve import Catalog, ResolvedScore
+from labcatalog.schema import SCRIPT
 from labcatalog.sources import LoadedDataset
 
 
@@ -10,6 +11,9 @@ def reverse(values: pd.Series, low: float, high: float) -> pd.Series:
 
 
 def scorable(loaded: LoadedDataset, score: ResolvedScore) -> bool:
+    # Whether labcatalog computes the score from its items here.
+    if score.method == SCRIPT:
+        return False
     return not score.unavailable_items and all(c in loaded.frame for c in score.columns)
 
 
@@ -27,6 +31,8 @@ def score_items(loaded: LoadedDataset, score: ResolvedScore) -> pd.DataFrame:
 
 
 def compute_score(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
+    if score.method == SCRIPT:
+        return scripted(loaded, score.score_id)
     if not scorable(loaded, score):
         return pd.Series(np.nan, index=loaded.frame.index, dtype=float)
     items = score_items(loaded, score)
@@ -47,6 +53,12 @@ def compute_score(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
     else:
         value = items.sum(axis=1)
     return value.where(enough)
+
+
+def scripted(loaded: LoadedDataset, score_id: str) -> pd.Series:
+    if loaded.scores is None or score_id not in loaded.scores:
+        return pd.Series(np.nan, index=loaded.frame.index, dtype=float)
+    return pd.to_numeric(loaded.scores[score_id], errors="coerce")
 
 
 def compute_scores(catalog: Catalog, datasets: dict[str, LoadedDataset]) -> dict[str, pd.DataFrame]:

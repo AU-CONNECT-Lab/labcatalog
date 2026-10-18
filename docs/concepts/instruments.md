@@ -62,7 +62,7 @@ A score combines items:
 | Key | Meaning |
 |---|---|
 | `id`, `label` | The score's ID and its name, such as Total or Anxiety. |
-| `method` | `sum` or `mean`. |
+| `method` | `sum`, `mean`, or `script` (below). |
 | `items` | The item IDs in the score. |
 | `missing_rule` | What to do when items are missing (below). |
 | `min_valid` | The fewest answered items that still give a score. |
@@ -75,7 +75,9 @@ The missing rules:
 
 Items marked `reverse: true` are reversed before scoring, using their response options: on a 0 to 3 scale, 0 becomes 3 and 3 becomes 0. If the data already hold the reversed values, set `reversed_in_data: true` on the administration (see [Column Maps and Overrides](variable-maps.md)).
 
-labcatalog computes every score itself from the items. If your data also contain a score your lab computed, map that column to `score:<id>` and labcatalog reports every row where the two disagree.
+labcatalog computes every summed or averaged score itself from the items. If your data also contain a score your lab computed, map that column to `score:<id>` and labcatalog reports every row where the two disagree.
+
+A score that is not a sum or a mean, such as one looked up in a norm table or weighted, is computed by a script you write, or have a language model write: give it `method: script`. The script, usually a [prepare step](../how-to/prepare-steps.md), reads the dataset's data and writes a CSV with the ID column and one column per score, named by the score's ID; name that file in the dataset's `scores` in `labcatalog.yaml`. labcatalog then reads the score from there, matched by ID, and shows and analyses it like any other. A column of that file for a summed or averaged score is checked against labcatalog's own, as above.
 
 ## References and license
 

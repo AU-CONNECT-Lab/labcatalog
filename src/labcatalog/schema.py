@@ -25,6 +25,8 @@ class ResponseSet(StrictModel):
 
 
 ItemType = Literal["choice", "number", "text"]
+# A score its own script computes, read from the dataset's scores file.
+SCRIPT = "script"
 
 
 class Item(StrictModel):
@@ -44,8 +46,8 @@ class Item(StrictModel):
 class Score(StrictModel):
     id: str
     label: str
-    method: Literal["sum", "mean"]
-    items: list[str]
+    method: Literal["sum", "mean", "script"]
+    items: list[str] = []
     missing_rule: Literal["complete", "prorate", "zero"] = "complete"
     min_valid: int | None = None
     custom: dict[str, Any] = {}

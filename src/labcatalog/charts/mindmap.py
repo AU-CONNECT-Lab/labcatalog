@@ -2,7 +2,7 @@ from html import escape
 
 from labcatalog.charts.style import FONT, INK, LABEL_INK, MUTED_INK, group_color
 from labcatalog.data.resolve import as_text_dict
-from labcatalog.schema import Instrument, Item, Score
+from labcatalog.schema import SCRIPT, Instrument, Item, Score
 
 ROW_HEIGHT = 24
 MIN_HEIGHT = 160
@@ -18,11 +18,13 @@ def instrument_tree(instrument: Instrument) -> dict:
     for score in instrument.scores:
         if score.id in summaries:
             branches.append(
-                node(f"{score.label} ({score.method} of {len(score.items)})", score_tip(score))
+                node(f"{score.label} ({method_text(score, counted=True)})", score_tip(score))
             )
         else:
             children = [item_node(items[i]) for i in score.items if i in items]
-            branches.append(node(f"{score.label} ({score.method})", score_tip(score), children))
+            branches.append(
+                node(f"{score.label} ({method_text(score)})", score_tip(score), children)
+            )
     scored = {i for score in instrument.scores for i in score.items}
     loose = [item_node(item) for item in instrument.items if item.id not in scored]
     if loose and instrument.scores:
@@ -123,8 +125,16 @@ def item_node(item: Item) -> dict:
     return node(f"{item.id}  {short}{reverse}", tip)
 
 
+def method_text(score: Score, counted: bool = False) -> str:
+    if score.method == SCRIPT:
+        return "by a script"
+    return f"{score.method} of {len(score.items)}" if counted else score.method
+
+
 def score_tip(score: Score) -> str:
     rule = {"complete": "every item answered", "prorate": "prorated", "zero": "missing as 0"}
+    if score.method == SCRIPT:
+        return f"<b>{escape(score.label)}</b> ({escape(score.id)})<br>computed by a script"
     return (
         f"<b>{escape(score.label)}</b> ({escape(score.id)})<br>{score.method} of "
         f"{len(score.items)} items, {rule[score.missing_rule]}<br>{escape(', '.join(score.items))}"

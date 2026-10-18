@@ -54,8 +54,8 @@ name: Example Mood Scale
 |---|---|---|---|
 | `id` | text | | The score's ID. Required. |
 | `label` | text | | Its name, such as Total. Required. |
-| `method` | `sum` or `mean` | | How the items are combined. Required. |
-| `items` | list of text | | The item IDs. Required. |
+| `method` | `sum`, `mean` or `script` | | How the items are combined, or `script` for a score the lab's own script computes, read from the dataset's `scores` file. Required. |
+| `items` | list of text | | The item IDs. Required for `sum` and `mean`; for `script`, optional, the items the script reads. |
 | `missing_rule` | `complete`, `prorate` or `zero` | `complete` | What to do with missing items. |
 | `min_valid` | number | | The fewest answered items that still give a score. |
 | `custom` | mapping | | Values of custom fields that apply to scores. |

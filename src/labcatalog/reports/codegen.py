@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from labcatalog.config import ProjectConfig, dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import Catalog, ResolvedScore
+from labcatalog.schema import SCRIPT
 
 
 def scoring_code_r(scores: list[ResolvedScore]) -> str:
@@ -29,7 +30,9 @@ def script(
     ]
     for score in scores:
         lines.append("")
-        if score.unavailable_items:
+        if score.method == SCRIPT:
+            lines.append(f"# {score.label} ({score.score_id}) is computed by the lab's own script.")
+        elif score.unavailable_items:
             lines.append(unavailable_note(score))
         else:
             lines += [f"# {score.label} ({score.score_id})", *body(score)]

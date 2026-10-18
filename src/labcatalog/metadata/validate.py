@@ -16,7 +16,7 @@ from labcatalog.issues import Issue, IssueLevel
 from labcatalog.metadata.varmap import MapEntry
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
 from labcatalog.reports import measures, participants
-from labcatalog.schema import Administration, Instrument
+from labcatalog.schema import SCRIPT, Administration, Instrument
 
 CONFIG = defaults.CONFIG_FILENAME
 
@@ -266,6 +266,12 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
         absent = [item_id for item_id in score.items if item_id not in items]
         if absent:
             issues.append(unknown(f"{where}.items: no item(s) {', '.join(absent)}", location))
+        # A script's score may name the items it reads, but labcatalog does not score them.
+        if score.method == SCRIPT:
+            continue
+        if not score.items:
+            message = f"{where}.items: list the items it is the {score.method} of"
+            issues.append(problem("invalid_value", message, location))
         unscorable = []
         for item_id in score.items:
             if item_id not in items:

@@ -32,6 +32,10 @@ class LoadedDataset:
     file_waves: set[str] | None = None
     # The IDs as the file writes them, before id_map.csv corrects them.
     original_ids: pd.Series | None = None
+    # The scores file's columns, one row per row of the data; None when there is no such file.
+    scores: pd.DataFrame | None = None
+    # Every ID of the scores file, to find those the data do not have.
+    score_ids: set[str] | None = None
     numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
     answer_cache: dict[tuple, pd.Series] = field(default_factory=dict, repr=False)
 
@@ -130,6 +134,7 @@ def load_dataset(
         for column in filter(None, (id_column, dataset.respondent_column)):
             frame[column] = id_map.apply(frame[column], corrected)
     ids = frame[id_column]
+    scores, score_ids = read_scores(project, dataset, id_column, ids, corrected)
 
     group = None
     if groups is not None:
@@ -145,7 +150,33 @@ def load_dataset(
         source_path=expand_path(dataset.path, project.root) if dataset.path else None,
         file_waves=file_waves,
         original_ids=original,
+        scores=scores,
+        score_ids=score_ids,
     )
+
+
+def read_scores(
+    project: Project,
+    dataset: DatasetConfig,
+    id_column: str,
+    ids: pd.Series,
+    corrected: dict[str, str],
+) -> tuple[pd.DataFrame | None, set[str] | None]:
+    # Before its prepare step has run the file is not there; the checks say so.
+    if dataset.scores is None:
+        return None, None
+    path = expand_path(dataset.scores, project.root)
+    if not path.is_file():
+        return None, None
+    table = read_csv(path, dataset.name)
+    if id_column not in table:
+        raise DataSourceError(
+            f"{dataset.name}: the scores file {dataset.scores} has no column '{id_column}'"
+        )
+    table[id_column] = id_map.apply(table[id_column], corrected)
+    found = set(table[id_column])
+    by_id = table.drop_duplicates(id_column).set_index(id_column)
+    return by_id.reindex(ids.to_numpy()).set_axis(ids.index), found
 
 
 def load_datasets(project: Project) -> dict[str, LoadedDataset]:

@@ -102,6 +102,8 @@ class DatasetConfig(StrictModel):
     wave_value: str | None = None
     # The column map in maps/ this dataset reads, when it shares one with other datasets.
     map: str | None = None
+    # A file a script writes: the ID column, then a column per score, named by the score's ID.
+    scores: str | None = None
     snapshot_date: date | None = None
     missing_codes: list[MissingCode] | None = None
     custom: dict[str, Any] = {}

@@ -4,7 +4,7 @@ from labcatalog.config import dataset_by_name
 from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.metadata.bibliography import in_text
 from labcatalog.project import Project
-from labcatalog.schema import Instrument
+from labcatalog.schema import SCRIPT, Instrument
 from labcatalog.stats.cfa import WLSMV, CfaFit
 from labcatalog.stats.summary import Summary
 
@@ -140,11 +140,15 @@ def reversed_items(instrument: Instrument, administered: set[str]) -> str:
 def scoring(scores: list[ResolvedScore]) -> str:
     by_method: dict[str, list[str]] = {}
     for s in scores:
-        by_method.setdefault(s.method, []).append(f"{s.label} ({number(len(s.columns))} items)")
+        named = s.label if s.method == SCRIPT else f"{s.label} ({number(len(s.columns))} items)"
+        by_method.setdefault(s.method, []).append(named)
     if not by_method:
         return ""
     parts = [
-        f"the {method} of the items for {series(named)}" for method, named in by_method.items()
+        f"computed by the lab's scoring script for {series(named)}"
+        if method == SCRIPT
+        else f"the {method} of the items for {series(named)}"
+        for method, named in by_method.items()
     ]
     return f"Scores are {series(parts)}."
 

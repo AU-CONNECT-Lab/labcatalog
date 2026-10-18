@@ -8,6 +8,7 @@ from labcatalog import defaults
 from labcatalog.config import ProjectConfig, missing_labels_for
 from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
 from labcatalog.data.scoring import scorable, score_items
+from labcatalog.schema import SCRIPT
 from labcatalog.sources import LoadedDataset
 from labcatalog.stats.link import link
 
@@ -242,8 +243,8 @@ def valid_answers(
 
 
 def summarize_score(loaded: LoadedDataset, score: ResolvedScore, values: pd.Series) -> ScoreSummary:
-    low, high = score_range(score)
     valid = values.dropna()
+    low, high = score_range(score, valid)
     summary = ScoreSummary(
         key=score.key,
         dataset=score.dataset,
@@ -276,7 +277,10 @@ def describe(values: pd.Series) -> dict[str, float | None]:
     }
 
 
-def score_range(score: ResolvedScore) -> tuple[float, float]:
+def score_range(score: ResolvedScore, values: pd.Series) -> tuple[float, float]:
+    # A script's score has no items to bound it, so its range is the one found.
+    if score.method == SCRIPT:
+        return (float(values.min()), float(values.max())) if len(values) else (0.0, 0.0)
     lows = [min(score.valid_values[column]) for column in score.columns]
     highs = [max(score.valid_values[column]) for column in score.columns]
     if score.method == "sum":

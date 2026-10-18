@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog import schema
 from labcatalog.exceptions import LabCatalogError, MplusError, RError
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis, mplus
@@ -116,7 +117,12 @@ def what(result: CatalogResult, v: Variable) -> str:
     score = next(s for s in result.catalog.scores if s.key == first_key(v.key))
     instrument = result.project.instruments[score.instrument_id]
     definition = next(s for s in instrument.scores if s.id == score.score_id)
-    return f"the score {v.label} ({v.dataset}), the {definition.method} of its items"
+    how = (
+        "computed by a script"
+        if definition.method == schema.SCRIPT
+        else f"the {definition.method} of its items"
+    )
+    return f"the score {v.label} ({v.dataset}), {how}"
 
 
 def values_text(v: Variable) -> str:
