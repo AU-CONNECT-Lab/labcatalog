@@ -3,6 +3,7 @@ import subprocess
 from dataclasses import dataclass
 
 from labcatalog.exceptions import RError
+from labcatalog.processes import NEW_GROUP, end_tree
 
 CFA_PACKAGES = ("lavaan", "semTools")
 ANALYSIS_PACKAGES = ("psych", "effectsize", "MBESS")
@@ -17,6 +18,8 @@ ALL_PACKAGES = (
     + IMPUTATION_PACKAGES
 )
 MISSING_PACKAGES = 3
+# The R processes running now, so that closing the window can end them.
+RUNNING: set[subprocess.Popen] = set()
 CHECK = """\
 missing <- Filter(function(p) !requireNamespace(p, quietly = TRUE), c({packages}))
 if (length(missing) > 0) {{
@@ -53,18 +56,35 @@ def r_status(rscript: str, packages: tuple[str, ...] = ALL_PACKAGES) -> RStatus:
 
 def run_r(rscript: str, args: list[str]) -> str:
     try:
-        done = subprocess.run(
-            [rscript, *args], capture_output=True, text=True, encoding="utf-8", errors="replace"
+        process = subprocess.Popen(
+            [rscript, *args],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            **NEW_GROUP,
         )
     except OSError:
         raise RError(
             f"Rscript not found at {rscript}; check the path on the Settings page"
         ) from None
-    if done.returncode == MISSING_PACKAGES:
-        missing = done.stdout.split()
+    RUNNING.add(process)
+    try:
+        stdout, stderr = process.communicate()
+    finally:
+        RUNNING.discard(process)
+    if process.returncode == MISSING_PACKAGES:
+        missing = stdout.split()
         raise RError(
             f"R is missing {', '.join(missing)}; install them in R with: {install_command(missing)}"
         )
-    if done.returncode != 0:
-        raise RError(f"R stopped with an error: {done.stderr.strip()[-500:]}")
-    return done.stdout
+    if process.returncode != 0:
+        raise RError(f"R stopped with an error: {stderr.strip()[-500:]}")
+    return stdout
+
+
+def stop_all() -> None:
+    # Ends every R still running, with the workers it started, as the window closes.
+    for process in list(RUNNING):
+        end_tree(process)

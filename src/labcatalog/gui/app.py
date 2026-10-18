@@ -56,6 +56,7 @@ from labcatalog.pipeline import (
     run_invariance,
     run_open_freeze,
 )
+from labcatalog.stats import rbridge
 from labcatalog.version import __version__
 
 WINDOW_SIZE = (1280, 820)
@@ -83,6 +84,7 @@ def launch(project: Path | None = None) -> None:
         use_folder(datalad)
     # Saving a table or figure goes through the window's own save dialog.
     app.native.settings["ALLOW_DOWNLOADS"] = True
+    app.on_shutdown(rbridge.stop_all)
     ui.run(
         root=lambda: main_page(project),
         title=f"labcatalog {__version__}",

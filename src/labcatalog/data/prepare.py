@@ -1,8 +1,5 @@
-import contextlib
 import os
-import signal
 import subprocess
-import sys
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -14,12 +11,12 @@ from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.bridge import run_args
 from labcatalog.exceptions import DataladError
 from labcatalog.paths import expand_path
+from labcatalog.processes import NEW_GROUP, end_tree
 from labcatalog.project import Project
 
 Status = Literal["up to date", "outdated", "missing output", "missing input"]
 
 # A shell that starts its own process group can be stopped together with what it runs.
-NEW_GROUP: dict = {} if sys.platform == "win32" else {"start_new_session": True}
 
 
 @dataclass
@@ -174,9 +171,4 @@ def stop(session: Session) -> None:
     process = session.process
     if process is None:
         return
-    if sys.platform == "win32":
-        # /T also ends what the shell started, such as Rscript.
-        subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True)
-    else:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(process.pid, signal.SIGTERM)
+    end_tree(process)
