@@ -50,6 +50,20 @@ labcatalog freeze NAME [--push] [-p PROJECT]
 
 Record the data as they are now under `NAME`, for example `2026-06-submission`. Datasets in DataLad are also saved and tagged; with `--push`, the tag and the data then go to each dataset's sibling (its only one, or `origin`). See [Using labcatalog with DataLad](../how-to/datalad.md).
 
+```bash
+labcatalog open-freeze NAME [--to FOLDER] [-p PROJECT]
+```
+
+Copy the project as it was at the freeze `NAME` into `FOLDER` (a new temporary folder when left out): the datasets are cloned, checked out at the freeze's tag, and the files the project reads are downloaded. The freeze must have been made with DataLad.
+
+## get
+
+```bash
+labcatalog get [PATHS...] [-p PROJECT]
+```
+
+In a clone of a DataLad project, download the content of the given files or folders, or, when none are given, the metadata and every file the project reads, as **Get missing content** does in the window. Both commands use the `datalad` on PATH.
+
 ## derivatives
 
 ```bash

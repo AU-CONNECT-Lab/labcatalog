@@ -48,7 +48,7 @@ cd my_project
 datalad get -n data
 ```
 
-`datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The Prepare page also has a Get button next to each file that is not downloaded.
+`datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The Prepare page also has a Get button next to each file that is not downloaded. On the command line, `labcatalog get` does the same as Get missing content.
 
 ## Prepare steps through datalad run
 
@@ -73,4 +73,4 @@ datalad push --to <sibling> --data anything
 git push <sibling> <freeze name>
 ```
 
-To see the data as they were at a freeze, open the Datasets page and press Open next to it in the Freezes table. labcatalog clones the datasets into a temporary folder, checks out the tag, downloads the files the project reads, and opens that copy. The window's title bar says whether every data file matches the freeze record; a mismatch usually means a data path in `labcatalog.yaml` is absolute or starts with `~`, so the copy read today's file. Edits in the copy do not change the project. Back to the project returns to it.
+To see the data as they were at a freeze, open the Datasets page and press Open next to it in the Freezes table. labcatalog clones the datasets into a temporary folder, checks out the tag, downloads the files the project reads, and opens that copy. The window's title bar says whether every data file matches the freeze record; a mismatch usually means a data path in `labcatalog.yaml` is absolute or starts with `~`, so the copy read today's file. Edits in the copy do not change the project. Back to the project returns to it. On the command line, `labcatalog open-freeze <name> --to <folder>` makes the same copy in a folder you choose.

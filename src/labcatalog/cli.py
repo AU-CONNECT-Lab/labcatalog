@@ -9,7 +9,13 @@ import typer
 from labcatalog import defaults
 from labcatalog.codebook.derivatives import Request, run_derivatives
 from labcatalog.datalad.freeze import RECORD_ONLY
-from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCatalogError
+from labcatalog.exceptions import (
+    EXIT_ISSUES,
+    EXIT_OK,
+    EXIT_UNEXPECTED,
+    DataladError,
+    LabCatalogError,
+)
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import (
     run_check,
@@ -18,6 +24,9 @@ from labcatalog.pipeline import (
     run_codebook_import,
     run_codebook_prompt,
     run_freeze,
+    run_get,
+    run_get_missing,
+    run_open_freeze,
     run_prepare,
     run_push_freeze,
     run_schema,
@@ -141,6 +150,44 @@ def freeze(
     if push:
         pushed = run_push_freeze(project, record.name, datalad)
         typer.echo(f"Pushed {len(pushed)} dataset(s).")
+
+
+@app.command()
+def get(
+    paths: Annotated[
+        list[Path] | None,
+        typer.Argument(help="Files or folders to get; everything the project reads when left out."),
+    ] = None,
+    project: ProjectOption = Path("."),
+) -> None:
+    """Get the content of files DataLad has not fetched yet in this clone."""
+    datalad = datalad_on_path()
+    if paths:
+        run_get(paths, datalad)
+    else:
+        run_get_missing(project, datalad)
+    typer.echo("Got the missing content.")
+
+
+@app.command("open-freeze")
+def open_freeze(
+    name: Annotated[str, typer.Argument(help="Name of the freeze, as given to labcatalog freeze.")],
+    to: Annotated[
+        Path | None,
+        typer.Option("--to", help="New folder for the copy; a temporary folder when left out."),
+    ] = None,
+    project: ProjectOption = Path("."),
+) -> None:
+    """Copy the project as it was at a freeze, with its data, into a folder of its own."""
+    copy = run_open_freeze(project, name, datalad_on_path(), to)
+    typer.echo(f"Opened {name} in {copy}")
+
+
+def datalad_on_path() -> str:
+    found = shutil.which("datalad")
+    if found is None:
+        raise DataladError("DataLad is not on PATH; install it first")
+    return found
 
 
 codebook_app = typer.Typer(

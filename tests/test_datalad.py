@@ -6,8 +6,10 @@ import sys
 from pathlib import Path
 
 import pytest
+from typer.testing import CliRunner
 
 from labcatalog.ai.scoring import reference_pdfs
+from labcatalog.cli import app
 from labcatalog.data.check import check_prepare_outputs
 from labcatalog.data.ids import load_exclusions
 from labcatalog.data.manifest import build_manifest, git_commit
@@ -507,3 +509,35 @@ def test_a_freeze_pushes_to_the_only_sibling_or_to_origin(tmp_path):
             git(root, "remote", "add", remote, str(tmp_path / "elsewhere.git"))
         roots.append(root)
     assert list(push_targets(roots).values()) == [None, "store", "origin", None]
+
+
+def test_the_command_line_needs_datalad_and_a_known_freeze(mock_project, monkeypatch):
+    run_freeze(mock_project, "pilot", None)
+    with pytest.raises(FreezeError, match="No freeze named pliot; the freezes are: pilot"):
+        run_open_freeze(mock_project, "pliot", "datalad")
+    monkeypatch.setattr(shutil, "which", lambda name, **kwargs: None)
+    done = CliRunner().invoke(app, ["get", "-p", str(mock_project)])
+    assert isinstance(done.exception, DataladError)
+
+
+@needs_datalad
+def test_the_command_line_gets_content_and_opens_a_freeze(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    run_freeze(mock_project, "pilot", datalad_exe())
+    clone = mock_project.parent / "clone"
+    datalad(mock_project.parent, "clone", str(mock_project), str(clone))
+    assert is_placeholder(clone / "data" / "child_w2.csv")
+    runner = CliRunner()
+    done = runner.invoke(app, ["get", "-p", str(clone)])
+    assert done.exit_code == 0, done.output
+    assert not is_placeholder(clone / "data" / "child_w2.csv")
+    frozen = mock_project.parent / "frozen"
+    done = runner.invoke(
+        app, ["open-freeze", "pilot", "--to", str(frozen), "-p", str(mock_project)]
+    )
+    assert done.exit_code == 0, done.output
+    assert done.output.strip() == f"Opened pilot in {frozen}"
+    assert run_catalog(frozen).datasets

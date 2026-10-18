@@ -26,7 +26,7 @@ from labcatalog.datalad.freeze import (
     open_freeze,
     push_freeze,
 )
-from labcatalog.exceptions import CodebookError, MetadataError
+from labcatalog.exceptions import CodebookError, FreezeError, MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.metadata import accepted
@@ -243,9 +243,13 @@ def run_get_missing(root: Path, datalad: str) -> None:
     get_content(datalad, [p for p in used_paths(config, root) if p != pdfs and p not in folders])
 
 
-def run_open_freeze(root: Path, name: str, datalad: str) -> Path:
-    record = next(f for f in list_freezes(root) if f.name == name)
-    folder = Path(tempfile.mkdtemp(prefix=f"labcatalog-{name}-"))
+def run_open_freeze(root: Path, name: str, datalad: str, folder: Path | None = None) -> Path:
+    freezes = list_freezes(root)
+    record = next((f for f in freezes if f.name == name), None)
+    if record is None:
+        known = ", ".join(f.name for f in freezes) or "none yet"
+        raise FreezeError(f"No freeze named {name}; the freezes are: {known}")
+    folder = folder or Path(tempfile.mkdtemp(prefix=f"labcatalog-{name}-"))
     copy = open_freeze(root.resolve(), record, folder, datalad)
     run_get_missing(copy, datalad)
     return copy
