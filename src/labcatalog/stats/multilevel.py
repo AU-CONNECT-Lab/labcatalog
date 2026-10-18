@@ -346,7 +346,9 @@ def each_wave(key: str) -> bool:
     return "@" not in key
 
 
-def covariate_choices(result: CatalogResult, labels: dict[str, str]) -> dict[str, str]:
+def covariate_choices(
+    result: CatalogResult, labels: dict[str, str], datasets: list[str] | None = None
+) -> dict[str, str]:
     configs = {d.name: d for d in result.project.config.datasets}
     keys = covariate_keys(result)
     found = {k: f"{variable_label(result, k)} ({labels[k.rsplit('@', 1)[1]]})" for k in keys}
@@ -361,6 +363,27 @@ def covariate_choices(result: CatalogResult, labels: dict[str, str]) -> dict[str
         studies = [study for study, _ in held]
         if len(studies) > len(set(studies)):
             found[base] = f"{variable_label(result, first[base])} (each wave)"
+    if datasets and analysis.pooling(result, datasets):
+        found = {k: v for k, v in found.items() if each_wave(k)}
+        found |= pooled_covariates(result, analysis.studies_of(result, datasets))
+    return found
+
+
+def pooled_covariates(result: CatalogResult, studies: list[str]) -> dict[str, str]:
+    # One file per study: each study's first file of the covariate together, then the second.
+    configs = {d.name: d for d in result.project.config.datasets}
+    by_base: dict[str, dict[str, list[str]]] = {}
+    for key in covariate_keys(result):
+        base, name = key.rsplit("@", 1)
+        by_base.setdefault(base, {}).setdefault(configs[name].study, []).append(name)
+    found = {}
+    for base, held in by_base.items():
+        if not all(s in held for s in studies):
+            continue
+        files = [sorted(held[s], key=lambda n: wave_order(configs[n].wave)) for s in studies]
+        for paired in zip(*files, strict=False):
+            label = variable_label(result, f"{base}@{paired[0]}")
+            found[f"{base}@{analysis.POOL.join(paired)}"] = f"{label} ({' + '.join(paired)})"
     return found
 
 
@@ -373,12 +396,35 @@ def holders(result: CatalogResult, base: str, study: str) -> list[str]:
     return [n for n in keys_of(covariate_keys(result), base) if configs[n].study == study]
 
 
+def study_model(result: CatalogResult, model: Model, study: str) -> Model:
+    # One study's part of a pooled model, each pooled covariate taken from that study's file.
+    configs = {d.name: d for d in result.project.config.datasets}
+
+    def own(key: str) -> str:
+        if each_wave(key):
+            return key
+        return next(
+            analysis.part_key(key, n) for n in analysis.parts(key) if configs[n].study == study
+        )
+
+    return replace(
+        model,
+        datasets=[n for n in model.datasets if configs[n].study == study],
+        covariates=[own(k) for k in model.covariates],
+    )
+
+
 def problem(result: CatalogResult, model: Model) -> str | None:
     configs = {d.name: d for d in result.project.config.datasets}
     if not model.datasets:
         return "Choose at least one wave."
-    if len({configs[n].study for n in model.datasets}) > 1:
-        return "Choose waves from one study."
+    studies = analysis.studies_of(result, model.datasets)
+    if len(studies) > 1:
+        for study in studies:
+            found = problem(result, study_model(result, model, study))
+            if found:
+                return f"{result.project.config.studies[study].label or study}: {found}"
+        return None
     if len({configs[n].wave for n in model.datasets}) < len(model.datasets):
         return "Choose one dataset per wave."
     if not (model.by_person or model.by_group):
@@ -409,6 +455,9 @@ def problem(result: CatalogResult, model: Model) -> str | None:
 
 
 def long_frame(result: CatalogResult, model: Model) -> Long:
+    studies = analysis.studies_of(result, model.datasets)
+    if len(studies) > 1:
+        return pooled_frame(result, model, studies)
     configs = {d.name: d for d in result.project.config.datasets}
     ordered = sorted(model.datasets, key=lambda n: wave_order(configs[n].wave))
     outcome = identifier(model.outcome.split(".", 1)[1], {PERSON, TIME, WAVE})
@@ -448,6 +497,47 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
     if origin is not None:
         label = f"Time ({model.time}s since wave {configs[ordered[0]].wave} began)"
     return Long(frame, outcome, group, covariates, left_out, label)
+
+
+def pooled_frame(result: CatalogResult, model: Model, studies: list[str]) -> Long:
+    # Each study's own rows, its people and groups kept apart, with the study as a fixed effect.
+    longs = [long_frame(result, study_model(result, model, s)) for s in studies]
+    first = longs[0]
+    frames, waves = [], {}
+    for code, (study, long) in enumerate(zip(studies, longs, strict=True), start=1):
+        names = {c.column: f.column for c, f in zip(long.covariates, first.covariates, strict=True)}
+        frame = long.frame.rename(columns=names)
+        frame[PERSON] = study + "/" + frame[PERSON]
+        if first.group:
+            frame[first.group] = study + "/" + frame[first.group]
+        # The nth chosen wave of each study shares one name, such as 1/baseline.
+        position = {w: n for n, w in enumerate(dict.fromkeys(frame[WAVE]))}
+        for wave, n in position.items():
+            waves.setdefault(n, []).append(wave)
+        frame[WAVE] = frame[WAVE].map(position)
+        frame["_study"] = float(code)
+        frames.append(frame)
+    frame = pd.concat(frames, ignore_index=True)
+    frame[WAVE] = frame[WAVE].map({n: "/".join(dict.fromkeys(w)) for n, w in waves.items()})
+    column = identifier(analysis.STUDY_KEY, set(frame.columns))
+    frame = frame.rename(columns={"_study": column})
+    configs = result.project.config.studies
+    study = Covariate(
+        analysis.STUDY_KEY,
+        "Study",
+        column,
+        [(float(n), configs[s].label or s) for n, s in enumerate(studies, start=1)],
+        {},
+    )
+    label = first.time_label
+    if label != TIME_LABEL:
+        label = f"Time ({model.time}s since each study's first wave began)"
+    left_out = sum(long.left_out for long in longs)
+    return Long(frame, first.outcome, first.group, [*first.covariates, study], left_out, label)
+
+
+def pooled(long: Long) -> bool:
+    return any(c.key == analysis.STUDY_KEY for c in long.covariates)
 
 
 def visit_dates(result: CatalogResult, name: str) -> pd.Series:
@@ -590,11 +680,12 @@ def title(model: Model, long: Long, label: str) -> str:
     heading = f"Multilevel model of {label}: {' and '.join(levels)}{random}."
     if len(model.datasets) < 2:
         return heading
+    first = "each study's first chosen wave" if pooled(long) else "the first chosen wave"
+    if pooled(long):
+        heading += " The studies' people and groups are their own, and the study is a fixed effect."
     if model.time == WAVES:
-        return f"{heading} Time is waves since the first chosen wave (a skipped wave leaves a gap)."
-    return (
-        f"{heading} Time is {model.time}s since the earliest visit date in the first chosen wave."
-    )
+        return f"{heading} Time is waves since {first} (a skipped wave leaves a gap)."
+    return f"{heading} Time is {model.time}s since the earliest visit date in {first}."
 
 
 def code(model: Model, long: Long, label: str) -> tuple[str, str]:

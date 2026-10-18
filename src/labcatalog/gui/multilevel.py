@@ -41,7 +41,12 @@ def render(result: CatalogResult, view) -> None:
         if view.multilevel is None or view.multilevel.outcome not in outcomes:
             view.multilevel = ml.default_model(result, list(outcomes))
         labels = {name: views.dataset_label(result, name) for name in result.datasets}
-        covariates = analysis.of_instruments(ml.covariate_choices(result, labels), view.instruments)
+
+        def covariate_options(datasets: list[str]) -> dict[str, str]:
+            found = ml.covariate_choices(result, labels, datasets)
+            return analysis.of_instruments(found, view.instruments)
+
+        covariates = covariate_options(view.multilevel.datasets)
         # Covariates of measures no longer chosen leave the model too.
         kept = [k for k in view.multilevel.covariates if k in covariates]
         view.multilevel = replace(view.multilevel, covariates=kept)
@@ -50,7 +55,9 @@ def render(result: CatalogResult, view) -> None:
         note(
             "Waves within people, people within groups, or both, fitted the way JASP's linear "
             "mixed models are. This section picks its own waves and keeps everyone with at least "
-            "one; the Sample on the left does not apply."
+            "one; the Sample on the left does not apply. Waves of several studies pool them: "
+            "each study's people and groups are their own, time counts from each study's first "
+            "chosen wave, and the study enters as a fixed effect."
         )
 
         @ui.refreshable
@@ -118,8 +125,15 @@ def render(result: CatalogResult, view) -> None:
             model = view.multilevel
             body.refresh()
 
+        def choose_waves(datasets: list[str], **fields) -> None:
+            # A covariate from one file needs its file in every study once waves pool studies.
+            options = covariate_options(datasets)
+            kept = [k for k in model.covariates if k in options]
+            change(datasets=datasets, covariates=kept, **fields)
+            covariate_select.set_options(options, value=model.covariates)
+
         def choose_outcome(value: str) -> None:
-            change(outcome=value, datasets=ml.wave_datasets(result, value))
+            choose_waves(ml.wave_datasets(result, value), outcome=value)
             waves.set_options(
                 {n: labels[n] for n in ml.occasions(result, value)}, value=model.datasets
             )
@@ -138,19 +152,23 @@ def render(result: CatalogResult, view) -> None:
                     multiple=True,
                     value=model.datasets,
                     label="Waves",
-                    on_change=lambda e: change(datasets=e.value or []),
+                    on_change=lambda e: choose_waves(e.value or []),
                 )
                 .props("dense outlined use-chips")
                 .classes("min-w-96 grow")
             )
-        ui.select(
-            covariates,
-            multiple=True,
-            value=[k for k in model.covariates if k in covariates],
-            label="Covariates (one dataset's value, or each wave's own)",
-            with_input=True,
-            on_change=lambda e: change(covariates=e.value or []),
-        ).props("dense outlined use-chips").classes("w-full")
+        covariate_select = (
+            ui.select(
+                covariates,
+                multiple=True,
+                value=[k for k in model.covariates if k in covariates],
+                label="Covariates (one dataset's value, or each wave's own)",
+                with_input=True,
+                on_change=lambda e: change(covariates=e.value or []),
+            )
+            .props("dense outlined use-chips")
+            .classes("w-full")
+        )
         with ui.row().classes("w-full items-center gap-6"):
             ui.select(
                 TIME_UNITS,

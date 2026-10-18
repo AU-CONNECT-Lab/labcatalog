@@ -380,3 +380,68 @@ def test_r_and_python_agree_on_time_in_years(result):
     model = growth(time="year")
     long = ml.long_frame(result, model)
     close(ml.run(result, model, long, "EMS", rscript()), ml.run(result, model, long, "EMS", None))
+
+
+BOTH = [*CHILD, "s2_child_baseline", "s2_child_followup"]
+STRESS = "example_parent_stress.eps_mean@parent_w1+s2_parent_baseline"
+
+
+@pytest.fixture
+def both(example_project):
+    return run_catalog(example_project)
+
+
+def test_waves_of_two_studies_pool_with_the_study_as_a_fixed_effect(both):
+    model = ml.Model(EMS, BOTH, slope=False)
+    assert ml.problem(both, model) is None
+    long = ml.long_frame(both, model)
+    frame = long.frame
+    # IDs repeat across the studies, but their people are their own.
+    assert {"mock_study/1001C", "mock_study_2/1001C"} <= set(frame[ml.PERSON])
+    assert frame.groupby(frame[ml.PERSON].str.split("/").str[0])[ml.TIME].max().to_dict() == {
+        "mock_study": 2,
+        "mock_study_2": 1,
+    }
+    assert sorted(frame[ml.WAVE].unique()) == ["1/baseline", "2/followup", "3"]
+    study = long.covariates[-1]
+    assert (study.label, study.levels) == (
+        "Study",
+        [(1.0, "Mock Family Study"), (2.0, "Mock Study 2")],
+    )
+    assert set(frame.loc[frame[ml.WAVE] == "3", study.column]) == {1.0}
+    r, _ = ml.code(model, long, "EMS")
+    assert f"time + {study.column}" in r and "first chosen wave" in r
+
+
+def test_a_pooled_covariate_takes_each_studys_own_file(both):
+    labels = {n: n for n in both.datasets}
+    choices = ml.covariate_choices(both, labels, BOTH)
+    assert STRESS in choices and "example_parent_stress.eps_mean@parent_w1" not in choices
+    assert "example_parent_stress.eps_mean@parent_w1" in ml.covariate_choices(both, labels, CHILD)
+    long = ml.long_frame(both, ml.Model(EMS, BOTH, covariates=[STRESS], slope=False))
+    stress = long.covariates[0]
+    in_study_2 = long.frame[ml.PERSON].str.startswith("mock_study_2/")
+    assert long.frame.loc[in_study_2, stress.column].notna().any()
+    assert long.frame.loc[~in_study_2, stress.column].notna().any()
+
+
+def test_each_study_needs_one_dataset_per_wave(both):
+    model = ml.Model(EMS, [*CHILD, "s2_child_baseline"])
+    assert ml.problem(both, model) == (
+        "Mock Study 2: People need two or more waves; choose more waves, or groups only."
+    )
+
+
+@needs_r
+def test_r_and_python_agree_on_a_pooled_model(both):
+    model = ml.Model(EMS, BOTH, slope=False)
+    long = ml.long_frame(both, model)
+    fitted = {
+        engine: ml.run(both, model, long, "EMS", path)
+        for engine, path in (("r", rscript()), ("python", None))
+    }
+    terms = {engine: {t.label: t.estimate for t in f.fixed} for engine, f in fitted.items()}
+    assert "Study: Mock Study 2" in terms["r"]
+    for label, value in terms["r"].items():
+        assert terms["python"][label] == pytest.approx(value, abs=1e-3)
+    assert fitted["r"].people == long.frame[ml.PERSON].nunique()
