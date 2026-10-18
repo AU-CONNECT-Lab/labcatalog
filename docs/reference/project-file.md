@@ -48,21 +48,9 @@ missing_codes:
 |---|---|
 | `pattern` | A regular expression every participant ID must match. |
 | `group.name` | The name of the group, such as `family`. |
-| `group.from_id` | A regular expression whose first group reads the group from an ID. Without it, the `roster` gives each person's group. |
+| `group.from_id` | A regular expression whose first group reads the group from an ID. Without it, each study's `roster` gives its people's groups. |
 
 See [IDs, Groups and Missing Codes](../concepts/ids-groups-missing.md).
-
-## roster
-
-A CSV file listing everyone once, one row per person. Optional.
-
-| Key | Default | Meaning |
-|---|---|---|
-| `path` | | The file, relative to the project folder. |
-| `id_column` | `defaults.id_column` | The column with each person's ID. |
-| `group_column` | none | The column with each person's group, named by `ids.group.name`. Every dataset takes its groups from here; a project gives `ids.group.from_id` or this, not both. |
-| `role_column` | none | The column with each person's role, one of `vocab.reporters`. Each dataset's respondents are then checked against its `reporter`. |
-| `instrument` | none | A demographics instrument describing the roster's other columns, mapped to them in `maps/roster.csv`. The Analysis page offers its items for the people of every file. |
 
 ## studies
 
@@ -75,7 +63,23 @@ A mapping from each study's ID to:
 | `reference` | text | The key in `references.bib` of how to cite the study's data. |
 | `waves` | mapping | Each wave's key to its `start` and `end` dates (both optional). |
 | `milestones` | list | Dates to show on the Overview timeline, each with a `name` and a `date`. |
+| `roster` | mapping | The study's people, see below. |
+| `exclusions` | text | A path to a CSV file with an `id` column listing people or groups of the study who must not be in the data. `labcatalog check` reports rows of the study's datasets that belong to them. |
 | `custom` | mapping | Values of custom fields that apply to studies. |
+
+IDs belong to their study: two studies may both have a `1001P`, and they are different people. So each study lists its own people and exclusions.
+
+### roster
+
+A CSV file listing everyone in the study once, one row per person. Optional.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `path` | | The file, relative to the project folder. |
+| `id_column` | `defaults.id_column` | The column with each person's ID. |
+| `group_column` | none | The column with each person's group, named by `ids.group.name`. Every dataset of the study takes its groups from here; a project gives `ids.group.from_id` or this, not both. A study without one links its files by ID. |
+| `role_column` | none | The column with each person's role, one of `vocab.reporters`. Each dataset's respondents are then checked against its `reporter`. |
+| `instrument` | none | A demographics instrument describing the roster's other columns, mapped to them in `maps/roster_<study>.csv`. The Analysis page offers its items for the people of every file of the study. |
 
 ## datasets
 
@@ -125,10 +129,6 @@ A list of fields your lab adds to instruments, scores, administrations or datase
 | Key | Default | Meaning |
 |---|---|---|
 | `root` | the project folder | The folder holding `references.bib` and the reference PDFs. May start with `~` or contain environment variables. |
-
-## exclusions
-
-A path to a CSV file with an `id` column listing people or groups who must not be in the data. `labcatalog check` reports rows that belong to them.
 
 ## stats
 

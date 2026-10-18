@@ -20,8 +20,7 @@ missing_codes: []
 #   ids:
 #     pattern: '^\d{4}[PC]$'
 #     group: {name: family, from_id: '^(\d{4})'}
-# Or list everyone once in a roster, one row per person, with the group in a column you name; every dataset then takes its people's groups from it, and ids.group needs only its name:
-#   roster: {path: data/participants.csv, id_column: pid, group_column: family_id}
+# Or list each study's people once in its roster (under the study below), one row per person, with the group in a column you name; every dataset of the study then takes its people's groups from it, and ids.group needs only its name.
 
 # Optional: how the statistics run, shown here with their defaults. Everyone opening the project gets the same numbers.
 #   stats:
@@ -34,6 +33,7 @@ missing_codes: []
 # Each study and its waves, for example:  my_study: {label: My Study, waves: {1: {start: 2026-01-01}}}
 # A study can also have a description and a reference (the key in references.bib of how to cite its data); the Datasets page shows them.
 # Deadlines and other dates go in milestones, for example: milestones: [{name: Interim report, date: 2026-12-15}]; the Overview timeline shows them.
+# IDs belong to their study. A study can list its people in a roster, for example: roster: {path: data/participants.csv, id_column: pid, group_column: family_id}, and the people who left in an exclusion list (a CSV file with an id column), for example: exclusions: withdrawn.csv.
 studies: {}
 
 # One entry per data file, for example:

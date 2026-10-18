@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 
 from labcatalog import defaults
-from labcatalog.config import ProjectConfig, dataset_by_name
+from labcatalog.config import ProjectConfig, dataset_by_name, rosters
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.metadata.completeness import gaps
 from labcatalog.project import Project
@@ -88,11 +88,11 @@ def build_index(project: Project) -> BrowseIndex:
         for entry in entries:
             if entry.instrument:
                 columns.setdefault(entry.instrument, set()).add(entry.column)
-    roster = project.config.roster.instrument if project.config.roster else None
+    in_rosters = {r.instrument for r in rosters(project.config).values()}
     for instrument_id, instrument in project.instruments.items():
         if instrument_id not in administered:
-            # The roster's instrument is in the data, though in no dataset.
-            unused = [] if instrument_id == roster else [NOT_GIVEN]
+            # A roster's instrument is in the data, though in no dataset.
+            unused = [] if instrument_id in in_rosters else [NOT_GIVEN]
             custom = {
                 **part_values(instrument),
                 **instrument.custom,

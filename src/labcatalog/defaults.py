@@ -14,7 +14,7 @@ SCORING_DIR = "scoring"
 DRAFTS_DIR = "drafts"
 DATA_DIR = "data"
 SCRIPTS_DIR = "scripts"
-# The roster's name where it is read like a dataset: its column map is maps/roster.csv.
+# A study's roster read like a dataset is roster_<study>, with its column map in maps/.
 ROSTER = "roster"
 BIB_FILENAME = "references.bib"
 OUTPUTS_DIR = "outputs"

@@ -61,8 +61,8 @@ def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):
     (mock_project / "withdrawn.csv").write_text("id,reason\n1032P,withdrew\n1003,family withdrew\n")
     edit(
         mock_project / "labcatalog.yaml",
-        "custom_fields:",
-        "exclusions: withdrawn.csv\n\ncustom_fields:",
+        "    reference: mockstudy2026\n",
+        "    reference: mockstudy2026\n    exclusions: withdrawn.csv\n",
     )
     messages = found(run_check(mock_project))["excluded_present"]
     # 1032P is in all three parent waves; family 1003 has a parent and a child in all three,

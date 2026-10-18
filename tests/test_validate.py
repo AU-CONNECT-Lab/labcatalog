@@ -160,7 +160,7 @@ def test_blank_rows_left_by_excel_are_ignored(mock_project):
 
 def test_group_pattern_needs_one_capture(mock_project):
     yaml = mock_project / "labcatalog.yaml"
-    edit(yaml, "  group_column: family_id\n", "")
+    edit(yaml, "      group_column: family_id\n", "")
     edit(yaml, "    name: family\n", "    name: family\n    from_id: '^[0-9]{4}'\n")
     [issue] = run_validate(mock_project)
     assert issue.message.startswith("ids.group.from_id")

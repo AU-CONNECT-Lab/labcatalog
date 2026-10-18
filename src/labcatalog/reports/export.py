@@ -227,7 +227,8 @@ def data_frame(result: CatalogResult, dataset: str, instrument_ids: list[str]) -
     frame = loaded.frame[[c for c in dict.fromkeys(keys) if c] + items].copy()
     group = result.project.config.ids.group
     # A group read from the roster is not in the data, so it goes next to the ID.
-    if result.project.config.roster and group and loaded.group is not None:
+    roster = result.project.config.studies[loaded.config.study].roster
+    if roster and group and loaded.group is not None:
         frame.insert(1, group.name, loaded.group)
     for score in exported_scores(result, dataset, instrument_ids):
         frame[output_name(score)] = result.scores[dataset][score.key]

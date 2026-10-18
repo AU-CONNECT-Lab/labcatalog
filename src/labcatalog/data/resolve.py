@@ -2,7 +2,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.config import DatasetConfig, roster_dataset
+from labcatalog.config import DatasetConfig, roster_dataset, roster_name, rosters
 from labcatalog.project import Project
 from labcatalog.schema import Administration, Instrument, ItemType, ResponseOption, Text
 
@@ -62,7 +62,7 @@ class ResolvedScore(BaseModel):
 class Catalog(BaseModel):
     variables: list[ResolvedVariable]
     scores: list[ResolvedScore]
-    # The roster's described columns; not given in any dataset, so kept apart.
+    # Each study roster's described columns; not given in any dataset, so kept apart.
     roster_variables: list[ResolvedVariable] = []
 
     def variables_for(self, dataset: str) -> list[ResolvedVariable]:
@@ -90,16 +90,16 @@ def resolve_catalog(project: Project) -> Catalog:
 
 
 def resolve_roster(project: Project) -> list[ResolvedVariable]:
-    roster = project.config.roster
-    instrument = (
-        project.instruments.get(roster.instrument) if roster and roster.instrument else None
-    )
-    if instrument is None:
-        return []
-    administration = Administration(instrument=instrument.id, datasets=[defaults.ROSTER])
-    dataset = roster_dataset(project.config)
-    columns = mapped_columns(project, dataset, instrument.id)
-    return resolve_items(instrument, administration, dataset, columns)
+    found = []
+    for study, roster in rosters(project.config).items():
+        instrument = project.instruments.get(roster.instrument) if roster.instrument else None
+        if instrument is None:
+            continue
+        administration = Administration(instrument=instrument.id, datasets=[roster_name(study)])
+        dataset = roster_dataset(project.config, study)
+        columns = mapped_columns(project, dataset, instrument.id)
+        found += resolve_items(instrument, administration, dataset, columns)
+    return found
 
 
 def mapped_columns(project: Project, dataset: DatasetConfig, instrument_id: str) -> dict[str, str]:

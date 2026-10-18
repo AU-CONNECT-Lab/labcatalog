@@ -16,7 +16,7 @@ from labcatalog.datalad.check import check_git_annex
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
-from labcatalog.sources import LoadedDataset, Roster, load_roster, load_roster_dataset
+from labcatalog.sources import LoadedDataset, Roster, load_roster_datasets, load_rosters
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
 PHONE = re.compile(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
@@ -44,7 +44,7 @@ def check_project(
             *check_values(project, catalog, datasets),
             *id_map.check(project.root, {d.name for d in project.config.datasets}),
             *check_ids(project, datasets),
-            *check_roster(project, datasets),
+            *check_rosters(project, datasets),
             *check_roster_columns(project, catalog),
             *check_exclusions(project, datasets),
             *check_identifier_columns(project, datasets),
@@ -174,7 +174,7 @@ def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issu
         clean, found = id_problems(project, ids, where, dataset=dataset_name)
         issues += found
         # With a roster, people missing from it are reported by check_roster instead.
-        if loaded.group is not None and project.config.roster is None:
+        if loaded.group is not None and project.config.studies[loaded.config.study].roster is None:
             no_group = clean & loaded.group.isna()
             if no_group.any():
                 name = project.config.ids.group.name if project.config.ids.group else "group"
@@ -226,19 +226,26 @@ def id_problems(
 
 
 def check_roster_columns(project: Project, catalog: Catalog) -> list[Issue]:
-    # The roster's other columns are held to their instrument like a dataset's.
-    roster = load_roster_dataset(project)
-    if roster is None:
-        return []
-    found = {defaults.ROSTER: roster}
+    # A roster's other columns are held to their instrument like a dataset's.
+    found = {r.config.name: r for r in load_roster_datasets(project).values()}
     described = Catalog(variables=catalog.roster_variables, scores=[])
     return [*check_columns(project, found), *check_values(project, described, found)]
 
 
-def check_roster(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
-    roster = load_roster(project)
-    if roster is None:
-        return []
+def check_rosters(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
+    # A study's roster lists the people of that study's files only.
+    return [
+        issue
+        for study, roster in load_rosters(project).items()
+        for issue in check_roster(
+            project, roster, {n: d for n, d in datasets.items() if d.config.study == study}
+        )
+    ]
+
+
+def check_roster(
+    project: Project, roster: Roster, datasets: dict[str, LoadedDataset]
+) -> list[Issue]:
     where = portable_path(roster.path, project.root).as_posix()
     ids = roster.frame[roster.id_column]
     clean, issues = id_problems(project, ids, where)
@@ -321,11 +328,16 @@ def check_roles(
 
 
 def check_exclusions(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
-    if not project.config.exclusions:
-        return []
-    excluded = load_exclusions(expand_path(project.config.exclusions, project.root))
+    lists = {
+        name: load_exclusions(expand_path(study.exclusions, project.root))
+        for name, study in project.config.studies.items()
+        if study.exclusions
+    }
     issues = []
     for loaded in datasets.values():
+        excluded = lists.get(loaded.config.study)
+        if excluded is None:
+            continue
         ids = loaded.frame[loaded.id_column]
         hits = ids.isin(excluded)
         if loaded.group is not None:

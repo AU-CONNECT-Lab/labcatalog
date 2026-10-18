@@ -43,34 +43,38 @@ ids:
 
 Here `1001P` and `1001C` are the parent and child of family `1001`. `from_id` is a regular expression whose first group is the group's ID.
 
-When every person has an ID of their own that says nothing of their group, list everyone once in a roster instead and give the group only its name:
+When every person has an ID of their own that says nothing of their group, list everyone once in a roster instead and give the group only its name. IDs belong to their study (two studies may both have a `1001P`, and they are different people), so each study has its own roster, under its entry in `studies`:
 
 ```yaml
 ids:
   group:
     name: family
 
-roster:
-  path: data/participants.csv
-  id_column: pid
-  group_column: family_id
+studies:
+  mock_study:
+    roster:
+      path: data/participants.csv
+      id_column: pid
+      group_column: family_id
 ```
 
-The roster is a CSV file with one row per person: their ID, their group in a column you name, and any other columns you keep there, such as their role or birth year. Every dataset takes its people's groups from it, so a file that holds only a child's ID, such as an EEG file, still knows the child's family. Most labs already keep such a list, from recruitment or a demographics form; it can be made by one of your [prepare steps](../how-to/prepare-steps.md) like any other file. `from_id` and a roster's `group_column` are two ways of giving the same thing, so a project uses one of them.
+The roster is a CSV file with one row per person of the study: their ID, their group in a column you name, and any other columns you keep there, such as their role or birth year. Every dataset of the study takes its people's groups from it, so a file that holds only a child's ID, such as an EEG file, still knows the child's family. Most labs already keep such a list, from recruitment or a demographics form; it can be made by one of your [prepare steps](../how-to/prepare-steps.md) like any other file. `from_id` and a roster's `group_column` are two ways of giving the same thing, so a project uses one of them. A study whose roster gives no group, or that has no roster, links its files by ID.
 
-The roster's other columns can be described like any data: name a `kind: demographics` instrument as `roster.instrument` and map the columns to its items in `maps/roster.csv`, listing the ID and group columns with no instrument, as in a dataset's map:
+The roster's other columns can be described like any data: name a `kind: demographics` instrument as the roster's `instrument` and map the columns to its items in `maps/roster_<study>.csv`, listing the ID and group columns with no instrument, as in a dataset's map:
 
 ```yaml
-roster:
-  path: data/participants.csv
-  id_column: pid
-  group_column: family_id
-  instrument: example_participants
+studies:
+  mock_study:
+    roster:
+      path: data/participants.csv
+      id_column: pid
+      group_column: family_id
+      instrument: example_participants
 ```
 
-The roster's values are then checked against the instrument's options and ranges, the instrument's page shows their distribution in the roster, and the Analysis page offers them for the people of every chosen file, for example the gender of the children in `child_w1` and of the parents in `parent_w1`, in Table 1, group comparisons and covariates. The instrument is not given in any dataset, so dataset pages do not list it.
+The roster's values are then checked against the instrument's options and ranges, the instrument's page shows their distribution in the roster, and the Analysis page offers them for the people of every chosen file of the study, for example the gender of the children in `child_w1` and of the parents in `parent_w1`, in Table 1, group comparisons and covariates. The instrument is not given in any dataset, so dataset pages do not list it.
 
-With a roster, `labcatalog check` also reports IDs in the data that the roster does not list (`id_not_in_roster`), people the roster lists twice (`id_duplicate`) or without a group (`group_missing`), and, for information, people in the roster who are in no dataset yet (`roster_unused`).
+With a roster, `labcatalog check` also reports IDs in the study's data that its roster does not list (`id_not_in_roster`), people the roster lists twice (`id_duplicate`) or without a group (`group_missing`), and, for information, people in the roster who are in no dataset of the study yet (`roster_unused`).
 
 A roster with a column of roles, one of `vocab.reporters` for each person, can name it as `role_column: role`. Each dataset's respondents are then checked against its `reporter`: a child's ID in a file of parents is reported (`reporter_mismatch`). The respondent is read from the dataset's `respondent_column` when it has one, so a parent's file about each child is checked against the parents. Roles that are not reporters are reported once (`role_unknown`), and the people with them are not checked.
 
@@ -97,10 +101,12 @@ Missing codes are counted and shown by label on the dataset and instrument pages
 
 ## Exclusions
 
-`exclusions` points to a CSV file with an `id` column that lists people or groups who must not be in the data, for example those who withdrew consent:
+A study's `exclusions` points to a CSV file with an `id` column that lists people or groups of the study who must not be in the data, for example those who withdrew consent:
 
 ```yaml
-exclusions: data/exclusions.csv
+studies:
+  mock_study:
+    exclusions: data/exclusions.csv
 ```
 
-labcatalog does not remove anyone from your data. `labcatalog check` reports rows that belong to someone on the list (`excluded_present`), so you can remove them in your cleaning script.
+labcatalog does not remove anyone from your data. `labcatalog check` reports rows of the study's datasets that belong to someone on the list (`excluded_present`), so you can remove them in your cleaning script.

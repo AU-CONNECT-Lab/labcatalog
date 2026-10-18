@@ -114,7 +114,7 @@ def items_for(result: CatalogResult, dataset: str) -> list[ResolvedVariable]:
 
 
 def roster_items(result: CatalogResult, dataset: str) -> list[ResolvedVariable]:
-    # The roster's columns for the people of one file, as if the file held them.
+    # The study roster's columns for the people of one file, as if the file held them.
     config = result.datasets[dataset].config
     update = {
         "dataset": dataset,
@@ -123,17 +123,22 @@ def roster_items(result: CatalogResult, dataset: str) -> list[ResolvedVariable]:
         "reporter": config.reporter,
         "modality": config.modality,
     }
-    return [v.model_copy(update=update) for v in result.catalog.roster_variables]
+    return [
+        v.model_copy(update=update)
+        for v in result.catalog.roster_variables
+        if v.study == config.study
+    ]
 
 
 def from_roster(result: CatalogResult, variable: ResolvedVariable) -> bool:
-    roster = result.project.config.roster
+    roster = result.project.config.studies[variable.study].roster
     return roster is not None and roster.instrument == variable.instrument_id
 
 
 def roster_numbers(result: CatalogResult, dataset: str, column: str) -> pd.Series:
-    # Each row's value in the roster, found by its ID; someone listed twice has none.
-    roster, loaded = result.roster, result.datasets[dataset]
+    # Each row's value in its study's roster, found by its ID; someone listed twice has none.
+    loaded = result.datasets[dataset]
+    roster = result.rosters[loaded.config.study]
     ids = roster.frame[roster.id_column]
     once = (~ids.duplicated(keep=False)).to_numpy()
     table = pd.Series(roster.numbers(column).to_numpy()[once], index=ids[once])

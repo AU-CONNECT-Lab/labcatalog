@@ -1,3 +1,4 @@
+import shutil
 from pathlib import Path
 
 import pandas as pd
@@ -76,9 +77,9 @@ def test_the_group_is_read_one_way_only(mock_project):
 
 
 def test_a_group_needs_from_id_or_a_roster_column(mock_project):
-    edit(mock_project / "labcatalog.yaml", "  group_column: family_id\n", "")
+    edit(mock_project / "labcatalog.yaml", "      group_column: family_id\n", "")
     [issue] = run_validate(mock_project)
-    assert issue.message.startswith("ids.group: needs from_id, or a roster")
+    assert issue.message.startswith("ids.group: needs from_id, or a study roster")
 
 
 def test_a_roster_group_column_needs_a_declared_group(mock_project):
@@ -99,7 +100,7 @@ def test_exported_data_carry_the_group_from_the_roster(mock_project):
 
 def test_the_manifest_records_the_roster(mock_project):
     result = run_catalog(mock_project)
-    [record] = [f for f in result.manifest.files if f.dataset == "roster"]
+    [record] = [f for f in result.manifest.files if f.dataset == "roster_mock_study"]
     assert (record.path, record.rows) == ("data/participants.csv", len(roster(mock_project)))
 
 
@@ -124,7 +125,7 @@ def test_the_roster_instrument_describes_the_roster_itself(mock_project):
     gender = next(s for s in result.summary.roster if s.column == "gender")
     assert gender.n_valid == len(roster(mock_project))
     columns, rows = instruments.sample_table(result, result.project.instruments[PARTICIPANTS])
-    assert columns[-1]["label"] == "roster" and rows[0]["d0"] == gender.n_valid
+    assert columns[-1]["label"] == "roster_mock_study" and rows[0]["d0"] == gender.n_valid
 
 
 def test_the_analysis_offers_the_roster_for_the_people_of_each_file(mock_project):
@@ -170,18 +171,18 @@ def test_roster_values_are_held_to_their_instrument(mock_project):
 
 def test_the_roster_instrument_and_its_map_are_validated(mock_project):
     edit(
-        mock_project / "maps" / "roster.csv",
+        mock_project / "maps" / "roster_mock_study.csv",
         "gender,example_participants,gender",
         "gender,example_participants,sex",
     )
     issues = {i.code: i for i in run_validate(mock_project)}
-    assert issues["unknown_reference"].location.startswith("maps/roster.csv")
+    assert issues["unknown_reference"].location.startswith("maps/roster_mock_study.csv")
     assert "no item 'sex'" in issues["unknown_reference"].message
     # The roster's gender item now has no column, as a dataset's would.
     assert "gender" in issues["unmapped_item"].message
     edit(mock_project / "labcatalog.yaml", "instrument: example_participants", "instrument: nobody")
     messages = [i.message for i in run_validate(mock_project)]
-    assert "roster.instrument: no instrument 'nobody'" in messages
+    assert "studies.mock_study.roster.instrument: no instrument 'nobody'" in messages
 
 
 def test_every_respondent_has_the_role_of_their_datasets_reporter(mock_project):
@@ -220,5 +221,60 @@ def test_a_role_that_is_no_reporter_is_reported_once(mock_project):
 
 def test_a_missing_role_column_is_named(mock_project):
     edit(mock_project / "labcatalog.yaml", "role_column: role", "role_column: kind")
-    with pytest.raises(DataSourceError, match="roster: no column 'kind'"):
+    with pytest.raises(DataSourceError, match="mock_study roster: no column 'kind'"):
         load_datasets(load_project(mock_project))
+
+
+def add_pilot(root: Path) -> None:
+    # A second study whose IDs repeat the first's, with its own roster.
+    (root / "data" / "pilot_roster.csv").write_text(
+        "pid,family_id,role,birth_year,gender\n1001C,9001,child,2017,1\n1001P,9001,parent,1980,2\n",
+        encoding="utf-8",
+    )
+    shutil.copy(root / "maps" / "roster_mock_study.csv", root / "maps" / "roster_pilot.csv")
+    (root / "maps" / "pilot_w1.csv").write_text(
+        "column,instrument,item\npid,,\nvisit_date,,\n", encoding="utf-8"
+    )
+    edit(
+        root / "labcatalog.yaml",
+        "\n# One entry per data file",
+        "  pilot:\n    waves: {1: {}}\n    roster: {path: data/pilot_roster.csv, id_column: pid, "
+        "group_column: family_id, role_column: role, instrument: example_participants}\n"
+        "\n# One entry per data file",
+    )
+    edit(
+        root / "labcatalog.yaml",
+        "datasets:\n",
+        "datasets:\n  - {name: pilot_w1, modality: questionnaire, study: pilot, wave: 1, "
+        "reporter: child, source: csv, path: data/child_w1.csv}\n",
+    )
+
+
+def test_each_study_reads_its_own_roster(mock_project):
+    add_pilot(mock_project)
+    datasets = load_datasets(load_project(mock_project))
+    for name, family in (("child_w1", "1001"), ("pilot_w1", "9001")):
+        loaded = datasets[name]
+        assert loaded.group[loaded.frame[loaded.id_column] == "1001C"].tolist() == [family]
+    issues = run_check(mock_project).issues
+    [unlisted] = [
+        i for i in issues if i.code == "id_not_in_roster" and i.details["dataset"] == "pilot_w1"
+    ]
+    assert "1002C" in unlisted.message and "1001C" not in unlisted.message
+    # 1001P gave mock_study's data, which is no one's in the pilot.
+    [unused] = [i for i in issues if i.code == "roster_unused" and "pilot" in i.location]
+    assert unused.message.endswith(": 1001P")
+
+
+def test_the_analysis_reads_roster_values_from_the_files_study(mock_project):
+    add_pilot(mock_project)
+    result = run_catalog(mock_project)
+    assert {v.dataset for v in result.catalog.roster_variables} == {
+        "roster_mock_study",
+        "roster_pilot",
+    }
+    for name, year in (("child_w1", 2016.0), ("pilot_w1", 2017.0)):
+        [birth] = [v for v in analysis.roster_items(result, name) if v.item_id == "birth_year"]
+        values = analysis.item_numbers(result, birth)
+        ids = result.datasets[name].frame["pid"]
+        assert values[ids == "1001C"].tolist() == [year]

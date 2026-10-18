@@ -10,7 +10,7 @@ from ruamel.yaml.tokens import CommentToken
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
-from labcatalog.config import StudyConfig, WaveConfig, map_name_of
+from labcatalog.config import StudyConfig, WaveConfig, map_name_of, roster_name
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
 from labcatalog.metadata.changes import Change
@@ -199,6 +199,14 @@ def rename_study(project: Project, old: str, new: str) -> list[Change]:
         if str(entry.get("study")) == old:
             entry["study"] = records.as_text(new)
     found = [Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)]
+    # The roster's map is named after the study.
+    roster_map = f"{defaults.MAPS_DIR}/{roster_name(old)}.csv"
+    if (project.root / roster_map).exists():
+        opened_map = editing.open_file(project.root, roster_map)
+        found += [
+            Change(f"{defaults.MAPS_DIR}/{roster_name(new)}.csv", opened_map.text),
+            Change(roster_map, "", opened_map, removed=True),
+        ]
     relative = project.study_files.get(old)
     if relative is None:
         return found
@@ -243,7 +251,7 @@ def delete_study(project: Project, study: str) -> list[Change]:
     found = [Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)]
     kept = {d.map_name() for d in project.config.datasets if d.study != study}
     gone = {map_name_of(project.config, name) for name in names} - kept
-    files = [f"{defaults.MAPS_DIR}/{name}.csv" for name in sorted(gone)]
+    files = [f"{defaults.MAPS_DIR}/{name}.csv" for name in [*sorted(gone), roster_name(study)]]
     if study in project.study_files:
         files.append(project.study_files[study])
     for relative in files:

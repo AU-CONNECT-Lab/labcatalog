@@ -8,7 +8,7 @@ from labcatalog.data import id_map
 from labcatalog.data.id_map import Row, Rule
 from labcatalog.gui.common import note
 from labcatalog.pipeline import CatalogResult
-from labcatalog.sources import load_roster
+from labcatalog.sources import load_rosters
 
 ALL = "all"
 CHANGED = "changed"
@@ -34,13 +34,18 @@ def open_dialog(
     state = State(dataset if dataset in names else names[0])
     state.manual = id_map.mapping(root, state.dataset)
     pattern = result.project.config.ids.pattern
-    roster = load_roster(result.project)
-    listed = set(roster.frame[roster.id_column].str.strip()) if roster else None
+    rosters = {
+        study: set(r.frame[r.id_column].str.strip())
+        for study, r in load_rosters(result.project).items()
+    }
+
+    def listed() -> set[str] | None:
+        return rosters.get(result.datasets[state.dataset].config.study)
 
     def rows() -> list[Row]:
         ids = result.datasets[state.dataset].original_ids
         ids = [v for v in ids.astype(str) if v != ""]
-        return id_map.propose(ids, state.rules, state.manual, pattern, listed)
+        return id_map.propose(ids, state.rules, state.manual, pattern, listed())
 
     def wrong(row: Row) -> bool:
         return row.clash or row.matches is False or row.listed is False
@@ -124,7 +129,7 @@ def open_dialog(
         parts = [f"{len(changed)} of {len(found)} IDs change"]
         if pattern:
             parts.append(f"{sum(r.matches is False for r in found)} do not match ids.pattern")
-        if listed is not None:
+        if listed() is not None:
             parts.append(f"{sum(r.listed is False for r in found)} are not in the roster")
         if clashes:
             parts.append(f"{len(clashes)} would become the same ID as another")

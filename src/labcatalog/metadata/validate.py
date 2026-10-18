@@ -5,7 +5,13 @@ from datetime import date
 from typing import Any
 
 from labcatalog import defaults
-from labcatalog.config import CustomFieldDef, missing_codes_for, roster_dataset
+from labcatalog.config import (
+    CustomFieldDef,
+    missing_codes_for,
+    roster_dataset,
+    roster_name,
+    rosters,
+)
 from labcatalog.issues import Issue, IssueLevel
 from labcatalog.metadata.varmap import MapEntry
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
@@ -425,15 +431,15 @@ def check_variable_maps(project: Project) -> list[Issue]:
                     administration
                 )
     expected_in = {d.name: administered.get(d.name, {}) for d in config.datasets}
-    # The roster's map is checked like a dataset's, against the instrument that describes it.
-    if config.roster and config.roster.instrument:
-        instrument_id = config.roster.instrument
-        expected_in[defaults.ROSTER] = {
-            instrument_id: Administration(instrument=instrument_id, datasets=[defaults.ROSTER])
-        }
     readers = {d.name: d for d in config.datasets}
-    if defaults.ROSTER in expected_in:
-        readers[defaults.ROSTER] = roster_dataset(config)
+    # A roster's map is checked like a dataset's, against the instrument that describes it.
+    for study, roster in rosters(config).items():
+        if roster.instrument:
+            name = roster_name(study)
+            expected_in[name] = {
+                roster.instrument: Administration(instrument=roster.instrument, datasets=[name])
+            }
+            readers[name] = roster_dataset(config, study)
     used = {d.map_name() for d in readers.values()}
     issues = [
         unknown(f"no dataset named '{name}' in {CONFIG}", f"{defaults.MAPS_DIR}/{name}.csv")
@@ -555,18 +561,23 @@ def check_data_settings(project: Project) -> list[Issue]:
         if dataset.source != "folder" and dataset.files is not None:
             message = f"{where}.files: only folder datasets take files"
             issues.append(problem("invalid_value", message, CONFIG))
-    roster_instrument = config.roster.instrument if config.roster else None
-    if roster_instrument and roster_instrument not in project.instruments:
-        issues.append(unknown(f"roster.instrument: no instrument '{roster_instrument}'", CONFIG))
-    group_column = config.roster.group_column if config.roster else None
-    if group_column and group is None:
-        message = "roster.group_column: declare ids.group (its name) first"
-        issues.append(problem("invalid_value", message, CONFIG))
-    if group and not group.from_id and not group_column:
-        message = "ids.group: needs from_id, or a roster with a group_column"
-        issues.append(problem("invalid_value", message, CONFIG))
-    if group and group.from_id and group_column:
-        message = "ids.group.from_id and roster.group_column: read the group in one way only"
+    for name, study in config.studies.items():
+        roster = study.roster
+        where = f"studies.{name}.roster"
+        if roster and roster.instrument and roster.instrument not in project.instruments:
+            issues.append(
+                unknown(f"{where}.instrument: no instrument '{roster.instrument}'", CONFIG)
+            )
+        group_column = roster.group_column if roster else None
+        if group_column and group is None:
+            message = f"{where}.group_column: declare ids.group (its name) first"
+            issues.append(problem("invalid_value", message, CONFIG))
+        if group and group.from_id and group_column:
+            message = f"ids.group.from_id and {where}.group_column: read the group in one way only"
+            issues.append(problem("invalid_value", message, CONFIG))
+    # A study whose roster gives no group links its files by ID.
+    if group and not group.from_id and not any(r.group_column for r in rosters(config).values()):
+        message = "ids.group: needs from_id, or a study roster with a group_column"
         issues.append(problem("invalid_value", message, CONFIG))
     allowed = {"id", "none"} | ({group.name} if group else set())
     if config.stats.correlate_by not in allowed:

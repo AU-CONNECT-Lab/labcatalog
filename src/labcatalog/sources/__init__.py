@@ -4,7 +4,7 @@ from typing import Protocol
 
 import pandas as pd
 
-from labcatalog.config import DatasetConfig, id_column_for, roster_dataset
+from labcatalog.config import DatasetConfig, id_column_for, roster_dataset, rosters
 from labcatalog.data import id_map
 from labcatalog.data.ids import group_ids
 from labcatalog.exceptions import DataSourceError
@@ -77,31 +77,34 @@ class Roster:
         return listed.set_index(self.id_column)[self.role_column].str.strip()
 
 
-def load_roster(project: Project) -> Roster | None:
-    roster = project.config.roster
-    if roster is None:
-        return None
+def load_roster(project: Project, study: str) -> Roster:
+    roster = project.config.studies[study].roster
     path = expand_path(roster.path, project.root)
-    frame = read_csv(path, "roster")
+    frame = read_csv(path, f"{study} roster")
     id_column = roster.id_column or project.config.defaults.id_column
     for column in (id_column, roster.group_column, roster.role_column):
         if column and column not in frame:
-            raise DataSourceError(f"roster: no column '{column}' in {path}")
+            raise DataSourceError(f"{study} roster: no column '{column}' in {path}")
     return Roster(frame, id_column, roster.group_column, path, roster.role_column)
 
 
-def load_roster_dataset(project: Project) -> LoadedDataset | None:
+def load_rosters(project: Project) -> dict[str, Roster]:
+    return {study: load_roster(project, study) for study in rosters(project.config)}
+
+
+def load_roster_datasets(project: Project) -> dict[str, LoadedDataset]:
     # Only a roster an instrument describes is read for its other columns.
-    roster = load_roster(project)
-    if roster is None or not project.config.roster.instrument:
-        return None
-    return LoadedDataset(
-        config=roster_dataset(project.config),
-        frame=roster.frame,
-        id_column=roster.id_column,
-        group=None,
-        source_path=roster.path,
-    )
+    return {
+        study: LoadedDataset(
+            config=roster_dataset(project.config, study),
+            frame=roster.frame,
+            id_column=roster.id_column,
+            group=None,
+            source_path=roster.path,
+        )
+        for study, roster in load_rosters(project).items()
+        if project.config.studies[study].roster.instrument
+    }
 
 
 def load_dataset(
@@ -146,8 +149,8 @@ def load_dataset(
 
 
 def load_datasets(project: Project) -> dict[str, LoadedDataset]:
-    roster = load_roster(project)
-    groups = roster.groups() if roster and roster.group_column else None
+    groups = {s: r.groups() for s, r in load_rosters(project).items() if r.group_column}
     return {
-        dataset.name: load_dataset(project, dataset, groups) for dataset in project.config.datasets
+        dataset.name: load_dataset(project, dataset, groups.get(dataset.study))
+        for dataset in project.config.datasets
     }

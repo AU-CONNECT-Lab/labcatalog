@@ -6,7 +6,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.config import ProjectConfig
+from labcatalog.config import ProjectConfig, roster_name
 from labcatalog.data.prepare import step_states
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.versions import (
@@ -17,7 +17,7 @@ from labcatalog.datalad.versions import (
 )
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project, bib_path, references_root
-from labcatalog.sources import LoadedDataset, load_roster
+from labcatalog.sources import LoadedDataset, load_rosters
 from labcatalog.version import __version__
 
 CHUNK = 1 << 20
@@ -86,10 +86,11 @@ def used_paths(config: ProjectConfig, root: Path) -> list[Path]:
     metadata = [*metadata_paths(root), bib_path(config, root)]
     if config.references.root:
         metadata.append(references_root(config, root))
-    if config.exclusions:
-        metadata.append(expand_path(config.exclusions, root))
-    if config.roster:
-        metadata.append(expand_path(config.roster.path, root))
+    for study in config.studies.values():
+        if study.exclusions:
+            metadata.append(expand_path(study.exclusions, root))
+        if study.roster:
+            metadata.append(expand_path(study.roster.path, root))
     sources = [expand_path(d.path, root) for d in config.datasets if d.path]
     inputs = [expand_path(path, root) for step in config.prepare for path in step.inputs]
     return present(list(dict.fromkeys([*metadata, *sources, *inputs])))
@@ -100,14 +101,14 @@ def present(paths: list[Path]) -> list[Path]:
 
 
 def roster_records(project: Project) -> list[FileRecord]:
-    roster = load_roster(project)
-    if roster is None:
-        return []
-    path = portable_path(roster.path, project.root).as_posix()
     return [
         FileRecord(
-            dataset=defaults.ROSTER, path=path, sha256=file_sha256(roster.path), rows=len(roster.frame)
+            dataset=roster_name(study),
+            path=portable_path(roster.path, project.root).as_posix(),
+            sha256=file_sha256(roster.path),
+            rows=len(roster.frame),
         )
+        for study, roster in load_rosters(project).items()
     ]
 
 

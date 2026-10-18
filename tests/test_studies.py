@@ -156,6 +156,8 @@ def test_renaming_a_study_follows_it_into_every_file(mock_project):
     found = studies.rename_study(project, "mock_study", "family_study")
     assert [(c.path, c.removed) for c in found] == [
         ("labcatalog.yaml", False),
+        ("maps/roster_family_study.csv", False),
+        ("maps/roster_mock_study.csv", True),
         ("studies/family_study.yaml", False),
         ("studies/mock_study.yaml", True),
     ]
@@ -190,7 +192,9 @@ def test_deleting_a_study_takes_its_datasets_and_maps(mock_project):
     found = studies.delete_study(project, "mock_study")
     removed = [c.path for c in found if c.removed]
     assert "maps/parent_w1.csv" in removed and removed[-1] == "studies/mock_study.yaml"
-    assert len(removed) == len(project.config.datasets) + 1
+    # Each dataset's map, the roster's map and the study file.
+    assert "maps/roster_mock_study.csv" in removed
+    assert len(removed) == len(project.config.datasets) + 2
     assert "\nstudies: {}\n\n# One entry per data file" in found[0].text
     assert changes.check(project, found) == []
     changes.write(project, found)
