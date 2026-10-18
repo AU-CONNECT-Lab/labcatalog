@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.config import missing_labels_for
+from labcatalog.data import id_map
 from labcatalog.data.ids import load_exclusions
 from labcatalog.data.prepare import step_states
 from labcatalog.data.resolve import Catalog, ResolvedVariable, numbers_in_range
@@ -41,6 +42,7 @@ def check_project(
             *check_columns(project, datasets),
             *check_waves(project, datasets),
             *check_values(project, catalog, datasets),
+            *id_map.check(project.root, {d.name for d in project.config.datasets}),
             *check_ids(project, datasets),
             *check_roster(project, datasets),
             *check_exclusions(project, datasets),

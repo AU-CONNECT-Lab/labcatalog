@@ -15,6 +15,20 @@ ids:
 
 `labcatalog check` then reports IDs that do not match (`id_pattern`), IDs with leading or trailing spaces (`id_whitespace`), rows without an ID (`id_missing`) and IDs that appear twice in one file (`id_duplicate`).
 
+### Correcting IDs
+
+When a file writes IDs another way than the project, such as `sub-1001C`, `1001c` or `S12`, **Fix IDs** corrects them without touching the file. It opens from the **Fix** of an ID problem on the Problems page and from a dataset's page. Add rules, applied in order: remove a prefix or a suffix, find and replace (a regular expression), pad the number with zeros, remove spaces, or change the case. Type an ID in the **Corrected ID** column to set one by hand. The table shows, for every ID of the file, its corrected ID, whether that matches `ids.pattern` and whether the roster lists it, with the IDs still wrong and those that change first. Two IDs that would become the same are marked, and Save stays off until they differ. **Save** asks before it writes anything.
+
+The corrections go to `id_map.csv` in the project folder, one line per ID:
+
+```text
+dataset,from,to
+child_w1,sub-1001C,1001C
+eeg_w1,S12,0012C
+```
+
+labcatalog applies them whenever it reads the dataset, to its ID column and its respondent column, so the checks, the catalog, the analyses and the exports all see the corrected IDs. Delete a line to undo it. `labcatalog check` reports a line that names a dataset the project does not have, gives an ID two corrections, or leaves the new ID empty (`id_map_invalid`). A cleaning script can still fix the file itself instead; then the line is no longer needed.
+
 ## Groups
 
 Some people belong together: a parent and their child, siblings, pupils in a class. A group links them. Declare it under `ids` with a name of your choosing. When the ID holds the group, say how to read it:

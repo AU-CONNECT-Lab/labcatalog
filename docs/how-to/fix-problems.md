@@ -41,7 +41,7 @@ On the Problems page, **Fix** at the end of a row opens a panel for that problem
 | Code | What it means | What to do |
 |---|---|---|
 | `unexpected_value` | A value is neither a response option nor a missing code, or a number is outside `min` and `max`. | The Fix panel lists the rows. A typo is fixed in the cleaning script; a real value is added in the panel as a missing code or a new answer option. |
-| `id_whitespace`, `id_missing`, `id_duplicate`, `id_pattern` | An ID has stray spaces, is empty, appears twice in one file, or does not match `ids.pattern`. | Fix the IDs in your cleaning script. |
+| `id_whitespace`, `id_missing`, `id_duplicate`, `id_pattern` | An ID has stray spaces, is empty, appears twice in one file, or does not match `ids.pattern`. | **Fix IDs** corrects them by rules or by hand without changing the file (see [Correcting IDs](../concepts/ids-groups-missing.md#correcting-ids)); an empty ID needs the cleaning script. |
 | `id_not_in_roster` | An ID in the data is not in the roster: a typo, or a person nobody has added yet. | Fix the ID in your cleaning script, or add the person to the roster. |
 | `column_missing` | The map names a column the data file does not have. | Pick the column's new name in the Fix panel, or take the row out of the map. |
 | `column_unmapped` | The data file has a column the map does not list. | In the Fix panel, add it to the map as not an item, or as the item it holds. |

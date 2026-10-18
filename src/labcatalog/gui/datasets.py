@@ -6,7 +6,7 @@ from nicegui import ui
 from labcatalog import defaults
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui import datalad, new_dataset, problems
+from labcatalog.gui import datalad, id_fix, new_dataset, problems
 from labcatalog.gui.common import (
     code_tabs,
     col,
@@ -57,7 +57,7 @@ def render(
         )
         ui.icon("chevron_right").classes("lc-crumb-sep")
         ui.label(selected).classes("lc-crumb")
-    detail(result, summaries[selected], on_instrument, on_edit)
+    detail(result, summaries[selected], on_instrument, on_edit, on_frozen)
 
 
 def list_summary(result: CatalogResult, summaries: dict[str, DatasetSummary]) -> str:
@@ -153,8 +153,9 @@ def detail(
     summary: DatasetSummary,
     on_instrument: Callable[[str], None],
     on_edit: Callable[[str, int | None], None],
+    on_changed: Callable[[], Awaitable[None]],
 ) -> None:
-    facts(result, summary)
+    facts(result, summary, on_changed)
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("grow min-w-0 gap-4"):
             with panel("Instruments", "People who answered all, some or none of the items"):
@@ -203,7 +204,9 @@ def label_code(snippets: dict[str, str]) -> None:
         code_tabs(snippets)
 
 
-def facts(result: CatalogResult, summary: DatasetSummary) -> None:
+def facts(
+    result: CatalogResult, summary: DatasetSummary, on_changed: Callable[[], Awaitable[None]]
+) -> None:
     config = result.project.config
     dataset = dataset_by_name(config, summary.dataset)
     rows = [
@@ -234,6 +237,12 @@ def facts(result: CatalogResult, summary: DatasetSummary) -> None:
             ui.label(summary.dataset).classes("lc-summary-title")
             ui.label(config.vocab.modality_label(dataset.modality)).classes("lc-pill lc-info")
             ui.space()
+            if summary.dataset in result.datasets:
+                ui.button(
+                    "Fix IDs",
+                    icon="badge",
+                    on_click=lambda: id_fix.open_dialog(result, summary.dataset, on_changed),
+                ).props("flat dense no-caps").tooltip("Correct IDs by rules or by hand")
             if path:
                 ui.button(
                     path, icon="open_in_new", on_click=lambda: open_path(result.project.root / path)

@@ -5,6 +5,7 @@ from typing import Protocol
 import pandas as pd
 
 from labcatalog.config import DatasetConfig, id_column_for
+from labcatalog.data import id_map
 from labcatalog.data.ids import group_ids
 from labcatalog.exceptions import DataSourceError
 from labcatalog.paths import expand_path
@@ -29,6 +30,8 @@ class LoadedDataset:
     source_path: Path | None
     # Every wave named in a file that holds several, before this dataset's rows were taken.
     file_waves: set[str] | None = None
+    # The IDs as the file writes them, before id_map.csv corrects them.
+    original_ids: pd.Series | None = None
     numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
     answer_cache: dict[tuple, pd.Series] = field(default_factory=dict, repr=False)
 
@@ -98,6 +101,11 @@ def load_dataset(
         raise DataSourceError(f"{dataset.name}: no ID column '{id_column}'")
     if dataset.respondent_column and dataset.respondent_column not in frame:
         raise DataSourceError(f"{dataset.name}: no respondent column '{dataset.respondent_column}'")
+    original = frame[id_column]
+    if corrected := id_map.mapping(project.root, dataset.name):
+        frame = frame.copy()
+        for column in filter(None, (id_column, dataset.respondent_column)):
+            frame[column] = id_map.apply(frame[column], corrected)
     ids = frame[id_column]
 
     group = None
@@ -113,6 +121,7 @@ def load_dataset(
         group=group,
         source_path=expand_path(dataset.path, project.root) if dataset.path else None,
         file_waves=file_waves,
+        original_ids=original,
     )
 
 

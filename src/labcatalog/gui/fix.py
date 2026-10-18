@@ -8,7 +8,7 @@ from labcatalog.codebook.core import holds
 from labcatalog.config import dataset_by_name
 from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import preferences
+from labcatalog.gui import id_fix, preferences
 from labcatalog.gui.common import caption, col, computed, note, split_location, table
 from labcatalog.issues import Issue
 from labcatalog.metadata import accepted, changes, fixes
@@ -26,6 +26,13 @@ SCRIPTS = (
     "so the fix goes into the script that makes this file. Copy a note for them below."
 )
 PICK = "If you know the right answer, fix it below; if not, ask whoever looks after the settings."
+IDS = (
+    "You can, with Fix IDs: rules or typed corrections that labcatalog applies whenever it reads "
+    "the file, kept in id_map.csv; the data file stays as it is. A cleaning script can fix the "
+    "file itself instead."
+)
+# Problems with IDs that a correction in id_map.csv can mend.
+ID_CODES = {"id_whitespace", "id_pattern", "id_duplicate", "id_not_in_roster"}
 LOOK = "Nobody may need to: look at it, and if it is fine, record that below so it stops showing."
 
 # What each problem means in plain words, and who usually fixes it.
@@ -98,14 +105,14 @@ EXPLAIN: dict[str, tuple[str, str]] = {
         "below.",
     ),
     "id_missing": ("Rows without an ID.", SCRIPTS),
-    "id_whitespace": ("IDs with a space before or after them.", SCRIPTS),
-    "id_pattern": ("IDs that do not look like the project's IDs.", SCRIPTS),
-    "id_duplicate": ("The same ID appears more than once in one file.", SCRIPTS),
+    "id_whitespace": ("IDs with a space before or after them.", IDS),
+    "id_pattern": ("IDs that do not look like the project's IDs.", IDS),
+    "id_duplicate": ("The same ID appears more than once in one file.", IDS),
     "group_missing": ("IDs with no group ID, read from the ID or from the roster.", SCRIPTS),
     "id_not_in_roster": (
         "IDs in the data that the roster does not list: a typo, or a person not yet added to "
         "the roster.",
-        SCRIPTS,
+        IDS,
     ),
     "excluded_present": ("Rows of people on the exclusion list are still in the data.", SCRIPTS),
     "possible_identifier": (
@@ -239,6 +246,10 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         dialog.close()
         actions.add_dataset(issue.details["dataset"], wave)
 
+    def fix_ids() -> None:
+        dialog.close()
+        id_fix.open_dialog(result, issue.details.get("dataset"), actions.reload)
+
     def copy_note() -> None:
         ui.clipboard.write(note_text(issue, rows))
         ui.notify("Note copied")
@@ -277,6 +288,8 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
                         icon="add",
                         on_click=lambda wave=wave: add_dataset(wave),
                     )
+            if issue.code in ID_CODES and issue.details.get("dataset") in result.datasets:
+                ui.button("Fix IDs", icon="badge", on_click=fix_ids)
             if issue.location:
                 ui.button(
                     f"Open {split_location(issue.location)[0]}", icon="open_in_new", on_click=follow

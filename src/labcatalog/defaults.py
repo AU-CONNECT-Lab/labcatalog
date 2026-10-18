@@ -2,6 +2,8 @@ SCHEMA_VERSION = 1
 
 CONFIG_FILENAME = "labcatalog.yaml"
 ACCEPTED_FILENAME = "accepted_warnings.yaml"
+# Corrections of IDs as the data files write them, applied whenever a dataset is read.
+ID_MAP_FILENAME = "id_map.csv"
 YAML_SUFFIXES = (".yaml", ".yml")
 INSTRUMENTS_DIR = "instruments"
 STUDIES_DIR = "studies"

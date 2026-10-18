@@ -56,6 +56,7 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 | `group_missing` | warning | IDs from which no group can be read, or people the roster lists without a group. |
 | `id_not_in_roster` | warning | IDs in the data that the roster does not list. |
 | `roster_unused` | info | People in the roster who are in no dataset. |
+| `id_map_invalid` | error or warning | A line of `id_map.csv` gives an ID two corrections or no new ID (error), or names a dataset the project does not have (warning). |
 | `excluded_present` | error | Rows of people or groups on the exclusion list. |
 | `possible_identifier` | warning | A column whose name or values suggest names, emails, phone numbers, addresses or birth dates. |
 | `date_unparseable` | warning | Dates in the `date_column` that do not match `defaults.date_format`. |
