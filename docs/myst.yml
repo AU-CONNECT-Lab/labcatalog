@@ -33,6 +33,7 @@ project:
         - file: app/analysis.md
         - file: app/methods.md
         - file: app/prepare.md
+        - file: app/ids.md
         - file: app/import.md
         - file: app/edit.md
         - file: app/problems.md

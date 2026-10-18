@@ -5,10 +5,16 @@ from nicegui import ui
 
 from labcatalog.codebook.core import unmapped_datasets
 from labcatalog.data.prepare import step_states
+from labcatalog.gui import id_check
 from labcatalog.pipeline import CatalogResult
 
-PREPARE, IMPORT, EDIT = "prepare", "import", "edit"
-STEPS = {PREPARE: "Prepare data", IMPORT: "Describe columns", EDIT: "Edit files"}
+PREPARE, IDS, IMPORT, EDIT = "prepare", "ids", "import", "edit"
+STEPS = {
+    PREPARE: "Prepare data",
+    IDS: "Check IDs",
+    IMPORT: "Describe columns",
+    EDIT: "Edit files",
+}
 # Where the last step's Next button leads.
 AFTER = ("problems", "Problems")
 
@@ -24,8 +30,10 @@ def to_do(result: CatalogResult | None) -> dict[str, str]:
         return {}
     waiting = sum(s.status != "up to date" for s in step_states(project))
     unmapped = len(unmapped_datasets(project))
+    checking = id_check.waiting(result)
     return {
         PREPARE: f"{waiting} to run" if waiting else "",
+        IDS: f"{checking} to check" if checking else "",
         IMPORT: f"{unmapped} to describe" if unmapped else "",
     }
 

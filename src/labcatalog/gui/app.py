@@ -24,6 +24,7 @@ from labcatalog.gui import (
     example,
     fix,
     gate,
+    id_check,
     instruments,
     look,
     methods,
@@ -312,9 +313,10 @@ class Window:
                 self.methods_panel()
             with ui.tab_panel("setup").classes("lc-page"):
                 self.setup_bar()
-                # All three stay built, so an unsaved edit survives a look at another step.
+                # Every step stays built, so an unsaved edit survives a look at another step.
                 for name, part in (
                     (setup.PREPARE, self.prepare_panel),
+                    (setup.IDS, self.ids_panel),
                     (setup.IMPORT, self.import_panel),
                     (setup.EDIT, self.edit_panel),
                 ):
@@ -547,6 +549,7 @@ class Window:
             self.methods_panel,
             self.setup_bar,
             self.prepare_panel,
+            self.ids_panel,
             self.import_panel,
             self.edit_panel,
             self.problems_panel,
@@ -756,6 +759,11 @@ class Window:
             common.empty("Open a project folder to edit its files.", "folder_open")
         else:
             edit.render(self.root, self.editing, lambda: self.load(self.root))
+
+    @ui.refreshable_method
+    def ids_panel(self) -> None:
+        if self.has_catalog():
+            id_check.render(self.result, self.reload, lambda: self.pick_step("problems"))
 
     @ui.refreshable_method
     def import_panel(self) -> None:
