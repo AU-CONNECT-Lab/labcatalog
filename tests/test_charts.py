@@ -1,4 +1,5 @@
 from datetime import date
+from itertools import pairwise
 
 import pytest
 
@@ -136,7 +137,7 @@ def test_collection_pace_counts_each_person_once_per_wave(result):
     assert {(facets[axis], wave): n for (axis, wave), n in ends.items()} == retention
     # Close counts at the line ends are nudged apart.
     shown = sorted(a.y for a in fig.layout.annotations if a.text.isdigit() and a.xref == "x")
-    assert all(b - a >= 0.07 * max(ends.values()) - 1e-9 for a, b in zip(shown, shown[1:]))
+    assert all(b - a >= 0.07 * max(ends.values()) - 1e-9 for a, b in pairwise(shown))
 
 
 def test_item_heatmap_and_table_keep_the_item_order_below_the_diagonal(result):
