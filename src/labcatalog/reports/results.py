@@ -35,7 +35,7 @@ from labcatalog.stats.mediation import (
 )
 from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
 from labcatalog.stats.multilevel import R as LME4
-from labcatalog.stats.panel import EQUAL, RICLPM, PanelFit, PanelModel
+from labcatalog.stats.panel import EQUAL, EQUAL_STUDIES, RICLPM, PanelFit, PanelModel
 
 SIGNIFICANT = 0.05
 # A table with this many pairs or fewer is told pair by pair; a larger one by its strongest pairs.
@@ -211,18 +211,42 @@ def panel_text(model: PanelModel, fit: PanelFit, digits: int = 2) -> str:
         f"The random intercepts {verb} fit over the cross-lagged panel model without them, "
         f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}."
     )
-    between = fit.correlation(RICLPM, "RIx", "RIy")
+    if model.grouped:
+        chisq, df, p = fit.tests["equal_studies" if fit.equal_holds else "studies"]
+        change = f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}"
+        sentences.append(
+            f"With the {len(model.studies)} studies as groups, holding the lagged paths equal "
+            f"across them {'did not worsen' if fit.studies_hold else 'worsened'} fit, {change}, "
+            + (
+                "so they are reported from that model, with β for each study."
+                if fit.studies_hold
+                else "so they are reported for each study."
+            )
+        )
+    for group, study in enumerate(model.studies or [""], start=1):
+        sentences += panel_paths_text(model, fit, digits, group, study)
+    return " ".join(sentences)
+
+
+def panel_paths_text(
+    model: PanelModel, fit: PanelFit, digits: int, group: int, study: str
+) -> list[str]:
+    x, y = model.x_label, model.y_label
+    sentences = []
+    where = f"In {study}, the" if study else "The"
+    between = fit.correlation(RICLPM, "RIx", "RIy", group)
     if between is not None and between.standardized is not None:
         sentences.append(
-            "The random intercepts, the stable differences between people, correlated "
+            f"{where} random intercepts, the stable differences between people, correlated "
             f"r = {bounded(between.standardized, digits)}, {p_text(between.p)}."
         )
-    chosen = EQUAL if fit.equal_holds else RICLPM
+    chosen = fit.chosen
+    within = f"In {study}, within people" if study else "Within people"
     for kind, phrase in (("x_to_y", f"{x} predicted {y}"), ("y_to_x", f"{y} predicted {x}")):
-        paths = fit.lagged(chosen, kind)
+        paths = fit.lagged(chosen, kind, group)
         if not paths:
             continue
-        if chosen == EQUAL:
+        if chosen in (EQUAL, EQUAL_STUDIES):
             path = paths[0]
             ordered = sorted(q.standardized for q in paths if q.standardized is not None)
             betas = list(dict.fromkeys(bounded(b, digits) for b in ordered))
@@ -231,7 +255,7 @@ def panel_text(model: PanelModel, fit: PanelFit, digits: int = 2) -> str:
             else:
                 spread = f" (β = {betas[0]})" if betas else ""
             sentences.append(
-                f"Within people, {phrase} at the next wave, b = {number(path.estimate, digits)}"
+                f"{within}, {phrase} at the next wave, b = {number(path.estimate, digits)}"
                 f"{spread}, {p_text(path.p)}."
             )
         else:
@@ -241,8 +265,8 @@ def panel_text(model: PanelModel, fit: PanelFit, digits: int = 2) -> str:
                 for q in paths
                 if q.standardized is not None
             ]
-            sentences.append(f"Within people, {phrase} at the next wave {series(steps)}.")
-    return " ".join(sentences)
+            sentences.append(f"{within}, {phrase} at the next wave {series(steps)}.")
+    return sentences
 
 
 def percent(part: int, whole: int) -> str:

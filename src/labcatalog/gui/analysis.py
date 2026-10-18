@@ -47,18 +47,6 @@ PARTS = {
     "multilevel": "Multilevel model",
     "panel": "Cross-lagged panel",
 }
-# What a sample of several studies can do so far: each person's own study's file, side by side.
-POOLED_PARTS = (
-    "missing",
-    "correlation",
-    "regression",
-    "groups",
-    "agreement",
-    "measurement",
-    "invariance",
-    "mediation",
-    "multilevel",
-)
 
 
 @dataclass
@@ -80,6 +68,8 @@ class AnalysisView:
     raters: list[str] = field(default_factory=list)
     panel_x: str | None = None
     panel_y: str | None = None
+    # The studies the panel model takes as groups; empty starts from the first.
+    panel_studies: list[str] = field(default_factory=list)
     # The imputation every section shares; None keeps the project's choice or every score.
     missing_method: str | None = None
     imputed: list[str] | None = None
@@ -130,14 +120,6 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
     @ui.refreshable
     def section() -> None:
         sample = recount()
-        if analysis.pooling(result, view.datasets) and view.part not in POOLED_PARTS:
-            with panel(PARTS[view.part]):
-                note(
-                    "Not yet for datasets of several studies; choose the datasets of one study, "
-                    "or use Missing data, Correlation table, Regression, Group comparison, "
-                    "Rater agreement, Measurement model, Invariance, Mediation or Multilevel model."
-                )
-            return
         if view.part == "multilevel":
             multilevel.render(result, view)
             return

@@ -316,10 +316,12 @@ def default_model(result: CatalogResult, choices: list[str] | None = None) -> Mo
     return Model(outcome, wave_datasets(result, outcome))
 
 
-def wave_datasets(result: CatalogResult, outcome: str) -> list[str]:
-    # One dataset per wave of the first one's study, from the first one's reporter.
+def wave_datasets(result: CatalogResult, outcome: str, study: str | None = None) -> list[str]:
+    # One dataset per wave of the first one's study, or of the study given, from its reporter.
     configs = {d.name: d for d in result.project.config.datasets}
-    names = occasions(result, outcome)
+    names = [n for n in occasions(result, outcome) if study in (None, configs[n].study)]
+    if not names:
+        return []
     first = configs[names[0]]
     found: dict[str, str] = {}
     for n in names:

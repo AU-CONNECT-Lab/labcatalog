@@ -47,26 +47,66 @@ def render(result: CatalogResult, view) -> None:
             "wave. It is fitted with the lagged paths free and equal across waves, beside the "
             "cross-lagged panel model without random intercepts (CLPM), in R with lavaan. This "
             "section picks its own waves and keeps everyone with a value; the Sample on the left "
-            "does not apply."
+            "does not apply. With several studies chosen, each study is a group with its own "
+            "means and variances, their nth waves side by side, and two more models hold the "
+            "lagged paths equal across the studies."
         )
 
-        def choose(name: str, value: str) -> None:
+        def offered() -> list[str]:
+            return pm.panel_studies(result, view.panel_x, view.panel_y)
+
+        def chosen_studies() -> list[str]:
+            studies = offered()
+            return [s for s in view.panel_studies if s in studies] or studies[:1]
+
+        def waves_of() -> tuple[list[str], list[list[tuple[str, str, str]]], str]:
+            # The waves' names, each study's waves, and why they cannot be fitted.
+            studies = chosen_studies()
+            if view.panel_x == view.panel_y:
+                return [], [], "Choose two different variables."
+            if not studies:
+                found = pm.common_waves(result, view.panel_x, view.panel_y)
+                return (
+                    [],
+                    [],
+                    (
+                        f"These two share {len(found)} waves of one study; the model needs "
+                        f"{pm.MIN_WAVES} or more."
+                    ),
+                )
+            each = [pm.common_waves(result, view.panel_x, view.panel_y, s) for s in studies]
+            counts = {len(w) for w in each}
+            if len(counts) > 1:
+                named = ", ".join(
+                    f"{study_label(s)} {len(w)}" for s, w in zip(studies, each, strict=True)
+                )
+                return (
+                    [],
+                    [],
+                    (
+                        f"The studies share different numbers of waves ({named}); choose studies "
+                        "with as many waves each."
+                    ),
+                )
+            names = ["/".join(dict.fromkeys(w[i][0] for w in each)) for i in range(len(each[0]))]
+            return names, each, ""
+
+        def study_label(study: str) -> str:
+            return result.project.config.studies[study].label or study
+
+        def choose(name: str, value) -> None:
             setattr(view, name, value)
+            studies_row.refresh()
             body.clear()
             with body:
                 preview()
 
         def preview() -> None:
-            waves = pm.common_waves(result, view.panel_x, view.panel_y)
-            if view.panel_x == view.panel_y:
-                note("Choose two different variables.")
-            elif len(waves) < pm.MIN_WAVES:
-                note(
-                    f"These two share {len(waves)} waves of one study; the model needs "
-                    f"{pm.MIN_WAVES} or more."
-                )
+            names, _, problem = waves_of()
+            if problem:
+                note(problem)
             else:
-                ui.html(diagram([w for w, _, _ in waves], None), sanitize=False).classes("w-full")
+                ui.html(diagram(names, None), sanitize=False).classes("w-full")
 
         async def fit() -> None:
             rscript = analysis_tables.rscript()
@@ -75,26 +115,35 @@ def render(result: CatalogResult, view) -> None:
                 with body:
                     note("Set the path to Rscript on the Settings page; the model runs in R only.")
                 return
-            waves = pm.common_waves(result, view.panel_x, view.panel_y)
-            if view.panel_x == view.panel_y or len(waves) < pm.MIN_WAVES:
+            names, each, problem = waves_of()
+            if problem:
                 with body:
                     preview()
                 return
-            datasets = list(dict.fromkeys([x for _, x, _ in waves] + [y for _, _, y in waves]))
+            # Study by study, so the data's study numbers follow the chosen order.
+            datasets = list(dict.fromkeys(n for waves in each for _, x, y in waves for n in (x, y)))
             sample = analysis.build_sample(result, datasets, False)
             data = script.AnalysisData(result, sample)
+
+            def variables(key: str, spot: int) -> list[script.Variable]:
+                # The nth wave of every study as one variable, each person's from their study.
+                files = ["+".join(w[i][spot] for w in each) for i in range(len(names))]
+                return [data.variable(f"{key}@{f}") for f in files]
+
+            studies = chosen_studies()
             model = pm.PanelModel(
                 choices[view.panel_x],
                 choices[view.panel_y],
-                [w for w, _, _ in waves],
-                [data.variable(f"{view.panel_x}@{x}") for _, x, _ in waves],
-                [data.variable(f"{view.panel_y}@{y}") for _, _, y in waves],
+                names,
+                variables(view.panel_x, 1),
+                variables(view.panel_y, 2),
+                [study_label(s) for s in studies] if len(studies) > 1 else [],
             )
             frame = data.frame()
             code = pm.panel_code(model)
             with body:
                 ui.spinner()
-                note("Fitting the three models in R.")
+                note(f"Fitting the {len(model.models)} models in R.")
             try:
                 found, _ = await computed(script.run_code, result, sample, frame, code, rscript)
             except LabCatalogError as err:
@@ -115,10 +164,16 @@ def render(result: CatalogResult, view) -> None:
 
         def show(model: pm.PanelModel, found: pm.PanelFit, texts: dict[str, str]) -> None:
             ui.html(diagram(model.waves, found), sanitize=False).classes("w-full")
+            if model.grouped:
+                note(
+                    f"The diagram gives {model.studies[0]}'s paths; the tables give every study's."
+                )
             legend = f"X = {model.x_label}; Y = {model.y_label}."
             papers = {
                 "panel_fit": PaperTable(
-                    "Fit of the Cross-Lagged Panel Models", *fit_table(found), fit_note(found)
+                    "Fit of the Cross-Lagged Panel Models",
+                    *fit_table(model, found),
+                    fit_note(found),
                 ),
                 "panel_paths": PaperTable(
                     "Lagged Effects", *lagged_table(model, found), f"{legend} {LAGGED_NOTE}"
@@ -156,6 +211,21 @@ def render(result: CatalogResult, view) -> None:
                 on_change=lambda e: choose("panel_y", e.value),
             ).props("dense outlined").classes("min-w-80 grow")
             ui.button("Fit", icon="play_arrow", on_click=fit).props("no-caps")
+
+        @ui.refreshable
+        def studies_row() -> None:
+            studies = offered()
+            if len(studies) < 2:
+                return
+            ui.select(
+                {s: study_label(s) for s in studies},
+                value=chosen_studies(),
+                multiple=True,
+                label="Studies",
+                on_change=lambda e: choose("panel_studies", e.value or []),
+            ).props("dense outlined use-chips").classes("w-full")
+
+        studies_row()
         body = ui.column().classes("w-full gap-2")
         with body:
             preview()
@@ -167,7 +237,7 @@ LAGGED_NOTE = (
 )
 
 
-def fit_table(found: pm.PanelFit) -> tuple[list[dict], list[dict]]:
+def fit_table(model: pm.PanelModel, found: pm.PanelFit) -> tuple[list[dict], list[dict]]:
     columns = [
         col("model", "Model"),
         col("chisq", "χ²", numeric=True),
@@ -181,7 +251,7 @@ def fit_table(found: pm.PanelFit) -> tuple[list[dict], list[dict]]:
         col("bic", "BIC", numeric=True),
     ]
     rows = []
-    for name, label in pm.MODELS.items():
+    for name, label in model.models.items():
         v = found.fits[name]
         rows.append(
             {
@@ -202,34 +272,48 @@ def fit_note(found: pm.PanelFit) -> str:
     for key, phrase in (
         ("equal", "Equal lagged paths against free ones"),
         ("intercepts", "The CLPM against the RI-CLPM"),
+        ("studies", "Paths equal across studies against free ones"),
+        ("equal_studies", "Paths equal across waves and studies against equal across waves"),
     ):
+        if key not in found.tests:
+            continue
         chisq, df, p = found.tests[key]
         parts.append(f"{phrase}: Δχ²({df:g}) = {fmt(chisq)}, {results.p_text(p)}")
     return (
         f"N = {found.n}; MLR with robust fit indices and full-information maximum likelihood. "
-        f"{'; '.join(parts)} (scaled differences; the second tests variances at zero, at the "
-        "boundary, so its p is conservative)."
+        f"{'; '.join(parts)} (scaled differences; the test of the CLPM sets variances at zero, "
+        "at the boundary, so its p is conservative)."
     )
 
 
+LAGGED_COLUMNS = {
+    pm.RICLPM: "RI-CLPM",
+    pm.EQUAL: "Equal paths",
+    pm.CLPM: "CLPM",
+    pm.STUDIES: "Equal across studies",
+    pm.EQUAL_STUDIES: "Equal across waves and studies",
+}
+
+
 def lagged_table(model: pm.PanelModel, found: pm.PanelFit) -> tuple[list[dict], list[dict]]:
+    fitted = [m for m in LAGGED_COLUMNS if m in model.models]
     columns = [col("path", "Path")]
-    for name, label in (("riclpm", "RI-CLPM"), ("equal", "Equal paths"), ("clpm", "CLPM")):
+    for name in fitted:
         columns += [
-            col(f"{name}_b", f"{label} β", numeric=True),
+            col(f"{name}_b", f"{LAGGED_COLUMNS[name]} β", numeric=True),
             col(f"{name}_p", "p", numeric=True),
         ]
     rows = []
-    for kind, label in ROWS.items():
-        for spot, path in enumerate(found.lagged(pm.RICLPM, kind)):
-            row = {
-                "path": f"{label}, wave {model.waves[path.wave - 2]} to {model.waves[path.wave - 1]}"
-            }
-            for name, fitted in (("riclpm", pm.RICLPM), ("equal", pm.EQUAL), ("clpm", pm.CLPM)):
-                same = found.lagged(fitted, kind)[spot]
-                row[f"{name}_b"] = fmt(same.standardized)
-                row[f"{name}_p"] = p_value(same.p)
-            rows.append(row)
+    for group, study in enumerate(model.studies or [""], start=1):
+        for kind, label in ROWS.items():
+            for spot, path in enumerate(found.lagged(pm.RICLPM, kind, group)):
+                waves = f"wave {model.waves[path.wave - 2]} to {model.waves[path.wave - 1]}"
+                row = {"path": f"{f'{study}: ' if study else ''}{label}, {waves}"}
+                for name in fitted:
+                    same = found.lagged(name, kind, group)[spot]
+                    row[f"{name}_b"] = fmt(same.standardized)
+                    row[f"{name}_p"] = p_value(same.p)
+                rows.append(row)
     return columns, rows
 
 
@@ -241,12 +325,17 @@ def correlation_table(model: pm.PanelModel, found: pm.PanelFit) -> tuple[list[di
         for i, w in enumerate(model.waves, start=1)
     ]
     rows = []
-    for label, lhs, rhs in pairs:
-        found_pair = found.correlation(pm.RICLPM, lhs, rhs)
-        if found_pair is not None:
-            rows.append(
-                {"what": label, "r": fmt(found_pair.standardized), "p": p_value(found_pair.p)}
-            )
+    for group, study in enumerate(model.studies or [""], start=1):
+        for label, lhs, rhs in pairs:
+            found_pair = found.correlation(pm.RICLPM, lhs, rhs, group)
+            if found_pair is not None:
+                rows.append(
+                    {
+                        "what": f"{study}: {label}" if study else label,
+                        "r": fmt(found_pair.standardized),
+                        "p": p_value(found_pair.p),
+                    }
+                )
     return columns, rows
 
 
@@ -260,7 +349,7 @@ def diagram(waves: list[str], found: pm.PanelFit | None) -> str:
     t = len(waves)
     xs = [LEFT + GAP * i for i in range(t)]
     width = xs[-1] + LEFT
-    chosen = pm.EQUAL if found is not None and found.equal_holds else pm.RICLPM
+    chosen = found.chosen if found is not None else pm.RICLPM
 
     def beta(kind: str, wave: int, symbol: str) -> str:
         if found is None:
