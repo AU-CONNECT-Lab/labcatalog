@@ -20,6 +20,8 @@ SUBSCALES = "subscales"
 ONE_FACTOR = "one factor"
 SECOND_ORDER = "second order"
 SUBSCALE_SCORES = "subscale scores"
+# Several scores, maybe of several instruments, each a factor of its items, all correlated.
+MEASUREMENT = "measurement"
 # Models of a general factor over the subscales; their fits keep its loadings and ω only.
 GENERAL_KINDS = (SECOND_ORDER, SUBSCALE_SCORES)
 GENERAL = "general"
@@ -83,6 +85,8 @@ class CfaFit:
     omega: dict[str, float] = field(default_factory=dict)
     # Hierarchical ω of a second-order model, or ω of the subscale scores.
     general_omega: float | None = None
+    # Two factors to their standardized correlation as r, low, high and p.
+    correlations: dict[tuple[str, str], dict[str, float]] = field(default_factory=dict)
     problem: str | None = None
     engine: str = R
     estimator: str = WLSMV
@@ -228,6 +232,10 @@ def read_fit(
             fit.loadings[(original[row.factor], original[row.item])] = float(row.value)
         elif row.what == "omega":
             fit.omega[original[row.factor]] = float(row.value)
+        elif row.what.startswith("correlation"):
+            pair = (original[row.factor], original[row.item])
+            part = row.what.removeprefix("correlation").lstrip("_") or "r"
+            fit.correlations.setdefault(pair, {})[part] = float(row.value)
     return exact(general(fit))
 
 

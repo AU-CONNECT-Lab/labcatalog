@@ -11,6 +11,7 @@ from labcatalog.gui import (
     charts,
     common,
     group_invariance,
+    measurement,
     mediation,
     multilevel,
 )
@@ -28,6 +29,7 @@ PARTS = {
     "correlation": "Correlation table",
     "regression": "Regression",
     "groups": "Group comparison",
+    "measurement": "Measurement model",
     "invariance": "Invariance",
     "mediation": "Mediation",
     "multilevel": "Multilevel model",
@@ -49,6 +51,7 @@ class AnalysisView:
     invariance_group: str | None = None
     # None keeps the project's stats.cfa_estimator.
     invariance_estimator: str | None = None
+    measurement: measurement.Choices = field(default_factory=measurement.Choices)
     mediation: mediation.Choices = field(default_factory=mediation.Choices)
     # The instruments whose variables the page offers; None until first shown, then all.
     instruments: list[str] | None = None
@@ -104,6 +107,9 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
             pair_section(result, sample, view, choices)
         elif view.part == "groups":
             analysis_tables.group_section(result, sample, view, choices)
+        elif view.part == "measurement":
+            totals = default_totals(result, view, choices)
+            measurement.render(result, sample, view.measurement, choices, totals)
         elif view.part == "invariance":
             group_invariance.render(result, sample, view)
         elif view.part == "mediation":

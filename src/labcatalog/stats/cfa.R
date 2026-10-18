@@ -46,9 +46,18 @@ fit_one <- function(model, syntax, data, estimator, composite) {
   }
   values <- lavaan::fitMeasures(fit, measures)
   for (name in names(values)) add(model, "fit", item = name, value = values[[name]])
-  std <- lavaan::standardizedSolution(fit)
-  std <- std[std$op == "=~", ]
+  solution <- lavaan::standardizedSolution(fit)
+  std <- solution[solution$op == "=~", ]
   for (i in seq_len(nrow(std))) add(model, "loading", std$lhs[i], std$rhs[i], std$est.std[i])
+  factors <- lavaan::lavNames(fit, "lv")
+  cors <- solution[solution$op == "~~" & solution$lhs != solution$rhs &
+                     solution$lhs %in% factors & solution$rhs %in% factors, ]
+  for (i in seq_len(nrow(cors))) {
+    add(model, "correlation", cors$lhs[i], cors$rhs[i], cors$est.std[i])
+    add(model, "correlation_low", cors$lhs[i], cors$rhs[i], cors$ci.lower[i])
+    add(model, "correlation_high", cors$lhs[i], cors$rhs[i], cors$ci.upper[i])
+    add(model, "correlation_p", cors$lhs[i], cors$rhs[i], cors$pvalue[i])
+  }
   omega <- suppressWarnings(
     if (composite == "") semTools::compRelSEM(fit) else semTools::compRelSEM(fit, W = composite)
   )

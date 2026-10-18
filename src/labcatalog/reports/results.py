@@ -2,6 +2,7 @@ from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import ANOVA, STUDENT, WELCH, Comparison, GroupStats
 from labcatalog.stats.cfa import (
     GENERAL_KINDS,
+    MEASUREMENT,
     MIN_SUBSCALES,
     MLR,
     SECOND_ORDER,
@@ -204,6 +205,15 @@ def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
     if fit.general_omega is not None:
         name = "Hierarchical ω" if fit.kind == SECOND_ORDER else "ω of the summed subscale scores"
         sentences.append(f"{name} was {bounded(fit.general_omega, digits)}.")
+    if fit.kind == MEASUREMENT and fit.correlations:
+        values = [c["r"] for c in fit.correlations.values()]
+        low, high = min(values), max(values)
+        sentences.append(
+            f"The factors correlated {bounded(values[0], digits)}."
+            if len(values) == 1
+            else f"Factor correlations ranged from {bounded(low, digits)} to "
+            f"{bounded(high, digits)}."
+        )
     omega = [(labels[s], v) for s, v in fit.omega.items()]
     if len(omega) == 1:
         sentences.append(f"ω was {bounded(omega[0][1], digits)}.")
@@ -220,6 +230,8 @@ def opening_case(text: str) -> str:
 
 
 def model_phrase(kind: str, names: list[str]) -> str:
+    if kind == MEASUREMENT:
+        return f"a measurement model with a correlated factor for each of {series(names)}"
     if kind == SUBSCALES:
         return f"a model with one factor for each subscale ({series(names)})"
     if kind == SECOND_ORDER:
