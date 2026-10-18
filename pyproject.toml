@@ -28,6 +28,7 @@ dependencies = [
     "pyreadstat>=1.2",
     "semopy>=2.3",
     "duckdb>=1.1",
+    "matplotlib>=3.8",
 ]
 
 [project.optional-dependencies]

@@ -9,6 +9,7 @@ import pandas as pd
 
 from labcatalog import schema
 from labcatalog.exceptions import LabCatalogError, MplusError, RError
+from labcatalog.own_python import command
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis, mplus
 from labcatalog.stats.analysis import ITEM_PREFIX, STUDY_KEY, first_key
@@ -243,7 +244,7 @@ def run_python(
         raise LabCatalogError(NO_PYTHON)
     try:
         # -I keeps the user's own settings out; -X utf8 keeps printed text readable on Windows.
-        return run_process([program, "-I", "-X", "utf8", path.name], folder, started)
+        return run_process([*command(program), "-I", "-X", "utf8", path.name], folder, started)
     except OSError:
         raise LabCatalogError(
             f"Python not found at {program}; check the path on the Settings page"
@@ -253,7 +254,7 @@ def run_python(
 def python_status(program: str) -> PythonStatus:
     check = PYTHON_CHECK.format(packages=repr(PYTHON_PACKAGES))
     try:
-        done = run_process([program, "-I", "-c", check])
+        done = run_process([*command(program), "-I", "-c", check])
     except OSError:
         raise LabCatalogError(f"No Python at {program}") from None
     if done.returncode != 0:

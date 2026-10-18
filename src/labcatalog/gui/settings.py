@@ -263,8 +263,9 @@ def python_section() -> None:
     with panel("Python", "For custom analyses written in Python"):
         note(
             "The Custom tab of the Analysis page runs Python scripts with this Python, which "
-            f"needs {', '.join(PYTHON_PACKAGES)}. Left empty, labcatalog installed with pip uses "
-            "its own Python; the Windows program has none, so set one here."
+            f"needs {', '.join(PYTHON_PACKAGES)}, and so do prepare steps that call python. Left "
+            "empty, labcatalog uses its own Python, which has those packages; set one here to "
+            "use packages of your own."
         )
         with ui.row().classes("w-full items-start no-wrap gap-2 mt-1"):
             path = path_input(
@@ -281,9 +282,6 @@ def python_section() -> None:
             path.value = value
             preferences.save({preferences.PYTHON: value})
             chosen = preferences.python()
-            if not chosen:
-                show_status(status, "No Python set: custom Python scripts cannot run.", "warn")
-                return
             try:
                 found = await computed(python_status, chosen)
             except LabCatalogError as err:

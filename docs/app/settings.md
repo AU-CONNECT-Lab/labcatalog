@@ -28,7 +28,7 @@ The path to `Rscript`. **Save and check** runs R once and reports its version an
 
 ## Python
 
-The Python that runs the Python scripts of the Analysis page's Custom tab, which needs pandas, numpy, scipy, statsmodels, semopy and matplotlib. **Save and check** reports its version and any missing packages, with the command to install them. Left empty, labcatalog installed with pip uses its own Python; the Windows program has none, so a Python must be set here to run Python scripts.
+The Python that runs the Python scripts of the Analysis page's Custom tab, which needs pandas, numpy, scipy, statsmodels, semopy and matplotlib, and that prepare steps get when they call `python`. **Save and check** reports its version and any missing packages, with the command to install them. Left empty, labcatalog uses its own Python, which has those packages; the Windows program carries one too, so it runs Python scripts without a Python installed. Set one here to use packages of your own.
 
 ## DataLad
 

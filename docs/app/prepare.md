@@ -26,4 +26,4 @@ A file in a DataLad dataset whose content is not on this computer is marked "not
 
 A step that fails stops the rest. After a step has run, its status line shows the outcome and **Log** shows what it printed; the log follows the running step live and has a **Copy log** button. When a step succeeds, the catalog reloads.
 
-Steps run in the project folder. If Rscript is set on the Settings page, its folder is put first on the PATH, so a step can call `Rscript` by name. With `prepare_with: datalad`, each step runs through `datalad run`.
+Steps run in the project folder. If Rscript is set on the Settings page, its folder is put first on the PATH, so a step can call `Rscript` by name. So is the Python set there, so a step that calls `python` gets it; in the Windows program, with no Python set, `python` runs the program's own. With `prepare_with: datalad`, each step runs through `datalad run`.

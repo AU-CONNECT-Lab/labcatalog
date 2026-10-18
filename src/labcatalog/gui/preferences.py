@@ -5,6 +5,8 @@ import sys
 from collections.abc import MutableMapping
 from pathlib import Path
 
+from labcatalog import own_python
+
 FILENAME = "gui.json"
 PALETTE = "palette"
 APPEARANCE = "appearance"
@@ -78,7 +80,11 @@ def server_secret() -> str:
     return found
 
 
-def python() -> str | None:
-    # Installed with pip, labcatalog's own Python runs the scripts; the Windows program has none.
-    own = None if getattr(sys, "frozen", False) else sys.executable
-    return load().get(PYTHON) or own
+def python() -> str:
+    # Unset, labcatalog's own Python runs the scripts, in the Windows program too.
+    return load().get(PYTHON) or sys.executable
+
+
+def step_python() -> str | None:
+    # The Python a prepare step's python command gets; installed with pip, the one on PATH.
+    return load().get(PYTHON) or (sys.executable if own_python.frozen() else None)

@@ -143,8 +143,9 @@ def test_r_and_python_scripts_need_their_program(monkeypatch, tmp_path):
         custom.run_script("python", "print(1)", pd.DataFrame({"x": [1]}), None)
     monkeypatch.setenv("APPDATA", str(tmp_path))
     assert preferences.python() == sys.executable
+    assert preferences.step_python() is None
     monkeypatch.setattr(sys, "frozen", True, raising=False)
-    assert preferences.python() is None
+    assert preferences.python() == preferences.step_python() == sys.executable
     preferences.save({preferences.PYTHON: "C:/Python/python.exe"})
     assert preferences.python() == "C:/Python/python.exe"
 

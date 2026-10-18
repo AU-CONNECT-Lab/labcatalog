@@ -14,6 +14,7 @@ from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.bridge import run_args
 from labcatalog.exceptions import DataladError, PrepareBusyError
 from labcatalog.metadata.accepted import who
+from labcatalog.own_python import folder_for
 from labcatalog.paths import expand_path
 from labcatalog.processes import NEW_GROUP, end_tree
 from labcatalog.project import Project
@@ -108,6 +109,7 @@ def run_steps(
     rscript: str | None = None,
     datalad: str | None = None,
     anyway: bool = False,
+    python: str | None = None,
 ) -> list[StepRun]:
     if project.config.prepare_with != "datalad":
         datalad = None
@@ -133,7 +135,7 @@ def run_steps(
                 done.append(run)
                 if echo:
                     echo(f"== {step.name}: {step.run}")
-                execute(step, project.root, run, session, echo, rscript, datalad)
+                execute(step, project.root, run, session, echo, rscript, datalad, python)
                 if run.exit_code != 0:
                     break
     finally:
@@ -173,6 +175,7 @@ def execute(
     echo: Callable[[str], None] | None,
     rscript: str | None,
     datalad: str | None,
+    python: str | None = None,
 ) -> None:
     session.current = step.name
     process = subprocess.Popen(
@@ -183,7 +186,7 @@ def execute(
         stderr=subprocess.STDOUT,
         text=True,
         errors="replace",
-        env=environment(rscript),
+        env=environment(rscript, python),
         **NEW_GROUP,
     )
     session.process = process
@@ -196,12 +199,14 @@ def execute(
     session.process = None
 
 
-def environment(rscript: str | None) -> dict[str, str] | None:
-    if not rscript:
+def environment(rscript: str | None, python: str | None = None) -> dict[str, str] | None:
+    # A step can then call Rscript and python by name and get the ones the Settings page chose.
+    first = [str(Path(rscript).parent)] if rscript else []
+    if python:
+        first.append(str(folder_for(python)))
+    if not first:
         return None
-    # A step can then call Rscript by name and get the R chosen on the Settings page.
-    path = os.pathsep.join([str(Path(rscript).parent), os.environ.get("PATH", "")])
-    return {**os.environ, "PATH": path}
+    return {**os.environ, "PATH": os.pathsep.join([*first, os.environ.get("PATH", "")])}
 
 
 def stop(session: Session) -> None:

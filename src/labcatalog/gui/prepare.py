@@ -84,6 +84,7 @@ def render(
                 tools.get(preferences.RSCRIPT),
                 tools.get(preferences.DATALAD),
                 anyway,
+                preferences.step_python(),
             )
         except PrepareBusyError as err:
             view.running = False
