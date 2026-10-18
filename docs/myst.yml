@@ -63,5 +63,6 @@ project:
 site:
   template: book-theme
   options:
+    logo: images/icon.png
     logo_text: labcatalog
     folders: true

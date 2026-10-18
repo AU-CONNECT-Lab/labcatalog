@@ -89,6 +89,7 @@ def launch(project: Path | None = None) -> None:
         title=f"labcatalog {__version__}",
         native=True,
         window_size=WINDOW_SIZE,
+        favicon=theme.ICON,
         reload=False,
         show_welcome_message=False,
     )

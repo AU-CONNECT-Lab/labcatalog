@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="512" height="512">
+<defs><clipPath id="clip"><rect width="100" height="100" rx="22"/></clipPath>
+<radialGradient id="sky" cx="60%" cy="40%" r="80%"><stop offset="0" stop-color="#1c2133"/><stop offset="1" stop-color="#111114"/></radialGradient></defs>
+<g clip-path="url(#clip)">
+<rect width="100" height="100" fill="url(#sky)"/>
+<defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"/></filter></defs><line x1="57.6" y1="78.0" x2="47.0" y2="43.9" stroke="#fff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><line x1="47.0" y1="43.9" x2="42.4" y2="22.0" stroke="#fff" stroke-opacity="0.55" stroke-width="3.5" stroke-linecap="round"/><g filter="url(#glow)"><circle cx="57.6" cy="78.0" r="11" fill="#ff9c2a"/><circle cx="47.0" cy="43.9" r="11" fill="#ffc116"/><circle cx="42.4" cy="22.0" r="11" fill="#20e9c1"/></g><circle cx="57.6" cy="78.0" r="11" fill="#ff9c2a"/><circle cx="47.0" cy="43.9" r="11" fill="#ffc116"/><circle cx="42.4" cy="22.0" r="11" fill="#20e9c1"/><circle cx="57.6" cy="78.0" r="5" fill="#fff"/><circle cx="47.0" cy="43.9" r="5" fill="#fff"/><circle cx="42.4" cy="22.0" r="5" fill="#fff"/>
+
+</g></svg>

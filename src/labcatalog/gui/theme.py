@@ -8,6 +8,7 @@ CSS = Path(__file__).with_name("theme.css")
 # Pictures that ship with the app, such as the overview banner.
 ASSETS_URL = "/lc-assets"
 BANNER = f"{ASSETS_URL}/banner.svg"
+ICON = Path(__file__).parent / "assets" / "icon.png"
 CLEAR = "rgba(0,0,0,0)"
 ACCENT = "#1d1d1f"
 OK = "#1a7f37"

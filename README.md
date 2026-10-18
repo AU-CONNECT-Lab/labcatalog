@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/images/logo.png" alt="labcatalog" width="160"></p>
+
 # labcatalog
 
 labcatalog builds a browsable catalog of a lab's study data. You describe your instruments, studies and data files once, and it gives you a desktop window where you can browse every instrument and variable across waves, see where the data disagree with the metadata, run the analyses most papers need, and copy the results as tables and text into a manuscript.
