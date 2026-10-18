@@ -5,7 +5,7 @@ from nicegui import ui
 from labcatalog import defaults
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, map_name_of
-from labcatalog.gui import datalad, id_fix, new_dataset, problems
+from labcatalog.gui import codebook_import, datalad, id_fix, new_dataset, problems
 from labcatalog.gui.common import (
     code_tabs,
     col,
@@ -253,6 +253,7 @@ def facts(
                     icon="badge",
                     on_click=lambda: id_fix.open_dialog(result, summary.dataset, on_changed),
                 ).props("flat dense no-caps").tooltip("Correct IDs by rules or by hand")
+            codebook_import.kept_menu(result.project, summary.dataset, on_changed)
             if path:
                 ui.button(
                     path, icon="open_in_new", on_click=lambda: open_path(result.project.root / path)

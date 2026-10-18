@@ -15,6 +15,8 @@ from labcatalog.codebook.core import (
     ai_prompt,
     codebook_paths,
     import_codebook,
+    keep_source,
+    kept_sources,
     split_ai_answer,
     unmapped_datasets,
     write_templates,
@@ -289,6 +291,14 @@ def test_a_redcap_dictionary_fills_in_items_and_imports(pilot, tmp_path):
     assert result.issues == []
     mood = (pilot / "instruments" / "mood_scale.yaml").read_text(encoding="utf-8")
     assert "{value: 1, label: 'Sometimes, often'}" in mood
+    # The dictionary is kept as the codebook; a file added later sits beside it.
+    assert [p.name for p in kept_sources(project, "pilot_w1")] == ["dictionary.csv"]
+    manual = tmp_path / "manual.pdf"
+    manual.write_bytes(b"%PDF")
+    kept = keep_source(project, "pilot_w1", manual)
+    assert kept == pilot / "codebook" / "pilot_w1" / "source" / "manual.pdf"
+    assert keep_source(project, "pilot_w1", kept) == kept
+    assert [p.name for p in kept_sources(project, "pilot_w1")] == ["dictionary.csv", "manual.pdf"]
 
 
 def test_an_spss_file_fills_in_wording_options_and_types(pilot, tmp_path):
@@ -318,6 +328,7 @@ def test_an_spss_file_fills_in_wording_options_and_types(pilot, tmp_path):
         "age,,age,Age,number,,,,",
         "remarks,,remarks,Anything else?,text,,,,",
     ]
+    assert kept_sources(project, "pilot_w1") == []
     (tmp_path / "broken.sav").write_text("not spss", encoding="utf-8")
     with pytest.raises(CodebookError, match="not an SPSS data file"):
         spss.read_sav(tmp_path / "broken.sav")

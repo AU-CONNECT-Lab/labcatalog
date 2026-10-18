@@ -13,6 +13,8 @@ Create the three files in `codebook/<dataset>/`: `items.csv`, `instruments.csv` 
 - **Create the three files** lists every column of the data file and guesses its instrument and item from the column name.
 - **Create from a REDCap data dictionary**, **Create from a Qualtrics survey file** and **Create from an SPSS file** also fill in each item's wording, options and type. Qualtrics blocks become instruments.
 
+The REDCap data dictionary or Qualtrics survey file is also kept as the dataset's codebook, in `codebook/<dataset>/source/`; an SPSS file is not, since it holds the data. **Keep the codebook** (or **Codebook**, once one is kept) beside the heading keeps any other file, such as a PDF, there too, and opens the ones kept, here and on the dataset's page.
+
 Once the files exist, the page links to them and **Open folder** opens their folder. **What goes in each column** explains every column of every file.
 
 ## 2. Fill them in with an AI (optional)

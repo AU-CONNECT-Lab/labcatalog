@@ -39,7 +39,7 @@ Click a row to open the dataset.
 
 ## A dataset
 
-The top of a dataset's page lists its study, wave, reporter and modality; its rows and IDs; with a group, the number of groups; how many people were also in the last wave that collected this modality and how many are new since then; when it was collected; and the data file, which opens in its own application when clicked. **All datasets** goes back to the list.
+The top of a dataset's page lists its study, wave, reporter and modality; its rows and IDs; with a group, the number of groups; how many people were also in the last wave that collected this modality and how many are new since then; when it was collected; and the data file, which opens in its own application when clicked. **Fix IDs** corrects the file's IDs (see [Check IDs](ids.md)). **Codebook** lists the codebook files kept for this dataset, or for another that shares its column map, and opens one in its own application; **Add a file** keeps another, such as the PDF the data came with, in `codebook/<dataset>/source/`. **All datasets** goes back to the list.
 
 Below that:
 

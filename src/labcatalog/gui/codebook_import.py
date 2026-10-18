@@ -1,5 +1,6 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 
 from nicegui import run, ui
@@ -84,6 +85,9 @@ def render(
         if outcome.written:
             imported_dialog(project.root, outcome)
 
+    async def refreshed() -> None:
+        steps.refresh()
+
     def pick(name: str) -> None:
         view.dataset, view.issues = name, []
         steps.refresh()
@@ -91,7 +95,10 @@ def render(
     @ui.refreshable
     def steps() -> None:
         paths = codebook.codebook_paths(project, view.dataset)
-        ui.label("1. Codebook files").classes("lc-subhead")
+        with ui.row().classes("w-full items-center gap-2"):
+            ui.label("1. Codebook files").classes("lc-subhead")
+            ui.space()
+            kept_menu(project, view.dataset, refreshed)
         if not any(path.exists() for path in paths.values()):
             note(
                 "labcatalog lists every column of the data file and guesses its instrument "
@@ -210,3 +217,27 @@ def imported_dialog(root: Path, outcome: ImportResult) -> None:
             ).props("flat no-caps")
             ui.button("Close", on_click=dialog.close)
     dialog.open()
+
+
+def kept_menu(project, dataset: str, on_changed: Callable[[], Awaitable[None]]) -> None:
+    # The codebook as the lab got it, kept in the project to look up while describing the data.
+    kept = codebook.kept_sources(project, dataset)
+
+    async def add() -> None:
+        chosen = await choose_path(start=project.root)
+        if chosen is None:
+            return
+        await run.io_bound(codebook.keep_source, project, dataset, chosen)
+        folder = codebook.source_folder(project, dataset).relative_to(project.root).as_posix()
+        ui.notify(f"Kept {chosen.name} in {folder}")
+        await on_changed()
+
+    label = "Codebook" if kept else "Keep the codebook"
+    with (
+        ui.dropdown_button(label, icon="menu_book", auto_close=True)
+        .props("flat dense no-caps")
+        .tooltip("The codebook as you got it, such as a PDF or a data dictionary")
+    ):
+        for path in kept:
+            ui.item(path.name, on_click=partial(open_path, path))
+        ui.item("Add a file", on_click=add)

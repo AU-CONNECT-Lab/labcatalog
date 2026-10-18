@@ -2,6 +2,7 @@ import csv
 import io
 import math
 import re
+import shutil
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -12,7 +13,13 @@ import yaml
 
 from labcatalog import defaults
 from labcatalog.codebook import qualtrics, redcap, spss
-from labcatalog.config import DatasetConfig, dataset_by_name, id_column_for, missing_codes_for
+from labcatalog.config import (
+    DatasetConfig,
+    dataset_by_name,
+    id_column_for,
+    map_sharers,
+    missing_codes_for,
+)
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import fetch_advice, is_placeholder
 from labcatalog.exceptions import CodebookError
@@ -25,6 +32,7 @@ from labcatalog.sources import get_source
 ITEMS = "items.csv"
 INSTRUMENTS = "instruments.csv"
 SCORES = "scores.csv"
+SOURCE_DIR = "source"
 
 # What each column holds; the Describe columns step shows these and the AI prompt quotes them.
 COLUMNS: dict[str, dict[str, str]] = {
@@ -128,6 +136,32 @@ def codebook_paths(project: Project, dataset: str) -> dict[str, Path]:
     return {name: folder / name for name in COLUMNS}
 
 
+def source_folder(project: Project, dataset: str) -> Path:
+    # The codebook as the lab got it, such as a PDF or a REDCap data dictionary.
+    return project.root / defaults.CODEBOOK_DIR / dataset / SOURCE_DIR
+
+
+def keep_source(project: Project, dataset: str, path: Path) -> Path:
+    folder = source_folder(project, dataset)
+    kept = folder / path.name
+    if path.resolve() != kept.resolve():
+        folder.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, kept)
+    return kept
+
+
+def kept_sources(project: Project, dataset: str) -> list[Path]:
+    # A dataset's own codebook files, then those of the datasets that share its column map.
+    names = [dataset, *map_sharers(project.config, dataset)]
+    return [
+        path
+        for name in names
+        if (folder := source_folder(project, name)).is_dir()
+        for path in sorted(folder.iterdir())
+        if path.is_file()
+    ]
+
+
 def unmapped_datasets(project: Project) -> list[str]:
     return [d.name for d in project.config.datasets if d.map_name() not in project.maps]
 
@@ -149,6 +183,9 @@ def write_templates(
         raise CodebookError(f"{folder} already has codebook files; delete them to start over")
     dataset = dataset_by_name(project.config, dataset_name)
     fields = read_fields(dictionary) if dictionary else None
+    # An SPSS file holds the data themselves, so only a dictionary or survey file is kept.
+    if dictionary and dictionary.suffix.lower() != ".sav":
+        keep_source(project, dataset_name, dictionary)
     items = template_items(project, dataset, read_data(project, dataset), fields)
     new = dict.fromkeys(
         row["instrument"]
