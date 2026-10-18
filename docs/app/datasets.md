@@ -39,7 +39,7 @@ Click a row to open the dataset.
 
 ## A dataset
 
-The top of a dataset's page lists its study, wave, reporter and modality; its rows and IDs; with a group, the number of groups; how many people were also in the previous wave and how many are new; when it was collected; and the data file, which opens in its own application when clicked. **All datasets** goes back to the list.
+The top of a dataset's page lists its study, wave, reporter and modality; its rows and IDs; with a group, the number of groups; how many people were also in the last wave that collected this modality and how many are new since then; when it was collected; and the data file, which opens in its own application when clicked. **All datasets** goes back to the list.
 
 Below that:
 
