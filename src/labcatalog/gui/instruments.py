@@ -13,7 +13,7 @@ from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, common, new_instrument, preferences
+from labcatalog.gui import charts, common, new_instrument, preferences, theme
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
@@ -267,7 +267,8 @@ def catalog_map(
         f"different instruments means |r| ≥ {defaults.CHART_MIN_R:g} in some wave; hover over a "
         "dot to see its links, scroll to zoom, and click to open it."
     )
-    NetworkGraph(spec, network.MAP_HEIGHT, on_click=opened, night=True).classes("w-full")
+    # Dark mode draws the map as the overview banner's night sky.
+    NetworkGraph(spec, network.MAP_HEIGHT, on_click=opened, night=theme.dark).classes("w-full")
 
 
 def wizard_done(view: BrowseView, cfa: CfaView) -> Callable[[str], Awaitable[None]]:
