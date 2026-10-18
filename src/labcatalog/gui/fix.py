@@ -514,6 +514,9 @@ def missing_column(project: Project, result: CatalogResult, issue: Issue, save) 
 
 def repeated_row(project: Project, result: CatalogResult, issue: Issue, save) -> None:
     details = issue.details
+    if "places" in details:
+        repeated_entry(project, issue, save)
+        return
     if "lines" not in details:
         note("Give one of them another ID in the file below; other files may name it too.")
         return
@@ -529,6 +532,38 @@ def repeated_row(project: Project, result: CatalogResult, issue: Issue, save) ->
                 icon="delete",
                 on_click=lambda n=n: save([fixes.map_line(project, dataset, n, None)]),
             ).props("flat dense")
+
+
+def repeated_entry(project: Project, issue: Issue, save) -> None:
+    details = issue.details
+    relative, _ = split_location(issue.location)
+    if details.get("remove"):
+        caption("Keep one")
+        for n, found in enumerate(details["places"], start=1):
+            with ui.row().classes("items-center gap-3 no-wrap"):
+                ui.label(f"{n}.").classes("w-8 lc-faint")
+                ui.label(found["shown"]).classes("w-72")
+                ui.button(
+                    "Take this one out",
+                    icon="delete",
+                    on_click=lambda path=found["path"]: save(
+                        [fixes.remove_at(project, relative, path)]
+                    ),
+                ).props("flat dense")
+        return
+    value = details["value"]
+    caption("Give one of them another ID")
+    note("Whatever else names the one you rename, such as a score or a column map, needs it too.")
+    for n, found in enumerate(details["places"], start=1):
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            box = ui.input(f"{n}. {found['shown']}"[:80], value=value).classes("w-96")
+
+            async def rename(box=box, path=found["path"]) -> None:
+                new = (box.value or "").strip()
+                if new and new != value:
+                    await save([fixes.replace_at(project, relative, path, new)])
+
+            ui.button("Rename", on_click=rename).props("flat dense")
 
 
 def clashing_code(project: Project, result: CatalogResult, issue: Issue, save) -> None:

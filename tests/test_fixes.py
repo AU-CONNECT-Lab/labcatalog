@@ -203,6 +203,62 @@ def test_a_row_listed_twice_in_the_map_is_taken_out(mock_project):
     assert issue.details["lines"] == [4, last]
 
 
+def test_an_id_used_twice_is_renamed_where_it_stands(mock_project):
+    mood = mock_project / "instruments" / "example_mood.yaml"
+    edit(mood, "{id: ems_6, text: I felt like crying.}", "{id: ems_5, text: I felt like crying.}")
+    [issue] = [i for i in run_validate(mock_project) if i.code == "duplicate_id"]
+    assert issue.details["value"] == "ems_5"
+    assert issue.details["places"] == [
+        {"path": ["items", 4, "id"], "shown": "I felt tired for no reason."},
+        {"path": ["items", 5, "id"], "shown": "I felt like crying."},
+    ]
+    project = load_project(mock_project)
+    renamed = fixes.replace_at(
+        project, "instruments/example_mood.yaml", ["items", 5, "id"], "ems_6"
+    )
+    changes.write(project, [renamed])
+    assert "duplicate_id" not in codes(run_validate(mock_project))
+
+    config = mock_project / "labcatalog.yaml"
+    edit(config, "name: child_w2,", "name: child_w1,")
+    [issue] = [i for i in run_validate(mock_project) if i.code == "duplicate_id"]
+    first, second = issue.details["places"]
+    assert first["shown"].startswith("mock_study wave 1") and second["path"][-1] == "name"
+    apply(
+        mock_project,
+        fixes.replace_at(load_project(mock_project), "labcatalog.yaml", second["path"], "child_w2"),
+    )
+    assert "duplicate_id" not in codes(run_validate(mock_project))
+
+
+def test_a_value_or_facet_listed_twice_is_taken_out(mock_project):
+    mood = mock_project / "instruments" / "example_mood.yaml"
+    before = mood.read_text(encoding="utf-8")
+    edit(mood, "{value: 2, label: Often}", "{value: 1, label: Often}")
+    config = mock_project / "labcatalog.yaml"
+    edit(config, "facets: [study, wave,", "facets: [study, wave, wave,")
+    found = [i for i in run_validate(mock_project) if i.code == "duplicate_id"]
+    assert all(i.details["remove"] for i in found) and len(found) == 2
+    option = next(i for i in found if "value 1" in i.message)
+    assert [p["shown"] for p in option.details["places"]] == ["Sometimes", "Often"]
+    facet = next(i for i in found if "facets" in i.message)
+    project = load_project(mock_project)
+    changes.write(
+        project,
+        [
+            fixes.remove_at(project, "labcatalog.yaml", facet.details["places"][1]["path"]),
+            fixes.remove_at(
+                project, "instruments/example_mood.yaml", option.details["places"][1]["path"]
+            ),
+        ],
+    )
+    assert "duplicate_id" not in codes(run_validate(mock_project))
+    assert "facets: [study, wave, coverage" in config.read_text(encoding="utf-8")
+    assert mood.read_text(encoding="utf-8") == before.replace(
+        "      - {value: 2, label: Often}\n", ""
+    )
+
+
 def test_a_missing_code_that_is_an_answer_is_taken_out(mock_project):
     edit(
         mock_project / "instruments" / "example_mood.yaml",

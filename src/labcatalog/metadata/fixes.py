@@ -217,3 +217,13 @@ def replace_at(project: Project, relative: str, path: list[str | int], value: st
         node = node[key]
     node[path[-1]] = records.as_text(value)
     return Change(relative, records.dumped(data), opened)
+
+
+def remove_at(project: Project, relative: str, path: list[str | int]) -> Change:
+    opened = editing.open_file(project.root, relative)
+    data = records.load(opened.text)
+    node = data
+    for key in path[:-1]:
+        node = node[key]
+    del node[path[-1]]
+    return Change(relative, records.dumped(data), opened)

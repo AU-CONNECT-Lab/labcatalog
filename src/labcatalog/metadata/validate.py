@@ -104,7 +104,17 @@ def check_cross_references(project: Project) -> list[Issue]:
     config = project.config
     datasets = {dataset.name: dataset for dataset in config.datasets}
     issues = [
-        problem("duplicate_id", f"dataset name '{name}' is used more than once", CONFIG)
+        problem(
+            "duplicate_id",
+            f"dataset name '{name}' is used more than once",
+            CONFIG,
+            value=name,
+            places=[
+                place(["datasets", n, "name"], f"{d.study} wave {d.wave}, {d.path or ''}")
+                for n, d in enumerate(config.datasets)
+                if d.name == name
+            ],
+        )
         for name, count in Counter(d.name for d in config.datasets).items()
         if count > 1
     ]
@@ -174,16 +184,24 @@ def check_cross_references(project: Project) -> list[Issue]:
 
 def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
     issues = []
-    for label, ids in [
-        ("item", [item.id for item in instrument.items]),
-        ("response set", [response_set.id for response_set in instrument.response_sets]),
-        ("score", [score.id for score in instrument.scores]),
+    for label, key, entries in [
+        ("item", "items", [(i.id, i.label or text_of(i.text)) for i in instrument.items]),
+        (
+            "response set",
+            "response_sets",
+            [(s.id, ", ".join(o.label for o in s.options)) for s in instrument.response_sets],
+        ),
+        ("score", "scores", [(s.id, s.label) for s in instrument.scores]),
     ]:
-        for value, count in Counter(ids).items():
+        for value, count in Counter(entry_id for entry_id, _ in entries).items():
             if count > 1:
-                issues.append(
-                    problem("duplicate_id", f"{label} id '{value}' is used {count} times", location)
-                )
+                found = [
+                    place([key, n, "id"], shown)
+                    for n, (entry_id, shown) in enumerate(entries)
+                    if entry_id == value
+                ]
+                message = f"{label} id '{value}' is used {count} times"
+                issues.append(problem("duplicate_id", message, location, value=value, places=found))
     set_ids = {response_set.id for response_set in instrument.response_sets}
     for n, response_set in enumerate(instrument.response_sets, start=1):
         values = Counter(str(option.value) for option in response_set.options)
@@ -192,7 +210,12 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
                 message = (
                     f"response_sets[{n}] ({response_set.id}): value {value} is listed {count} times"
                 )
-                issues.append(problem("duplicate_id", message, location))
+                found = [
+                    place(["response_sets", n - 1, "options", m], option.label)
+                    for m, option in enumerate(response_set.options)
+                    if str(option.value) == value
+                ]
+                issues.append(problem("duplicate_id", message, location, places=found, remove=True))
     if instrument.default_response_set and instrument.default_response_set not in set_ids:
         message = f"default_response_set: no response set '{instrument.default_response_set}'"
         issues.append(
@@ -317,8 +340,15 @@ def check_browse(project: Project) -> list[Issue]:
     facets = config.browse.facets or []
     for name, count in Counter(facets).items():
         if count > 1:
+            found = [place(["browse", "facets", n], "") for n, f in enumerate(facets) if f == name]
             issues.append(
-                problem("duplicate_id", f"browse.facets: '{name}' is listed twice", CONFIG)
+                problem(
+                    "duplicate_id",
+                    f"browse.facets: '{name}' is listed twice",
+                    CONFIG,
+                    places=found,
+                    remove=True,
+                )
             )
     for name in dict.fromkeys(facets):
         if name in defaults.BUILTIN_FACETS:
@@ -589,7 +619,17 @@ def check_references(project: Project) -> list[Issue]:
 def check_prepare_steps(project: Project) -> list[Issue]:
     steps = project.config.prepare
     issues = [
-        problem("duplicate_id", f"prepare: step name '{name}' is used more than once", CONFIG)
+        problem(
+            "duplicate_id",
+            f"prepare: step name '{name}' is used more than once",
+            CONFIG,
+            value=name,
+            places=[
+                place(["prepare", n, "name"], step.run)
+                for n, step in enumerate(steps)
+                if step.name == name
+            ],
+        )
         for name, count in Counter(step.name for step in steps).items()
         if count > 1
     ]
@@ -633,6 +673,15 @@ def problem(
     code: str, message: str, location: str, level: IssueLevel = "error", **details: Any
 ) -> Issue:
     return Issue(level=level, code=code, message=message, location=location, details=details)
+
+
+def place(path: list[str | int], shown: str) -> dict:
+    # One of several entries with the same ID: its path in the file and what tells it apart.
+    return {"path": path, "shown": shown}
+
+
+def text_of(text: str | dict[str, str]) -> str:
+    return text if isinstance(text, str) else next(iter(text.values()), "")
 
 
 def unknown(message: str, location: str, **details: Any) -> Issue:
