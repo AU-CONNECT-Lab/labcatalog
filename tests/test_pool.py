@@ -8,7 +8,15 @@ from scipy import stats
 from labcatalog.charts import views
 from labcatalog.pipeline import run_catalog
 from labcatalog.reports import results
-from labcatalog.stats import analysis, cfa, group_invariance, imputation, invariance, mplus
+from labcatalog.stats import (
+    agreement,
+    analysis,
+    cfa,
+    group_invariance,
+    imputation,
+    invariance,
+    mplus,
+)
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import measurement as mm
 from labcatalog.stats import mediation as med
@@ -449,3 +457,82 @@ def test_pooled_labels_lose_the_whole_dataset_label(result):
     choices = script.group_choices(result, FILES, labels)
     assert all("(" not in text for text in choices.values())
     assert analysis.without_suffix("EMS (total) (child_w1 (Wave 1, child))") == "EMS (total)"
+
+
+@pytest.fixture
+def raters(pilot_project: Path):
+    # The pilot also copies the parents' ratings of the child, so both studies have two raters.
+    config = pilot_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8").replace("correlate_by: family", "correlate_by: id")
+    text = text.replace(
+        "datasets:\n",
+        "datasets:\n  - {name: pilot_parent, modality: questionnaire, study: pilot, wave: 1, "
+        "reporter: parent, source: csv, path: data/parent_child_w1.csv, "
+        "respondent_column: parent_pid, map: parent_child_w1}\n",
+        1,
+    )
+    config.write_text(text, encoding="utf-8")
+    study = pilot_project / "studies" / "pilot.yaml"
+    study.write_text(
+        study.read_text(encoding="utf-8")
+        + "  - {instrument: example_worries_temper, datasets: [pilot_parent], target: child}\n",
+        encoding="utf-8",
+    )
+    return run_catalog(pilot_project)
+
+
+AGREEMENT_FILES = ["child_w1", "parent_child_w1", "pilot_w1", "pilot_parent"]
+
+
+@needs_r
+def test_agreement_of_two_studies_with_the_same_ratings_is_one_studys(raters):
+    pooled = analysis.build_sample(raters, AGREEMENT_FILES, True)
+    one = analysis.build_sample(raters, AGREEMENT_FILES[:2], True)
+    labels = {n: n for n in AGREEMENT_FILES}
+    items = [k for k in agreement.choices(raters, AGREEMENT_FILES, labels) if ".ewt_1@" in k]
+    assert items == [
+        "item:example_worries_temper.ewt_1@child_w1+pilot_w1",
+        "item:example_worries_temper.ewt_1@parent_child_w1+pilot_parent",
+    ]
+    totals = [
+        "example_worries_temper.ewt_total@child_w1+pilot_w1",
+        "example_worries_temper.ewt_total@parent_child_w1+pilot_parent",
+    ]
+    for keys in (items, totals):
+        found = {}
+        for name, sample, used in (
+            ("pooled", pooled, keys),
+            ("one", one, [first(k) for k in keys]),
+        ):
+            data = script.AnalysisData(raters, sample)
+            variables = [data.variable(k) for k in used]
+            code = agreement.agreement_code(variables, name == "pooled")
+            outputs, _ = script.run_code(raters, sample, data.frame(), code, rscript())
+            found[name] = agreement.read_agreement(outputs, variables)
+        pooled_fit, alone = found["pooled"], found["one"]
+        if pooled_fit.kind == agreement.KAPPA:
+            assert pooled_fit.kappas[0].kappa == pytest.approx(alone.kappas[0].kappa)
+            assert pooled_fit.kappas[0].n == 2 * alone.kappas[0].n
+            each = [pairs[0].kappa for pairs in pooled_fit.study_kappas.values()]
+            assert each == pytest.approx([alone.kappas[0].kappa] * 2)
+        else:
+            # Each person twice changes the mean squares' df a little, so close, not equal.
+            assert pooled_fit.icc[1].icc == pytest.approx(alone.icc[1].icc, abs=0.005)
+            assert pooled_fit.n == 2 * alone.n
+            each = [rows[1].icc for rows in pooled_fit.study_icc.values()]
+            assert each == pytest.approx([alone.icc[1].icc] * 2, abs=1e-6)
+            studies = {1.0: "Mock Family Study", 2.0: "pilot"}
+            text = results.agreement_text(pooled_fit, studies=studies)
+            assert "In each study on its own, ICC(2,1) was" in text and "in pilot" in text
+
+
+def first(key: str) -> str:
+    return analysis.first_key(key)
+
+
+def test_two_reporters_of_one_score_pool_apart(raters):
+    choices = views.variable_choices(raters, AGREEMENT_FILES)
+    child = choices["example_worries_temper.ewt_total@child_w1+pilot_w1"]
+    parent = choices["example_worries_temper.ewt_total@parent_child_w1+pilot_parent"]
+    assert child.endswith("(child)") and parent.endswith("(parent)")
+    assert choices["example_mood.ems_total@child_w1+pilot_w1"] == "EMS total score"

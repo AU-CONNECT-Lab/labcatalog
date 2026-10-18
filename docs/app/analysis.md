@@ -17,7 +17,7 @@ The note below says how many people are in the sample and how they were matched 
 (several-studies)=
 ### Several studies
 
-Choosing datasets of more than one study pools the studies. Each study's people are matched within that study, as above, and the studies' people are then put together, one row each. A variable is offered when every chosen study has it in exactly one chosen dataset, for example the mood total in wave 1 of one study and in the baseline of another; each person's value comes from their own study's file. Choose one wave of each study for the variables to pool. The group comparison also offers **Study** as the groups.
+Choosing datasets of more than one study pools the studies. Each study's people are matched within that study, as above, and the studies' people are then put together, one row each. A variable is offered when every chosen study has it in exactly one chosen dataset of a reporter, for example the mood total in wave 1 of one study and in the baseline of another; each person's value comes from their own study's file. A score that two reporters give, such as a child's and a parent's ratings of the child, is offered once for each, with the reporter after its name. Choose one wave of each study for the variables to pool. The group comparison also offers **Study** as the groups.
 
 The analyses allow for the study, so that a difference between the studies' means does not show up as a correlation:
 
@@ -27,9 +27,10 @@ The analyses allow for the study, so that a difference between the studies' mean
 - The measurement model regresses every factor on the study, a 0/1 covariate for each study but the first, so the factor correlations are within studies, and the standardized loadings are those of the pooled sample. Each study's people bring their own file's items. This takes the items to work alike in every study, which Invariance tests. ω comes from the same factors fitted without the study, since semTools' ω does not take covariates.
 - Invariance offers each instrument that every chosen study has in one chosen dataset, and **Study** as the groups: a multigroup model with one group per study, which tests whether the instrument measures the same thing in each study before their scores are put together.
 - Mediation includes the study as a fixed effect on M and Y, a 0/1 covariate for each study but the first, named as Study: and the study's label. In Items mode the factors take each study's people's items from their own file, and the study predicts the factors of M and Y.
+- Rater agreement gives κ on everyone of the studies together, and intraclass correlations within studies: each rating less its study's mean rating, so that a difference between the studies does not count as agreement. A second table gives each study on its own: each pair's κ, or ICC(2,1) and ICC(2,k), and the Results paragraph adds them.
 - Multiple imputation imputes each study by itself, with the same choices, and each person's values come from their own study's imputation. The correlation table and regression then pool the correlations and slopes within studies over the imputed data sets (see [Multiple imputation](#multiple-imputation)).
 
-The multilevel model picks its own waves, and waves of several studies pool them in the same way (see [Multilevel model](#multilevel-model)). Rater agreement and the cross-lagged panel take the datasets of one study for now and say so.
+The multilevel model picks its own waves, and waves of several studies pool them in the same way (see [Multilevel model](#multilevel-model)). The cross-lagged panel takes the datasets of one study for now and says so.
 
 The variable lists hold every score and number item of the chosen measures in the chosen datasets, labeled with their wave. Type in a list to filter it.
 

@@ -32,7 +32,8 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
             data = script.AnalysisData(result, sample)
             variables = [data.variable(k) for k in keys]
             frame = data.frame()
-            code = agreement.agreement_code(variables)
+            by_study = analysis.pooling(result, sample.datasets)
+            code = agreement.agreement_code(variables, by_study)
             try:
                 found, engine = await run(result, sample, frame, code, variables)
             except LabCatalogError as err:
@@ -41,12 +42,17 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
             found_agreement = agreement.read_agreement(found, variables)
             names = {v.column: options[k] for k, v in zip(keys, variables, strict=True)}
             texts = analysis_tables.section_files(result, sample, frame, code)
-            shown = table(found_agreement, names)
+            tables = {"agreement": table(found_agreement, names, by_study)}
+            studies = dict(analysis.study_options(result, sample)) if by_study else {}
+            if by_study:
+                tables["study_agreement"] = study_table(found_agreement, names, studies)
+            text = results.agreement_text(found_agreement, studies=studies)
 
             def content() -> None:
-                paper.paper_table(shown)
-                paper.results_text(results.agreement_text(found_agreement), [shown])
-                paper.result_actions(result, "agreement", {"agreement": shown}, None, texts, engine)
+                for shown in tables.values():
+                    paper.paper_table(shown)
+                paper.results_text(text, list(tables.values()))
+                paper.result_actions(result, "agreement", tables, None, texts, engine)
                 analysis_tables.code_view(texts)
 
             return content
@@ -89,7 +95,7 @@ def interval(value: float | None, low: float | None, high: float | None) -> str:
     return f"{apa(value)} [{apa(low)}, {apa(high)}]" if low is not None else apa(value)
 
 
-def table(found: Agreement, names: dict[str, str]) -> PaperTable:
+def table(found: Agreement, names: dict[str, str], by_study: bool = False) -> PaperTable:
     if found.kind == agreement.ICC:
         columns = [
             col("type", "Type"),
@@ -111,6 +117,11 @@ def table(found: Agreement, names: dict[str, str]) -> PaperTable:
             for r in found.icc
         ]
         text = f"On the {found.n} people rated by all {found.raters} raters (psych::ICC)."
+        if by_study:
+            text += (
+                " Within studies: each rating less its study's mean rating, so a difference "
+                "between the studies does not count as agreement."
+            )
         return PaperTable("Intraclass Correlations", columns, rows, text)
     columns = [
         col("pair", "Raters"),
@@ -133,4 +144,50 @@ def table(found: Agreement, names: dict[str, str]) -> PaperTable:
         "Cohen's κ on everyone both raters rated; weighted κ uses quadratic weights, for "
         "ordered options."
     )
+    if by_study:
+        text += " The studies' people together."
     return PaperTable("Agreement Between Raters", columns, rows, text)
+
+
+def study_table(found: Agreement, names: dict[str, str], studies: dict[float, str]) -> PaperTable:
+    if found.kind == agreement.ICC:
+        columns = [
+            col("study", "Study"),
+            col("n", "n", numeric=True),
+            col("single", "ICC(2,1) [95% CI]", numeric=True),
+            col("mean", "ICC(2,k) [95% CI]", numeric=True),
+        ]
+        rows = []
+        for k, found_rows in (found.study_icc or {}).items():
+            by_type = {r.type: r for r in found_rows}
+            single, mean = by_type["ICC2"], by_type["ICC2k"]
+            rows.append(
+                {
+                    "study": studies[k],
+                    "n": found.study_n[k],
+                    "single": interval(single.icc, single.low, single.high),
+                    "mean": interval(mean.icc, mean.low, mean.high),
+                }
+            )
+        text = "Each study on its own, on its people rated by all raters (psych::ICC)."
+        return PaperTable("Intraclass Correlations in Each Study", columns, rows, text)
+    columns = [
+        col("study", "Study"),
+        col("pair", "Raters"),
+        col("n", "n", numeric=True),
+        col("kappa", "κ [95% CI]", numeric=True),
+        col("weighted", "Weighted κ [95% CI]", numeric=True),
+    ]
+    rows = [
+        {
+            "study": studies[k],
+            "pair": f"{names.get(p.first, p.first)} and {names.get(p.second, p.second)}",
+            "n": p.n,
+            "kappa": interval(p.kappa, p.kappa_low, p.kappa_high),
+            "weighted": interval(p.weighted, p.weighted_low, p.weighted_high),
+        }
+        for k, pairs in (found.study_kappas or {}).items()
+        for p in pairs
+    ]
+    text = "Each study on its own, on its people both raters rated."
+    return PaperTable("Agreement Between Raters in Each Study", columns, rows, text)

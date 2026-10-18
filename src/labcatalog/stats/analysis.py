@@ -1,3 +1,4 @@
+from collections import Counter
 from dataclasses import dataclass, replace
 
 import numpy as np
@@ -95,18 +96,23 @@ def first_key(key: str) -> str:
 
 
 def pooled(result: CatalogResult, datasets: list[str], found: dict[str, str]) -> dict[str, str]:
-    # Each variable that every study gives in exactly one chosen file, as one variable.
+    # Each variable that every study gives in exactly one chosen file of a reporter, as one.
     studies = studies_of(result, datasets)
-    by_base: dict[str, list[str]] = {}
+    by_base: dict[tuple[str, str], list[str]] = {}
     for key in found:
-        by_base.setdefault(key.rsplit("@", 1)[0], []).append(key)
+        reporter = result.datasets[parts(key)[0]].config.reporter
+        by_base.setdefault((key.rsplit("@", 1)[0], reporter), []).append(key)
     joined = {}
-    for keys in by_base.values():
+    for (base, reporter), keys in by_base.items():
         names = [parts(k)[0] for k in keys]
         if sorted(study_of(result, n) for n in names) == sorted(studies):
-            key = f"{keys[0].rsplit('@', 1)[0]}@{POOL.join(names)}"
-            joined[key] = without_suffix(found[keys[0]])
-    return joined
+            joined[f"{base}@{POOL.join(names)}"] = (base, reporter, without_suffix(found[keys[0]]))
+    # The reporter tells apart a variable that two reporters give, such as a child's two raters.
+    reporters = Counter(base for base, _, _ in joined.values())
+    return {
+        key: label if reporters[base] == 1 else f"{label} ({reporter})"
+        for key, (base, reporter, label) in joined.items()
+    }
 
 
 def without_suffix(label: str) -> str:

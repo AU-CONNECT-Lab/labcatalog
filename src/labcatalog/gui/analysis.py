@@ -53,6 +53,7 @@ POOLED_PARTS = (
     "correlation",
     "regression",
     "groups",
+    "agreement",
     "measurement",
     "invariance",
     "mediation",
@@ -134,7 +135,7 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
                 note(
                     "Not yet for datasets of several studies; choose the datasets of one study, "
                     "or use Missing data, Correlation table, Regression, Group comparison, "
-                    "Measurement model, Invariance, Mediation or Multilevel model."
+                    "Rater agreement, Measurement model, Invariance, Mediation or Multilevel model."
                 )
             return
         if view.part == "multilevel":

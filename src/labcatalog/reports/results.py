@@ -1,4 +1,4 @@
-from labcatalog.stats.agreement import ICC, Agreement
+from labcatalog.stats.agreement import ICC, KAPPA, Agreement
 from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import (
     ANOVA,
@@ -123,7 +123,33 @@ def missing_text(missing: MissingData, labels: list[str]) -> str:
     )
 
 
-def agreement_text(agreement: Agreement, digits: int = 2) -> str:
+def agreement_text(
+    agreement: Agreement, digits: int = 2, studies: dict[float, str] | None = None
+) -> str:
+    text = pooled_agreement_text(agreement, digits)
+    if not studies or not text:
+        return text
+    if agreement.kind == ICC:
+        name = "ICC(2,1)"
+        values = {
+            k: next(r.icc for r in rows if r.type == "ICC2")
+            for k, rows in (agreement.study_icc or {}).items()
+        }
+    else:
+        name = "Cohen's κ" if agreement.raters == 2 else "Light's κ"
+        values = {
+            k: Agreement(KAPPA, agreement.raters, kappas=pairs).light
+            if agreement.raters > 2
+            else pairs[0].kappa
+            for k, pairs in (agreement.study_kappas or {}).items()
+        }
+    each = [f"{bounded(v, digits)} in {studies[k]}" for k, v in values.items() if v is not None]
+    if not each:
+        return text
+    return f"{text} In each study on its own, {name} was {series(each)}."
+
+
+def pooled_agreement_text(agreement: Agreement, digits: int) -> str:
     k = agreement.raters
     among = "between the two raters" if k == 2 else f"among the {k} raters"
     if agreement.kind == ICC:
