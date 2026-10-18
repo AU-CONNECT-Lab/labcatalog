@@ -35,6 +35,7 @@ from labcatalog.stats.mediation import (
 )
 from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
 from labcatalog.stats.multilevel import R as LME4
+from labcatalog.stats.panel import EQUAL, RICLPM, PanelFit, PanelModel
 
 SIGNIFICANT = 0.05
 # A table with this many pairs or fewer is told pair by pair; a larger one by its strongest pairs.
@@ -156,6 +157,66 @@ def agreement_text(agreement: Agreement, digits: int = 2) -> str:
         f"{bounded(agreement.light, digits)}, ranging from {bounded(min(values), digits)} to "
         f"{bounded(max(values), digits)} across pairs."
     )
+
+
+def panel_text(model: PanelModel, fit: PanelFit, digits: int = 2) -> str:
+    x, y, t = model.x_label, model.y_label, len(model.waves)
+    values = {**fit.fits[RICLPM]}
+    values["p"] = values["pvalue"]
+    sentences = [
+        f"A random intercept cross-lagged panel model (RI-CLPM) of {x} and {y} over {t} waves "
+        f"(N = {fit.n}) gave {fit_indices(values, digits)}."
+    ]
+    chisq, df, p = fit.tests["equal"]
+    change = f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}"
+    if fit.equal_holds:
+        sentences.append(
+            f"Holding the lagged paths equal across waves did not worsen fit, {change}, so the "
+            "lagged paths are reported from that model."
+        )
+    else:
+        sentences.append(
+            f"Holding the lagged paths equal across waves worsened fit, {change}, so the lagged "
+            "paths are reported as estimated at each wave."
+        )
+    chisq, df, p = fit.tests["intercepts"]
+    verb = "improved" if p < SIGNIFICANT else "did not improve"
+    sentences.append(
+        f"The random intercepts {verb} fit over the cross-lagged panel model without them, "
+        f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}."
+    )
+    between = fit.correlation(RICLPM, "RIx", "RIy")
+    if between is not None and between.standardized is not None:
+        sentences.append(
+            "The random intercepts, the stable differences between people, correlated "
+            f"r = {bounded(between.standardized, digits)}, {p_text(between.p)}."
+        )
+    chosen = EQUAL if fit.equal_holds else RICLPM
+    for kind, phrase in (("x_to_y", f"{x} predicted {y}"), ("y_to_x", f"{y} predicted {x}")):
+        paths = fit.lagged(chosen, kind)
+        if not paths:
+            continue
+        if chosen == EQUAL:
+            path = paths[0]
+            ordered = sorted(q.standardized for q in paths if q.standardized is not None)
+            betas = list(dict.fromkeys(bounded(b, digits) for b in ordered))
+            if len(betas) > 1:
+                spread = f" (β from {betas[0]} to {betas[-1]})"
+            else:
+                spread = f" (β = {betas[0]})" if betas else ""
+            sentences.append(
+                f"Within people, {phrase} at the next wave, b = {number(path.estimate, digits)}"
+                f"{spread}, {p_text(path.p)}."
+            )
+        else:
+            steps = [
+                f"from wave {model.waves[q.wave - 2]} to {model.waves[q.wave - 1]}, β = "
+                f"{bounded(q.standardized, digits)}, {p_text(q.p)}"
+                for q in paths
+                if q.standardized is not None
+            ]
+            sentences.append(f"Within people, {phrase} at the next wave {series(steps)}.")
+    return " ".join(sentences)
 
 
 def percent(part: int, whole: int) -> str:

@@ -15,6 +15,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 | Mediation, with up to two moderators | lavaan; modsem for latent interactions | not available |
 | Multiple imputation, pooled correlations, regressions and group comparisons | mice, miceadds | not available |
 | Rater agreement: Cohen's κ, intraclass correlations | psych | statsmodels (κ only) |
+| Cross-lagged panel models (RI-CLPM, CLPM) | lavaan | not available |
 
 ## Settings that change the numbers
 

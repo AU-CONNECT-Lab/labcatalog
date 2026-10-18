@@ -18,6 +18,7 @@ from labcatalog.gui import (
     missing,
     multilevel,
 )
+from labcatalog.gui import panel as panel_view
 from labcatalog.gui.common import apa, col, empty, fmt, method_toggle, note, p_value, panel
 from labcatalog.gui.paper import (
     Chart,
@@ -44,6 +45,7 @@ PARTS = {
     "invariance": "Invariance",
     "mediation": "Mediation",
     "multilevel": "Multilevel model",
+    "panel": "Cross-lagged panel",
 }
 
 
@@ -64,6 +66,8 @@ class AnalysisView:
     invariance_estimator: str | None = None
     missing: list[str] = field(default_factory=list)
     raters: list[str] = field(default_factory=list)
+    panel_x: str | None = None
+    panel_y: str | None = None
     # The imputation every section shares; None keeps the project's choice or every score.
     missing_method: str | None = None
     imputed: list[str] | None = None
@@ -116,6 +120,9 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
         if view.part == "multilevel":
             multilevel.render(result, view)
             return
+        if view.part == "panel":
+            panel_view.render(result, view)
+            return
         choices = variables(view)(result, view.datasets)
         if view.part in ("correlation", "regression") and len(choices) < 2:
             with panel(PARTS[view.part]):
@@ -147,8 +154,8 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
                 mediation.render(result, sample, view.mediation, choices, totals)
 
     def sample_changed() -> None:
-        # The multilevel model picks its own waves and people, so the sample does not refit it.
-        if view.part == "multilevel":
+        # These models pick their own waves and people, so the sample does not refit them.
+        if view.part in ("multilevel", "panel"):
             recount()
         else:
             section.refresh()
