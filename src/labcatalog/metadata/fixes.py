@@ -56,6 +56,11 @@ def map_lines(project: Project, dataset: str) -> list[str]:
 def add_to_vocab(project: Project, kind: str, value: str) -> Change:
     opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
     data = records.load(opened.text)
+    append_word(project, data, kind, value)
+    return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
+
+
+def append_word(project: Project, data: CommentedMap, kind: str, value: str) -> None:
     if not data.get("vocab"):
         data["vocab"] = CommentedMap()
     vocab = data["vocab"]
@@ -63,7 +68,6 @@ def add_to_vocab(project: Project, kind: str, value: str) -> Change:
         # Written out in full, so the words that applied by default still apply.
         vocab[kind] = flow(getattr(project.config.vocab, kind))
     vocab[kind].append(value)
-    return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
 
 
 def replace_word(project: Project, places: list[dict], word: str) -> list[Change]:

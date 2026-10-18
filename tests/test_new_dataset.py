@@ -124,6 +124,33 @@ def test_a_dataset_that_repeats_none_starts_a_new_study(project_root, tmp_path):
     assert after.studies["pilot"].administrations[0].datasets == ["pilot_child_w1"]
 
 
+def test_a_new_kind_of_file_brings_its_wave_dates_and_new_words(project_root, tmp_path):
+    project = load_project(project_root)
+    source = tmp_path / "diary.csv"
+    rows = ["pid,visit_date,ems_1", "1001C,2027-01-20,1", "1002C,2027-02-03,2", "1003C,,3"]
+    source.write_text("\n".join(rows) + "\n", encoding="utf-8")
+    draft = new_dataset.suggest_blank(project, "mock_study")
+    draft.name, draft.wave = "teacher_diary_w4", "4"
+    draft.blank.modality, draft.blank.reporter = "diary", "teacher"
+    draft.blank.id_column, draft.blank.date_column = "pid", "visit_date"
+    placement = new_dataset.place(project, draft, source)
+    new_dataset.bring_in(project, source, placement)
+    dataset = new_dataset.dataset_config(project, draft, placement)
+    first_day, last_day = new_dataset.date_range(project, dataset)
+    assert (first_day.isoformat(), last_day.isoformat()) == ("2027-01-20", "2027-02-03")
+    draft.wave_start = first_day
+    found = new_dataset.changes(
+        project, draft, placement, new_dataset.match_columns(project, dataset)
+    )
+    assert changes.check(project, found) == []
+    changes.write(project, found)
+    after = load_project(project_root)
+    assert after.config.studies["mock_study"].waves["4"].start == first_day
+    assert after.config.studies["mock_study"].waves["4"].end is None
+    assert after.config.vocab.modalities[-1] == "diary"
+    assert after.config.vocab.reporters[-1] == "teacher"
+
+
 def test_a_folder_of_files_is_read_in_place(project_root):
     for name in [
         "sub-2001C/ses-1/func/sub-2001C_task-rest_run-1_bold.nii.gz",

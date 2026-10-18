@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
@@ -15,6 +16,7 @@ from labcatalog.data.prepare import Session, StepRun, execute
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
 from labcatalog.metadata.changes import Change
+from labcatalog.metadata.fixes import append_word
 from labcatalog.metadata.varmap import MAP_COLUMNS
 from labcatalog.paths import portable_path
 from labcatalog.project import Project
@@ -60,6 +62,9 @@ class Draft:
     blank: Blank | None = None
     # Set for a folder of files: which files to count, with {id} where the path holds the ID.
     files: str | None = None
+    # Written when the wave is new to the study.
+    wave_start: date | None = None
+    wave_end: date | None = None
 
 
 @dataclass
@@ -394,8 +399,18 @@ def settings_change(project: Project, draft: Draft, placement: Placement) -> Cha
             study["waves"] = CommentedMap()
         wave = CommentedMap()
         wave.fa.set_flow_style()
+        for key, day in (("start", draft.wave_start), ("end", draft.wave_end)):
+            if day is not None:
+                wave[key] = day
         study["waves"][entry["wave"]] = wave
         records.put_tail(study, tail)
+    if draft.blank is not None:
+        for kind, word in (
+            ("modalities", draft.blank.modality),
+            ("reporters", draft.blank.reporter),
+        ):
+            if word and word not in getattr(project.config.vocab, kind):
+                append_word(project, data, kind, word)
     if placement.step is not None:
         steps = data["prepare"]
         old = dataset_by_name(project.config, draft.template).path
@@ -450,6 +465,23 @@ def flow_list(values: list[str]) -> CommentedSeq:
     seq = CommentedSeq(values)
     seq.fa.set_flow_style()
     return seq
+
+
+def date_range(project: Project, dataset: DatasetConfig) -> tuple[date | None, date | None]:
+    if not dataset.date_column:
+        return None, None
+    frame = read_data(project, dataset)
+    if dataset.wave_column:
+        frame = frame[frame[dataset.wave_column] == dataset.wave]
+    # A date column the new file lacks is reported by the checks; here it gives no dates.
+    if dataset.date_column not in frame:
+        return None, None
+    dates = pd.to_datetime(
+        frame[dataset.date_column], format=project.config.defaults.date_format, errors="coerce"
+    ).dropna()
+    if dates.empty:
+        return None, None
+    return dates.min().date(), dates.max().date()
 
 
 def is_new_wave(project: Project, draft: Draft) -> bool:

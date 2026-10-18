@@ -55,6 +55,7 @@ def open_wizard(
         "wave_column": None,
         "paths": [],
         "prefilled": None,
+        "wave_dates": (None, None),
     }
 
     def cleanup() -> None:
@@ -105,7 +106,45 @@ def open_wizard(
             date.fromisoformat((as_of.value or "").strip()),
             described,
             (files.value or "").strip() if folder() else None,
+            *state["wave_dates"],
         )
+
+    async def prefill_dates() -> None:
+        # The new wave starts on the data's first date; its end stays open while it collects.
+        new = new_dataset.is_new_wave(project, draft())
+        dates_box.visible = new
+        if not new:
+            state["wave_dates"] = (None, None)
+            return
+        dataset = new_dataset.dataset_config(project, draft(), state["placement"])
+        first_day, last_day = await computed(new_dataset.date_range, project, dataset)
+        state["wave_dates"] = (first_day, None)
+        starts.set_value(first_day.isoformat() if first_day else "")
+        ends.set_value("")
+        last_note.set_text(
+            f"The data run to {last_day.isoformat()}. Leave the end empty while the wave is "
+            "still collecting."
+            if last_day
+            else "Leave the end empty while the wave is still collecting."
+        )
+
+    def dates_changed() -> None:
+        try:
+            state["wave_dates"] = tuple(
+                date.fromisoformat(box.value.strip()) if (box.value or "").strip() else None
+                for box in (starts, ends)
+            )
+        except ValueError:
+            review_status.set_text("Wave dates: a date such as 2026-10-16, or empty")
+            return
+        rows = [] if folder() else state["rows"]
+        try:
+            state["changes"] = new_dataset.changes(project, draft(), state["placement"], rows)
+        except LabCatalogError as err:
+            review_status.set_text(str(err))
+            return
+        review_status.set_text("")
+        review.refresh()
 
     async def prefill_folder() -> None:
         # From the dataset it repeats, kept once the person has changed it for this template and wave.
@@ -222,6 +261,7 @@ def open_wizard(
             if not seen.people:
                 raise LabCatalogError("No file matches; check the files rule")
             state["placement"] = new_dataset.place(project, draft(), state["source"])
+            await prefill_dates()
             found = new_dataset.changes(project, draft(), state["placement"], [])
         except LabCatalogError as err:
             file_status.set_text(str(err))
@@ -378,6 +418,7 @@ def open_wizard(
             return
         state["rows"] = rows
         try:
+            await prefill_dates()
             found = new_dataset.changes(project, draft(), state["placement"], rows)
         except LabCatalogError as err:
             columns_status.set_text(str(err))
@@ -412,10 +453,7 @@ def open_wizard(
                 f"for {template.value}: {placement.step.run}"
             )
         if new_dataset.is_new_wave(project, draft()):
-            note(
-                f"Wave {wave.value} is new, so it is added to the study without dates; fill in "
-                "its start and end on the Studies page."
-            )
+            note(f"Wave {wave.value} is new, so it is added to the study with the dates above.")
         note("Adding the dataset changes these files; each line with + is new.")
         for change in state["changes"]:
             before = change.opened.text if change.opened else ""
@@ -486,12 +524,17 @@ def open_wizard(
                             {m: config.vocab.modality_label(m) for m in config.vocab.modalities},
                             value=config.vocab.modalities[0],
                             label="Modality",
+                            with_input=True,
+                            new_value_mode="add-unique",
                         ).classes("w-48")
                         reporter = ui.select(
                             config.vocab.reporters,
                             value=(config.vocab.reporters or [None])[0],
                             label="Reporter",
+                            with_input=True,
+                            new_value_mode="add-unique",
                         ).classes("w-48")
+                    note("A modality or reporter not on the list can be typed in.")
                 repeating.visible, describing.visible = start == REPEAT, start == BLANK
                 with ui.row().classes("gap-3"):
                     name = ui.input("Name", value=first.name).classes("w-56")
@@ -561,6 +604,15 @@ def open_wizard(
                     ui.button("Back", on_click=stepper.previous).props("flat")
                     ui.button("Cancel", on_click=cancel).props("flat")
             with ui.step(CHECK_STEP):
+                with ui.column().classes("gap-1") as dates_box:
+                    with ui.row().classes("gap-3"):
+                        starts = ui.input("Wave starts").classes("w-40")
+                        ends = ui.input("Wave ends").classes("w-40")
+                    for box in (starts, ends):
+                        box.on("blur", dates_changed)
+                        box.on("keydown.enter", dates_changed)
+                    last_note = ui.label().classes("lc-note")
+                dates_box.visible = False
                 review()
                 review_status = ui.label().classes("lc-bad-text")
                 with ui.stepper_navigation():
