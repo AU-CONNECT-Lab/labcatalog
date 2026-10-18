@@ -28,6 +28,8 @@ class IdRow:
     ids: int
     # Rows with each problem, by code.
     problems: dict[str, int] = field(default_factory=dict)
+    # The IDs as the file writes them, for each problem; lines of the file for rows with none.
+    shown: dict[str, list[str]] = field(default_factory=dict)
     corrected: int = 0
 
 
@@ -41,12 +43,23 @@ def id_rows(result: CatalogResult) -> list[IdRow]:
     for name, loaded in result.datasets.items():
         ids = loaded.frame[loaded.id_column]
         row = IdRow(name, loaded.config.study, len(ids), ids.nunique())
+        typed = loaded.original_ids if loaded.original_ids is not None else ids
         for issue in by_dataset.get(name, []):
-            row.problems[issue.code] = len(issue.details.get("rows", []))
+            rows = issue.details.get("rows", [])
+            row.problems[issue.code] = len(rows)
+            row.shown[issue.code] = shown_ids(issue.code, typed, rows)
         row.problems = {c: row.problems[c] for c in CODES if c in row.problems}
         row.corrected = int((corrections["dataset"] == name).sum())
         found.append(row)
     return found
+
+
+def shown_ids(code: str, typed, rows: list[int]) -> list[str]:
+    if code == "id_missing":
+        # Line 1 is the header, so the first row below it is line 2.
+        return [f"line {n + 2}" for n in rows]
+    values = dict.fromkeys(typed.loc[rows])
+    return [repr(v) if v != v.strip() else v for v in values]
 
 
 def roster_issues(result: CatalogResult) -> list[Issue]:
@@ -76,21 +89,26 @@ def render(
             empty("No data files read yet.")
             return
         for row in rows:
-            with ui.row().classes("w-full items-center gap-3"):
-                ui.label(row.dataset).classes("font-medium")
-                ui.label(f"{row.study}, {row.rows} rows, {row.ids} IDs").classes("lc-note")
-                for code, count in row.problems.items():
-                    ui.label(f"{count} {CODES[code]}").classes("lc-pill lc-warn")
-                if not row.problems:
-                    ui.label("All right").classes("lc-pill lc-ok")
-                if row.corrected:
-                    ui.label(f"{row.corrected} corrected").classes("lc-pill lc-info")
-                ui.space()
-                ui.button(
-                    "Fix IDs",
-                    icon="badge",
-                    on_click=lambda name=row.dataset: id_fix.open_dialog(result, name, on_saved),
-                ).props("flat dense no-caps")
+            with ui.column().classes("w-full gap-0"):
+                with ui.row().classes("w-full items-center gap-3"):
+                    ui.label(row.dataset).classes("font-medium")
+                    ui.label(f"{row.study}, {row.rows} rows, {row.ids} IDs").classes("lc-note")
+                    for code, count in row.problems.items():
+                        ui.label(f"{count} {CODES[code]}").classes("lc-pill lc-warn")
+                    if not row.problems:
+                        ui.label("All right").classes("lc-pill lc-ok")
+                    if row.corrected:
+                        ui.label(f"{row.corrected} corrected").classes("lc-pill lc-info")
+                    ui.space()
+                    ui.button(
+                        "Fix IDs",
+                        icon="badge",
+                        on_click=lambda name=row.dataset: id_fix.open_dialog(
+                            result, name, on_saved
+                        ),
+                    ).props("flat dense no-caps")
+                for code, found in row.shown.items():
+                    note(f"{CODES[code].capitalize()}: {', '.join(found)}")
         if rosters := roster_issues(result):
             with ui.row().classes("w-full items-center gap-2"):
                 note(

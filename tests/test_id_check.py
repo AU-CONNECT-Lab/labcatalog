@@ -20,3 +20,9 @@ def test_each_data_file_shows_its_id_problems_and_corrections(mock_project):
     )
     fixed = {row.dataset: row for row in id_check.id_rows(run_catalog(mock_project))}
     assert fixed["parent_w1"].problems == {} and fixed["parent_w1"].corrected == 1
+
+
+def test_each_problem_lists_the_ids_as_the_file_writes_them(mock_project):
+    rows = {row.dataset: row for row in id_check.id_rows(run_catalog(mock_project))}
+    assert rows["parent_w1"].shown == {"id_whitespace": ["' 1031P'"]}
+    assert "1341C" in rows["child_w3"].shown["id_not_in_roster"]
