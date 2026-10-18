@@ -10,7 +10,7 @@ from nicegui import ui
 from nicegui.events import GenericEventArguments
 
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import preferences
+from labcatalog.gui import common, preferences
 from labcatalog.gui.common import computed, note, open_path
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult, run_interpretation
@@ -44,15 +44,12 @@ def results_text(text: str, shown: list[PaperTable] | None = None) -> None:
     async def ask() -> None:
         button.disable()
         status.set_text("Asking the language model.")
-        chosen = preferences.load()
         try:
             found = await computed(
                 run_interpretation,
                 shown,
                 text,
-                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
-                chosen.get(preferences.LLM_MODEL, ""),
-                chosen.get(preferences.LLM_URL, ""),
+                *common.llm_choice(),
             )
         except LabCatalogError as err:
             status.set_text(str(err))
@@ -76,7 +73,7 @@ def results_text(text: str, shown: list[PaperTable] | None = None) -> None:
         ui.label(text).classes("lc-prose")
         with ui.row().classes("items-center gap-2"):
             copy_text(text)
-            if shown and preferences.model_set():
+            if shown and common.model_set():
                 button = ui.button(
                     "Interpret with the language model", icon="psychology", on_click=ask
                 ).props("flat dense no-caps")

@@ -28,7 +28,7 @@ A language model can:
 
 What it writes is always a draft for you to check, and the references, license and tags are always filled in by hand. These features need the `ai` extra (see [Installation](../getting-started/installation.md)).
 
-On the **Settings** page, under **Language model**, choose the provider and the model, and press **Save**.
+On the **Settings** page, under **This project**, choose the provider and the model, and press **Save**. They are saved in the project, so the whole lab uses the same model. What each person needs is set on their own computer:
 
 - **Anthropic, OpenAI or Gemini**: labcatalog reads the API key from an environment variable, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`, and never stores it. Set it yourself and restart labcatalog. On Windows: `setx ANTHROPIC_API_KEY your-key` in a terminal. On macOS or Linux, add `export ANTHROPIC_API_KEY=your-key` to your shell profile. The page says whether the variable is set.
 - **Local (OpenAI-compatible server)**: a model running on your own computer or server, for example with Ollama or LM Studio. Give the server's address, for example `http://localhost:11434/v1`. Nothing leaves your network.

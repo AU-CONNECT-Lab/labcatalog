@@ -9,7 +9,7 @@ On the **Settings** page, under **Tables**, choose what the copy buttons copy:
 - **Word or Google Docs**: rich text that pastes as a formatted table.
 - **LaTeX**: a `booktabs` table. Add `\usepackage{booktabs}` to your preamble.
 
-The same section sets the number of decimal places. *p* values always keep three and are written in APA style (".034", "< .001").
+The number of decimal places is set for the whole project, under **This project** on the same page. *p* values always keep three and are written in APA style (".034", "< .001").
 
 ## Copy a table
 

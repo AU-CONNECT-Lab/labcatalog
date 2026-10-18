@@ -79,7 +79,6 @@ def launch(project: Path | None = None) -> None:
     saved = preferences.load().get(preferences.PALETTE)
     # A palette saved by another version may no longer exist.
     style.use_palette(saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
-    common.set_decimals(preferences.load().get(preferences.DECIMALS, preferences.DEFAULT_DECIMALS))
     if datalad := preferences.load().get(preferences.DATALAD):
         use_folder(datalad)
     # Saving a table or figure goes through the window's own save dialog.
@@ -224,13 +223,13 @@ class Window:
             with ui.tab_panel("problems").classes("lc-page"):
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-page"):
-                settings.render(
+                self.project_settings = settings.render(
+                    lambda: self.result,
                     self.set_appearance,
                     self.set_palette,
                     self.start_cfa,
                     self.instruments_panel.refresh,
                     self.reload,
-                    self.set_decimals,
                     self.reset_example,
                 )
 
@@ -386,12 +385,6 @@ class Window:
         if self.result is not None:
             self.show_result()
 
-    def set_decimals(self, places: int) -> None:
-        common.set_decimals(places)
-        preferences.save({preferences.DECIMALS: places})
-        if self.result is not None:
-            self.show_result()
-
     def set_busy(self, busy: bool) -> None:
         self.spinner.visible = busy
         self.open_button.set_enabled(not busy)
@@ -400,6 +393,7 @@ class Window:
     def show_result(self) -> None:
         result = self.result
         project = result.project if result else None
+        common.use_project(project.config if project else None)
         self.title.set_text(project.config.project.name if project else self.root.name)
         self.path_tip.set_text(str(self.root))
         self.as_of.set_text(as_of_text(result) if result else "")
@@ -425,6 +419,7 @@ class Window:
             self.problems_panel,
         ):
             panel.refresh()
+        self.project_settings()
 
     def open_instrument(self, instrument_id: str | None) -> None:
         self.view.instrument = instrument_id

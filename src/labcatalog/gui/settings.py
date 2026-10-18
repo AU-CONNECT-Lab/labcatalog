@@ -2,13 +2,18 @@ import os
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from nicegui import ui
+from nicegui import run, ui
 
 from labcatalog.charts import style
+from labcatalog.config import CORRELATIONS
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import common, datalad, example, preferences, theme
 from labcatalog.gui.common import command, computed, note, panel, path_input, show_status
 from labcatalog.llm import KEY_ENV, PROVIDERS
+from labcatalog.metadata.editing import save_settings
+from labcatalog.pipeline import CatalogResult
+from labcatalog.stats import attrition
+from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.mediation import DEFAULT_WORKERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
 
@@ -17,24 +22,88 @@ MPLUS_EXAMPLE = r"C:\Program Files\Mplus\Mplus.exe"
 
 
 def render(
+    current: Callable[[], CatalogResult | None],
     on_appearance: Callable[[str], Awaitable[None]],
     on_palette: Callable[[str], None],
     on_rscript: Callable[[], Awaitable[None]],
     on_model: Callable[[], None],
-    on_datalad: Callable[[], Awaitable[None]],
-    on_decimals: Callable[[int], None],
+    on_saved: Callable[[], Awaitable[None]],
     on_reset_example: Callable[[], Awaitable[None]],
-) -> None:
+) -> Callable[[], None]:
+    # Returns what redraws the parts that follow the open project.
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("grow min-w-0 gap-4"):
+            ui.label("This project").classes("lc-caption m-0")
+            project = ui.refreshable(project_section)
+            project(current, on_saved)
+            ui.label("This computer").classes("lc-caption m-0")
             r_section(on_rscript)
             mplus_section()
-            datalad.datalad_section(on_datalad)
-            models_section(on_model)
+            datalad.datalad_section(on_saved)
+            model = ui.refreshable(models_section)
+            model(on_model)
         with ui.column().classes("w-96 shrink-0 gap-4"):
+            ui.label("Only for you").classes("lc-caption m-0")
             looks_section(on_appearance, on_palette)
-            tables_section(on_decimals)
+            tables_section()
             example_section(on_reset_example)
+    return lambda: (project.refresh(), model.refresh())
+
+
+def project_section(
+    current: Callable[[], CatalogResult | None], on_saved: Callable[[], Awaitable[None]]
+) -> None:
+    result = current()
+    with panel(
+        "Shared with the lab",
+        "Saved in labcatalog.yaml, so everyone who opens the project starts from the same "
+        "choices. Each section of the Analysis page can still try another for itself.",
+    ):
+        if result is None or result.project is None:
+            note("Open a project that reads without errors to set its choices.")
+            return
+        config = result.project.config
+        stats = config.stats
+        with ui.row().classes("w-full items-start gap-2"):
+            decimals = select(
+                {places: str(places) for places in range(1, 5)},
+                stats.decimals,
+                "Decimal places (p values keep three)",
+            )
+            t_test = select(attrition.T_TESTS, stats.t_test, "Two groups")
+            correlation = select(CORRELATIONS, stats.correlation, "Correlations")
+            estimator = select(ESTIMATORS, stats.cfa_estimator, "Factor models")
+        with ui.row().classes("w-full items-start gap-2"):
+            provider = select(PROVIDERS, config.llm.provider, "Language model provider")
+            model = (
+                ui.input("Model", value=config.llm.model or "")
+                .props("outlined dense")
+                .classes("w-60")
+            )
+            ui.button("Save", on_click=lambda: save())
+        status = ui.label()
+        status.visible = False
+
+        async def save() -> None:
+            changes = {
+                "stats": {
+                    "decimals": decimals.value,
+                    "t_test": t_test.value,
+                    "correlation": correlation.value,
+                    "cfa_estimator": estimator.value,
+                },
+                "llm": {"provider": provider.value, "model": (model.value or "").strip() or None},
+            }
+            try:
+                await run.io_bound(save_settings, result.project.root, changes)
+            except LabCatalogError as err:
+                show_status(status, str(err), "bad")
+                return
+            await on_saved()
+
+
+def select(options: dict, value, label: str) -> ui.select:
+    return ui.select(options, value=value, label=label).props("outlined dense").classes("w-60")
 
 
 def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
@@ -150,7 +219,7 @@ def looks_section(
         ).props("outlined dense").classes("w-full mt-2")
 
 
-def tables_section(on_decimals: Callable[[int], None]) -> None:
+def tables_section() -> None:
     with panel(
         "Tables",
         "The Copy button under each table on the Analysis page copies it as a three-line "
@@ -162,12 +231,6 @@ def tables_section(on_decimals: Callable[[int], None]) -> None:
             value=preferences.load().get(preferences.TABLE_FORMAT, preferences.RICH),
             on_change=lambda e: preferences.save({preferences.TABLE_FORMAT: e.value}),
         ).props("no-caps")
-        ui.select(
-            {places: str(places) for places in range(1, 5)},
-            value=common.decimals,
-            label="Decimal places in tables (p values keep three)",
-            on_change=lambda e: on_decimals(e.value),
-        ).props("outlined dense").classes("w-full mt-2")
 
 
 def example_section(on_reset_example: Callable[[], Awaitable[None]]) -> None:
@@ -196,64 +259,41 @@ def example_section(on_reset_example: Callable[[], Awaitable[None]]) -> None:
 
 
 def models_section(on_model: Callable[[], None]) -> None:
+    provider = common.llm.provider
     with panel("Language model", "Scoring scripts and descriptions drafted from reference PDFs"):
         note(
             "On an instrument's page, a language model can write the scoring scripts and draft "
-            "the description for the Measures paragraph from the instrument's reference PDF. A "
-            "cloud provider reads its key from an environment variable that you set yourself, "
-            "for example by typing this in a terminal and restarting labcatalog:"
+            "the description for the Measures paragraph from the instrument's reference PDF. The "
+            "project names the provider and model; the key or the server stays on this computer."
         )
-        command("setx ANTHROPIC_API_KEY your-key")
+        env = KEY_ENV.get(provider)
+        if env:
+            note(
+                "A cloud provider reads its key from an environment variable that you set "
+                "yourself, for example by typing this in a terminal and restarting labcatalog:"
+            )
+            command(f"setx {env} your-key")
+            found = os.environ.get(env)
+            key = ui.label()
+            show_status(
+                key, f"{env} is {'set' if found else 'not set'}.", "ok" if found else "warn"
+            )
+            return
         note(
             "A local model runs on an OpenAI-compatible server such as Ollama or LM Studio; "
             "give its address, for example http://localhost:11434/v1."
         )
-        saved = preferences.load()
         with ui.row().classes("w-full items-start gap-2 mt-1"):
-            provider = (
-                ui.select(
-                    PROVIDERS,
-                    value=saved.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
-                    label="Provider",
-                )
-                .props("outlined dense")
-                .classes("w-60")
-            )
-            model = (
-                ui.input("Model", value=saved.get(preferences.LLM_MODEL, ""))
-                .props("outlined dense")
-                .classes("w-60")
-            )
             url = (
-                ui.input("Server address", value=saved.get(preferences.LLM_URL, ""))
+                ui.input("Server address", value=preferences.load().get(preferences.LLM_URL, ""))
                 .props("outlined dense")
                 .classes("w-72")
             )
             ui.button("Save", on_click=lambda: save())
-        url.bind_visibility_from(provider, "value", value="local")
-        key = ui.label()
         status = ui.label()
         status.visible = False
 
-        def show_key() -> None:
-            env = KEY_ENV.get(provider.value)
-            key.visible = env is not None
-            if env:
-                found = os.environ.get(env)
-                show_status(
-                    key, f"{env} is {'set' if found else 'not set'}.", "ok" if found else "warn"
-                )
-
         def save() -> None:
-            preferences.save(
-                {
-                    preferences.LLM_PROVIDER: provider.value,
-                    preferences.LLM_MODEL: (model.value or "").strip(),
-                    preferences.LLM_URL: (url.value or "").strip(),
-                }
-            )
+            preferences.save({preferences.LLM_URL: (url.value or "").strip()})
             show_status(status, "Saved.", "ok")
             on_model()
-
-        provider.on_value_change(lambda _: show_key())
-        show_key()

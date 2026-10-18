@@ -132,10 +132,20 @@ Settings that change the numbers, kept in the project so that everyone gets the 
 | Key | Default | Values |
 |---|---|---|
 | `correlate_by` | `id` | `id`, the group's name, or `none`: how people in different datasets are matched. |
+| `decimals` | `2` | 1 to 4: decimal places of the numbers in tables and paragraphs; *p* values keep three. |
 | `correlation` | `pearson` | `pearson` or `spearman`. |
 | `t_test` | `welch` | `welch` or `student`. |
 | `cfa_estimator` | `wlsmv` | The estimator factor models and invariance tests start from: `wlsmv` (items as ordered categories), `ml` or `mlr` (items as continuous; `mlr` is robust maximum likelihood). The pages can switch it for what they show. |
 | `invariance_free` | none | Items whose parameters an invariance test lets differ, each as `{instrument, item, parameter, across}`: `parameter` is `loading`, `threshold` or `intercept`, and `across` is `waves`, `reporters`, or the grouping item as `instrument.item`. Written by **Save and rerun** on the invariance tables. |
+
+## llm
+
+The language model the lab uses, set on the Settings page. API keys are never kept here; each person sets theirs in an environment variable, and a local server's address is a setting of each computer. See [Set Up R and Language Models](../how-to/r-and-models.md).
+
+| Key | Default | Values |
+|---|---|---|
+| `provider` | `anthropic` | `anthropic`, `openai`, `gemini` or `local` (an OpenAI-compatible server). |
+| `model` | none | The model's name, as the provider gives it. |
 
 ## prepare and prepare_with
 

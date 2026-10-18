@@ -77,3 +77,19 @@ def test_freed_parameters_are_saved_into_the_stats_settings(mock_project):
     assert load_project(mock_project).config.stats.invariance_free == freed
     editing.save_freed(mock_project, [])
     assert "invariance_free" not in (mock_project / "labcatalog.yaml").read_text()
+
+
+def test_lab_settings_are_saved_into_the_project_without_their_defaults(mock_project):
+    changes = {
+        "stats": {"decimals": 3, "t_test": "student", "correlation": "pearson"},
+        "llm": {"provider": "local", "model": "qwen3"},
+    }
+    editing.save_settings(mock_project, changes)
+    text = (mock_project / "labcatalog.yaml").read_text()
+    assert "correlate_by: family" in text and "# Score correlations link" in text
+    assert "correlation:" not in text
+    config = load_project(mock_project).config
+    assert (config.stats.decimals, config.stats.t_test) == (3, "student")
+    assert (config.llm.provider, config.llm.model) == ("local", "qwen3")
+    editing.save_settings(mock_project, {"llm": {"provider": "anthropic", "model": None}})
+    assert "llm:" not in (mock_project / "labcatalog.yaml").read_text()

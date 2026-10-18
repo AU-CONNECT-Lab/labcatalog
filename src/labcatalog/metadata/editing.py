@@ -3,6 +3,7 @@ import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
+from typing import Any
 
 import yaml
 from pydantic import BaseModel, ValidationError
@@ -104,6 +105,27 @@ def save_freed(root: Path, freed: list[FreedParameter]) -> None:
         stats["invariance_free"] = entries
     else:
         stats.pop("invariance_free", None)
+    save_data(root, opened, data)
+
+
+def save_settings(root: Path, changes: dict[str, dict[str, Any]]) -> None:
+    # A setting equal to its default leaves the file, so the file holds only the lab's choices.
+    opened = open_file(root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    for section, values in changes.items():
+        default = ProjectConfig.model_fields[section].default_factory()
+        held = data.setdefault(section, CommentedMap())
+        for key, value in values.items():
+            if value == getattr(default, key):
+                held.pop(key, None)
+            else:
+                held[key] = value
+        if not held:
+            data.pop(section)
+    save_data(root, opened, data)
+
+
+def save_data(root: Path, opened: Opened, data: CommentedMap) -> None:
     out = io.StringIO()
     records.round_trip().dump(data, out)
     save_file(root, opened, out.getvalue())

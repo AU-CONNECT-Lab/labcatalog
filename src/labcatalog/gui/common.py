@@ -10,6 +10,8 @@ from pathlib import Path
 from nicegui import run, ui
 
 from labcatalog import defaults
+from labcatalog.config import LlmConfig, ProjectConfig
+from labcatalog.gui import preferences
 from labcatalog.metadata.bibliography import Bibliography, citation
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.summary import wave_order
@@ -101,12 +103,23 @@ def cited(bibliography: Bibliography, key: str) -> None:
         ui.link("Link", entry["url"], new_tab=True)
 
 
-decimals = 2  # Decimal places of the numbers in tables; the Settings page sets it.
+# The open project's settings, set as it loads.
+decimals = defaults.DECIMALS
+llm = LlmConfig()
 
 
-def set_decimals(places: int) -> None:
-    global decimals
-    decimals = places
+def use_project(config: ProjectConfig | None) -> None:
+    global decimals, llm
+    decimals = config.stats.decimals if config else defaults.DECIMALS
+    llm = config.llm if config else LlmConfig()
+
+
+def llm_choice() -> tuple[str, str, str]:
+    return llm.provider, llm.model or "", preferences.load().get(preferences.LLM_URL, "")
+
+
+def model_set() -> bool:
+    return bool(llm.model)
 
 
 def fmt(value: float | None, digits: int | None = None) -> str:
@@ -175,9 +188,17 @@ def copy_command(text: str) -> None:
 
 
 def estimator_toggle(value: str, on_change: Callable[[str], None]) -> None:
-    ui.toggle(ESTIMATORS, value=value, on_change=lambda e: on_change(e.value)).props(
+    method_toggle(ESTIMATORS, value, on_change, "How the factor models treat the items")
+
+
+def method_toggle(
+    options: dict[str, str], value: str, on_change: Callable[[str], None], tip: str = ""
+) -> None:
+    # A choice for this section only; the lab's default is on the Settings page.
+    tip = f"{tip}; " if tip else ""
+    ui.toggle(options, value=value, on_change=lambda e: on_change(e.value)).props(
         "dense no-caps"
-    ).tooltip("How the factor models treat the items; the project's default is in labcatalog.yaml")
+    ).tooltip(f"{tip}for this section only, the project's default is on the Settings page")
 
 
 def path_input(label: str, value: str, hint: str) -> ui.input:

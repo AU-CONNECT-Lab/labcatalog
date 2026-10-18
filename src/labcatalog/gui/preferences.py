@@ -11,13 +11,8 @@ MPLUS = "mplus"
 BOOTSTRAP_WORKERS = "bootstrap_workers"
 DATALAD = "datalad"
 LAST_PROJECT = "last_project"
-LLM_PROVIDER = "llm_provider"
-LLM_MODEL = "llm_model"
 LLM_URL = "llm_url"
-DEFAULT_LLM_PROVIDER = "anthropic"
 TABLE_FORMAT = "table_format"
-DECIMALS = "decimals"
-DEFAULT_DECIMALS = 2
 RICH = "rich"
 LATEX = "latex"
 
@@ -33,10 +28,6 @@ def folder() -> Path:
 def load() -> dict:
     path = folder() / FILENAME
     return json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-
-
-def model_set() -> bool:
-    return bool(load().get(LLM_MODEL))
 
 
 def save(changes: dict) -> None:

@@ -9,7 +9,7 @@ from nicegui import app, ui
 from labcatalog import defaults
 from labcatalog.charts import mindmap
 from labcatalog.exceptions import EditError, LabCatalogError
-from labcatalog.gui import edit_form, preferences, theme
+from labcatalog.gui import common, edit_form, theme
 from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
@@ -244,7 +244,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     def draft() -> None:
         with ui.dialog() as dialog, ui.card().classes("w-[32rem]"):
             ui.label("New instrument from a PDF")
-            if not preferences.model_set():
+            if not common.model_set():
                 note("Set a language model on the Settings page to draft an instrument from a PDF.")
                 ui.button("Close", on_click=dialog.close).props("flat")
                 dialog.open()
@@ -266,16 +266,13 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     return
                 button.disable()
                 status.set_text("Reading the PDF and drafting the instrument.")
-                settings = preferences.load()
                 try:
                     drafted = await computed(
                         run_instrument_draft,
                         root,
                         (name.value or "").strip(),
                         chosen[0],
-                        settings.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
-                        settings.get(preferences.LLM_MODEL, ""),
-                        settings.get(preferences.LLM_URL, ""),
+                        *common.llm_choice(),
                         which.value or "",
                     )
                 except LabCatalogError as err:

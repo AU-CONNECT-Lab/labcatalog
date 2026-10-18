@@ -1,8 +1,20 @@
 # Settings
 
-The Settings page, opened with the gear at the top right of the window, holds the settings of your computer, not of the project: they apply to every project you open and are not shared with anyone else who opens one. Settings that change the numbers are in `labcatalog.yaml` instead (see [Statistics](../statistics/index.md)).
+The Settings page, opened with the gear at the top right of the window, has three parts. **This project** holds the choices shared with the lab: they are saved in the project's `labcatalog.yaml`, so everyone who opens the project starts from them. **This computer** holds the paths to R, Mplus and DataLad and what a language model needs on this computer. **Only for you** holds how the window looks and what the copy buttons copy.
 
 ![The Settings page](../images/app/settings.png)
+
+## Shared with the lab
+
+Saved in `labcatalog.yaml` with **Save**, after which the project reloads:
+
+- **Decimal places**: 1 to 4, 2 by default, for the numbers in tables and paragraphs. *p* values always keep three.
+- **Two groups**: Welch's or Student's *t* test.
+- **Correlations**: Pearson's *r* or Spearman's ρ.
+- **Factor models**: WLSMV (items as ordered categories), ML or MLR (items as continuous).
+- **Language model provider** and **Model**: Anthropic, OpenAI, Gemini, or a local OpenAI-compatible server, and the model's name.
+
+These are where each page starts. A switch on a section of the Analysis page, or on the factor model panels, tries another choice for what that section shows, without changing the project; the table notes say which was used. See [Statistics](../statistics/index.md).
 
 ## R
 
@@ -14,7 +26,7 @@ The path to `datalad`. **Save and check** reports the versions of DataLad and gi
 
 ## Language model
 
-The **Provider** (Anthropic, OpenAI, Gemini, or a local OpenAI-compatible server), the **Model**, and for a local server its address. A cloud provider's API key is read from an environment variable and never stored; the page says whether it is set. Press **Save**.
+What the project's language model needs on this computer. A cloud provider's API key is read from an environment variable that each person sets, and is never stored, in the project or anywhere else; the page gives the command and says whether it is set. For a local server, its address, with **Save**.
 
 ## Appearance
 
@@ -22,12 +34,11 @@ The **Provider** (Anthropic, OpenAI, Gemini, or a local OpenAI-compatible server
 
 ## Tables
 
-- **Word or Google Docs** or **LaTeX**: what the copy buttons copy. See [Copy Tables into a Manuscript](../how-to/copy-tables.md).
-- **Decimal places in tables**: 1 to 4, 2 by default. *p* values always keep three.
+**Word or Google Docs** or **LaTeX**: what the copy buttons copy. See [Copy Tables into a Manuscript](../how-to/copy-tables.md).
 
 ## Where the settings are kept
 
-In a file named `gui.json`: `%APPDATA%\labcatalog` on Windows, `~/Library/Application Support/labcatalog` on macOS, and `~/.config/labcatalog` on Linux.
+The project's in `labcatalog.yaml` (see [The Project File](../reference/project-file.md)). The rest in a file named `gui.json`: `%APPDATA%\labcatalog` on Windows, `~/Library/Application Support/labcatalog` on macOS, and `~/.config/labcatalog` on Linux.
 
 ## Example project
 

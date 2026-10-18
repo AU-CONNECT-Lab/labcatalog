@@ -13,7 +13,7 @@ from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, common, new_instrument, preferences, theme
+from labcatalog.gui import charts, common, new_instrument, theme
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
@@ -316,15 +316,12 @@ def ask_panel(
             return
         button.disable()
         status.set_text("Asking the language model.")
-        chosen = preferences.load()
         try:
             asked = await computed(
                 run_search,
                 result,
                 query,
-                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
-                chosen.get(preferences.LLM_MODEL, ""),
-                chosen.get(preferences.LLM_URL, ""),
+                *common.llm_choice(),
             )
         except LabCatalogError as err:
             status.set_text(str(err))
@@ -350,7 +347,7 @@ def ask_panel(
     with ui.expansion(
         "Ask the language model", icon="manage_search", value=bool(view.asked)
     ).classes("lc-panel lc-expansion w-full"):
-        if not preferences.model_set():
+        if not common.model_set():
             note("Set a language model on the Settings page to search the catalog with it.")
             return
         note(
@@ -1016,16 +1013,13 @@ def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str)
     async def write() -> None:
         button.disable()
         status.set_text("Reading the reference and writing the scripts.")
-        chosen = preferences.load()
         try:
             meta = await computed(
                 run_scoring_script,
                 result,
                 instrument.id,
                 dataset,
-                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
-                chosen.get(preferences.LLM_MODEL, ""),
-                chosen.get(preferences.LLM_URL, ""),
+                *common.llm_choice(),
             )
         except LabCatalogError as err:
             status.set_text(str(err))
@@ -1039,7 +1033,7 @@ def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str)
             button.enable()
 
     with panel("Scoring script from the reference PDF", dataset):
-        if preferences.model_set():
+        if common.model_set():
             with ui.row().classes("items-center gap-3"):
                 button = ui.button("Write with the language model", on_click=write)
                 status = ui.label().classes("lc-note")
@@ -1269,15 +1263,12 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
     async def write() -> None:
         button.disable()
         status.set_text("Reading the reference and drafting the description.")
-        chosen = preferences.load()
         try:
             draft = await computed(
                 run_description_draft,
                 result,
                 instrument.id,
-                chosen.get(preferences.LLM_PROVIDER, preferences.DEFAULT_LLM_PROVIDER),
-                chosen.get(preferences.LLM_MODEL, ""),
-                chosen.get(preferences.LLM_URL, ""),
+                *common.llm_choice(),
             )
         except LabCatalogError as err:
             status.set_text(str(err))
@@ -1298,7 +1289,7 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
             button.enable()
 
     with panel("Description from the reference PDF", "For description: in the instrument's YAML"):
-        if not preferences.model_set():
+        if not common.model_set():
             note("Set a language model on the Settings page to draft the description from the PDF.")
             return
         with ui.row().classes("items-center gap-3"):

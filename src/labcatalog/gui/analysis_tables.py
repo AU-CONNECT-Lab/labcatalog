@@ -7,7 +7,17 @@ from labcatalog.charts import plot_code, plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, common, paper, preferences
-from labcatalog.gui.common import apa, code_tabs, col, computed, fmt, note, p_value, panel
+from labcatalog.gui.common import (
+    apa,
+    code_tabs,
+    col,
+    computed,
+    fmt,
+    method_toggle,
+    note,
+    p_value,
+    panel,
+)
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
@@ -231,7 +241,8 @@ def group_section(
             group = data.item(view.group)
             outcome = data.variable(view.outcome)
             frame = data.frame()
-            plan = script.comparison_plan(frame, group, outcome, result.project.config.stats.t_test)
+            t_test = view.t_test or result.project.config.stats.t_test
+            plan = script.comparison_plan(frame, group, outcome, t_test)
             if plan is None:
                 return lambda: note("Fewer than two groups have two or more people with a value.")
             found, engine = await compute(result, sample, frame, plan.code)
@@ -276,6 +287,10 @@ def group_section(
         view.outcome = value
         body.refresh()
 
+    def choose_test(value: str) -> None:
+        view.t_test = value
+        body.refresh()
+
     with panel("Group comparison", "An outcome across the groups of a demographics item"):
         with ui.row().classes("w-full items-center gap-4"):
             ui.select(
@@ -292,6 +307,12 @@ def group_section(
                 with_input=True,
                 on_change=lambda e: choose_outcome(e.value),
             ).props("dense outlined").classes("w-96")
+            method_toggle(
+                {k: TESTS[k] for k in ("welch", "student")},
+                view.t_test or result.project.config.stats.t_test,
+                choose_test,
+                "With two groups; three or more take a one-way ANOVA",
+            )
         body()
 
 

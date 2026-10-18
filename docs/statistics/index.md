@@ -20,6 +20,7 @@ These settings are in `labcatalog.yaml`, under `stats`, so everyone who opens th
 
 ```yaml
 stats:
+  decimals: 2              # 1 to 4; p values keep three
   correlation: pearson     # pearson or spearman
   t_test: welch            # welch or student
   cfa_estimator: wlsmv     # wlsmv (items as ordered categories), ml or mlr (items as continuous)
@@ -28,11 +29,12 @@ stats:
 
 - `correlation` sets the coefficient of the correlations between scores and variables. Item-rest correlations and regression always use Pearson.
 - `t_test` sets the test that compares two groups.
-- `cfa_estimator` sets how factor models and invariance tests treat the items when a page opens; a switch on the Factor structure and invariance panels changes it for what that page shows, and the table notes say which was used.
+- `cfa_estimator` sets how factor models and invariance tests treat the items.
+- `decimals` sets the decimal places of the numbers in tables and paragraphs.
 - `invariance_free` lists the items an invariance test lets differ (partial invariance). It is written by the invariance tables' **Save and rerun**; see [Instruments](../app/instruments.md).
 - `correlate_by` sets how people in different datasets are matched, for example a parent and their child through their family. See [IDs, Groups and Missing Codes](../concepts/ids-groups-missing.md).
 
-The number of decimal places is a setting of your computer, on the Settings page.
+The Settings page sets these under **This project** and saves them here. They are where each page starts: a switch on a section of the Analysis page (the coefficient of the correlation table, the test of the group comparison) or on the factor model and invariance panels tries another for what that section shows, without changing the project, and the table notes say which was used.
 
 ## Get the code
 

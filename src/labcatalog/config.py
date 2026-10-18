@@ -87,9 +87,14 @@ class DatasetConfig(StrictModel):
     date_column: str | None = None
     # In a file holding several waves, the column that names each row's wave.
     wave_column: str | None = None
+    # How the wave column writes this dataset's wave, when not as `wave`.
+    wave_value: str | None = None
     snapshot_date: date | None = None
     missing_codes: list[MissingCode] | None = None
     custom: dict[str, Any] = {}
+
+    def wave_in_file(self) -> str:
+        return self.wave if self.wave_value is None else self.wave_value
 
 
 class CustomFieldDef(StrictModel):
@@ -117,8 +122,13 @@ class FreedParameter(StrictModel):
     across: str = "waves"
 
 
+CORRELATIONS = {"pearson": "Pearson r", "spearman": "Spearman's ρ"}
+
+
 class StatsConfig(StrictModel):
     correlate_by: str = defaults.CORRELATE_BY
+    # Decimal places of the numbers in tables and paragraphs; p values keep three.
+    decimals: int = Field(defaults.DECIMALS, ge=1, le=4)
     # Factor models: items as ordered categories (WLSMV) or as continuous (ML, robust MLR); the
     # default the pages start from.
     cfa_estimator: Literal["wlsmv", "ml", "mlr"] = "wlsmv"
@@ -130,7 +140,13 @@ class StatsConfig(StrictModel):
     invariance_free: list[FreedParameter] = []
 
     def coefficient(self) -> str:
-        return "Spearman's ρ" if self.correlation == "spearman" else "Pearson r"
+        return CORRELATIONS[self.correlation]
+
+
+class LlmConfig(StrictModel):
+    # The lab's provider and model; keys and a local server's address stay on each computer.
+    provider: Literal["anthropic", "openai", "gemini", "local"] = defaults.LLM_PROVIDER
+    model: str | None = None
 
 
 class PrepareStep(StrictModel):
@@ -155,6 +171,7 @@ class ProjectConfig(StrictModel):
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
     exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)
+    llm: LlmConfig = Field(default_factory=LlmConfig)
     prepare: list[PrepareStep] = []
     # Runs each prepare step through datalad run, which records it in the dataset's history.
     prepare_with: Literal["datalad"] | None = None

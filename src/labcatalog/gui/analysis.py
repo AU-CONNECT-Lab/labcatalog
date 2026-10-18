@@ -5,7 +5,7 @@ from functools import partial
 from nicegui import ui
 
 from labcatalog.charts import matrices, plot_code, views
-from labcatalog.config import dataset_by_name
+from labcatalog.config import CORRELATIONS, dataset_by_name
 from labcatalog.gui import (
     analysis_tables,
     charts,
@@ -15,7 +15,7 @@ from labcatalog.gui import (
     mediation,
     multilevel,
 )
-from labcatalog.gui.common import apa, col, empty, fmt, note, p_value, panel
+from labcatalog.gui.common import apa, col, empty, fmt, method_toggle, note, p_value, panel
 from labcatalog.gui.paper import (
     Chart,
     measures_text,
@@ -57,6 +57,9 @@ class AnalysisView:
     invariance_group: str | None = None
     # None keeps the project's stats.cfa_estimator.
     invariance_estimator: str | None = None
+    # None keeps the project's stats.correlation and stats.t_test.
+    correlation: str | None = None
+    t_test: str | None = None
     measurement: measurement.Choices = field(default_factory=measurement.Choices)
     mediation: mediation.Choices = field(default_factory=mediation.Choices)
     # The instruments whose variables the page offers; None until first shown, then all.
@@ -263,11 +266,12 @@ def correlation_section(
         async def fill() -> Callable:
             data = analysis_script.AnalysisData(result, sample)
             variables = [data.variable(k) for k in keys]
-            stats = result.project.config.stats
-            code = analysis_script.correlation_code(variables, stats.correlation)
+            method = view.correlation or result.project.config.stats.correlation
+            coefficient = CORRELATIONS[method]
+            code = analysis_script.correlation_code(variables, method)
             frame = data.frame()
             found, engine = await analysis_tables.compute(result, sample, frame, code)
-            if stats.correlation == "spearman" and engine != analysis_tables.R_NOTE:
+            if method == "spearman" and engine != analysis_tables.R_NOTE:
                 engine += (
                     " Spearman's p uses the t approximation here; in R, as in JASP, it is exact "
                     "when there are no ties."
@@ -276,7 +280,7 @@ def correlation_section(
 
             def files() -> dict[str, str]:
                 dots = view.style == "dots"
-                figure = plot_code.correlation(columns_labels, stats.coefficient(), dots)
+                figure = plot_code.correlation(columns_labels, coefficient, dots)
                 return analysis_tables.section_files(result, sample, frame, code, figure)
 
             # Saving and the Code view read this one dict, so a new style updates both.
@@ -318,20 +322,18 @@ def correlation_section(
                 "Correlations Among Variables",
                 columns,
                 rows,
-                f"{stats.coefficient()}, each pair on everyone with both values ({n}). "
-                f"{STARS_NOTE}",
+                f"{coefficient}, each pair on everyone with both values ({n}). {STARS_NOTE}",
             )
 
             def content() -> None:
                 chart()
                 paper_table(shown)
-                spearman = stats.correlation == "spearman"
                 results_text(
                     results.correlation_text(
                         labels,
                         [analysis.instrument_of(k) for k in keys],
                         matrix,
-                        spearman,
+                        method == "spearman",
                         common.decimals,
                     ),
                     [shown],
@@ -350,6 +352,10 @@ def correlation_section(
         view.scores = value or []
         body.refresh()
 
+    def set_method(value: str) -> None:
+        view.correlation = value
+        body.refresh()
+
     with panel("Correlation table", "Every pair of the chosen variables"):
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             scores = (
@@ -365,6 +371,11 @@ def correlation_section(
                 .classes("grow")
             )
             pick_menu(scores, views.menu_groups(result, view.datasets, variables(view)))
+            method_toggle(
+                CORRELATIONS,
+                view.correlation or result.project.config.stats.correlation,
+                set_method,
+            )
         body()
 
 
