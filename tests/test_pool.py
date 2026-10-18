@@ -394,3 +394,51 @@ def test_a_pooled_regression_after_imputation_takes_the_study_as_fixed(result, s
     assert pooled_row["n"] == 2 * alone_row["n"]
     for column in ("slope", "intercept", "r"):
         assert pooled_row[column] == pytest.approx(alone_row[column], abs=1e-6)
+
+
+def test_mediation_of_factors_takes_the_study_as_fixed(result, sample):
+    data = script.AnalysisData(result, sample)
+    model = item_mediation(data, "child_w1+pilot_w1")
+    model.covariates = data.study_dummies()
+    code = mediation_code(model, workers=1)
+    assert '"M ~ a*X + cov1"' in code.r and "cov1 = d[[" in code.r
+    if not rscript():
+        return
+    fit = med.read_fit(script.run_code(result, sample, data.frame(), code, rscript())[0], model)
+    one = analysis.build_sample(result, ["child_w1"], True)
+    alone_data = script.AnalysisData(result, one)
+    alone_model = item_mediation(alone_data, "child_w1")
+    found, _ = script.run_code(
+        result, one, alone_data.frame(), mediation_code(alone_model, workers=1), rscript()
+    )
+    alone = med.read_fit(found, alone_model)
+    assert fit.n == 2 * alone.n
+    for path in ("a", "b", "c", "indirect"):
+        assert fit.effects[path].estimate == pytest.approx(alone.effects[path].estimate, abs=1e-4)
+
+
+def item_mediation(data, files: str) -> med.MediationModel:
+    x, m, y = (
+        data.score(f"{key}@{files}", items=True)
+        for key in (
+            "example_mood.ems_sadness",
+            "example_worries_temper.ewt_worries",
+            "example_worries_temper.ewt_temper",
+        )
+    )
+    return med.MediationModel(x, m, y, items=True, bootstrap=0)
+
+
+@needs_r
+def test_a_moderated_mediation_of_factors_fits_with_the_study(result, sample):
+    data = script.AnalysisData(result, sample)
+    model = item_mediation(data, "child_w1+pilot_w1")
+    w = data.score("example_mood.ems_low_positive@child_w1+pilot_w1")
+    model.moderators = [med.Moderator(w, ("b",))]
+    model.covariates = data.study_dummies()
+    code = mediation_code(model, workers=1)
+    assert "modsem" in code.packages and "cov1" in code.r
+    found, _ = script.run_code(result, sample, data.frame(), code, rscript())
+    fit = med.read_fit(found, model)
+    assert fit.package == med.MODSEM and fit.n > len(sample.people) / 2
+    assert all(fit.effects[k].estimate == fit.effects[k].estimate for k in ("a", "b", "b_mw"))

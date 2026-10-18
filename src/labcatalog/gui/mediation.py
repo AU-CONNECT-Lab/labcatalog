@@ -109,10 +109,6 @@ def render(
             with body:
                 note("X, M, Y, the moderators and the covariates must all be different variables.")
             return
-        if chosen.items and analysis.pooling(result, sample.datasets):
-            with body:
-                note("Items mode takes the datasets of one study for now; use Scores.")
-            return
         data = script.AnalysisData(result, sample)
         model = model_of(data)
         if problem := item_problem(model):
