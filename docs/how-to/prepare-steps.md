@@ -25,7 +25,7 @@ prepare:
 | `name` | The step's name. |
 | `run` | The command. It runs in the project folder, so paths are relative to it. |
 | `inputs` | The files the step reads. |
-| `outputs` | The files the step writes. |
+| `outputs` | The files the step writes: new files, never one of its inputs, and never a file another step writes. `labcatalog validate` reports a step that would overwrite what it reads, so the raw files stay as exported. |
 
 A step is **outdated** when one of its inputs is newer than one of its outputs. List the script itself among the inputs, so that changing the script also marks the step outdated. A step is **missing output** when an output does not exist yet, and **missing input** when an input does not.
 

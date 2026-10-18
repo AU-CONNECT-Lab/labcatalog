@@ -1,3 +1,4 @@
+import os
 import re
 from collections import Counter
 from datetime import date
@@ -640,7 +641,28 @@ def check_prepare_steps(project: Project) -> list[Issue]:
         if not step.outputs:
             message = f"{where}.outputs: list at least one file the step writes"
             issues.append(problem("invalid_value", message, CONFIG))
+        reads = {same_file(project, path) for path in step.inputs}
+        for path in step.outputs:
+            if same_file(project, path) in reads:
+                message = (
+                    f"{where}.outputs: {path} is also an input, so the step would overwrite the "
+                    "file it reads; write the cleaned data to a new file"
+                )
+                issues.append(problem("invalid_value", message, CONFIG))
+    writers: dict[str, tuple[str, list[str]]] = {}
+    for step in steps:
+        for path in step.outputs:
+            writers.setdefault(same_file(project, path), (path, []))[1].append(step.name)
+    for path, names in writers.values():
+        if len(names) > 1:
+            message = f"prepare: {', '.join(names)} all write {path}; give each its own file"
+            issues.append(problem("invalid_value", message, CONFIG))
     return issues
+
+
+def same_file(project: Project, path: str) -> str:
+    # The same file however a step spells it, in any letter case on Windows.
+    return os.path.normcase((project.root / path).resolve().relative_to(project.root.resolve()))
 
 
 def check_templates(project: Project) -> list[Issue]:

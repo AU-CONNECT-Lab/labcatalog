@@ -163,6 +163,22 @@ def test_step_names_are_unique_and_steps_need_outputs(project_root):
     ]
 
 
+def test_a_step_cannot_overwrite_what_it_reads_or_what_another_step_writes(project_root):
+    config = project_root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8").replace(
+        "outputs: [data/a.csv]", "outputs: [raw/A.csv]"
+    )
+    config.write_text(
+        text.replace("outputs: [data/b.txt]", "outputs: [./raw/a.csv]"), encoding="utf-8"
+    )
+    messages = [i.message for i in run_validate(project_root)]
+    assert messages[0] == (
+        "prepare[1] (clean).outputs: raw/A.csv is also an input, so the step would overwrite the "
+        "file it reads; write the cleaned data to a new file"
+    )
+    assert messages[1] == "prepare: clean, summarize all write raw/A.csv; give each its own file"
+
+
 def test_example_steps_rebuild_the_example_data(mock_project, tmp_path):
     steps = load_project(mock_project).config.prepare
     assert len(steps) == 21
