@@ -11,14 +11,18 @@ from labcatalog.codebook import redcap, spss
 from labcatalog.codebook.core import (
     INSTRUMENTS,
     ITEMS,
+    NEW,
     SCORES,
     ai_prompt,
     codebook_paths,
     import_codebook,
+    import_instruments,
     keep_source,
     kept_sources,
+    new_prompt,
     split_ai_answer,
     unmapped_datasets,
+    write_new_templates,
     write_templates,
 )
 from labcatalog.exceptions import CodebookError
@@ -495,3 +499,41 @@ def test_a_qualtrics_style_label_matches_on_its_row_text(pilot, tmp_path):
     write_templates(load_project(pilot), "pilot_w1", dictionary)
     rows = codebook_paths(load_project(pilot), "pilot_w1")[ITEMS].read_text(encoding="utf-8-sig")
     assert "mood_1_w1,feelings,feel_sad,,,,,," in rows.splitlines()
+
+
+def test_new_instruments_come_from_a_dictionary_before_any_data(pilot, tmp_path):
+    (pilot / "data" / "pilot_w1.csv").unlink()
+    dictionary = write_dictionary(tmp_path / "dictionary.csv", REDCAP_HEADER)
+    project = load_project(pilot)
+    write_new_templates(project, dictionary)
+    paths = codebook_paths(project, NEW)
+    items = paths[ITEMS].read_text(encoding="utf-8-sig").splitlines()
+    assert not [row for row in items if row.startswith("id,")]
+    assert (
+        'mood_1,mood_scale,mood_1,I feel sad,choice,"0=Never; 1=Sometimes, often; 2=Always",,,'
+        in items
+    )
+    assert [p.name for p in kept_sources(project, NEW)] == ["dictionary.csv"]
+    with pytest.raises(CodebookError, match="already has codebook files"):
+        write_new_templates(project, dictionary)
+    prompt = new_prompt(project)
+    assert (
+        "There is no data file yet." in prompt and "the variable name the data will use" in prompt
+    )
+    assert "mood_1,mood_scale" in prompt
+    found = import_instruments(project)
+    assert not [i for i in found.issues if i.level == "error"], found.issues
+    assert sorted(p.name for p in found.written) == ["background.yaml", "mood_scale.yaml"]
+    assert not paths[ITEMS].parent.exists()
+    archived = [p.name for p in (pilot / "codebook").iterdir()]
+    assert len(archived) == 1 and archived[0].startswith(f"{NEW}_")
+    assert {"mood_scale", "background"} <= set(load_project(pilot).instruments)
+
+
+def test_an_empty_new_codebook_says_there_is_nothing_to_import(pilot):
+    project = load_project(pilot)
+    write_new_templates(project)
+    assert codebook_paths(project, NEW)[ITEMS].read_text(encoding="utf-8-sig").startswith("column,")
+    found = import_instruments(project)
+    assert [i.message for i in found.issues] == ["no new instrument to import"]
+    assert codebook_paths(project, NEW)[ITEMS].is_file()

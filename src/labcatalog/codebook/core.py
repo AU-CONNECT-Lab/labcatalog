@@ -5,6 +5,7 @@ import re
 import shutil
 from collections import Counter
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any, get_args
 
@@ -33,6 +34,12 @@ ITEMS = "items.csv"
 INSTRUMENTS = "instruments.csv"
 SCORES = "scores.csv"
 SOURCE_DIR = "source"
+# The codebook of new instruments, made before any data file; not a dataset's name.
+NEW = "_instruments"
+# What the column cell means in that codebook, where no data file lists the columns.
+NEW_COLUMN = (
+    "the variable name the data will use for the item, when the codebook gives one; otherwise empty"
+)
 
 # What each column holds; the Describe columns step shows these and the AI prompt quotes them.
 COLUMNS: dict[str, dict[str, str]] = {
@@ -75,6 +82,26 @@ Rules:
 - IDs (instrument, item, score) use only letters, digits and underscores. An item ID should not carry the wave (eps_1, not eps_1_w2).
 - Take wording, response options and scoring only from the codebook. Where it does not say, leave the cell empty; do not guess.
 - These instruments are already in the project. Reuse their IDs; for them only column, instrument and item matter in items.csv, and they need no rows in instruments.csv or scores.csv.
+{known}
+- Answer with exactly three csv code blocks, in the order items.csv, instruments.csv, scores.csv, each starting with its header row. Put a cell in double quotes when it contains a comma or a double quote.
+
+items.csv as it is now:
+
+```csv
+{items}
+```
+"""
+
+NEW_PROMPT = """\
+I am entering a codebook into labcatalog, a tool that catalogs a lab's questionnaires. Using the codebook I attach or paste below, fill in three CSV files that describe its instruments: their items, response options and scores. There is no data file yet.
+
+{format}
+
+Rules:
+- One row in items.csv for each item of each instrument, in the codebook's order. Rows that are already there are a first guess from a data dictionary; correct and complete them.
+- IDs (instrument, item, score) use only letters, digits and underscores. An item ID should not carry a wave (eps_1, not eps_1_w2).
+- Take wording, response options and scoring only from the codebook. Where it does not say, leave the cell empty; do not guess.
+- These instruments are already in the project; leave them out:
 {known}
 - Answer with exactly three csv code blocks, in the order items.csv, instruments.csv, scores.csv, each starting with its header row. Put a cell in double quotes when it contains a comma or a double quote.
 
@@ -160,6 +187,63 @@ def kept_sources(project: Project, dataset: str) -> list[Path]:
         for path in sorted(folder.iterdir())
         if path.is_file()
     ]
+
+
+def write_new_templates(project: Project, dictionary: Path | None = None) -> list[Path]:
+    # The three files for new instruments, from a dictionary or empty, before there is any data.
+    paths = codebook_paths(project, NEW)
+    if any(path.exists() for path in paths.values()):
+        folder = relative(project, paths[ITEMS].parent)
+        raise CodebookError(f"{folder} already has codebook files; import or delete them first")
+    fields = read_fields(dictionary) if dictionary else {}
+    if dictionary and dictionary.suffix.lower() != ".sav":
+        keep_source(project, NEW, dictionary)
+    wordings = catalog_wordings(project)
+    items = [
+        {
+            "column": name,
+            "instrument": field.form,
+            "item": field.item,
+            "text": field.text,
+            "type": field.type,
+            "choices": field.choices,
+            "min": field.min,
+            "max": field.max,
+        }
+        for name, field in fields.items()
+        # The ID is how the data are linked, not an item.
+        if field.form
+        and name != project.config.defaults.id_column
+        and not same_wording(wordings, field.text)
+    ]
+    forms = dict.fromkeys(row["instrument"] for row in items)
+    names = {f.form: f.form_label or redcap.form_name(f.form) for f in fields.values()}
+    write_table(paths[ITEMS], ITEMS, items)
+    write_table(
+        paths[INSTRUMENTS], INSTRUMENTS, [{"instrument": i, "name": names[i]} for i in forms]
+    )
+    write_table(paths[SCORES], SCORES, [])
+    return list(paths.values())
+
+
+def new_prompt(project: Project) -> str:
+    known = [f"  - {i.id}: {i.name}" for i in project.instruments.values()]
+    items = codebook_paths(project, NEW)[ITEMS].read_text(encoding="utf-8-sig").strip()
+    return NEW_PROMPT.format(
+        format=format_text(NEW_COLUMN),
+        known="\n".join(known) or "  (none yet)",
+        items=items,
+    )
+
+
+def import_instruments(project: Project) -> ImportResult:
+    found = Importer(project, None).run()
+    if found.written:
+        # Kept beside the instruments they made, so the next codebook starts from empty files.
+        folder = project.root / defaults.CODEBOOK_DIR / NEW
+        stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        folder.rename(folder.with_name(f"{NEW}_{stamp}"))
+    return found
 
 
 def unmapped_datasets(project: Project) -> list[str]:
@@ -355,11 +439,13 @@ def ai_prompt(project: Project, dataset_name: str) -> str:
     )
 
 
-def format_text() -> str:
+def format_text(column: str | None = None) -> str:
     parts = []
     for name, columns in COLUMNS.items():
+        if column is not None and name == ITEMS:
+            columns = {**columns, "column": column}
         lines = [f"{name}, with the columns {', '.join(columns)}:"]
-        lines.extend(f"- {column}: {meaning}" for column, meaning in columns.items())
+        lines.extend(f"- {key}: {meaning}" for key, meaning in columns.items())
         parts.append("\n".join(lines))
     return "\n\n".join(parts)
 
@@ -400,16 +486,20 @@ def import_codebook(project: Project, dataset_name: str) -> ImportResult:
 
 
 class Importer:
-    def __init__(self, project: Project, dataset: DatasetConfig) -> None:
+    # With no dataset, the codebook of new instruments: instrument files only, no column map.
+    def __init__(self, project: Project, dataset: DatasetConfig | None) -> None:
         self.project = project
         self.dataset = dataset
-        self.folder = f"{defaults.CODEBOOK_DIR}/{dataset.name}"
+        self.name = dataset.name if dataset else NEW
+        self.folder = f"{defaults.CODEBOOK_DIR}/{self.name}"
         self.issues: list[Issue] = []
         self.map_rows: list[tuple[str, str, str]] = []
         self.drafts: dict[str, Draft] = {}
         self.score_columns: list[tuple[int, str, str]] = []
 
     def run(self) -> ImportResult:
+        if self.dataset is None:
+            return self.run_new()
         map_path = self.project.root / self.dataset.map_file()
         if map_path.exists():
             message = f"{self.dataset.name} already has a column map; importing would replace it"
@@ -437,6 +527,21 @@ class Importer:
         used = dict.fromkeys(instrument for _, instrument, _ in self.map_rows if instrument)
         reused = [i for i in used if i in self.project.instruments]
         return ImportResult(self.issues, written, reused, self.steps(list(used)))
+
+    def run_new(self) -> ImportResult:
+        paths = codebook_paths(self.project, NEW)
+        tables = {name: self.read_table(name, path) for name, path in paths.items()}
+        if has_errors(self.issues):
+            return ImportResult(self.issues)
+        self.read_items(tables[ITEMS], None)
+        self.read_instruments(tables[INSTRUMENTS])
+        self.read_scores(tables[SCORES])
+        if not self.drafts and not has_errors(self.issues):
+            self.report(ITEMS, None, "no new instrument to import")
+        if has_errors(self.issues):
+            return ImportResult(self.issues)
+        written = [self.write_instrument(draft) for draft in self.drafts.values()]
+        return ImportResult(self.issues, written)
 
     def report(self, name: str, line: int | None, message: str, level: IssueLevel = "error"):
         location = f"{self.folder}/{name}" + (f":{line}" if line else "")
@@ -470,12 +575,15 @@ class Importer:
                 rows.append((reader.line_num, row))
         return rows
 
-    def read_items(self, rows: list[tuple[int, dict[str, str]]], columns: set[str]) -> None:
+    def read_items(self, rows: list[tuple[int, dict[str, str]]], columns: set[str] | None) -> None:
+        # columns is None for new instruments, whose column cells are only the expected names.
         seen_columns: dict[str, int] = {}
         seen_items: dict[tuple[str, str], int] = {}
         for line, row in rows:
             column, instrument_id, item_id = row["column"], row["instrument"], row["item"]
-            if not column:
+            if columns is None and not instrument_id:
+                continue
+            if not column and columns is not None:
                 self.report(ITEMS, line, "column is empty")
                 continue
             if column in seen_columns:
@@ -483,8 +591,9 @@ class Importer:
                     ITEMS, line, f"column {column} is already on line {seen_columns[column]}"
                 )
                 continue
-            seen_columns[column] = line
-            if column not in columns:
+            if column:
+                seen_columns[column] = line
+            if columns is not None and column not in columns:
                 self.report(ITEMS, line, f"{column} is not a column of the data file")
                 continue
             if bool(instrument_id) != bool(item_id):
@@ -499,7 +608,9 @@ class Importer:
                 self.report(ITEMS, line, message)
                 continue
             seen_items[key] = line
-            if item_id.startswith(defaults.SCORE_PREFIX):
+            if item_id.startswith(defaults.SCORE_PREFIX) and columns is None:
+                self.report(ITEMS, line, "a score column belongs to a data file; leave it out here")
+            elif item_id.startswith(defaults.SCORE_PREFIX):
                 score_id = item_id.removeprefix(defaults.SCORE_PREFIX)
                 self.score_columns.append((line, instrument_id, score_id))
             elif instrument_id in self.project.instruments:
