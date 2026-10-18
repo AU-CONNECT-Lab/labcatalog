@@ -21,7 +21,7 @@ async def choose_path(
             dialog, directory=str(start or ""), file_types=file_types
         )
         return Path(selection[0]) if selection else None
-    return await browse(kind, patterns(file_types), start or Path.home())
+    return await browse(kind, patterns(file_types), start or common.serving or Path.home())
 
 
 def patterns(file_types: tuple[str, ...]) -> list[str]:
@@ -31,6 +31,11 @@ def patterns(file_types: tuple[str, ...]) -> list[str]:
         inside = kind[kind.rfind("(") + 1 : kind.rfind(")")]
         found += [p.strip().lower() for p in inside.split(";") if p.strip()]
     return found
+
+
+def allowed(path: Path) -> bool:
+    # Serving several people, the chooser stays inside the folder of projects.
+    return common.serving is None or path.resolve().is_relative_to(common.serving)
 
 
 def listing(folder: Path, shown: list[str], kind: str) -> tuple[list[Path], list[Path]]:
@@ -73,13 +78,17 @@ async def browse(kind: str, shown: list[str], start: Path) -> Path | None:
 
     def typed(text: str) -> None:
         path = Path((text or "").strip()).expanduser()
-        if path.is_file() and kind == FILE:
+        if path.is_file() and kind == FILE and allowed(path):
             state["picked"] = path
             go(path.parent)
         else:
             go(path)
 
     def go(folder: Path) -> None:
+        if not allowed(folder):
+            problem.set_text(f"Only folders inside {common.serving} can be chosen here.")
+            where.set_value(str(state["folder"]))
+            return
         try:
             folders, files = listing(folder, shown, kind)
         except OSError as err:

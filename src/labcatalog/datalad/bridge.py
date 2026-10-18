@@ -39,11 +39,14 @@ def datalad_status(datalad: str) -> DataladStatus:
     return DataladStatus(version, annex)
 
 
-def run_datalad(datalad: str, args: list[str], cwd: Path | None = None) -> str:
+def run_datalad(
+    datalad: str, args: list[str], cwd: Path | None = None, env: dict[str, str] | None = None
+) -> str:
     try:
         done = subprocess.run(
             [datalad, *args],
             cwd=cwd,
+            env=os.environ | env if env else None,
             capture_output=True,
             text=True,
             encoding="utf-8",

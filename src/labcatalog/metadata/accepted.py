@@ -86,8 +86,18 @@ def write(root: Path, data: CommentedMap) -> None:
     (root / defaults.ACCEPTED_FILENAME).write_text(out.getvalue(), encoding="utf-8", newline="\n")
 
 
+def nobody() -> str | None:
+    return None
+
+
+# The name given at the window, when one labcatalog serves several people; serving points it there.
+named = nobody
+
+
 def who(root: Path) -> str:
-    # The name git records for this person, else the computer's user name.
+    # The name given at the window, else the one git records, else the computer's user name.
+    if given := named():
+        return given
     try:
         found = subprocess.run(
             ["git", "config", "user.name"], cwd=root, capture_output=True, text=True, check=False

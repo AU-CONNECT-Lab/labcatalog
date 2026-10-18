@@ -19,8 +19,10 @@ from labcatalog.stats.summary import wave_order
 
 LINE_SUFFIX = re.compile(r":(\d+)$")
 ROW_KEY = "_row"
-# False when the pages are in a browser, set once at launch: one person runs each labcatalog.
+# False when the pages are in a browser, set once at launch.
 native = True
+# The folder of projects, when one labcatalog serves several people; set once at launch.
+serving: Path | None = None
 
 
 def col(name: str, label: str, *, numeric: bool = False, sortable: bool = True) -> dict:

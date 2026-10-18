@@ -1,5 +1,6 @@
 import sys
 from collections.abc import Awaitable, Callable
+from functools import partial
 from pathlib import Path
 
 from nicegui import run, ui
@@ -28,6 +29,7 @@ from labcatalog.gui.common import (
     show_status,
     table,
 )
+from labcatalog.gui.look import look
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     CatalogResult,
@@ -303,7 +305,7 @@ def versions_panel(result: CatalogResult, on_changed: Callable[[], Awaitable[Non
                     ui.notify("Say in a few words what changed", type="warning")
                     return
                 dialog.close()
-                saved = await act(save, run_data_save, text)
+                saved = await act(save, partial(run_data_save, author=look().who), text)
                 if saved is not None:
                     ui.notify(f"Saved {len(saved)} dataset(s)")
                     await on_changed()

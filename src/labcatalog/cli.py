@@ -97,6 +97,31 @@ def gui(
 
 
 @app.command()
+def serve(
+    projects: Annotated[
+        Path,
+        typer.Argument(help="Folder holding the projects to serve, each in a folder of its own."),
+    ],
+    port: Annotated[
+        int | None, typer.Option(help="Port to serve on; a free one when not given.")
+    ] = None,
+    host: Annotated[
+        str,
+        typer.Option(
+            help="Address to listen on: 127.0.0.1 for an SSH tunnel or a reverse proxy on this "
+            "computer, 0.0.0.0 for everyone on the network who has the link."
+        ),
+    ] = "127.0.0.1",
+) -> None:
+    """Serve the projects in a folder to several people at once, in their browsers."""
+    from labcatalog.gui import launch
+
+    if not projects.is_dir():
+        raise typer.BadParameter(f"{projects} is not a folder", param_hint="PROJECTS")
+    launch(port=port, projects=projects, host=host)
+
+
+@app.command()
 def init(
     target: Annotated[Path, typer.Argument(help="Folder to create the project in.")],
     example: Annotated[

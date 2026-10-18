@@ -22,6 +22,8 @@ class Look:
     dark: bool = False
     decimals: int = defaults.DECIMALS
     llm: LlmConfig = field(default_factory=LlmConfig)
+    # The name the person gave, when one labcatalog serves several people.
+    who: str | None = None
 
     def use_project(self, config: ProjectConfig | None) -> None:
         self.decimals = config.stats.decimals if config else defaults.DECIMALS

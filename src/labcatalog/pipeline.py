@@ -285,8 +285,8 @@ def run_data_status(root: Path) -> list[DatasetState]:
     return dataset_states(data_datasets(root))
 
 
-def run_data_save(root: Path, message: str, datalad: str) -> list[Path]:
-    return save_datasets(data_datasets(root), message, datalad)
+def run_data_save(root: Path, message: str, datalad: str, author: str | None = None) -> list[Path]:
+    return save_datasets(data_datasets(root), message, datalad, author)
 
 
 def run_data_update(root: Path, datalad: str) -> list[Path]:

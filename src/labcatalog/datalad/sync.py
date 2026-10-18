@@ -68,12 +68,16 @@ def dataset_states(roots: list[Path]) -> list[DatasetState]:
     return [dataset_state(root) for root in roots]
 
 
-def save_datasets(roots: list[Path], message: str, datalad: str) -> list[Path]:
+def save_datasets(
+    roots: list[Path], message: str, datalad: str, author: str | None = None
+) -> list[Path]:
     # Deepest first, so a dataset above records the new versions of those inside it.
     saved = []
+    # Serving several people, the version carries the name given at the window.
+    env = {"GIT_AUTHOR_NAME": author} if author else None
     for root in deepest_first(roots):
         if changed_paths(root):
-            run_datalad(datalad, ["save", "-m", message], cwd=root)
+            run_datalad(datalad, ["save", "-m", message], cwd=root, env=env)
             saved.append(root)
     return saved
 

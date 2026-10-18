@@ -103,7 +103,7 @@ def copy_text(text: str) -> None:
 
 
 def wants_latex() -> bool:
-    return preferences.load().get(preferences.TABLE_FORMAT) == preferences.LATEX
+    return preferences.mine().get(preferences.TABLE_FORMAT) == preferences.LATEX
 
 
 def copy_button(label: str, what: str, kinds: dict[str, str]) -> None:

@@ -2,6 +2,8 @@
 
 The Settings page, opened with the gear at the top right of the window, has three parts. **This project** holds the choices shared with the lab: they are saved in the project's `labcatalog.yaml`, so everyone who opens the project starts from them. **This computer** holds the paths to R, Mplus and DataLad and what a language model needs on this computer. **Only for you** holds how the window looks and what the copy buttons copy.
 
+When one labcatalog serves several people ([`labcatalog serve`](../how-to/work-as-a-team.md)), **This computer** only shows what the person running it set, **Only for you** is kept for each browser, and the example is not offered.
+
 ![The Settings page](../images/app/settings.png)
 
 ## Shared with the lab

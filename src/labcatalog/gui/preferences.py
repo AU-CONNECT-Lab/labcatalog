@@ -1,6 +1,8 @@
 import json
 import os
+import secrets
 import sys
+from collections.abc import MutableMapping
 from pathlib import Path
 
 FILENAME = "gui.json"
@@ -18,6 +20,12 @@ LLM_URL = "llm_url"
 TABLE_FORMAT = "table_format"
 RICH = "rich"
 LATEX = "latex"
+# The name a person gives when one labcatalog serves several people.
+WHO = "who"
+# Each person's own; kept per browser when one labcatalog serves several people.
+PERSONAL = (PALETTE, APPEARANCE, LAST_PROJECT, STUDY_SCOPE, TABLE_FORMAT, WHO)
+# Signs the browsers' cookies, kept so that people's own settings outlast a restart.
+SERVER_SECRET = "server_secret"
 
 
 def folder() -> Path:
@@ -37,3 +45,33 @@ def save(changes: dict) -> None:
     path = folder() / FILENAME
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps({**load(), **changes}, indent=2), encoding="utf-8")
+
+
+def no_browser() -> MutableMapping | None:
+    return None
+
+
+# Where each person's own settings go instead of this computer's file; serving points it at the
+# browser's storage on the server.
+browser = no_browser
+
+
+def mine() -> dict:
+    store = browser()
+    return load() if store is None else dict(store)
+
+
+def save_mine(changes: dict) -> None:
+    store = browser()
+    if store is None:
+        save(changes)
+    else:
+        store.update(changes)
+
+
+def server_secret() -> str:
+    found = load().get(SERVER_SECRET)
+    if not found:
+        found = secrets.token_urlsafe(32)
+        save({SERVER_SECRET: found})
+    return found

@@ -1,10 +1,12 @@
 import secrets
+import socket
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 
 from nicegui import app, background_tasks, ui
 from nicegui.native import find_open_port
+from nicegui.storage import Storage
 
 from labcatalog.charts import style, views
 from labcatalog.data.manifest import changed, file_times
@@ -30,6 +32,7 @@ from labcatalog.gui import (
     preferences,
     prepare,
     problems,
+    serving,
     settings,
     setup,
     shared,
@@ -56,6 +59,7 @@ from labcatalog.gui.prepare import PrepareView
 from labcatalog.gui.setup import SetupView
 from labcatalog.gui.studies import StudiesView
 from labcatalog.issues import Issue
+from labcatalog.metadata import accepted
 from labcatalog.metadata.browse import BrowseIndex, build_index
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
@@ -86,11 +90,21 @@ SETTINGS = "settings"
 ALL_STUDIES = "*"
 # How often the window looks for files changed by someone else.
 DISK_SECONDS = 5
+LOCAL_HOST = "127.0.0.1"
 
 
-def launch(project: Path | None = None, browser: bool = False, port: int | None = None) -> None:
+def launch(
+    project: Path | None = None,
+    browser: bool = False,
+    port: int | None = None,
+    projects: Path | None = None,
+    host: str = LOCAL_HOST,
+) -> None:
     theme.install()
     look.install()
+    if projects is not None:
+        serve(projects)
+        browser = True
     if datalad := preferences.load().get(preferences.DATALAD):
         use_folder(datalad)
     rbridge.allow_at_once(
@@ -111,9 +125,20 @@ def launch(project: Path | None = None, browser: bool = False, port: int | None 
     }
     if browser:
         common.native = False
-        print(f"labcatalog is at http://127.0.0.1:{port}{start}")
+        shown = LOCAL_HOST if host == LOCAL_HOST else socket.gethostname()
+        print(f"labcatalog is at http://{shown}:{port}{start}")
+        if common.serving:
+            print(f"It serves the projects in {common.serving} to everyone with that link.")
+        if host != LOCAL_HOST:
+            print(
+                "Anyone on the network with the link can open these projects and run their "
+                "prepare steps, and the link travels unencrypted (no HTTPS): put a reverse proxy "
+                "with HTTPS in front, or reach it through an SSH tunnel instead."
+            )
         print("Open that link in a browser; this stops when you press Ctrl+C.", flush=True)
-        ui.run(host="127.0.0.1", show=start, **options)
+        if common.serving:
+            options["storage_secret"] = preferences.server_secret()
+        ui.run(host=host, show=start if not common.serving else False, **options)
         return
     # Saving a table or figure goes through the window's own save dialog.
     app.native.settings["ALLOW_DOWNLOADS"] = True
@@ -130,15 +155,27 @@ def main_page(project: Path | None) -> None:
     )
     window = Window()
     window.build()
+    if common.serving:
+        ui.timer(0, window.start_serving, once=True)
+        return
     start = project.resolve() if project is not None else example.start_folder()
     ui.timer(0, lambda: window.open_project(start), once=True)
 
 
+def serve(projects: Path) -> None:
+    # One labcatalog for several people: each person's own settings and name go with their browser.
+    common.serving = projects.resolve()
+    Storage.path = preferences.folder() / "browsers"
+    preferences.browser = lambda: app.storage.user
+    accepted.named = lambda: look.look().who
+
+
 class Window:
     def __init__(self) -> None:
-        saved = preferences.load().get(preferences.PALETTE)
+        saved = preferences.mine().get(preferences.PALETTE)
         # A palette saved by another version may no longer exist.
         self.look = Look(palette=saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
+        self.look.who = preferences.mine().get(preferences.WHO)
         register(ui.context.client, self.look)
         self.root: Path | None = None
         self.result: CatalogResult | None = None
@@ -170,7 +207,7 @@ class Window:
         self.watching = False
 
     def build(self) -> None:
-        appearance = preferences.load().get(preferences.APPEARANCE, theme.DEFAULT_APPEARANCE)
+        appearance = preferences.mine().get(preferences.APPEARANCE, theme.DEFAULT_APPEARANCE)
         # A value saved by another version may no longer exist.
         appearance = appearance if appearance in theme.APPEARANCES else theme.DEFAULT_APPEARANCE
         self.dark_mode = ui.dark_mode(theme.mode_value(appearance))
@@ -224,7 +261,15 @@ class Window:
                 ):
                     with ui.menu().props("anchor='bottom right' self='top right'"):
                         ui.menu_item("Open project", on_click=self.choose_folder)
-                        ui.menu_item("Open example", on_click=self.open_example)
+                        if not common.serving:
+                            ui.menu_item("Open example", on_click=self.open_example)
+                if common.serving:
+                    self.who_button = (
+                        ui.button(self.look.who or "", icon="person", on_click=self.rename)
+                        .props("flat no-caps")
+                        .classes("lc-quiet-btn")
+                        .tooltip("Your name, on what you change")
+                    )
                 gear = (
                     ui.button(icon="settings", on_click=lambda: self.tabs.set_value(SETTINGS))
                     .props("flat round")
@@ -289,9 +334,25 @@ class Window:
                     self.reset_example,
                 )
 
+    async def start_serving(self) -> None:
+        if not self.look.who:
+            await self.rename()
+        start = serving.start_folder()
+        if start is None:
+            await self.choose_folder()
+        else:
+            await self.open_project(start)
+
+    async def rename(self) -> None:
+        await serving.ask_name(self.look)
+        self.who_button.set_text(self.look.who)
+
     async def choose_folder(self) -> None:
-        start = self.root.parent if self.root is not None else None
-        folder = await choose_path(FOLDER, start=start)
+        if common.serving:
+            folder = await serving.choose_project(self.root)
+        else:
+            start = self.root.parent if self.root is not None else None
+            folder = await choose_path(FOLDER, start=start)
         if folder:
             self.home = None
             self.frozen_bar.visible = False
@@ -299,7 +360,7 @@ class Window:
 
     async def open_project(self, root: Path) -> None:
         # Remembered for the next start; a freeze opened from it is not.
-        preferences.save({preferences.LAST_PROJECT: str(root)})
+        preferences.save_mine({preferences.LAST_PROJECT: str(root)})
         await self.load(root)
 
     async def open_example(self) -> None:
@@ -336,7 +397,7 @@ class Window:
                 self.setting_up = SetupView()
                 self.cfa.estimator = self.cfa.invariance_estimator = None
                 self.root = root
-                self.scope = preferences.load().get(preferences.STUDY_SCOPE, {}).get(str(root))
+                self.scope = preferences.mine().get(preferences.STUDY_SCOPE, {}).get(str(root))
                 self.follow_scope()
             self.set_busy(False)
         self.result, self.times = result, times
@@ -423,7 +484,7 @@ class Window:
         cfa_changed(cfa)
 
     async def set_appearance(self, name: str) -> None:
-        preferences.save({preferences.APPEARANCE: name})
+        preferences.save_mine({preferences.APPEARANCE: name})
         self.dark_mode.set_value(theme.mode_value(name))
         if name == theme.SYSTEM:
             await self.follow_system()
@@ -441,7 +502,7 @@ class Window:
 
     def set_palette(self, name: str) -> None:
         self.look.palette = name
-        preferences.save({preferences.PALETTE: name})
+        preferences.save_mine({preferences.PALETTE: name})
         if self.result is not None:
             self.show_result()
 
@@ -541,8 +602,8 @@ class Window:
             self.confirm_scope(scope)
             return
         self.scope = scope
-        saved = preferences.load().get(preferences.STUDY_SCOPE, {})
-        preferences.save({preferences.STUDY_SCOPE: {**saved, str(self.root): scope}})
+        saved = preferences.mine().get(preferences.STUDY_SCOPE, {})
+        preferences.save_mine({preferences.STUDY_SCOPE: {**saved, str(self.root): scope}})
         self.follow_scope()
         for panel in (
             self.overview_panel,

@@ -9,7 +9,7 @@ from labcatalog.ai.cleaning import RAW_ROWS, ROWS, VALUES
 from labcatalog.charts import style
 from labcatalog.config import CORRELATIONS
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import common, datalad, example, preferences, theme
+from labcatalog.gui import common, datalad, example, preferences, serving, theme
 from labcatalog.gui.common import command, computed, note, panel, path_input, show_status
 from labcatalog.gui.look import look
 from labcatalog.llm import KEY_ENV, PROVIDERS
@@ -47,16 +47,20 @@ def render(
             project = ui.refreshable(project_section)
             project(current, on_saved)
             ui.label("This computer").classes("lc-caption m-0")
-            r_section(on_rscript)
-            mplus_section()
-            datalad.datalad_section(on_saved)
             model = ui.refreshable(models_section)
-            model(on_model)
+            if common.serving:
+                serving.server_section()
+            else:
+                r_section(on_rscript)
+                mplus_section()
+                datalad.datalad_section(on_saved)
+                model(on_model)
         with ui.column().classes("w-96 shrink-0 gap-4"):
             ui.label("Only for you").classes("lc-caption m-0")
             looks_section(on_appearance, on_palette)
             tables_section()
-            example_section(on_reset_example)
+            if not common.serving:
+                example_section(on_reset_example)
     return lambda: (project.refresh(), model.refresh())
 
 
@@ -255,7 +259,7 @@ def looks_section(
     with panel("Appearance"):
         ui.toggle(
             theme.APPEARANCES,
-            value=preferences.load().get(preferences.APPEARANCE, theme.DEFAULT_APPEARANCE),
+            value=preferences.mine().get(preferences.APPEARANCE, theme.DEFAULT_APPEARANCE),
             on_change=lambda e: on_appearance(e.value),
         ).props("no-caps")
         ui.select(
@@ -275,8 +279,8 @@ def tables_section() -> None:
     ):
         ui.toggle(
             {preferences.RICH: "Word or Google Docs", preferences.LATEX: "LaTeX"},
-            value=preferences.load().get(preferences.TABLE_FORMAT, preferences.RICH),
-            on_change=lambda e: preferences.save({preferences.TABLE_FORMAT: e.value}),
+            value=preferences.mine().get(preferences.TABLE_FORMAT, preferences.RICH),
+            on_change=lambda e: preferences.save_mine({preferences.TABLE_FORMAT: e.value}),
         ).props("no-caps")
 
 

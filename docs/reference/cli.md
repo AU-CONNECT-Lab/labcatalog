@@ -14,6 +14,14 @@ With `--browser` the pages open in a web browser instead of a window, for a comp
 
 The link holds a key made new each time labcatalog starts, and a page opened without it is refused, because anyone signed in to the same computer can reach its local ports. Open the printed link once; the browser then remembers the key until labcatalog stops. The window of the desktop app passes the key by itself.
 
+## serve
+
+```bash
+labcatalog serve PROJECTS [--port PORT] [--host HOST]
+```
+
+Serve the projects in the folder `PROJECTS` to several people at once, in their browsers: each picks a project from the folder, gives their name once and keeps their own appearance and last project. labcatalog prints a link with a key, as `gui --browser` does. `--host` is `127.0.0.1` unless given, for an SSH tunnel or a reverse proxy on the same computer; `0.0.0.0` lets everyone on the network who has the link open it. See [Working as a Team](../how-to/work-as-a-team.md).
+
 ## init
 
 ```bash

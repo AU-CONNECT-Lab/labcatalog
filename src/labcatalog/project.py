@@ -73,6 +73,22 @@ def load_project(root: Path) -> Project:
     )
 
 
+def find_projects(folder: Path, depth: int = 2) -> list[Path]:
+    # The folder's projects, down to depth levels, without looking inside a project.
+    if (folder / defaults.CONFIG_FILENAME).is_file():
+        return [folder]
+    if depth == 0:
+        return []
+    try:
+        inside = sorted(
+            (p for p in folder.iterdir() if p.is_dir() and not p.name.startswith(".")),
+            key=lambda p: p.name.lower(),
+        )
+    except OSError:
+        return []
+    return [found for p in inside for found in find_projects(p, depth - 1)]
+
+
 def load_config(root: Path) -> ProjectConfig:
     issues: list[Issue] = []
     config = load_model(root / defaults.CONFIG_FILENAME, ProjectConfig, root, issues)
@@ -163,7 +179,12 @@ def init_project(target: Path, example: bool = True) -> Path:
     if example:
         shutil.copytree(EXAMPLE_DIR, target, dirs_exist_ok=True)
     else:
-        for name in (defaults.INSTRUMENTS_DIR, defaults.STUDIES_DIR, defaults.MAPS_DIR, defaults.DATA_DIR):
+        for name in (
+            defaults.INSTRUMENTS_DIR,
+            defaults.STUDIES_DIR,
+            defaults.MAPS_DIR,
+            defaults.DATA_DIR,
+        ):
             (target / name).mkdir(parents=True, exist_ok=True)
         # A JSON string is valid YAML, so any folder name is quoted safely.
         config = BLANK_CONFIG.read_text(encoding="utf-8").replace(

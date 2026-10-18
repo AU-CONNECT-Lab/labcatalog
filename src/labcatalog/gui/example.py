@@ -26,7 +26,7 @@ def reset_example() -> Path:
 
 def start_folder() -> Path:
     # The project open when the window last closed, or the example the first time.
-    last = preferences.load().get(preferences.LAST_PROJECT)
+    last = preferences.mine().get(preferences.LAST_PROJECT)
     if last and (Path(last) / defaults.CONFIG_FILENAME).is_file():
         return Path(last)
     return example_copy()
