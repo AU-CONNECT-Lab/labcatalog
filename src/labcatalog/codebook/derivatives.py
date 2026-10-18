@@ -74,10 +74,10 @@ def run_derivatives(root: Path, request: Request) -> Derived:
 def derive(project: Project, request: Request) -> Derived:
     table = read_table(request.table)
     keys = row_keys(table, request)
-    measures, left_out = measure_columns(table, request.columns)
+    sidecar = read_sidecar(request.table)
+    measures, left_out = measure_columns(table, request.columns, sidecar)
     if not measures:
         raise CodebookError(f"No numeric columns to take from {request.table.name}")
-    sidecar = read_sidecar(request.table)
     groups = sorted({tuple(row[e] for e in request.split) for _, row in keys.iterrows()})
     done = Derived(left_out=left_out)
     instruments = {}
@@ -167,12 +167,27 @@ def wave_order(wave: str) -> tuple:
     return (0, int(wave), "") if wave.isdigit() else (1, 0, wave)
 
 
-def measure_columns(table: pd.DataFrame, patterns: list[str]) -> tuple[list[str], list[str]]:
+def measure_columns(
+    table: pd.DataFrame, patterns: list[str], sidecar: dict[str, Any]
+) -> tuple[list[str], list[str]]:
     candidates = [c for c in table if c not in KEY_COLUMNS]
     if patterns:
         candidates = [c for c in candidates if any(fnmatch.fnmatchcase(c, p) for p in patterns)]
-    numeric = [c for c in candidates if is_numeric(table[c])]
-    return numeric, [c for c in candidates if c not in numeric]
+    # A column whose sidecar lists its Levels is a choice, numbers or not.
+    taken = [c for c in candidates if levels_of(sidecar, c) or is_numeric(table[c])]
+    return taken, [c for c in candidates if c not in taken]
+
+
+def levels_of(sidecar: dict[str, Any], column: str) -> dict[str, str]:
+    # BIDS gives a level as its label, or as an object with a Description.
+    entry = sidecar.get(column)
+    found = entry.get("Levels") if isinstance(entry, dict) else None
+    if not isinstance(found, dict):
+        return {}
+    return {
+        str(key): value if isinstance(value, str) else str(value.get("Description", key))
+        for key, value in found.items()
+    }
 
 
 def is_numeric(values: pd.Series) -> bool:
@@ -181,13 +196,38 @@ def is_numeric(values: pd.Series) -> bool:
 
 
 def read_sidecar(table: Path) -> dict[str, Any]:
-    path = table.with_suffix(".json")
-    if not path.is_file():
-        return {}
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as err:
-        raise CodebookError(f"{path.name} is not valid JSON: {err}") from None
+    # BIDS inheritance: the sidecars nearer the table, and naming more of its entities, win.
+    found: dict[str, Any] = {}
+    for path in sidecars(table):
+        try:
+            found.update(json.loads(path.read_text(encoding="utf-8")))
+        except json.JSONDecodeError as err:
+            raise CodebookError(f"{path.name} is not valid JSON: {err}") from None
+    return found
+
+
+def sidecars(table: Path) -> list[Path]:
+    own = table.with_suffix(".json")
+    parts = table.stem.split("_")
+    if ENTITY.match(parts[-1]):
+        # Without a suffix, nothing above the table describes it.
+        return [own] if own.is_file() else []
+    suffix, entities = parts[-1], set(parts[:-1])
+    # Up to the pipeline's folder, the one with dataset_description.json; else the table's own.
+    folders = []
+    for folder in table.resolve().parents:
+        folders.append(folder)
+        if (folder / "dataset_description.json").is_file():
+            break
+    else:
+        folders = [table.resolve().parent]
+    found = []
+    for depth, folder in enumerate(reversed(folders)):
+        for path in folder.glob(f"*{suffix}.json"):
+            named = path.stem.split("_")
+            if named[-1] == suffix and set(named[:-1]) <= entities:
+                found.append((depth, len(named), path))
+    return [path for _, _, path in sorted(found)]
 
 
 def generated_by(table: Path, root: Path) -> str | None:
@@ -219,9 +259,14 @@ def instrument_text(
 ) -> str:
     old = yaml.safe_load(path.read_text(encoding="utf-8")) if path.is_file() else None
     kept = {i["id"]: i for i in old.get("items", [])} if old else {}
-    items = [kept.get(identifier(c)) or item(c, sidecar.get(c, {})) for c in measures]
+    items = [kept.get(identifier(c)) or item(c, sidecar) for c in measures]
+    sets = response_sets(sidecar, measures)
     if old:
         document = {**old, "items": items}
+        held = {s["id"] for s in old.get("response_sets", [])}
+        added = [s for s in sets if s["id"] not in held]
+        if added:
+            document["response_sets"] = [*old.get("response_sets", []), *added]
     else:
         name = request.label or request.name
         source = generated_by(request.table, project.root)
@@ -231,6 +276,7 @@ def instrument_text(
             "kind": request.modality,
             "description": f"Measures from {source or request.table.name}"
             + (f" for {', '.join(group)}." if group else "."),
+            **({"response_sets": sets} if sets else {}),
             "items": items,
         }
     table = portable_path(request.table.resolve(), project.root.resolve()).as_posix()
@@ -238,14 +284,42 @@ def instrument_text(
     return f"{modeline}\n{HEADER.format(table=table)}\n{rest}"
 
 
-def item(column: str, entry: dict[str, Any]) -> dict[str, Any]:
+def item(column: str, sidecar: dict[str, Any]) -> dict[str, Any]:
+    entry = sidecar.get(column, {})
     text = entry.get("Description") or entry.get("LongName") or column
     if entry.get("Units"):
         text = f"{text} ({entry['Units']})"
     fields: dict[str, Any] = {"id": identifier(column)}
     if entry.get("LongName"):
         fields["label"] = entry["LongName"]
+    if levels_of(sidecar, column):
+        return {**fields, "text": text, "response_set": set_id(sidecar, column)}
     return {**fields, "text": text, "type": "number"}
+
+
+def set_id(sidecar: dict[str, Any], column: str) -> str:
+    # Columns with the same levels share the set named after the first of them.
+    levels = levels_of(sidecar, column)
+    first = next(c for c in sidecar if levels_of(sidecar, c) == levels)
+    return identifier(first)
+
+
+def response_sets(sidecar: dict[str, Any], measures: list[str]) -> list[dict[str, Any]]:
+    sets = {}
+    for column in measures:
+        levels = levels_of(sidecar, column)
+        if levels:
+            options = [{"value": option_value(k), "label": v} for k, v in levels.items()]
+            sets.setdefault(set_id(sidecar, column), options)
+    return [{"id": key, "options": options} for key, options in sets.items()]
+
+
+def option_value(key: str) -> int | float | str:
+    try:
+        number = float(key)
+    except ValueError:
+        return key
+    return int(number) if number.is_integer() else number
 
 
 def column_name(group: tuple[str, ...], measure: str) -> str:

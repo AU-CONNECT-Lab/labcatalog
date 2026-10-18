@@ -6,9 +6,9 @@ Many processing pipelines for fNIRS, EEG and MRI end with a table: one row per r
 
 - A tab-separated file (`.tsv`).
 - A way to tell whose row it is: a `bids_name` column such as `sub-001_ses-01_task-nback_nirs`, or a `participant_id` column (and `session_id` when there are sessions). The IDs in the data file are written as `sub-001`, so they match the other modalities' IDs only if those use the same form.
-- Optionally, a sidecar with the same name and `.json`, giving each column a `LongName`, a `Description` and `Units`. These become the item's short name and text. A `dataset_description.json` above the table names the pipeline and its version in the instrument's description.
+- Optionally, a sidecar with the same name and `.json`, giving each column a `LongName`, a `Description` and `Units`. These become the item's short name and text. A column with `Levels` (`{"0": "no", "1": "yes"}`) becomes a choice item with those options, and columns with the same levels share one response set. Sidecars higher up follow the BIDS inheritance principle: up to the folder with `dataset_description.json`, a `.json` with the table's suffix whose entities are all in the table's name describes it too (`task-rest_qc.json` for `sub-01/ses-01/sub-01_ses-01_task-rest_qc.tsv`), and the one nearer the table, or naming more of its entities, wins. A `dataset_description.json` above the table names the pipeline and its version in the instrument's description.
 
-Only columns whose values are all numbers (or `n/a`) become items. The command lists the columns it left out.
+Only columns whose values are all numbers (or `n/a`), or whose sidecar gives their `Levels`, become items. The command lists the columns it left out.
 
 ## Run it
 

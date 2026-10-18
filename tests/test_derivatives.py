@@ -8,10 +8,13 @@ import yaml
 
 from labcatalog.cli import main
 from labcatalog.codebook.derivatives import Request, command_line, run_derivatives
+from labcatalog.data.check import check_values
+from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.exceptions import CodebookError
 from labcatalog.gui.pipeline_table import PipelineForm, missing, request_of
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
+from labcatalog.sources import load_dataset
 
 ROWS = [
     "bids_name\tsci\tsnr\tdevice",
@@ -172,3 +175,71 @@ def test_the_import_page_form_asks_for_what_is_missing_and_splits_lists():
         ["raw_*", "motion_*"],
         None,
     )
+
+
+def test_a_column_with_levels_is_a_choice_with_its_own_options(demo_project):
+    rows = [
+        f"{row}	{value}" for row, value in zip(ROWS, ["usable", 1, 0, 1, "n/a"], strict=True)
+    ]
+    table = pipeline_table(demo_project, rows)
+    levels = {"Levels": {"0": "no", "1": "yes"}, "Description": "Usable run."}
+    (table.parent / "desc-qc.json").write_text(json.dumps({**SIDECAR, "usable": levels}))
+    done = run_derivatives(demo_project, request(table, split=["task"]))
+    assert done.left_out == ["device"]
+    found = yaml.safe_load((demo_project / "instruments" / "qc_rest.yaml").read_text())
+    assert found["response_sets"] == [
+        {"id": "usable", "options": [{"value": 0, "label": "no"}, {"value": 1, "label": "yes"}]}
+    ]
+    assert found["items"][-1] == {"id": "usable", "text": "Usable run.", "response_set": "usable"}
+    # Running again keeps a set the user renamed and adds none twice.
+    path = demo_project / "instruments" / "qc_rest.yaml"
+    found["response_sets"][0]["options"][1]["label"] = "kept"
+    path.write_text(yaml.safe_dump(found))
+    run_derivatives(demo_project, request(table, split=["task"]))
+    again = yaml.safe_load(path.read_text())
+    assert [o["label"] for o in again["response_sets"][0]["options"]] == ["no", "kept"]
+    assert len(again["response_sets"]) == 1
+
+
+def test_sidecars_higher_in_the_tree_describe_the_tables_below(demo_project):
+    folder = demo_project / "derivatives" / "pipe"
+    nested = folder / "sub-01" / "ses-01"
+    nested.mkdir(parents=True)
+    (folder / "dataset_description.json").write_text(json.dumps({"Name": "pipe"}))
+    (folder / "qc.json").write_text(json.dumps(SIDECAR))
+    (folder / "task-rest_qc.json").write_text(json.dumps({"snr": {"Description": "Rest SNR."}}))
+    (folder / "task-nback_qc.json").write_text(json.dumps({"snr": {"Description": "Wrong."}}))
+    table = nested / "sub-01_ses-01_task-rest_qc.tsv"
+    table.write_text("participant_id\tsession_id\tsci\tsnr\nsub-01\tses-01\t0.9\t12\n")
+    run_derivatives(demo_project, request(table))
+    found = yaml.safe_load((demo_project / "instruments" / "qc.yaml").read_text())
+    assert [i["text"] for i in found["items"]] == ["Scalp coupling index.", "Rest SNR."]
+
+
+def test_a_choice_from_levels_checks_its_values(demo_project):
+    rows = [f"{row}\t{value}" for row, value in zip(ROWS, ["usable", 1, 0, 2, "n/a"], strict=True)]
+    table = pipeline_table(demo_project, rows)
+    levels = {"Levels": {"0": "no", "1": "yes"}}
+    (table.parent / "desc-qc.json").write_text(json.dumps({**SIDECAR, "usable": levels}))
+    done = run_derivatives(demo_project, request(table, split=["task"]))
+    config = demo_project / "labcatalog.yaml"
+    steps = list(dict(done.steps).values())
+    data = yaml.safe_load(config.read_text())
+    data["studies"]["demo_study"]["waves"] |= yaml.safe_load(steps[0])
+    data["datasets"] += yaml.safe_load(steps[1])
+    data["vocab"]["modalities"].append("fnirs")
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+    study = next((demo_project / "studies").glob("*.yaml"))
+    content = yaml.safe_load(study.read_text())
+    content["administrations"] += yaml.safe_load(steps[2])
+    study.write_text(yaml.safe_dump(content, sort_keys=False))
+    project = load_project(demo_project)
+    assert [i for i in validate_project(project) if i.level == "error"] == []
+    loaded = {
+        d.name: load_dataset(project, d) for d in project.config.datasets if d.modality == "fnirs"
+    }
+    catalog = resolve_catalog(project)
+    mine = [v for v in catalog.variables if v.dataset in loaded]
+    issues = check_values(project, Catalog(variables=mine, scores=[]), loaded)
+    # Only the 2, which is no level, is reported.
+    assert [(i.code, i.details["column"]) for i in issues] == [("unexpected_value", "rest_usable")]
