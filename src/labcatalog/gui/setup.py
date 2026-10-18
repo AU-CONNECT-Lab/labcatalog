@@ -8,12 +8,13 @@ from labcatalog.data.prepare import step_states
 from labcatalog.gui import id_check
 from labcatalog.pipeline import CatalogResult
 
-PREPARE, IDS, IMPORT, EDIT = "prepare", "ids", "import", "edit"
+PREPARE, IDS, IMPORT, EDIT, REVIEW = "prepare", "ids", "import", "edit", "review"
 STEPS = {
     PREPARE: "Prepare data",
     IDS: "Check IDs",
     IMPORT: "Describe columns",
     EDIT: "Edit files",
+    REVIEW: "Review",
 }
 # Where the last step's Next button leads.
 AFTER = ("problems", "Problems")

@@ -1,0 +1,3 @@
+# Review
+
+**Review**, the last step of the Set up page, looks over each data file as the catalog reads it, before the analyses. For each file it gives its rows and IDs; how many of the answers its instruments ask for it holds; how many cells hold a missing code and how many a value the item does not allow; how many errors and warnings Problems lists for it; and a table of its scores with n, mean and SD, α, and a small histogram of each score's spread, to spot a score piled up at one end or with an odd gap. **Open** goes to the file's page on the Datasets page, with its charts and problems. **Next** goes on to Problems.

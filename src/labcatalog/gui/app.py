@@ -33,6 +33,7 @@ from labcatalog.gui import (
     preferences,
     prepare,
     problems,
+    review,
     serving,
     settings,
     setup,
@@ -319,6 +320,7 @@ class Window:
                     (setup.IDS, self.ids_panel),
                     (setup.IMPORT, self.import_panel),
                     (setup.EDIT, self.edit_panel),
+                    (setup.REVIEW, self.review_panel),
                 ):
                     with ui.column().classes("lc-step w-full") as self.steps[name]:
                         part()
@@ -552,6 +554,7 @@ class Window:
             self.ids_panel,
             self.import_panel,
             self.edit_panel,
+            self.review_panel,
             self.problems_panel,
         ):
             panel.refresh()
@@ -759,6 +762,11 @@ class Window:
             common.empty("Open a project folder to edit its files.", "folder_open")
         else:
             edit.render(self.root, self.editing, lambda: self.load(self.root))
+
+    @ui.refreshable_method
+    def review_panel(self) -> None:
+        if self.has_catalog():
+            review.render(self.result, self.open_dataset)
 
     @ui.refreshable_method
     def ids_panel(self) -> None:

@@ -36,6 +36,7 @@ project:
         - file: app/ids.md
         - file: app/import.md
         - file: app/edit.md
+        - file: app/review.md
         - file: app/problems.md
         - file: app/settings.md
     - title: How-To Guides
