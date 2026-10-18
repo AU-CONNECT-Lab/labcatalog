@@ -14,6 +14,7 @@ The Sample on the left applies to every tab except the multilevel model.
 
 The note below says how many people are in the sample and how they were matched across files: by ID, or by group when `stats.correlate_by` names one. IDs belong to their study, so files of two studies share no one: with files of several studies, each person's ID is written with their study first, as `pilot/1001C`. Rows whose ID repeats within a file are left out. When a file holds several people of one group (two children of a family), that group is taken person by person, as described under [Groups](../concepts/ids-groups-missing.md#groups), and the note says how many groups that affects.
 
+(several-studies)=
 ### Several studies
 
 Choosing datasets of more than one study pools the studies. Each study's people are matched within that study, as above, and the studies' people are then put together, one row each. A variable is offered when every chosen study has it in exactly one chosen dataset, for example the mood total in wave 1 of one study and in the baseline of another; each person's value comes from their own study's file. Choose one wave of each study for the variables to pool. The group comparison also offers **Study** as the groups.
