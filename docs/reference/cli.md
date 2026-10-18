@@ -72,6 +72,14 @@ labcatalog derivatives TABLE --name NAME --study STUDY --modality MODALITY --rep
 
 Write instruments, column maps and a data file per wave from a pipeline's table (`.tsv`) and its JSON sidecar, and print the lines to add to `labcatalog.yaml` and the study file. See [Bring In a Pipeline's Tables](../how-to/pipeline-tables.md).
 
+## sql
+
+```bash
+labcatalog sql DATABASE QUERY OUTPUT
+```
+
+Run the query in the `.sql` file `QUERY` on a SQLite or DuckDB file, read only, and write the result to the CSV file `OUTPUT`, empty where the database has NULL. See [Register Prepare Steps](../how-to/prepare-steps.md#from-a-database).
+
 ## database
 
 ```bash

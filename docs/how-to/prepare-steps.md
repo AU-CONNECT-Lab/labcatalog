@@ -29,6 +29,20 @@ prepare:
 
 A step is **outdated** when one of its inputs is newer than one of its outputs. List the script itself among the inputs, so that changing the script also marks the step outdated. A step is **missing output** when an output does not exist yet, and **missing input** when an input does not.
 
+## From a database
+
+Data kept in a SQLite or DuckDB file, such as a lab's visit tracker or a pipeline's run log, come in through a query. Write the query in a `.sql` file and let `labcatalog sql` write its result as a CSV file:
+
+```yaml
+prepare:
+  - name: visits
+    run: labcatalog sql tracker/visits.sqlite scripts/visits.sql data/visits.csv
+    inputs: [tracker/visits.sqlite, scripts/visits.sql]
+    outputs: [data/visits.csv]
+```
+
+The database is opened read only. The CSV file is then a dataset like any other, and changing the query or the database marks the step outdated. Databases on a server are not read directly; export from them with their own tools into a file first.
+
 ## Run the steps
 
 The **Prepare data** step of the Set up page lists every step with its status and the dates of its files. Press **Run** on one step, **Run outdated** to run only the steps that are not up to date, or **Run all** to run every step in order; a step that fails stops the rest. **Stop** ends the running step, and **Log** shows what the command printed. Press **Refresh** afterwards to read the new data.

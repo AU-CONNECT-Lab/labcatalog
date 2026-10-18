@@ -82,8 +82,6 @@ class DatasetConfig(StrictModel):
     path: str | None = None
     # A folder dataset's files, with {id} where each file's path holds the ID.
     files: str | None = None
-    url: str | None = None
-    table: str | None = None
     id_column: str | None = None
     # Who filled in each row, when the ID is the person the row is about.
     respondent_column: str | None = None

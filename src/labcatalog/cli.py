@@ -8,6 +8,7 @@ import typer
 
 from labcatalog import defaults
 from labcatalog.codebook.derivatives import Request, run_derivatives
+from labcatalog.data.sql import query_to_csv
 from labcatalog.datalad.freeze import RECORD_ONLY
 from labcatalog.exceptions import (
     EXIT_ISSUES,
@@ -323,10 +324,21 @@ def derivatives(
     for path in done.written:
         typer.echo(f"Wrote {path}")
     if done.left_out:
-        typer.echo(f"Not numbers, so left out: {', '.join(done.left_out)}")
+        typer.echo(f"Neither numbers nor given Levels, so left out: {', '.join(done.left_out)}")
     for instruction, lines in done.steps:
         typer.echo(instruction)
         typer.echo(lines)
+
+
+@app.command()
+def sql(
+    database: Annotated[Path, typer.Argument(help="A SQLite or DuckDB file, read only.")],
+    query: Annotated[Path, typer.Argument(help="A .sql file with one query.")],
+    output: Annotated[Path, typer.Argument(help="The CSV file to write, such as data/visits.csv.")],
+) -> None:
+    """Write the result of a SQL query to a CSV file, for a prepare step to run."""
+    rows = query_to_csv(database, query, output)
+    typer.echo(f"Wrote {rows} rows to {output}")
 
 
 @app.command()

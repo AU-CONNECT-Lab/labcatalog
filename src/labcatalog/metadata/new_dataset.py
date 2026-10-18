@@ -23,7 +23,7 @@ from labcatalog.project import Project
 from labcatalog.sources.folder_source import ID, file_pattern
 
 # Fields of the template that describe its own file, so a new dataset does not take them over.
-OWN_FILE = ("url", "table", "files")
+OWN_FILE = ("files",)
 # The order a dataset that repeats none is written in, as in the example project.
 BLANK_KEYS = (
     "name",
