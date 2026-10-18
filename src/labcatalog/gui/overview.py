@@ -92,9 +92,10 @@ def banner(result: CatalogResult, on_map: Callable[[], None]) -> None:
     found = views.banner(result)
     with ui.element("div").classes("lc-banner w-full"):
         BannerArt(theme.BANNER)
-        ui.button("Explore the map", icon="hub", on_click=on_map).props("flat no-caps").classes(
-            "lc-banner-go"
-        )
+        # No Quasar color: its text-primary would override the light text on the dark banner.
+        ui.button("Explore the map", icon="hub", on_click=on_map, color=None).props(
+            "flat no-caps"
+        ).classes("lc-banner-go")
         with ui.column().classes("lc-banner-words gap-2"):
             if found.kicker:
                 ui.label(found.kicker).classes("lc-banner-kicker")
