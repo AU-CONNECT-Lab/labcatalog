@@ -10,6 +10,7 @@ PALETTE = "palette"
 APPEARANCE = "appearance"
 RSCRIPT = "rscript"
 MPLUS = "mplus"
+PYTHON = "python"
 BOOTSTRAP_WORKERS = "bootstrap_workers"
 R_AT_ONCE = "r_at_once"
 DATALAD = "datalad"
@@ -75,3 +76,9 @@ def server_secret() -> str:
         found = secrets.token_urlsafe(32)
         save({SERVER_SECRET: found})
     return found
+
+
+def python() -> str | None:
+    # Installed with pip, labcatalog's own Python runs the scripts; the Windows program has none.
+    own = None if getattr(sys, "frozen", False) else sys.executable
+    return load().get(PYTHON) or own

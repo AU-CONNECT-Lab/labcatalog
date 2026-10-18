@@ -1,6 +1,6 @@
 # Settings
 
-The Settings page, opened with the gear at the top right of the window, has three parts. **This project** holds the choices shared with the lab: they are saved in the project's `labcatalog.yaml`, so everyone who opens the project starts from them. **This computer** holds the paths to R, Mplus and DataLad and what a language model needs on this computer. **Only for you** holds how the window looks and what the copy buttons copy.
+The Settings page, opened with the gear at the top right of the window, has three parts. **This project** holds the choices shared with the lab: they are saved in the project's `labcatalog.yaml`, so everyone who opens the project starts from them. **This computer** holds the paths to R, Mplus, Python and DataLad and what a language model needs on this computer. **Only for you** holds how the window looks and what the copy buttons copy.
 
 When one labcatalog serves several people ([`labcatalog serve`](../how-to/work-as-a-team.md)), **This computer** only shows what the person running it set, **Only for you** is kept for each browser, and the example is not offered.
 
@@ -25,6 +25,10 @@ These are where each page starts. A switch on a section of the Analysis page, or
 The path to `Rscript`. **Save and check** runs R once and reports its version and any missing packages, with the command to install them. See [Set Up R and Language Models](../how-to/r-and-models.md).
 
 **Analyses in R at once** (2 unless changed) caps how many analyses run in R together, from every window of this labcatalog; the rest wait their turn, so several windows or people cannot fill the computer's memory. **R processes for bootstrap resamples** is how many R processes one mediation's resamples are split over.
+
+## Python
+
+The Python that runs the Python scripts of the Analysis page's Custom tab, which needs pandas, numpy, scipy, statsmodels, semopy and matplotlib. **Save and check** reports its version and any missing packages, with the command to install them. Left empty, labcatalog installed with pip uses its own Python; the Windows program has none, so a Python must be set here to run Python scripts.
 
 ## DataLad
 

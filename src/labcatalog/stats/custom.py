@@ -1,6 +1,5 @@
 import re
 import subprocess
-import sys
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -8,7 +7,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from labcatalog.exceptions import MplusError, RError
+from labcatalog.exceptions import LabCatalogError, MplusError, RError
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis, mplus
 from labcatalog.stats.analysis import ITEM_PREFIX, STUDY_KEY, first_key
@@ -24,12 +23,24 @@ from labcatalog.stats.rbridge import r_turn, run_process
 
 NO_R = "R scripts run in R: set the path to Rscript on the Settings page."
 NO_MPLUS = "Mplus inputs run in Mplus: set the path to Mplus on the Settings page."
+NO_PYTHON = "Python scripts run in Python: set the path to Python on the Settings page."
 MPLUS = "mplus"
 SCRIPT = {"r": "analysis.R", "python": "analysis.py", MPLUS: "analysis.inp"}
 MPLUS_DATA = "analysis_data.dat"
 MPLUS_OUT = "analysis.out"
 # Mplus names have at most eight characters and start with a letter.
 MPLUS_NAME = 8
+PYTHON_PACKAGES = ("pandas", "numpy", "scipy", "statsmodels", "semopy", "matplotlib")
+PYTHON_CHECK = (
+    "import importlib.util, sys; print(sys.version.split()[0]); "
+    "[print(p) for p in {packages} if importlib.util.find_spec(p) is None]"
+)
+
+
+@dataclass
+class PythonStatus:
+    version: str
+    missing: list[str]
 
 
 @dataclass
@@ -187,8 +198,7 @@ def run_script(
                     f"Rscript not found at {program}; check the path on the Settings page"
                 ) from None
         else:
-            # -I keeps the user's own settings out; -X utf8 keeps printed text readable on Windows.
-            done = run_process([sys.executable, "-I", "-X", "utf8", path.name], folder, started)
+            done = run_python(program, path, folder, started)
         files = written(folder, {*data, path.name})
     output = "\n".join(part.rstrip() for part in (done.stdout, done.stderr) if part.strip())
     return Ran(done.returncode == 0, output, files)
@@ -215,6 +225,35 @@ def run_mplus(
     output = out.read_text(encoding="utf-8", errors="replace")
     files = written(folder, {MPLUS_DATA, path.name, MPLUS_OUT})
     return Ran(done.returncode == 0 and "*** ERROR" not in output, output, files)
+
+
+def run_python(
+    program: str | None,
+    path: Path,
+    folder: Path,
+    started: Callable[[subprocess.Popen], None] | None,
+) -> subprocess.CompletedProcess:
+    if not program:
+        raise LabCatalogError(NO_PYTHON)
+    try:
+        # -I keeps the user's own settings out; -X utf8 keeps printed text readable on Windows.
+        return run_process([program, "-I", "-X", "utf8", path.name], folder, started)
+    except OSError:
+        raise LabCatalogError(
+            f"Python not found at {program}; check the path on the Settings page"
+        ) from None
+
+
+def python_status(program: str) -> PythonStatus:
+    check = PYTHON_CHECK.format(packages=repr(PYTHON_PACKAGES))
+    try:
+        done = run_process([program, "-I", "-c", check])
+    except OSError:
+        raise LabCatalogError(f"No Python at {program}") from None
+    if done.returncode != 0:
+        raise LabCatalogError(f"Python stopped with an error: {done.stderr.strip()[-500:]}")
+    version, *missing = done.stdout.split()
+    return PythonStatus(version, missing)
 
 
 def written(folder: Path, given: set[str]) -> dict[str, bytes]:

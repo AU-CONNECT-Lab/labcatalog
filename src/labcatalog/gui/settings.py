@@ -17,6 +17,7 @@ from labcatalog.metadata.editing import save_settings
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import attrition, imputation, rbridge
 from labcatalog.stats.cfa import ESTIMATORS
+from labcatalog.stats.custom import PYTHON_PACKAGES, python_status
 from labcatalog.stats.mediation import DEFAULT_WORKERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
 
@@ -29,6 +30,10 @@ MPLUS_EXAMPLE = {
     "win32": r"C:\Program Files\Mplus\Mplus.exe",
     "darwin": "/Applications/Mplus/mplus",
 }.get(sys.platform, "/opt/mplus/mplus")
+PYTHON_EXAMPLE = {
+    "win32": r"C:\Users\you\AppData\Local\Programs\Python\Python313\python.exe",
+    "darwin": "/usr/local/bin/python3",
+}.get(sys.platform, "/usr/bin/python3")
 
 
 def render(
@@ -53,6 +58,7 @@ def render(
             else:
                 r_section(on_rscript)
                 mplus_section()
+                python_section()
                 datalad.datalad_section(on_saved)
                 model(on_model)
         with ui.column().classes("w-96 shrink-0 gap-4"):
@@ -248,6 +254,50 @@ def mplus_section() -> None:
                 show_status(status, "Found Mplus.", "ok")
             else:
                 show_status(status, f"No file at {value}.", "bad")
+
+        button.on_click(save)
+        path.on("keydown.enter", save)
+
+
+def python_section() -> None:
+    with panel("Python", "For custom analyses written in Python"):
+        note(
+            "The Custom tab of the Analysis page runs Python scripts with this Python, which "
+            f"needs {', '.join(PYTHON_PACKAGES)}. Left empty, labcatalog installed with pip uses "
+            "its own Python; the Windows program has none, so set one here."
+        )
+        with ui.row().classes("w-full items-start no-wrap gap-2 mt-1"):
+            path = path_input(
+                "Python",
+                preferences.load().get(preferences.PYTHON, ""),
+                f"The Python program, for example {PYTHON_EXAMPLE}",
+            )
+            button = ui.button("Save and check")
+        status = ui.label()
+        status.visible = False
+
+        async def save() -> None:
+            value = (path.value or "").strip().strip('"')
+            path.value = value
+            preferences.save({preferences.PYTHON: value})
+            chosen = preferences.python()
+            if not chosen:
+                show_status(status, "No Python set: custom Python scripts cannot run.", "warn")
+                return
+            try:
+                found = await computed(python_status, chosen)
+            except LabCatalogError as err:
+                show_status(status, str(err), "bad")
+                return
+            if found.missing:
+                show_status(
+                    status,
+                    f"Python {found.version}, but it is missing {', '.join(found.missing)}; "
+                    f"install them with: pip install {' '.join(found.missing)}",
+                    "warn",
+                )
+            else:
+                show_status(status, f"Python {found.version}, with every package it needs.", "ok")
 
         button.on_click(save)
         path.on("keydown.enter", save)

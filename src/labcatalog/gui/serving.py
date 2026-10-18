@@ -84,6 +84,7 @@ def server_section() -> None:
         rows = [
             ("Rscript", saved.get(preferences.RSCRIPT) or "not set"),
             ("Mplus", saved.get(preferences.MPLUS) or "not set"),
+            ("Python", saved.get(preferences.PYTHON) or "labcatalog's own"),
             ("DataLad", saved.get(preferences.DATALAD) or "not set"),
             (
                 "Analyses in R at once",

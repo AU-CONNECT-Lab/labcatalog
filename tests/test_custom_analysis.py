@@ -1,4 +1,5 @@
 import shutil
+import sys
 from glob import glob
 
 import pandas as pd
@@ -6,6 +7,7 @@ import pytest
 
 from labcatalog.ai import custom as ai
 from labcatalog.config import SavedAnalysis
+from labcatalog.gui import preferences
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.metadata import editing
 from labcatalog.metadata.validate import validate_project
@@ -111,12 +113,12 @@ def test_a_python_script_runs_beside_the_data_and_gives_back_what_it_wrote(resul
         f"print('mean', round(d['{column}'].mean(), 3))\n"
         f"d[['{column}']].describe().to_csv('summary.csv')\n"
     )
-    ran = custom.run_script("python", code, frame, None)
+    ran = custom.run_script("python", code, frame, sys.executable)
     assert ran.ok
     assert ran.output == f"mean {round(frame[column].mean(), 3)}"
     assert list(ran.files) == ["summary.csv"]
     broken = custom.run_script(
-        "python", "print('before')\nraise ValueError('no such column')\n", frame, None
+        "python", "print('before')\nraise ValueError('no such column')\n", frame, sys.executable
     )
     assert not broken.ok
     assert broken.output.startswith("before\n") and "ValueError: no such column" in broken.output
@@ -130,13 +132,28 @@ def test_a_running_script_can_be_stopped():
         started.append(process)
         end_tree(process)
 
-    ran = custom.run_script("python", code, pd.DataFrame({"x": [1]}), None, stop)
+    ran = custom.run_script("python", code, pd.DataFrame({"x": [1]}), sys.executable, stop)
     assert started and not ran.ok
 
 
-def test_an_r_script_needs_rscript(result, sample):
+def test_r_and_python_scripts_need_their_program(monkeypatch, tmp_path):
     with pytest.raises(Exception, match="set the path to Rscript"):
         custom.run_script("r", "print(1)", pd.DataFrame({"x": [1]}), None)
+    with pytest.raises(Exception, match="set the path to Python"):
+        custom.run_script("python", "print(1)", pd.DataFrame({"x": [1]}), None)
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    assert preferences.python() == sys.executable
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    assert preferences.python() is None
+    preferences.save({preferences.PYTHON: "C:/Python/python.exe"})
+    assert preferences.python() == "C:/Python/python.exe"
+
+
+def test_the_python_check_gives_the_version_and_the_packages_it_lacks(monkeypatch):
+    found = custom.python_status(sys.executable)
+    assert found.version == sys.version.split()[0]
+    monkeypatch.setattr(custom, "PYTHON_PACKAGES", ("pandas", "no_such_package_here"))
+    assert custom.python_status(sys.executable).missing == ["no_such_package_here"]
 
 
 @pytest.mark.skipif(rscript() is None, reason="R is not installed")

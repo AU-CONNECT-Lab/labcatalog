@@ -390,7 +390,9 @@ def data_name(language: str) -> str:
 def program(language: str) -> str | None:
     if language == MPLUS:
         return preferences.load().get(preferences.MPLUS) or None
-    return analysis_tables.rscript() if language == "r" else None
+    if language == "r":
+        return analysis_tables.rscript()
+    return preferences.python()
 
 
 def language_of(script: str) -> str:
