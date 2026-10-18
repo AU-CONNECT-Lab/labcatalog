@@ -48,7 +48,7 @@ PARTS = {
     "panel": "Cross-lagged panel",
 }
 # What a sample of several studies can do so far: each person's own study's file, side by side.
-POOLED_PARTS = ("missing", "correlation", "regression", "groups", "invariance")
+POOLED_PARTS = ("missing", "correlation", "regression", "groups", "invariance", "mediation")
 
 
 @dataclass
@@ -124,7 +124,8 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
             with panel(PARTS[view.part]):
                 note(
                     "Not yet for datasets of several studies; choose the datasets of one study, "
-                    "or use Missing data, Correlation table, Regression, Group comparison or Invariance."
+                    "or use Missing data, Correlation table, Regression, Group comparison, "
+                    "Invariance or Mediation."
                 )
             return
         if view.part == "multilevel":

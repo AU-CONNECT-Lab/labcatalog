@@ -592,6 +592,16 @@ class AnalysisData:
             options=options if variable.type == CHOICE else [],
         )
 
+    def study_dummies(self) -> list[Variable]:
+        # Each study but the first as a 0/1 number, for models that take the study as fixed.
+        codes = analysis.study_numbers(self.result, self.sample)
+        found = []
+        for code, label in analysis.study_options(self.result, self.sample)[1:]:
+            column = f"{STUDY_KEY}_{int(code)}"
+            self.columns[column] = (codes == code).astype(float)
+            found.append(Variable(column, f"Study: {label}", "", NUMBER, column))
+        return found
+
     def column_name(self, dataset: str, column: str) -> str:
         # A column name that two files share gets the dataset added, whatever is selected.
         catalog = self.result.catalog

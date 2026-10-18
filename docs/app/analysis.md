@@ -24,8 +24,9 @@ The analyses allow for the study, so that a difference between the studies' mean
 - Each regression includes the study as a fixed effect, a dummy for each study but the first. The slope is the slope within studies, the intercept is the first study's, and *r* is the correlation within studies, so the table gives no interval for it.
 - Missing data and the group comparison work as for one study.
 - Invariance offers each instrument that every chosen study has in one chosen dataset, and **Study** as the groups: a multigroup model with one group per study, which tests whether the instrument measures the same thing in each study before their scores are put together.
+- Mediation includes the study as a fixed effect on M and Y, a 0/1 covariate for each study but the first, named as Study: and the study's label. It works on scores; Items mode takes the datasets of one study for now.
 
-The other tabs and multiple imputation do not take several studies yet: they say so, and the Missing values switch is not shown.
+The other tabs (rater agreement, the measurement model, the multilevel model and the cross-lagged panel) and multiple imputation do not take several studies yet: they say so, and the Missing values switch is not shown.
 
 The variable lists hold every score and number item of the chosen measures in the chosen datasets, labeled with their wave. Type in a list to filter it.
 

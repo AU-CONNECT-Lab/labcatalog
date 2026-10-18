@@ -8,6 +8,8 @@ from labcatalog.charts import views
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import analysis, group_invariance, invariance
 from labcatalog.stats import analysis_script as script
+from labcatalog.stats import mediation as med
+from labcatalog.stats.mediation_r import mediation_code
 from tests.test_analysis_script import needs_r, rscript
 
 FILES = ["child_w1", "pilot_w1"]
@@ -190,6 +192,44 @@ def test_the_same_answers_in_two_studies_hold_every_step(result, sample):
     chisq = [s.fit["chisq"] for s in test.steps]
     assert chisq == pytest.approx([chisq[0]] * 3, abs=1e-4)
     assert test.steps[2].fit["df"] > test.steps[1].fit["df"] > test.steps[0].fit["df"]
+
+
+def test_mediation_takes_the_study_as_fixed(result, sample):
+    data = script.AnalysisData(result, sample)
+    [pilot] = data.study_dummies()
+    assert (pilot.label, data.frame()[pilot.column].sum()) == (
+        "Study: pilot",
+        len(sample.people) / 2,
+    )
+    model = mediation_model(data, "child_w1+pilot_w1")
+    model.covariates = data.study_dummies()
+    code = mediation_code(model, workers=1)
+    assert '"m ~ a*x + cov1"' in code.r and '"y ~ c*x + b*m + cov1"' in code.r
+    if not rscript():
+        return
+    fit = med.read_fit(script.run_code(result, sample, data.frame(), code, rscript())[0], model)
+    one = analysis.build_sample(result, ["child_w1"], True)
+    alone_data = script.AnalysisData(result, one)
+    alone_model = mediation_model(alone_data, "child_w1")
+    code = mediation_code(alone_model, workers=1)
+    found, _ = script.run_code(result, one, alone_data.frame(), code, rscript())
+    alone = med.read_fit(found, alone_model)
+    # The same answers in both studies: the same paths on twice the people.
+    assert fit.n == 2 * alone.n
+    for path in ("a", "b", "c", "indirect"):
+        assert fit.effects[path].estimate == pytest.approx(alone.effects[path].estimate)
+
+
+def mediation_model(data, files: str) -> med.MediationModel:
+    x, m, y = (
+        data.score(f"{key}@{files}")
+        for key in (
+            "example_mood.ems_total",
+            "example_worries_temper.ewt_worries",
+            "example_worries_temper.ewt_temper",
+        )
+    )
+    return med.MediationModel(x, m, y)
 
 
 def test_the_example_pools_its_two_studies(example_project):

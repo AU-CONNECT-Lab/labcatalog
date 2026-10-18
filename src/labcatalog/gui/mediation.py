@@ -75,6 +75,10 @@ def render(
             return data.score(key, items=True)
         return data.variable(key)
 
+    def by_study(data: script.AnalysisData) -> list[script.Variable]:
+        # Pooled studies enter M and Y as fixed effects, as in the pooled regressions.
+        return data.study_dummies() if analysis.pooling(result, sample.datasets) else []
+
     def model_of(data: script.AnalysisData) -> med.MediationModel:
         moderators = [
             med.Moderator(variable(data, w), tuple(paths))
@@ -85,7 +89,7 @@ def render(
             variable(data, chosen.x),
             variable(data, chosen.m),
             variable(data, chosen.y),
-            [data.variable(c) for c in chosen.covariates],
+            [data.variable(c) for c in chosen.covariates] + by_study(data),
             moderators,
             chosen.estimator,
             chosen.bootstrap if chosen.booted else 0,
@@ -104,6 +108,10 @@ def render(
         if len(set(used)) < len(used):
             with body:
                 note("X, M, Y, the moderators and the covariates must all be different variables.")
+            return
+        if chosen.items and analysis.pooling(result, sample.datasets):
+            with body:
+                note("Items mode takes the datasets of one study for now; use Scores.")
             return
         data = script.AnalysisData(result, sample)
         model = model_of(data)
