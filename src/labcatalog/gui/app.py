@@ -32,6 +32,7 @@ from labcatalog.gui import (
     problems,
     settings,
     setup,
+    shared,
     studies,
     theme,
 )
@@ -59,7 +60,6 @@ from labcatalog.metadata.browse import BrowseIndex, build_index
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     CatalogResult,
-    run_catalog,
     run_cfa,
     run_get_missing,
     run_invariance,
@@ -313,9 +313,7 @@ class Window:
     async def load(self, root: Path) -> None:
         self.set_busy(True)
         try:
-            # Taken first, so a save while the catalog builds still shows as a change.
-            times = await common.computed(file_times, root)
-            result = await common.computed(run_catalog, root)
+            times, result = await common.computed(shared.catalog, root)
         except LabCatalogError as err:
             # The project stays open so Set up can make the missing data.
             ui.notify(str(err), type="negative", multi_line=True)
@@ -396,7 +394,7 @@ class Window:
         cfa_changed(cfa)
         fits, message, status = await in_r(fit, result, rscript)
         if status == CFA_FAILED:
-            fits = await common.computed(fit, result, None)
+            fits = await common.computed(shared.fitted, fit, result, None)
             message, status = (
                 f"R failed, so the factor models were fitted in Python: {message}",
                 CFA_DONE,
@@ -743,7 +741,7 @@ async def in_r(
     rscript: str | None,
 ) -> tuple[list, str, str]:
     try:
-        found = await common.computed(function, result, rscript)
+        found = await common.computed(shared.fitted, function, result, rscript)
     except LabCatalogError as err:
         return [], str(err), CFA_FAILED
     return found, "", CFA_DONE
