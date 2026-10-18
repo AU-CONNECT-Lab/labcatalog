@@ -4,6 +4,8 @@ CONFIG_FILENAME = "labcatalog.yaml"
 ACCEPTED_FILENAME = "accepted_warnings.yaml"
 # Corrections of IDs as the data files write them, applied whenever a dataset is read.
 ID_MAP_FILENAME = "id_map.csv"
+# Who is running the prepare steps, there only while they run.
+PREPARE_LOCK_FILENAME = "prepare_running.json"
 YAML_SUFFIXES = (".yaml", ".yml")
 INSTRUMENTS_DIR = "instruments"
 STUDIES_DIR = "studies"

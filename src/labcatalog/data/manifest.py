@@ -15,8 +15,9 @@ from labcatalog.datalad.versions import (
     datalad_records,
     original_branch,
 )
+from labcatalog.exceptions import LabCatalogError
 from labcatalog.paths import expand_path, portable_path
-from labcatalog.project import Project, bib_path, references_root
+from labcatalog.project import Project, bib_path, load_config, references_root
 from labcatalog.sources import LoadedDataset, load_rosters
 from labcatalog.version import __version__
 
@@ -94,6 +95,31 @@ def used_paths(config: ProjectConfig, root: Path) -> list[Path]:
     sources = [expand_path(d.path, root) for d in config.datasets if d.path]
     inputs = [expand_path(path, root) for step in config.prepare for path in step.inputs]
     return present(list(dict.fromkeys([*metadata, *sources, *inputs])))
+
+
+def file_times(root: Path) -> dict[Path, int]:
+    # When each file the catalog reads last changed; folder datasets and PDFs would take too long.
+    paths = [root / name for name in (defaults.ACCEPTED_FILENAME, defaults.ID_MAP_FILENAME)]
+    for path in metadata_paths(root):
+        paths += sorted(path.rglob("*")) if path.is_dir() else [path]
+    try:
+        config = load_config(root)
+    except LabCatalogError:
+        # Half-edited settings still let the files they do not name be watched.
+        config = None
+    if config is not None:
+        paths.append(bib_path(config, root))
+        for study in config.studies.values():
+            roster = study.roster.path if study.roster else None
+            paths += [expand_path(p, root) for p in (study.exclusions, roster) if p]
+        paths += [
+            expand_path(d.path, root) for d in config.datasets if d.source == "csv" and d.path
+        ]
+    return {p: p.stat().st_mtime_ns for p in dict.fromkeys(paths) if p.is_file()}
+
+
+def changed(before: dict[Path, int], after: dict[Path, int]) -> list[Path]:
+    return sorted(p for p in before.keys() | after.keys() if before.get(p) != after.get(p))
 
 
 def present(paths: list[Path]) -> list[Path]:

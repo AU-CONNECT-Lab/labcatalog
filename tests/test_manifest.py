@@ -1,4 +1,6 @@
-from labcatalog.data.manifest import build_manifest, git_commit
+import os
+
+from labcatalog.data.manifest import build_manifest, changed, file_times, git_commit
 from labcatalog.project import EXAMPLE_DIR, load_project
 from labcatalog.sources import load_datasets
 
@@ -34,6 +36,26 @@ def test_checksum_changes_when_a_value_changes(mock_project):
     after = {r.dataset: r.sha256 for r in manifest_for(mock_project).files}
     assert before["child_w2"] != after["child_w2"]
     assert before["child_w1"] == after["child_w1"]
+
+
+def test_file_times_see_what_others_change(mock_project):
+    before = file_times(mock_project)
+    relative = {p.relative_to(mock_project).as_posix() for p in before}
+    assert {"labcatalog.yaml", "data/child_w1.csv", "data/participants.csv"} <= relative
+    assert any(r.startswith("instruments/") for r in relative)
+
+    instrument = next(p for p in before if p.parent.name == "instruments")
+    os.utime(instrument, ns=(before[instrument] + 10**9, before[instrument] + 10**9))
+    (mock_project / "accepted_warnings.yaml").write_text("accepted: []\n", encoding="utf-8")
+    assert changed(before, file_times(mock_project)) == sorted(
+        [instrument, mock_project / "accepted_warnings.yaml"]
+    )
+
+
+def test_file_times_still_watch_the_folders_when_the_settings_break(mock_project):
+    (mock_project / "labcatalog.yaml").write_text("datasets: [", encoding="utf-8")
+    relative = {p.relative_to(mock_project).as_posix() for p in file_times(mock_project)}
+    assert "labcatalog.yaml" in relative and any(r.startswith("instruments/") for r in relative)
 
 
 def test_metadata_outside_git_has_no_commit(tmp_path):

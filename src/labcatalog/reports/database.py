@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 
 import duckdb
@@ -71,20 +72,25 @@ def tables(result: CatalogResult) -> dict[str, pd.DataFrame]:
 
 
 def write_database(result: CatalogResult, path: Path) -> Path:
-    # Built beside the old file and swapped in, so a failed build keeps the last good one.
-    partial = path.with_name(f"{path.name}.partial")
-    partial.unlink(missing_ok=True)
+    # Built beside the old file and swapped in, so a failed build keeps the last good one;
+    # each build has its own partial file, so two people building at once do not collide.
+    partial = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.partial")
     path.parent.mkdir(parents=True, exist_ok=True)
     date_format = result.project.config.defaults.date_format
-    with duckdb.connect(str(partial)) as con:
-        con.execute(f"CREATE SCHEMA {DATA_SCHEMA}")
-        for name, instruments in full_plan(result).items():
-            config = result.datasets[name].config
-            frame = typed(data_frame(result, name, instruments), config.date_column, date_format)
-            write_table(con, f'{DATA_SCHEMA}."{name}"', frame)
-        for name, frame in tables(result).items():
-            write_table(con, name, frame)
-    partial.replace(path)
+    try:
+        with duckdb.connect(str(partial)) as con:
+            con.execute(f"CREATE SCHEMA {DATA_SCHEMA}")
+            for name, instruments in full_plan(result).items():
+                config = result.datasets[name].config
+                frame = typed(
+                    data_frame(result, name, instruments), config.date_column, date_format
+                )
+                write_table(con, f'{DATA_SCHEMA}."{name}"', frame)
+            for name, frame in tables(result).items():
+                write_table(con, name, frame)
+        partial.replace(path)
+    finally:
+        partial.unlink(missing_ok=True)
     return path
 
 

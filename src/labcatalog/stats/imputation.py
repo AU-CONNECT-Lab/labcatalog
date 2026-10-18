@@ -1,3 +1,4 @@
+import getpass
 import hashlib
 import tempfile
 from dataclasses import dataclass, field
@@ -142,7 +143,8 @@ def file_name(frame: pd.DataFrame, found: ImputationPlan) -> str:
 
 
 def cache_path(frame: pd.DataFrame, found: ImputationPlan) -> Path:
-    folder = Path(tempfile.gettempdir()) / CACHE_FOLDER
+    # Each person has their own folder: on Linux the temporary folder is shared by everyone.
+    folder = Path(tempfile.gettempdir()) / f"{CACHE_FOLDER}_{getpass.getuser()}"
     folder.mkdir(exist_ok=True)
     return folder / file_name(frame, found)
 

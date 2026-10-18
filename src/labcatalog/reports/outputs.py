@@ -8,12 +8,15 @@ from labcatalog.data.manifest import Manifest
 def write_output(root: Path, name: str, files: dict[str, bytes], manifest: Manifest) -> Path:
     base = root / defaults.OUTPUTS_DIR / f"{datetime.now():%Y-%m-%d_%H%M%S}_{name}"
     folder = base
-    # Two saves within one second get _2, _3 rather than failing.
+    # Two saves within one second, by one person or two, get _2, _3 rather than failing.
     n = 1
-    while folder.exists():
-        n += 1
-        folder = base.with_name(f"{base.name}_{n}")
-    folder.mkdir(parents=True)
+    while True:
+        try:
+            folder.mkdir(parents=True)
+            break
+        except FileExistsError:
+            n += 1
+            folder = base.with_name(f"{base.name}_{n}")
     for filename, content in files.items():
         (folder / filename).write_bytes(content)
     # Which data files, at which checksums, the saved numbers came from.

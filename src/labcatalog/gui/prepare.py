@@ -8,7 +8,7 @@ from nicegui import app, ui
 from labcatalog import defaults
 from labcatalog.ai.cleaning import cleaning_step, raw_of
 from labcatalog.data.prepare import FileState, Session, StepState, run_steps, step_states, stop
-from labcatalog.exceptions import DataladError, LabCatalogError
+from labcatalog.exceptions import DataladError, LabCatalogError, PrepareBusyError
 from labcatalog.gui import common, preferences
 from labcatalog.gui.cleaning import LANGUAGE_NAMES, review, sent_text
 from labcatalog.gui.common import computed, empty, note, open_path, page_head, panel, path_input
@@ -69,7 +69,7 @@ def render(
         return
     names = [step.name for step in project.config.prepare]
 
-    async def start(chosen: list[str], outdated_only: bool = False) -> None:
+    async def start(chosen: list[str], outdated_only: bool = False, anyway: bool = False) -> None:
         view.running = True
         steps.refresh()
         tools = preferences.load()
@@ -83,7 +83,13 @@ def render(
                 None,
                 tools.get(preferences.RSCRIPT),
                 tools.get(preferences.DATALAD),
+                anyway,
             )
+        except PrepareBusyError as err:
+            view.running = False
+            steps.refresh()
+            confirm_busy(err, lambda: start(chosen, outdated_only, anyway=True))
+            return
         except DataladError as err:
             view.running = False
             steps.refresh()
@@ -156,6 +162,24 @@ def render(
         draft_panel(result, on_success)
 
     steps()
+
+
+def confirm_busy(err: PrepareBusyError, run_anyway: Callable[[], Awaitable[None]]) -> None:
+    with ui.dialog() as dialog, ui.card().classes("w-[36rem] max-w-full"):
+        ui.label(
+            f"{err.by} has been running the prepare steps since {err.since:%H:%M on %Y-%m-%d}. "
+            "Running them at the same time writes the same files twice. Run them anyway only "
+            "if that run has ended, for example because its window was closed."
+        )
+
+        async def go() -> None:
+            dialog.close()
+            await run_anyway()
+
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+            ui.button("Run anyway", on_click=go)
+    dialog.open()
 
 
 def step_row(

@@ -11,7 +11,7 @@ from labcatalog.reports.export import variable_rows
 def test_the_database_holds_the_data_and_what_they_mean(mock_project):
     path = run_database(mock_project)
     assert path == mock_project / "database" / "labcatalog.duckdb"
-    assert not path.with_name("labcatalog.duckdb.partial").exists()
+    assert not list(path.parent.glob("*.partial"))
     result = run_catalog(mock_project)
     with duckdb.connect(str(path), read_only=True) as con:
         names = {row[0] for row in con.execute("SELECT table_name FROM duckdb_tables()").fetchall()}

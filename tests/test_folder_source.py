@@ -1,6 +1,6 @@
 import pytest
 
-from labcatalog.data.manifest import build_manifest
+from labcatalog.data.manifest import build_manifest, file_times
 from labcatalog.exceptions import DataSourceError
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
@@ -76,3 +76,9 @@ def test_patterns_read_the_id_out_of_a_path():
     assert pattern.fullmatch("a/b/sub-1001C_ses-1_x.nii").group("id") == "1001C"
     assert pattern.fullmatch("sub-1001C_ses-1_x.nii").group("id") == "1001C"
     assert pattern.fullmatch("sub-1001C_ses-2_x.nii") is None
+
+
+def test_changes_inside_a_folder_dataset_are_not_watched(mock_project):
+    # Such folders may hold thousands of files, too many to look at every few seconds.
+    add_scans(mock_project)
+    assert not [p for p in file_times(mock_project) if "bids" in p.parts]

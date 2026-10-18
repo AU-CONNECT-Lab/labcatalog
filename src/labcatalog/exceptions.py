@@ -1,3 +1,6 @@
+from datetime import datetime
+from pathlib import Path
+
 from labcatalog.issues import Issue
 
 EXIT_OK = 0
@@ -44,6 +47,17 @@ class FreezeError(LabCatalogError):
 
 class EditError(LabCatalogError):
     exit_code = EXIT_ISSUES
+
+
+class PrepareBusyError(LabCatalogError):
+    exit_code = EXIT_ISSUES
+
+    def __init__(self, by: str, since: datetime, path: Path) -> None:
+        super().__init__(
+            f"{by} has been running the prepare steps since {since:%Y-%m-%d %H:%M}; "
+            f"if that run has ended, delete {path}"
+        )
+        self.by, self.since = by, since
 
 
 class RError(LabCatalogError):

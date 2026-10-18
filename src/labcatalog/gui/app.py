@@ -6,6 +6,7 @@ import webview
 from nicegui import app, background_tasks, ui
 
 from labcatalog.charts import style, views
+from labcatalog.data.manifest import changed, file_times
 from labcatalog.datalad.annex import dataset_root
 from labcatalog.datalad.bridge import use_folder
 from labcatalog.datalad.freeze import list_freezes
@@ -49,6 +50,7 @@ from labcatalog.gui.setup import SetupView
 from labcatalog.gui.studies import StudiesView
 from labcatalog.issues import Issue
 from labcatalog.metadata.browse import BrowseIndex, build_index
+from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     CatalogResult,
     run_catalog,
@@ -76,6 +78,8 @@ PAGES = (
 SETTINGS = "settings"
 # The study picker's choice that narrows nothing; a study ID never has this character.
 ALL_STUDIES = "*"
+# How often the window looks for files changed by someone else.
+DISK_SECONDS = 5
 
 
 def launch(project: Path | None = None) -> None:
@@ -139,6 +143,9 @@ class Window:
         self.error: str | None = None
         # The project a frozen copy was opened from, while the copy is shown.
         self.home: Path | None = None
+        # When each file was last changed as the catalog read it.
+        self.times: dict[Path, int] = {}
+        self.watching = False
 
     def build(self) -> None:
         appearance = preferences.load().get(preferences.APPEARANCE, theme.DEFAULT_APPEARANCE)
@@ -161,6 +168,13 @@ class Window:
                     ).classes("lc-quiet-btn")
                 self.frozen_bar.visible = False
                 ui.space()
+                self.disk_mark = ui.label("Changed on disk").classes(
+                    "lc-pill lc-info cursor-pointer"
+                )
+                with self.disk_mark:
+                    self.disk_tip = ui.tooltip("")
+                self.disk_mark.on("click", self.reload)
+                self.disk_mark.visible = False
                 self.data_mark = ui.label().classes("lc-pill cursor-pointer")
                 with self.data_mark:
                     self.data_tip = ui.tooltip("")
@@ -210,6 +224,7 @@ class Window:
                     self.badge = ui.label().classes("lc-pill ml-2")
                     self.badge.visible = False
         self.tabs = tabs
+        ui.timer(DISK_SECONDS, self.watch_disk)
         tabs.on_value_change(
             lambda e: gear.classes(**{"add" if e.value == SETTINGS else "remove": "lc-active"})
         )
@@ -278,6 +293,8 @@ class Window:
     async def load(self, root: Path) -> None:
         self.set_busy(True)
         try:
+            # Taken first, so a save while the catalog builds still shows as a change.
+            times = await common.computed(file_times, root)
             result = await common.computed(run_catalog, root)
         except LabCatalogError as err:
             # The project stays open so Set up can make the missing data.
@@ -301,7 +318,8 @@ class Window:
                 self.scope = preferences.load().get(preferences.STUDY_SCOPE, {}).get(str(root))
                 self.follow_scope()
             self.set_busy(False)
-        self.result = result
+        self.result, self.times = result, times
+        self.disk_mark.visible = False
         self.show_result()
         # R is slow, so the factor models fill in after the rest of the catalog shows.
         background_tasks.create(self.start_cfa())
@@ -462,6 +480,25 @@ class Window:
         self.data_mark.classes(replace=f"lc-pill cursor-pointer lc-{kind}")
         self.data_tip.set_text(versions_tooltip(states, root))
         self.data_mark.visible = True
+
+    async def watch_disk(self) -> None:
+        # Someone else's save, or a synced folder, changes the files under this window.
+        if self.root is None or self.home is not None or self.spinner.visible or self.watching:
+            return
+        root, times = self.root, self.times
+        self.watching = True
+        try:
+            now = await common.computed(file_times, root)
+        finally:
+            self.watching = False
+        if root != self.root or times is not self.times:
+            return
+        found = changed(times, now)
+        self.disk_mark.visible = bool(found)
+        names = ", ".join(portable_path(p, root).as_posix() for p in found)
+        self.disk_tip.set_text(
+            f"Changed since the project was read: {names}. Click to read it again."
+        )
 
     def open_versions(self) -> None:
         self.show_dataset(None)

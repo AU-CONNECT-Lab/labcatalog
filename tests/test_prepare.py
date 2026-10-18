@@ -9,7 +9,9 @@ from pathlib import Path
 import pytest
 
 from labcatalog.cli import main
-from labcatalog.data.prepare import Session, run_steps, step_states, stop
+from labcatalog.data.prepare import Session, run_steps, running, step_states, stop
+from labcatalog.exceptions import PrepareBusyError
+from labcatalog.metadata.accepted import who
 from labcatalog.pipeline import run_catalog, run_check, run_validate
 from labcatalog.project import init_project, load_project
 
@@ -121,6 +123,27 @@ def test_stop_ends_the_running_command(project_root):
     assert not worker.is_alive()
     assert session.runs["clean"].outcome == "stopped"
     assert "summarize" not in session.runs
+
+
+def test_a_run_says_who_is_running_until_it_ends(project_root):
+    (project_root / "scripts" / "clean.py").write_text(
+        "import json\nprint(json.load(open('prepare_running.json'))['by'])\n", encoding="utf-8"
+    )
+    session = Session()
+    run_steps(load_project(project_root), ["clean"], session)
+    assert session.runs["clean"].log == [who(project_root)]
+    assert running(project_root) is None
+
+
+def test_someone_elses_run_stops_a_second_one_unless_asked(project_root):
+    lock = project_root / "prepare_running.json"
+    lock.write_text('{"by": "Sam", "since": "2026-10-18T10:42:00"}', encoding="utf-8")
+    with pytest.raises(PrepareBusyError, match="Sam has been running .* since 2026-10-18 10:42"):
+        run_steps(load_project(project_root), ["clean"], Session())
+    assert not (project_root / "data" / "a.csv").exists()
+    runs = run_steps(load_project(project_root), ["clean"], Session(), anyway=True)
+    assert runs[0].outcome == "succeeded"
+    assert not lock.exists()
 
 
 def test_check_warns_about_missing_and_outdated_outputs(project_root):

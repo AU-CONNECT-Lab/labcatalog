@@ -1,6 +1,7 @@
 import shutil
 from glob import glob
 
+import pandas as pd
 import pytest
 
 from labcatalog.pipeline import run_catalog
@@ -162,3 +163,10 @@ def test_the_summary_sets_imputed_values_beside_the_observed_ones(result, sample
     assert sorted(long[".imp"].unique()) == [0, 1, 2, 3] and len(long) == 4 * len(frame)
     imputed = long[long[".imp"] == 1]
     assert imputed["ecs_total_parent_w1"].notna().all()
+
+
+def test_each_person_keeps_imputations_in_their_own_folder(monkeypatch):
+    monkeypatch.setattr(imputation.getpass, "getuser", lambda: "sam")
+    found = imputation.ImputationPlan(m=5, seed=1, numbers=["x"])
+    path = imputation.cache_path(pd.DataFrame({"x": [1.0, None]}), found)
+    assert path.parent.name == f"{imputation.CACHE_FOLDER}_sam"

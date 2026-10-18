@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 from collections.abc import Callable
@@ -6,10 +7,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
+from labcatalog import defaults
 from labcatalog.config import PrepareStep
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.bridge import run_args
-from labcatalog.exceptions import DataladError
+from labcatalog.exceptions import DataladError, PrepareBusyError
+from labcatalog.metadata.accepted import who
 from labcatalog.paths import expand_path
 from labcatalog.processes import NEW_GROUP, end_tree
 from labcatalog.project import Project
@@ -33,6 +36,12 @@ class StepState:
     inputs: list[FileState]
     outputs: list[FileState]
     status: Status
+
+
+@dataclass
+class Runner:
+    by: str
+    since: datetime
 
 
 @dataclass
@@ -97,6 +106,7 @@ def run_steps(
     echo: Callable[[str], None] | None = None,
     rscript: str | None = None,
     datalad: str | None = None,
+    anyway: bool = False,
 ) -> list[StepRun]:
     if project.config.prepare_with != "datalad":
         datalad = None
@@ -105,26 +115,47 @@ def run_steps(
             "The prepare steps run with DataLad (prepare_with: datalad); "
             "set the path to datalad on the Settings page"
         )
+    lock = project.root / defaults.PREPARE_LOCK_FILENAME
+    # Two people running the steps at once would write the same files.
+    if not anyway and (other := running(project.root)):
+        raise PrepareBusyError(other.by, other.since, lock)
+    lock.write_text(
+        json.dumps(
+            {"by": who(project.root), "since": datetime.now().isoformat(timespec="seconds")}
+        ),
+        encoding="utf-8",
+    )
     session.stopping = False
     done = []
-    for step in project.config.prepare:
-        if session.stopping:
-            break
-        # Checked step by step, so a rerun step makes the steps after it outdated too.
-        if step.name not in names or (
-            outdated_only and step_state(project, step).status == "up to date"
-        ):
-            continue
-        run = StepRun(step.name, step.run)
-        session.runs[step.name] = run
-        done.append(run)
-        if echo:
-            echo(f"== {step.name}: {step.run}")
-        execute(step, project.root, run, session, echo, rscript, datalad)
-        if run.exit_code != 0:
-            break
-    session.current = None
+    try:
+        for step in project.config.prepare:
+            if session.stopping:
+                break
+            # Checked step by step, so a rerun step makes the steps after it outdated too.
+            if step.name not in names or (
+                outdated_only and step_state(project, step).status == "up to date"
+            ):
+                continue
+            run = StepRun(step.name, step.run)
+            session.runs[step.name] = run
+            done.append(run)
+            if echo:
+                echo(f"== {step.name}: {step.run}")
+            execute(step, project.root, run, session, echo, rscript, datalad)
+            if run.exit_code != 0:
+                break
+    finally:
+        lock.unlink(missing_ok=True)
+        session.current = None
     return done
+
+
+def running(root: Path) -> Runner | None:
+    path = root / defaults.PREPARE_LOCK_FILENAME
+    if not path.is_file():
+        return None
+    found = json.loads(path.read_text(encoding="utf-8"))
+    return Runner(found["by"], datetime.fromisoformat(found["since"]))
 
 
 def execute(
