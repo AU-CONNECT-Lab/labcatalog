@@ -147,7 +147,7 @@ def render(
             table_note(model, fit),
         )
         paper_table(shown)
-        results_text(results.mediation_text(model, fit, common.decimals), [shown])
+        results_text(results.mediation_text(model, fit, common.decimals()), [shown])
         result_actions(
             result, "mediation", {"mediation": shown}, texts=texts, engine="Computed in R."
         )

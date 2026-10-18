@@ -4,10 +4,9 @@ from labcatalog.charts import style
 from labcatalog.gui import preferences
 
 
-def test_use_palette_recolors_waves_groups_and_pairs(monkeypatch):
-    monkeypatch.setattr(style, "palette", style.palette)
+def test_the_window_palette_recolors_waves_groups_and_pairs(monkeypatch):
     default = [style.wave_color(0), style.group_color(0), style.pair_color(0)]
-    style.use_palette("okabe_ito")
+    monkeypatch.setattr(style, "palette_of", lambda: "okabe_ito")
     chosen = style.PALETTES["okabe_ito"]
     assert [style.wave_color(0), style.group_color(0), style.pair_color(1)] == [
         chosen.waves[0],
@@ -15,7 +14,7 @@ def test_use_palette_recolors_waves_groups_and_pairs(monkeypatch):
         chosen.pair[1],
     ]
     assert style.wave_color(len(chosen.waves)) == chosen.waves[0]
-    style.use_palette(style.DEFAULT_PALETTE)
+    monkeypatch.setattr(style, "palette_of", style.default_palette)
     assert [style.wave_color(0), style.group_color(0), style.pair_color(0)] == default
 
 
@@ -37,7 +36,7 @@ def test_preferences_keep_other_keys(monkeypatch, tmp_path):
 
 
 def test_groups_past_the_palette_come_lighter_then_darker():
-    groups = style.PALETTES[style.palette].groups
+    groups = style.PALETTES[style.palette_of()].groups
     colors = [style.group_color(k) for k in range(3 * len(groups))]
     assert colors[: len(groups)] == list(groups)
     assert len(set(colors)) == len(colors)

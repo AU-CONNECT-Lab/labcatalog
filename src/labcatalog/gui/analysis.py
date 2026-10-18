@@ -418,7 +418,7 @@ def correlation_section(
                         [analysis.instrument_of(k) for k in keys],
                         matrix,
                         method == "spearman",
-                        common.decimals,
+                        common.decimals(),
                     ),
                     [shown],
                 )
@@ -598,7 +598,7 @@ def pair_section(
                 drawn = Chart(charts.show(fig), fig)
                 paper_table(shown)
                 results_text(
-                    results.regression_text(fits, choices, choices[y_key], common.decimals),
+                    results.regression_text(fits, choices, choices[y_key], common.decimals()),
                     [shown],
                 )
                 measures_text(measure_paragraphs(result, [y_key, *fits]))

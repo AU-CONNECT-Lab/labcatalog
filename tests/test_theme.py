@@ -1,4 +1,4 @@
-from labcatalog.gui import theme
+from labcatalog.gui import look, theme
 from labcatalog.gui.theme import MIN_FONT, for_page
 
 
@@ -21,7 +21,7 @@ def test_for_page_raises_small_fonts_and_leaves_marks_alone():
 
 
 def test_dark_figures_flip_greys_and_keep_hues(monkeypatch):
-    monkeypatch.setattr(theme, "dark", True)
+    monkeypatch.setattr(look.OUTSIDE, "dark", True)
     figure = {
         "data": [{"marker": {"color": ["#3498db", "#ffffff"], "line": {"color": "white"}}}],
         "layout": {

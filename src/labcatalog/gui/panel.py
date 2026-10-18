@@ -186,7 +186,7 @@ def render(result: CatalogResult, view) -> None:
             }
             for shown in papers.values():
                 paper_table(shown)
-            results_text(results.panel_text(model, found, common.decimals), list(papers.values()))
+            results_text(results.panel_text(model, found, common.decimals()), list(papers.values()))
             result_actions(result, "panel", papers, texts=texts, engine="Computed in R.")
             with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
                 note(

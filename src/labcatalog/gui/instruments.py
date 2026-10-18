@@ -13,7 +13,7 @@ from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, common, new_instrument, theme
+from labcatalog.gui import charts, common, new_instrument
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
@@ -27,10 +27,12 @@ from labcatalog.gui.common import (
     open_path,
     p_value,
     panel,
+    redraw,
     table,
     unique,
 )
 from labcatalog.gui.datalad import get_button
+from labcatalog.gui.look import look, within
 from labcatalog.gui.network_graph import NetworkGraph
 from labcatalog.gui.paper import (
     copy_text,
@@ -268,7 +270,7 @@ def catalog_map(
         "dot to see its links, scroll to zoom, and click to open it."
     )
     # Dark mode draws the map as the overview banner's night sky.
-    NetworkGraph(spec, network.MAP_HEIGHT, on_click=opened, night=theme.dark).classes("w-full")
+    NetworkGraph(spec, network.MAP_HEIGHT, on_click=opened, night=look().dark).classes("w-full")
 
 
 def wizard_done(view: BrowseView, cfa: CfaView) -> Callable[[str], Awaitable[None]]:
@@ -985,11 +987,9 @@ def score_summaries(result: CatalogResult, instrument: Instrument, dataset: str)
     ]
 
 
-def cfa_changed() -> None:
-    score_statistics.refresh()
-    factor_structure.refresh()
-    measures_section.refresh()
-    invariance_section.refresh()
+def cfa_changed(cfa: CfaView) -> None:
+    for function in (score_statistics, factor_structure, measures_section, invariance_section):
+        redraw(function, cfa)
 
 
 # Module level, so a finished CFA can redraw this table without redrawing the page.
@@ -1141,7 +1141,7 @@ def factor_structure(
 
     def choose(value: str) -> None:
         cfa.estimator = value
-        background_tasks.create(cfa.refit())
+        background_tasks.create(within(look(), cfa.refit()))
 
     with panel("Factor structure", dataset) as tools:
         with tools:
@@ -1191,7 +1191,7 @@ def factor_structure(
             for shown in papers.values():
                 paper_table(shown)
             labels = {s.id: s.label for s in instrument.scores}
-            results_text(results.cfa_text(fits, labels, common.decimals), list(papers.values()))
+            results_text(results.cfa_text(fits, labels, common.decimals()), list(papers.values()))
             save_button(
                 result,
                 f"cfa_{instrument.id}_{dataset}",
@@ -1427,7 +1427,7 @@ def invariance_section(
 
     def choose(value: str) -> None:
         cfa.invariance_estimator = value
-        background_tasks.create(cfa.retest())
+        background_tasks.create(within(look(), cfa.retest()))
 
     if several_waves:
         with panel("Invariance across waves") as tools:

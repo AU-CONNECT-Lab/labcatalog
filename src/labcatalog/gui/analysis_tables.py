@@ -296,7 +296,7 @@ def group_section(
                 for shown in papers.values():
                     paper.paper_table(shown)
                 paper.results_text(
-                    results.comparison_text(comparison, outcome.label, common.decimals),
+                    results.comparison_text(comparison, outcome.label, common.decimals()),
                     list(papers.values()),
                 )
                 paper.result_actions(result, "groups", papers, drawn, texts, engine)

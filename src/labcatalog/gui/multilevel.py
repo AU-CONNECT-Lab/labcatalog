@@ -101,7 +101,7 @@ def render(result: CatalogResult, view) -> None:
                     for shown in papers.values():
                         paper.paper_table(shown)
                     paper.results_text(
-                        results.multilevel_text(fitted, label, common.decimals),
+                        results.multilevel_text(fitted, label, common.decimals()),
                         list(papers.values()),
                     )
                     fig = views.trajectories(long, fitted, label)

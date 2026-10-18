@@ -5,7 +5,16 @@ from nicegui import ui
 from labcatalog.charts import views
 from labcatalog.gui import analysis_tables, attrition
 from labcatalog.gui.analysis import sample_text
-from labcatalog.gui.common import col, empty, note, page_head, panel, sorted_waves, unique
+from labcatalog.gui.common import (
+    col,
+    empty,
+    note,
+    page_head,
+    panel,
+    redraw,
+    sorted_waves,
+    unique,
+)
 from labcatalog.gui.datasets import paragraphs
 from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView
 from labcatalog.gui.paper import copy_text, paper_table, save_button
@@ -261,5 +270,5 @@ def measure_paragraphs(
     return texts
 
 
-def cfa_changed() -> None:
-    measures_body.refresh()
+def cfa_changed(cfa: CfaView) -> None:
+    redraw(measures_body, cfa)

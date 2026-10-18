@@ -11,6 +11,7 @@ from labcatalog.config import CORRELATIONS
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import common, datalad, example, preferences, theme
 from labcatalog.gui.common import command, computed, note, panel, path_input, show_status
+from labcatalog.gui.look import look
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.metadata.editing import save_settings
 from labcatalog.pipeline import CatalogResult
@@ -246,7 +247,7 @@ def looks_section(
         ).props("no-caps")
         ui.select(
             {name: p.label for name, p in style.PALETTES.items()},
-            value=style.palette,
+            value=look().palette,
             label="Chart colors",
             on_change=lambda e: on_palette(e.value),
         ).props("outlined dense").classes("w-full mt-2")
@@ -292,7 +293,7 @@ def example_section(on_reset_example: Callable[[], Awaitable[None]]) -> None:
 
 
 def models_section(on_model: Callable[[], None]) -> None:
-    provider = common.llm.provider
+    provider = common.llm().provider
     with panel("Language model", "Scoring scripts and descriptions drafted from reference PDFs"):
         note(
             "On an instrument's page, a language model can write the scoring scripts and draft "

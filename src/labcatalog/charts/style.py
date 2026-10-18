@@ -42,7 +42,6 @@ PALETTES = {
 DEFAULT_PALETTE = "default"
 # How much lighter each further round of a palette is drawn; negative is darker.
 SHADES = (0.0, 0.45, -0.35)
-palette = DEFAULT_PALETTE
 LOLLIPOP_COLORS = (
     "#A6CEE3",
     "#1F78B4",
@@ -80,18 +79,21 @@ CONNECTOR = "#c3cad1"
 GRID = "#f2f2f2"
 
 
-def use_palette(name: str) -> None:
-    global palette
-    palette = name
+def default_palette() -> str:
+    return DEFAULT_PALETTE
+
+
+# Where figures get their palette's name; the GUI points it at the window being drawn.
+palette_of = default_palette
 
 
 def wave_color(index: int) -> str:
-    waves = PALETTES[palette].waves
+    waves = PALETTES[palette_of()].waves
     return waves[index % len(waves)]
 
 
 def group_color(index: int) -> str:
-    groups = PALETTES[palette].groups
+    groups = PALETTES[palette_of()].groups
     # Past the palette, each round repeats it lighter, then darker, so no two groups share a colour.
     lighter = SHADES[index // len(groups) % len(SHADES)]
     color = groups[index % len(groups)]
@@ -107,7 +109,7 @@ def shade(color: str, lighter: float) -> str:
 
 
 def pair_color(index: int) -> str:
-    return PALETTES[palette].pair[index]
+    return PALETTES[palette_of()].pair[index]
 
 
 def base_layout(fig: go.Figure, height: int, **extra) -> go.Figure:

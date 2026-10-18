@@ -12,6 +12,7 @@ from nicegui import run, ui
 from labcatalog import defaults
 from labcatalog.config import LlmConfig, ProjectConfig
 from labcatalog.gui import preferences
+from labcatalog.gui.look import look, scoped
 from labcatalog.metadata.bibliography import Bibliography, citation
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.summary import wave_order
@@ -41,7 +42,7 @@ def keyed(rows: list[dict]) -> list[dict]:
 
 async def computed(callback, *args):
     # NiceGUI gives None in place of the result while the window closes.
-    found = await run.io_bound(callback, *args)
+    found = await run.io_bound(scoped, look(), callback, *args)
     if found is None:
         raise asyncio.CancelledError
     return found
@@ -105,27 +106,38 @@ def cited(bibliography: Bibliography, key: str) -> None:
         ui.link("Link", entry["url"], new_tab=True)
 
 
-# The open project's settings, set as it loads.
-decimals = defaults.DECIMALS
-llm = LlmConfig()
+def redraw(function: ui.refreshable, owner: object) -> None:
+    # A module-level refreshable keeps every window's copies; redraw those drawn for owner.
+    function.prune()
+    for target in function.targets:
+        if any(arg is owner for arg in target.args):
+            target.container.clear()
+            target.run(function.func)
 
 
 def use_project(config: ProjectConfig | None) -> None:
-    global decimals, llm
-    decimals = config.stats.decimals if config else defaults.DECIMALS
-    llm = config.llm if config else LlmConfig()
+    look().use_project(config)
+
+
+def decimals() -> int:
+    return look().decimals
+
+
+def llm() -> LlmConfig:
+    return look().llm
 
 
 def llm_choice() -> tuple[str, str, str]:
-    return llm.provider, llm.model or "", preferences.load().get(preferences.LLM_URL, "")
+    chosen = llm()
+    return chosen.provider, chosen.model or "", preferences.load().get(preferences.LLM_URL, "")
 
 
 def model_set() -> bool:
-    return bool(llm.model)
+    return bool(llm().model)
 
 
 def fmt(value: float | None, digits: int | None = None) -> str:
-    return "" if value is None else f"{value:.{decimals if digits is None else digits}f}"
+    return "" if value is None else f"{value:.{decimals() if digits is None else digits}f}"
 
 
 def p_value(p: float | None) -> str:

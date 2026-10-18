@@ -23,6 +23,7 @@ from labcatalog.gui import (
     fix,
     gate,
     instruments,
+    look,
     methods,
     new_dataset,
     overview,
@@ -48,6 +49,7 @@ from labcatalog.gui.instruments import (
     BrowseView,
     CfaView,
 )
+from labcatalog.gui.look import Look, register, within
 from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
 from labcatalog.gui.setup import SetupView
@@ -88,9 +90,7 @@ DISK_SECONDS = 5
 
 def launch(project: Path | None = None, browser: bool = False, port: int | None = None) -> None:
     theme.install()
-    saved = preferences.load().get(preferences.PALETTE)
-    # A palette saved by another version may no longer exist.
-    style.use_palette(saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
+    look.install()
     if datalad := preferences.load().get(preferences.DATALAD):
         use_folder(datalad)
     app.on_shutdown(rbridge.stop_all)
@@ -133,6 +133,10 @@ def main_page(project: Path | None) -> None:
 
 class Window:
     def __init__(self) -> None:
+        saved = preferences.load().get(preferences.PALETTE)
+        # A palette saved by another version may no longer exist.
+        self.look = Look(palette=saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
+        register(ui.context.client, self.look)
         self.root: Path | None = None
         self.result: CatalogResult | None = None
         self.index: BrowseIndex | None = None
@@ -167,7 +171,7 @@ class Window:
         # A value saved by another version may no longer exist.
         appearance = appearance if appearance in theme.APPEARANCES else theme.DEFAULT_APPEARANCE
         self.dark_mode = ui.dark_mode(theme.mode_value(appearance))
-        theme.set_dark(appearance == theme.DARK)
+        self.look.dark = appearance == theme.DARK
         if appearance == theme.SYSTEM:
             ui.timer(0, self.follow_system, once=True)
         with ui.header().classes("lc-header block px-6 pt-3 pb-0"):
@@ -338,7 +342,7 @@ class Window:
         self.disk_mark.visible = False
         self.show_result()
         # R is slow, so the factor models fill in after the rest of the catalog shows.
-        background_tasks.create(self.start_cfa())
+        background_tasks.create(within(self.look, self.start_cfa()))
 
     async def open_freeze(self, name: str) -> None:
         datalad = preferences.load().get(preferences.DATALAD)
@@ -376,7 +380,7 @@ class Window:
         cfa.invariance, cfa.invariance_message = [], ""
         if result is None or result.project is None:
             cfa.status = cfa.invariance_status = CFA_UNSET
-            cfa_changed()
+            cfa_changed(cfa)
             return
         rscript = preferences.load().get(preferences.RSCRIPT)
         cfa.invariance_status = CFA_RUNNING if rscript else CFA_UNSET
@@ -389,7 +393,7 @@ class Window:
         rscript = preferences.load().get(preferences.RSCRIPT)
         fit = partial(run_cfa, estimator=cfa.estimator or default_estimator(result))
         cfa.fits, cfa.message, cfa.status = [], "", CFA_RUNNING
-        cfa_changed()
+        cfa_changed(cfa)
         fits, message, status = await in_r(fit, result, rscript)
         if status == CFA_FAILED:
             fits = await common.computed(fit, result, None)
@@ -401,7 +405,7 @@ class Window:
         if self.result is not result:
             return
         cfa.fits, cfa.message, cfa.status = fits, message, status
-        cfa_changed()
+        cfa_changed(cfa)
 
     async def test_invariance(self) -> None:
         result, cfa = self.result, self.cfa
@@ -410,12 +414,12 @@ class Window:
             run_invariance, estimator=cfa.invariance_estimator or default_estimator(result)
         )
         cfa.invariance, cfa.invariance_message, cfa.invariance_status = [], "", CFA_RUNNING
-        cfa_changed()
+        cfa_changed(cfa)
         found = await in_r(test, result, rscript)
         if self.result is not result:
             return
         cfa.invariance, cfa.invariance_message, cfa.invariance_status = found
-        cfa_changed()
+        cfa_changed(cfa)
 
     async def set_appearance(self, name: str) -> None:
         preferences.save({preferences.APPEARANCE: name})
@@ -423,19 +427,19 @@ class Window:
         if name == theme.SYSTEM:
             await self.follow_system()
             return
-        theme.set_dark(name == theme.DARK)
+        self.look.dark = name == theme.DARK
         if self.result is not None:
             self.show_result()
 
     async def follow_system(self) -> None:
         # Figures are drawn on the server, which cannot see the system setting.
         on = await ui.run_javascript("window.matchMedia('(prefers-color-scheme: dark)').matches")
-        theme.set_dark(bool(on))
+        self.look.dark = bool(on)
         if self.result is not None:
             self.show_result()
 
     def set_palette(self, name: str) -> None:
-        style.use_palette(name)
+        self.look.palette = name
         preferences.save({preferences.PALETTE: name})
         if self.result is not None:
             self.show_result()
@@ -448,7 +452,7 @@ class Window:
     def show_result(self) -> None:
         result = self.result
         project = result.project if result else None
-        common.use_project(project.config if project else None)
+        self.look.use_project(project.config if project else None)
         self.title.set_text(project.config.project.name if project else self.root.name)
         self.path_tip.set_text(str(self.root))
         self.as_of.set_text(as_of_text(result) if result else "")
@@ -463,7 +467,7 @@ class Window:
         self.show_scope()
         self.data_mark.visible = False
         if project is not None and self.home is None:
-            background_tasks.create(self.show_versions())
+            background_tasks.create(within(self.look, self.show_versions()))
         for panel in (
             self.overview_panel,
             self.instruments_panel,
@@ -724,9 +728,9 @@ class Window:
             get_button("Get missing content", run_get_missing, [self.root], self.reload)
 
 
-def cfa_changed() -> None:
-    instruments.cfa_changed()
-    methods.cfa_changed()
+def cfa_changed(cfa: CfaView) -> None:
+    instruments.cfa_changed(cfa)
+    methods.cfa_changed(cfa)
 
 
 def default_estimator(result: CatalogResult) -> str:

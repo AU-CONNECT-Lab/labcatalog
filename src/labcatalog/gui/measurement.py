@@ -107,7 +107,7 @@ def render(
             for shown in papers.values():
                 paper_table(shown)
             results_text(
-                results.cfa_text([fit], found.labels, common.decimals), list(papers.values())
+                results.cfa_text([fit], found.labels, common.decimals()), list(papers.values())
             )
             result_actions(result, "measurement", papers, texts=texts, engine="Computed in R.")
         with ui.expansion("Code", icon="code").props("dense").classes("w-full"):

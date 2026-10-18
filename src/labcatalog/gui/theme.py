@@ -4,6 +4,8 @@ from pathlib import Path
 
 from nicegui import app, ui
 
+from labcatalog.gui.look import look
+
 CSS = Path(__file__).with_name("theme.css")
 # Pictures that ship with the app, such as the overview banner.
 ASSETS_URL = "/lc-assets"
@@ -29,8 +31,6 @@ NAMED = {"white": (255, 255, 255), "black": (0, 0, 0), "gray": (128, 128, 128)}
 NAMED |= {"grey": NAMED["gray"], "lightgray": (211, 211, 211), "lightgrey": (211, 211, 211)}
 RGBA = re.compile(r"rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)")
 
-dark = False  # Whether figures are drawn for a dark page; the window sets it.
-
 
 def install() -> None:
     app.colors(primary=ACCENT, positive=OK, warning=WARN, negative=BAD)
@@ -42,24 +42,19 @@ def install() -> None:
     ui.toggle.default_props("flat no-caps toggle-color=primary")
 
 
-def set_dark(on: bool) -> None:
-    global dark
-    dark = on
-
-
 def mode_value(appearance: str) -> bool | None:
     # What ui.dark_mode takes: None follows the system.
     return {LIGHT: False, DARK: True}.get(appearance)
 
 
 def codemirror_theme() -> str:
-    return "oneDark" if dark else "basicLight"
+    return "oneDark" if look().dark else "basicLight"
 
 
 def for_page(figure: dict) -> dict:
     layout = {**legible(figure["layout"]), "paper_bgcolor": CLEAR}
     figure = {**figure, "data": legible(figure["data"]), "layout": layout}
-    if not dark:
+    if not look().dark:
         return figure
     figure = night(figure)
     return {**figure, "layout": {**figure["layout"], "plot_bgcolor": CLEAR}}
@@ -81,7 +76,7 @@ def legible(node):
 
 
 def echart_for_page(option: dict) -> dict:
-    option = night(option) if dark else option
+    option = night(option) if look().dark else option
     return {**option, "backgroundColor": CLEAR}
 
 
