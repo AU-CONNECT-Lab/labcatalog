@@ -13,6 +13,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 | Measurement invariance across waves, reporters and groups, score tests | lavaan, semTools | not available |
 | Multilevel models | lme4, lmerTest, performance | statsmodels |
 | Mediation, with up to two moderators | lavaan; modsem for latent interactions | not available |
+| Multiple imputation, pooled correlations | mice, miceadds | not available |
 
 ## Settings that change the numbers
 
@@ -25,12 +26,16 @@ stats:
   t_test: welch            # welch or student
   cfa_estimator: wlsmv     # wlsmv (items as ordered categories), ml or mlr (items as continuous)
   correlate_by: id         # id, the group's name, or none
+  missing: available       # available (everyone with values) or impute (multiple imputation)
+  imputations: 20          # imputed data sets
+  seed: 1                  # the imputation's random seed
 ```
 
 - `correlation` sets the coefficient of the correlations between scores and variables. Item-rest correlations and regression always use Pearson.
 - `t_test` sets the test that compares two groups.
 - `cfa_estimator` sets how factor models and invariance tests treat the items.
 - `decimals` sets the decimal places of the numbers in tables and paragraphs.
+- `missing` sets whether the Analysis page's sections use everyone with values (`available`) or multiple imputation (`impute`), with `imputations` imputed data sets drawn from `seed`. See [Analysis](../app/analysis.md#multiple-imputation).
 - `invariance_free` lists the items an invariance test lets differ (partial invariance). It is written by the invariance tables' **Save and rerun**; see [Instruments](../app/instruments.md).
 - `correlate_by` sets how people in different datasets are matched, for example a parent and their child through their family. See [IDs, Groups and Missing Codes](../concepts/ids-groups-missing.md).
 

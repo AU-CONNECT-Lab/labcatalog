@@ -137,6 +137,9 @@ Settings that change the numbers, kept in the project so that everyone gets the 
 |---|---|---|
 | `correlate_by` | `id` | `id`, the group's name, or `none`: how people in different datasets are matched. |
 | `decimals` | `2` | 1 to 4: decimal places of the numbers in tables and paragraphs; *p* values keep three. |
+| `missing` | `available` | `available` (each analysis on everyone with values) or `impute` (multiple imputation in R) for the Analysis page. |
+| `imputations` | `20` | 2 to 500: the number of imputed data sets. |
+| `seed` | `1` | The imputation's random seed. |
 | `correlation` | `pearson` | `pearson` or `spearman`. |
 | `t_test` | `welch` | `welch` or `student`. |
 | `cfa_estimator` | `wlsmv` | The estimator factor models and invariance tests start from: `wlsmv` (items as ordered categories), `ml` or `mlr` (items as continuous; `mlr` is robust maximum likelihood). The pages can switch it for what they show. |

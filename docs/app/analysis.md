@@ -20,7 +20,15 @@ The variable lists hold every score and number item of the chosen measures in th
 
 Choose the **Variables**; by default, every score of the chosen measures. The first table gives each variable's *n*, the number of people without a value, and their percentage, among the people in the Sample. The second lists each pattern of which variables people have (1) and lack (0), with how many people have it, the most common first, as `mice::md.pattern` shows them. The Results paragraph gives how many people have every variable and the range of missing values.
 
-The correlation table, regression and group comparison each use everyone with values on what they need, and their table notes give the *n*.
+The correlation table, regression and group comparison each use everyone with values on what they need, and their table notes give the *n*, unless they are set to multiple imputation.
+
+### Multiple imputation
+
+One imputation model serves every section of the page. **Imputed** lists what it imputes, by default every score of the chosen datasets: a score is imputed item by item, from its items with reverse-keyed items reversed, and computed again from them in each imputed data set. **Other scores that help impute** adds scores imputed as they are, to carry information into the model (auxiliary variables). **Imputed data sets** and **Seed** start from the project's settings. The imputation runs in R with `mice`, by predictive mean matching, each column predicted by the columns that correlate at least .10 with it or with its missingness (`quickpred`).
+
+**Run** shows each imputed column's missing count with its observed and imputed *M* (*SD*), and anything `mice` reported doing, such as leaving out a column that another predicts exactly. The **Missing values** switch on a section (**Available cases** or **Multiple imputation**, starting from the project's setting) chooses whether that section uses it. A section's code holds the same imputation, with the same seed, so every section works on the same imputed data. A variable a section needs that the imputation leaves out is named, to add here.
+
+With multiple imputation, the correlation table gives each variable's *M* and *SD* averaged over the imputed data sets and each correlation pooled with `miceadds::micombine.cor` (Fisher's *z* and Rubin's rules), for everyone in the Sample.
 
 ## Correlation table
 

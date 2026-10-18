@@ -6,6 +6,7 @@ from nicegui import ui
 
 from labcatalog.charts import matrices, plot_code, views
 from labcatalog.config import CORRELATIONS, dataset_by_name
+from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import (
     analysis_tables,
     charts,
@@ -27,7 +28,7 @@ from labcatalog.gui.paper import (
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import measures, results
 from labcatalog.reports.tables import PaperTable
-from labcatalog.stats import analysis, analysis_script
+from labcatalog.stats import analysis, analysis_script, imputation
 from labcatalog.stats import multilevel as ml
 
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
@@ -60,6 +61,12 @@ class AnalysisView:
     # None keeps the project's stats.cfa_estimator.
     invariance_estimator: str | None = None
     missing: list[str] = field(default_factory=list)
+    # The imputation every section shares; None keeps the project's choice or every score.
+    missing_method: str | None = None
+    imputed: list[str] | None = None
+    auxiliaries: list[str] = field(default_factory=list)
+    imputations: int | None = None
+    seed: int | None = None
     # None keeps the project's stats.correlation and stats.t_test.
     correlation: str | None = None
     t_test: str | None = None
@@ -267,16 +274,31 @@ def correlation_section(
             note("Pick at least two variables.")
             return
         keys = list(view.scores)
+        imputed = missing.imputing(result, view)
+        if imputed and (lacking := missing.outside(result, view, keys, choices)):
+            note(lacking)
+            return
 
         async def fill() -> Callable:
             data = analysis_script.AnalysisData(result, sample)
             variables = [data.variable(k) for k in keys]
-            method = view.correlation or result.project.config.stats.correlation
+            stats = result.project.config.stats
+            method = view.correlation or stats.correlation
             coefficient = CORRELATIONS[method]
-            code = analysis_script.correlation_code(variables, method)
-            frame = data.frame()
-            found, engine = await analysis_tables.compute(result, sample, frame, code)
-            if method == "spearman" and engine != analysis_tables.R_NOTE:
+            if imputed:
+                plan = missing.imputation_plan(result, view, data)
+                code = imputation.correlation_code(variables, method, plan)
+                frame = data.frame()
+                try:
+                    found, engine = await missing.pooled(result, sample, frame, code)
+                except LabCatalogError as err:
+                    message = str(err)
+                    return lambda: note(message)
+            else:
+                code = analysis_script.correlation_code(variables, method)
+                frame = data.frame()
+                found, engine = await analysis_tables.compute(result, sample, frame, code)
+            if method == "spearman" and engine != analysis_tables.R_NOTE and not imputed:
                 engine += (
                     " Spearman's p uses the t approximation here; in R, as in JASP, it is exact "
                     "when there are no ties."
@@ -323,11 +345,16 @@ def correlation_section(
             def code_part() -> None:
                 analysis_tables.code_view(texts, figure=True)
 
+            who = (
+                f"pooled over {plan.m} imputed data sets for everyone ({n})"
+                if imputed
+                else f"each pair on everyone with both values ({n})"
+            )
             shown = PaperTable(
                 "Correlations Among Variables",
                 columns,
                 rows,
-                f"{coefficient}, each pair on everyone with both values ({n}). {STARS_NOTE}",
+                f"{coefficient}, {who}. {STARS_NOTE}",
             )
 
             def content() -> None:
@@ -381,6 +408,7 @@ def correlation_section(
                 view.correlation or result.project.config.stats.correlation,
                 set_method,
             )
+            missing.method_switch(result, view, body.refresh)
         body()
 
 

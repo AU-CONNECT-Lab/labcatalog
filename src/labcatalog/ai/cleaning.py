@@ -165,7 +165,7 @@ def clean_file_lines(project: Project, catalog: Catalog, dataset: str) -> list[s
         f"Clean file: {found.path}",
         "Its columns, in order (column | what it holds | values):",
     ]
-    for entry in project.maps.get(dataset, []):
+    for entry in project.maps.get(found.map_name(), []):
         if entry.column in variables:
             lines.append(item_line(project, variables[entry.column]))
         else:

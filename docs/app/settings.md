@@ -12,6 +12,7 @@ Saved in `labcatalog.yaml` with **Save**, after which the project reloads:
 - **Two groups**: Welch's or Student's *t* test.
 - **Correlations**: Pearson's *r* or Spearman's ρ.
 - **Factor models**: WLSMV (items as ordered categories), ML or MLR (items as continuous).
+- **Missing values**, **Imputed data sets** and **Imputation seed**: whether the Analysis page's sections use everyone with values or multiple imputation, and how it is drawn.
 - **Language model provider** and **Model**: Anthropic, OpenAI, Gemini, or a local OpenAI-compatible server, and the model's name.
 - **What a cleaning script's model sees of a raw file**: each column's different values (the default), or the raw file's first 20 rows.
 

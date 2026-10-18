@@ -8,7 +8,14 @@ CFA_PACKAGES = ("lavaan", "semTools")
 ANALYSIS_PACKAGES = ("psych", "effectsize", "MBESS")
 MULTILEVEL_PACKAGES = ("lme4", "lmerTest", "performance")
 MEDIATION_PACKAGES = ("modsem",)
-ALL_PACKAGES = CFA_PACKAGES + ANALYSIS_PACKAGES + MULTILEVEL_PACKAGES + MEDIATION_PACKAGES
+IMPUTATION_PACKAGES = ("mice", "miceadds")
+ALL_PACKAGES = (
+    CFA_PACKAGES
+    + ANALYSIS_PACKAGES
+    + MULTILEVEL_PACKAGES
+    + MEDIATION_PACKAGES
+    + IMPUTATION_PACKAGES
+)
 MISSING_PACKAGES = 3
 CHECK = """\
 missing <- Filter(function(p) !requireNamespace(p, quietly = TRUE), c({packages}))

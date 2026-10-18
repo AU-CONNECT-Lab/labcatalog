@@ -13,7 +13,7 @@ from labcatalog.gui.common import command, computed, note, panel, path_input, sh
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.metadata.editing import save_settings
 from labcatalog.pipeline import CatalogResult
-from labcatalog.stats import attrition
+from labcatalog.stats import attrition, imputation
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.mediation import DEFAULT_WORKERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
@@ -75,6 +75,18 @@ def project_section(
             correlation = select(CORRELATIONS, stats.correlation, "Correlations")
             estimator = select(ESTIMATORS, stats.cfa_estimator, "Factor models")
         with ui.row().classes("w-full items-start gap-2"):
+            missing = select(imputation.METHODS, stats.missing, "Missing values")
+            imputations = (
+                ui.number("Imputed data sets", value=stats.imputations, min=2, max=500, precision=0)
+                .props("outlined dense")
+                .classes("w-60")
+            )
+            seed = (
+                ui.number("Imputation seed", value=stats.seed, precision=0)
+                .props("outlined dense")
+                .classes("w-60")
+            )
+        with ui.row().classes("w-full items-start gap-2"):
             provider = select(PROVIDERS, config.llm.provider, "Language model provider")
             raw_data = select(
                 {VALUES: "Each column's values", ROWS: f"The first {RAW_ROWS} rows"},
@@ -97,6 +109,9 @@ def project_section(
                     "t_test": t_test.value,
                     "correlation": correlation.value,
                     "cfa_estimator": estimator.value,
+                    "missing": missing.value,
+                    "imputations": int(imputations.value or stats.imputations),
+                    "seed": int(stats.seed if seed.value is None else seed.value),
                 },
                 "llm": {
                     "provider": provider.value,
