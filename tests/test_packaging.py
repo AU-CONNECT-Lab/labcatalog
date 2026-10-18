@@ -7,7 +7,7 @@ PACKAGE = REPO / "src" / "labcatalog"
 
 def bundled() -> dict[Path, str]:
     text = (REPO / "packaging" / "build_windows.ps1").read_text(encoding="utf-8")
-    pairs = re.findall(r'--add-data "(src/[^;"]+);([^"]+)"', text)
+    pairs = re.findall(r'--add-data "\$repo/(src/[^;"]+);([^"]+)"', text)
     return {REPO / source: target for source, target in pairs}
 
 
