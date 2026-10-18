@@ -1,5 +1,6 @@
 import json
 import subprocess
+import threading
 from dataclasses import dataclass
 
 from labcatalog.exceptions import RError
@@ -20,6 +21,9 @@ ALL_PACKAGES = (
 MISSING_PACKAGES = 3
 # The R processes running now, so that closing the window can end them.
 RUNNING: set[subprocess.Popen] = set()
+# How many R processes run at once; the rest wait their turn, so many windows cannot fill memory.
+DEFAULT_AT_ONCE = 2
+turns = threading.BoundedSemaphore(DEFAULT_AT_ONCE)
 CHECK = """\
 missing <- Filter(function(p) !requireNamespace(p, quietly = TRUE), c({packages}))
 if (length(missing) > 0) {{
@@ -54,7 +58,19 @@ def r_status(rscript: str, packages: tuple[str, ...] = ALL_PACKAGES) -> RStatus:
     return RStatus(version=lines[0].strip(), missing=[s.strip() for s in lines[1:] if s.strip()])
 
 
+def allow_at_once(count: int) -> None:
+    global turns
+    turns = threading.BoundedSemaphore(count)
+
+
 def run_r(rscript: str, args: list[str]) -> str:
+    # Held from this object, so a change to the limit meanwhile releases the one taken.
+    gate = turns
+    with gate:
+        return run_now(rscript, args)
+
+
+def run_now(rscript: str, args: list[str]) -> str:
     try:
         process = subprocess.Popen(
             [rscript, *args],

@@ -15,7 +15,7 @@ from labcatalog.gui.look import look
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.metadata.editing import save_settings
 from labcatalog.pipeline import CatalogResult
-from labcatalog.stats import attrition, imputation
+from labcatalog.stats import attrition, imputation, rbridge
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.mediation import DEFAULT_WORKERS
 from labcatalog.stats.rbridge import ALL_PACKAGES, install_command, r_status
@@ -167,6 +167,19 @@ def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
         ).props("outlined dense").classes("w-96 mt-2").tooltip(
             "More processes finish sooner; the resamples drawn differ with the number, so the "
             "intervals can move in the last digit"
+        )
+
+        def set_at_once(count: int) -> None:
+            preferences.save({preferences.R_AT_ONCE: count})
+            rbridge.allow_at_once(count)
+
+        ui.select(
+            {n: str(n) for n in range(1, 9)},
+            value=int(preferences.load().get(preferences.R_AT_ONCE, rbridge.DEFAULT_AT_ONCE)),
+            label="Analyses in R at once",
+            on_change=lambda e: set_at_once(e.value),
+        ).props("outlined dense").classes("w-96 mt-2").tooltip(
+            "Further analyses wait their turn, so several windows cannot fill the memory"
         )
 
         async def save() -> None:

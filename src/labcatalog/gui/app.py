@@ -93,6 +93,9 @@ def launch(project: Path | None = None, browser: bool = False, port: int | None 
     look.install()
     if datalad := preferences.load().get(preferences.DATALAD):
         use_folder(datalad)
+    rbridge.allow_at_once(
+        int(preferences.load().get(preferences.R_AT_ONCE, rbridge.DEFAULT_AT_ONCE))
+    )
     app.on_shutdown(rbridge.stop_all)
     port = port or find_open_port()
     token = secrets.token_urlsafe(24)

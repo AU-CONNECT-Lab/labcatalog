@@ -9,6 +9,7 @@ APPEARANCE = "appearance"
 RSCRIPT = "rscript"
 MPLUS = "mplus"
 BOOTSTRAP_WORKERS = "bootstrap_workers"
+R_AT_ONCE = "r_at_once"
 DATALAD = "datalad"
 LAST_PROJECT = "last_project"
 # The study each project was last narrowed to, by its folder.

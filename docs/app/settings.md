@@ -22,6 +22,8 @@ These are where each page starts. A switch on a section of the Analysis page, or
 
 The path to `Rscript`. **Save and check** runs R once and reports its version and any missing packages, with the command to install them. See [Set Up R and Language Models](../how-to/r-and-models.md).
 
+**Analyses in R at once** (2 unless changed) caps how many analyses run in R together, from every window of this labcatalog; the rest wait their turn, so several windows or people cannot fill the computer's memory. **R processes for bootstrap resamples** is how many R processes one mediation's resamples are split over.
+
 ## DataLad
 
 The path to `datalad`. **Save and check** reports the versions of DataLad and git-annex. See [Using labcatalog with DataLad](../how-to/datalad.md).
