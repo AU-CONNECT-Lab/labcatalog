@@ -27,6 +27,14 @@ from labcatalog.datalad.freeze import (
     open_freeze,
     push_freeze,
 )
+from labcatalog.datalad.sync import (
+    DatasetState,
+    dataset_states,
+    project_datasets,
+    push_datasets,
+    save_datasets,
+    update_datasets,
+)
 from labcatalog.exceptions import CodebookError, FreezeError, MetadataError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
@@ -266,6 +274,30 @@ def run_get_missing(root: Path, datalad: str) -> None:
         expand_path(d.path, root) for d in config.datasets if d.source == "folder" and d.path
     }
     get_content(datalad, [p for p in used_paths(config, root) if p != pdfs and p not in folders])
+
+
+def data_datasets(root: Path) -> list[Path]:
+    root = root.resolve()
+    return project_datasets(load_config(root), root)
+
+
+def run_data_status(root: Path) -> list[DatasetState]:
+    return dataset_states(data_datasets(root))
+
+
+def run_data_save(root: Path, message: str, datalad: str) -> list[Path]:
+    return save_datasets(data_datasets(root), message, datalad)
+
+
+def run_data_update(root: Path, datalad: str) -> list[Path]:
+    # New versions bring files this clone has no content for yet.
+    updated = update_datasets(data_datasets(root), datalad)
+    run_get_missing(root, datalad)
+    return updated
+
+
+def run_data_push(root: Path, datalad: str) -> list[Path]:
+    return push_datasets(data_datasets(root), datalad)
 
 
 def run_open_freeze(root: Path, name: str, datalad: str, folder: Path | None = None) -> Path:

@@ -1,6 +1,6 @@
 # Datasets
 
-The Datasets page shows each study and its data files: who is in each file, how complete their answers are, which values are missing and why, and the freezes made of the data.
+The Datasets page shows each study and its data files: who is in each file, how complete their answers are, which values are missing and why, the versions of the data in DataLad, and the freezes made of the data.
 
 ![The Datasets page listing the example's data files](../images/app/datasets.png)
 
@@ -49,6 +49,10 @@ Below that:
 - **Collected by month**: rows per month, when the dataset has a `date_column`.
 - **Problems**: the problems found in this file and its column map. The file links open the **Edit files** step of the Set up page at the line.
 - **Label code**: R code (with haven) and Python code (for pyreadstat) that puts the item wording, response labels and missing codes on the data, for example to save it as an SPSS file.
+
+## Data versions
+
+When the data are in DataLad, the **Data versions** panel lists each dataset the project reads with its unsaved changes and the versions not yet pushed to its sibling or merged from it. **Save** keeps the changes as a new version on this computer, **Push** sends saved versions to the sibling, and **Update** merges what others pushed and downloads the files the project reads. The header shows a short note such as **2 unsaved**; click it to come here. See [Using labcatalog with DataLad](../how-to/datalad.md#saving-pushing-and-updating).
 
 ## Freezes
 

@@ -54,6 +54,9 @@ def render(
             )
             return
         studies(result, summaries, on_select)
+        # A frozen copy, which has no freezes to open, is not for saving or pushing.
+        if on_open_freeze is not None:
+            datalad.versions_panel(result, on_frozen)
         datalad.freezes_table(result.project.root, on_open_freeze)
         return
     with ui.row().classes("items-center gap-1 no-wrap"):

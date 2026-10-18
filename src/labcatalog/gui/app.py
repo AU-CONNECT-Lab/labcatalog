@@ -9,6 +9,7 @@ from labcatalog.charts import style, views
 from labcatalog.datalad.annex import dataset_root
 from labcatalog.datalad.bridge import use_folder
 from labcatalog.datalad.freeze import list_freezes
+from labcatalog.datalad.sync import dataset_states, project_datasets, summary
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import (
     analysis,
@@ -32,7 +33,7 @@ from labcatalog.gui import (
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
-from labcatalog.gui.datalad import frozen_text, get_button
+from labcatalog.gui.datalad import frozen_text, get_button, versions_tooltip
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.instruments import (
     CFA_DONE,
@@ -160,6 +161,11 @@ class Window:
                     ).classes("lc-quiet-btn")
                 self.frozen_bar.visible = False
                 ui.space()
+                self.data_mark = ui.label().classes("lc-pill cursor-pointer")
+                with self.data_mark:
+                    self.data_tip = ui.tooltip("")
+                self.data_mark.on("click", self.open_versions)
+                self.data_mark.visible = False
                 self.scope_select = (
                     ui.select({}, on_change=lambda e: self.set_scope(e.value))
                     .props("dense outlined options-dense")
@@ -421,6 +427,9 @@ class Window:
         if result is not None and project is None:
             self.tabs.set_value("problems")
         self.show_scope()
+        self.data_mark.visible = False
+        if project is not None and self.home is None:
+            background_tasks.create(self.show_versions())
         for panel in (
             self.overview_panel,
             self.instruments_panel,
@@ -436,6 +445,27 @@ class Window:
         ):
             panel.refresh()
         self.project_settings()
+
+    async def show_versions(self) -> None:
+        # Only with datalad set: inside a dataset git itself needs git-annex on PATH.
+        root = self.root
+        if not preferences.load().get(preferences.DATALAD):
+            return
+        roots = project_datasets(self.result.project.config, root.resolve())
+        if not roots:
+            return
+        states = await common.computed(dataset_states, roots)
+        if root != self.root:
+            return
+        text, kind = summary(states)
+        self.data_mark.set_text(text)
+        self.data_mark.classes(replace=f"lc-pill cursor-pointer lc-{kind}")
+        self.data_tip.set_text(versions_tooltip(states, root))
+        self.data_mark.visible = True
+
+    def open_versions(self) -> None:
+        self.show_dataset(None)
+        self.tabs.set_value("datasets")
 
     def show_scope(self) -> None:
         studies = self.result.project.config.studies if self.result and self.result.project else {}

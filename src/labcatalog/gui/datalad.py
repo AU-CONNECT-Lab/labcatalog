@@ -14,6 +14,7 @@ from labcatalog.datalad.freeze import (
     list_freezes,
     push_targets,
 )
+from labcatalog.datalad.sync import DatasetState, dataset_states, project_datasets, state_text
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import preferences
 from labcatalog.gui.common import (
@@ -27,7 +28,14 @@ from labcatalog.gui.common import (
     table,
 )
 from labcatalog.paths import portable_path
-from labcatalog.pipeline import CatalogResult, run_freeze, run_push_freeze
+from labcatalog.pipeline import (
+    CatalogResult,
+    run_data_push,
+    run_data_save,
+    run_data_update,
+    run_freeze,
+    run_push_freeze,
+)
 
 
 def get_button(
@@ -216,3 +224,139 @@ def frozen_text(record: Freeze, result: CatalogResult | None) -> str:
     if changed:
         return f"{text}. Differs from the freeze record: {', '.join(changed)}"
     return f"{text}. All {len(record.manifest.files)} data files match the freeze record"
+
+
+def dataset_label(path: Path, root: Path) -> str:
+    return "the project folder" if path == root.resolve() else portable_path(path, root).as_posix()
+
+
+def versions_panel(result: CatalogResult, on_changed: Callable[[], Awaitable[None]]) -> None:
+    root = result.project.root
+    roots = project_datasets(result.project.config, root.resolve())
+    if not roots:
+        return
+    datalad = preferences.load().get(preferences.DATALAD)
+    with panel("Data versions", "Saved on this computer, pushed and updated with DataLad") as head:
+        if not datalad:
+            note("Set the path to datalad on the Settings page to save, push and update the data.")
+            return
+        with head:
+            save = ui.button("Save", icon="save").props("flat no-caps")
+            update = ui.button("Update", icon="cloud_download").props("flat no-caps")
+            push = ui.button("Push", icon="cloud_upload").props("flat no-caps")
+        holder = ui.column().classes("w-full gap-2")
+        with holder:
+            ui.spinner()
+
+    states: list[DatasetState] = []
+
+    async def fill() -> None:
+        found = await computed(dataset_states, roots)
+        states[:] = found
+        if holder.is_deleted:
+            return
+        holder.clear()
+        with holder:
+            versions_table(found, root)
+
+    async def act(button: ui.button, function: Callable, *args) -> list[Path] | None:
+        button.props("loading")
+        try:
+            return await computed(function, root, *args, datalad)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative", multi_line=True)
+            return None
+        finally:
+            button.props(remove="loading")
+
+    def open_save() -> None:
+        changed = [(s.root, p) for s in states for p in s.changed]
+        with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
+            ui.label("Save the changes").classes("text-lg font-medium")
+            if not changed:
+                note("Nothing has changed since the last save.")
+                ui.button("Close", on_click=dialog.close).props("flat no-caps").classes("self-end")
+                dialog.open()
+                return
+            note(
+                "DataLad saves these as a new version on this computer; Push then sends it to "
+                "the sibling."
+            )
+            with ui.column().classes("w-full gap-0 max-h-60 overflow-auto"):
+                for folder, path in changed:
+                    where = dataset_label(folder, root)
+                    ui.label(path if folder == root.resolve() else f"{where}: {path}").classes(
+                        "font-mono text-sm"
+                    )
+            message = (
+                ui.input("What changed", placeholder="Wave 3 exports of October")
+                .props("outlined dense autofocus")
+                .classes("w-full")
+            )
+
+            async def go() -> None:
+                text = (message.value or "").strip()
+                if not text:
+                    ui.notify("Say in a few words what changed", type="warning")
+                    return
+                dialog.close()
+                saved = await act(save, run_data_save, text)
+                if saved is not None:
+                    ui.notify(f"Saved {len(saved)} dataset(s)")
+                    await on_changed()
+
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+                ui.button("Save", on_click=go)
+        dialog.open()
+
+    async def go_update() -> None:
+        updated = await act(update, run_data_update)
+        if updated is not None:
+            ui.notify(f"Updated {len(updated)} dataset(s) and got the files the project reads")
+            await on_changed()
+
+    async def go_push() -> None:
+        pushed = await act(push, run_data_push)
+        if pushed is None:
+            return
+        done = f"Pushed {len(pushed)} dataset(s)"
+        if unsaved := sum(len(s.changed) for s in states):
+            done += f"; {unsaved} unsaved change(s) stay on this computer until you save them"
+        ui.notify(done, multi_line=True)
+        await on_changed()
+
+    save.on_click(open_save)
+    update.on_click(go_update)
+    push.on_click(go_push)
+    ui.timer(0, fill, once=True)
+
+
+def versions_table(states: list[DatasetState], root: Path) -> None:
+    columns = [
+        col("dataset", "Dataset"),
+        col("changed", "Unsaved changes", numeric=True),
+        col("sibling", "Sibling"),
+        col("ahead", "Not pushed", numeric=True),
+        col("behind", "New on the sibling", numeric=True),
+    ]
+    rows = [
+        {
+            "dataset": dataset_label(s.root, root),
+            "changed": len(s.changed),
+            "sibling": s.sibling or "none, or several",
+            "ahead": "never pushed" if s.sibling and s.ahead is None else (s.ahead or ""),
+            "behind": s.behind or "",
+        }
+        for s in states
+    ]
+    table(columns, rows)
+    note(
+        "Save keeps the changes as a new version on this computer, Push sends saved versions and "
+        "their data to the sibling, and Update merges what others pushed and gets the files the "
+        "project reads. New on the sibling counts what the last Update saw."
+    )
+
+
+def versions_tooltip(states: list[DatasetState], root: Path) -> str:
+    return "; ".join(f"{dataset_label(s.root, root)}: {state_text(s)}" for s in states)

@@ -22,6 +22,10 @@ from labcatalog.exceptions import DataladError, DataSourceError, FreezeError, Me
 from labcatalog.metadata.history import file_history
 from labcatalog.pipeline import (
     run_catalog,
+    run_data_push,
+    run_data_save,
+    run_data_status,
+    run_data_update,
     run_freeze,
     run_get,
     run_get_missing,
@@ -543,3 +547,45 @@ def test_the_command_line_gets_content_and_opens_a_freeze(mock_project, datalad)
     assert done.exit_code == 0, done.output
     assert done.output.strip() == f"Opened pilot in {frozen}"
     assert run_catalog(frozen).datasets
+
+
+@needs_datalad
+def test_save_push_and_update_keep_two_clones_in_step(mock_project, datalad, tmp_path):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    subprocess.run(["git", "init", "-q", "--bare", str(tmp_path / "store.git")], check=True)
+    store = (tmp_path / "store.git").as_posix()
+    datalad(mock_project, "siblings", "add", "-s", "store", "--url", store)
+    datalad(mock_project, "push", "--to", "store")
+    exe = datalad_exe()
+
+    change_child_w2(mock_project, datalad)
+    [state] = run_data_status(mock_project)
+    assert state.changed and state.ahead == 0
+    assert run_data_save(mock_project, "Fix wave 2", exe) == [mock_project.resolve()]
+    [state] = run_data_status(mock_project)
+    assert (state.changed, state.ahead) == ([], 1)
+    run_data_push(mock_project, exe)
+    assert run_data_status(mock_project)[0].ahead == 0
+
+    (tmp_path / "elsewhere").mkdir()
+    datalad(tmp_path / "elsewhere", "clone", store, "lab")
+    clone = tmp_path / "elsewhere" / "lab"
+    datalad(clone, "get", "data")
+    path = clone / "data" / "child_w1.csv"
+    datalad(clone / "data", "unlock", "child_w1.csv")
+    path.write_text(path.read_text(encoding="utf-8") + "\n", encoding="utf-8")
+    run_data_save(clone, "Add a line", exe)
+    run_data_push(clone, exe)
+
+    run_data_update(mock_project, exe)
+    [state] = run_data_status(mock_project)
+    assert (state.changed, state.ahead, state.behind) == ([], 0, 0)
+    mine = mock_project / "data" / "child_w1.csv"
+    assert not is_placeholder(mine)
+    assert mine.read_text(encoding="utf-8") == path.read_text(encoding="utf-8")
+    done = CliRunner().invoke(app, ["datalad", "status", "-p", str(mock_project)])
+    assert done.exit_code == 0, done.output
+    assert "the project folder: saved, and the same as store" in done.output

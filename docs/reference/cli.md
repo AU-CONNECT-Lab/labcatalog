@@ -64,6 +64,17 @@ labcatalog get [PATHS...] [-p PROJECT]
 
 In a clone of a DataLad project, download the content of the given files or folders, or, when none are given, the metadata and every file the project reads, as **Get missing content** does in the window. Both commands use the `datalad` on PATH.
 
+## datalad
+
+```bash
+labcatalog datalad status [-p PROJECT]
+labcatalog datalad save MESSAGE [-p PROJECT]
+labcatalog datalad update [-p PROJECT]
+labcatalog datalad push [-p PROJECT]
+```
+
+Keep the DataLad datasets the project reads saved and in step with their sibling (the only one, or `origin`), as the **Data versions** panel of the Datasets page does. `status` lists each dataset's unsaved changes and the saved versions it has not pushed, and the new versions on the sibling as of the last update. `save` saves every change in those datasets as a new version, deepest first, with `MESSAGE` saying what changed. `update` merges the new versions on each sibling and then downloads the files the project reads. `push` sends the saved versions and their data to each sibling. `save`, `update` and `push` use the `datalad` on PATH.
+
 ## derivatives
 
 ```bash

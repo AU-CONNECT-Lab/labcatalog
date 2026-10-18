@@ -50,6 +50,16 @@ datalad get -n data
 
 `datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The **Prepare data** step of the Set up page also has a Get button next to each file that is not downloaded. On the command line, `labcatalog get` does the same as Get missing content.
 
+## Saving, pushing and updating
+
+The **Data versions** panel of the Datasets page keeps the datasets the project reads in step with their sibling, without a terminal. Its table lists each dataset (the one holding the project folder, and any subdataset or dataset elsewhere that holds data the project reads) with its unsaved changes, its sibling, the saved versions not pushed yet and the new versions on the sibling as of the last update. The header shows the same in a few words, such as **2 unsaved** or **1 to push**; click it to go to the panel.
+
+- **Save** lists the changed files, asks what changed, and runs `datalad save` in each dataset with changes, deepest first, so a dataset above records the new versions of those inside it.
+- **Push** runs `datalad push` to each dataset's sibling, deepest first. Unsaved changes stay on this computer until they are saved.
+- **Update** runs `datalad update --how merge` from each sibling, the outermost dataset first, and then downloads the files the project reads, as **Get missing content** does.
+
+A dataset is pushed to and updated from its only sibling, or `origin` when it has several; a dataset with several siblings and no `origin` is left for you to push from a terminal. The panel needs the path to datalad on the Settings page. On the command line, `labcatalog datalad status`, `save`, `update` and `push` do the same.
+
 ## Prepare steps through datalad run
 
 Add this line to `labcatalog.yaml`:

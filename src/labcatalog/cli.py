@@ -10,6 +10,7 @@ from labcatalog import defaults
 from labcatalog.codebook.derivatives import Request, run_derivatives
 from labcatalog.data.sql import query_to_csv
 from labcatalog.datalad.freeze import RECORD_ONLY
+from labcatalog.datalad.sync import state_text
 from labcatalog.exceptions import (
     EXIT_ISSUES,
     EXIT_OK,
@@ -18,12 +19,17 @@ from labcatalog.exceptions import (
     LabCatalogError,
 )
 from labcatalog.issues import Issue, has_errors, summarize_issues
+from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     run_check,
     run_codebook_answer,
     run_codebook_create,
     run_codebook_import,
     run_codebook_prompt,
+    run_data_push,
+    run_data_save,
+    run_data_status,
+    run_data_update,
     run_freeze,
     run_get,
     run_get_missing,
@@ -189,6 +195,54 @@ def datalad_on_path() -> str:
     if found is None:
         raise DataladError("DataLad is not on PATH; install it first")
     return found
+
+
+datalad_app = typer.Typer(
+    help="Keep the DataLad datasets the project reads saved and in step with their sibling.",
+    no_args_is_help=True,
+)
+app.add_typer(datalad_app, name="datalad")
+
+
+def dataset_name(path: Path, project: Path) -> str:
+    root = project.resolve()
+    return "the project folder" if path == root else portable_path(path, root).as_posix()
+
+
+@datalad_app.command("status")
+def datalad_status(project: ProjectOption = Path(".")) -> None:
+    """Unsaved changes and versions not pushed, as of the last update."""
+    states = run_data_status(project)
+    if not states:
+        typer.echo("The project does not read anything in a DataLad dataset.")
+    for state in states:
+        typer.echo(f"{dataset_name(state.root, project)}: {state_text(state)}")
+        for path in state.changed:
+            typer.echo(f"  {path}")
+
+
+@datalad_app.command("save")
+def datalad_save(
+    message: Annotated[str, typer.Argument(help="What changed, for the history.")],
+    project: ProjectOption = Path("."),
+) -> None:
+    """Save the changes in every dataset the project reads, deepest first."""
+    saved = run_data_save(project, message, datalad_on_path())
+    typer.echo(f"Saved {len(saved)} dataset(s).")
+
+
+@datalad_app.command("update")
+def datalad_update(project: ProjectOption = Path(".")) -> None:
+    """Merge the new versions on each dataset's sibling, then get the files the project reads."""
+    updated = run_data_update(project, datalad_on_path())
+    typer.echo(f"Updated {len(updated)} dataset(s).")
+
+
+@datalad_app.command("push")
+def datalad_push(project: ProjectOption = Path(".")) -> None:
+    """Push the saved versions and their data to each dataset's sibling."""
+    pushed = run_data_push(project, datalad_on_path())
+    typer.echo(f"Pushed {len(pushed)} dataset(s).")
 
 
 codebook_app = typer.Typer(
