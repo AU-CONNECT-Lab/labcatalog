@@ -105,8 +105,18 @@ def pooled(result: CatalogResult, datasets: list[str], found: dict[str, str]) ->
         names = [parts(k)[0] for k in keys]
         if sorted(study_of(result, n) for n in names) == sorted(studies):
             key = f"{keys[0].rsplit('@', 1)[0]}@{POOL.join(names)}"
-            joined[key] = found[keys[0]].rsplit(" (", 1)[0]
+            joined[key] = without_suffix(found[keys[0]])
     return joined
+
+
+def without_suffix(label: str) -> str:
+    # The label without its last parenthesis, which may hold parentheses of its own.
+    depth = 0
+    for i in range(len(label) - 1, -1, -1):
+        depth += {")": 1, "(": -1}.get(label[i], 0)
+        if depth == 0:
+            return label[:i].rstrip()
+    return label
 
 
 def study_options(result: CatalogResult, sample: Sample) -> list[tuple[float, str]]:

@@ -442,3 +442,10 @@ def test_a_moderated_mediation_of_factors_fits_with_the_study(result, sample):
     fit = med.read_fit(found, model)
     assert fit.package == med.MODSEM and fit.n > len(sample.people) / 2
     assert all(fit.effects[k].estimate == fit.effects[k].estimate for k in ("a", "b", "b_mw"))
+
+
+def test_pooled_labels_lose_the_whole_dataset_label(result):
+    labels = {n: f"{n} (Wave 1, child)" for n in FILES}
+    choices = script.group_choices(result, FILES, labels)
+    assert all("(" not in text for text in choices.values())
+    assert analysis.without_suffix("EMS (total) (child_w1 (Wave 1, child))") == "EMS (total)"
