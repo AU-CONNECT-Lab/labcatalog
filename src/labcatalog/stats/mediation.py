@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from itertools import product
 
 import pandas as pd
 
@@ -6,6 +7,7 @@ from labcatalog.stats.analysis_script import Variable, none
 from labcatalog.stats.cfa import ML, MLR, WLSMV
 
 PATHS = ("a", "b", "c")
+MAX_MODERATORS = 2
 SCORE_ESTIMATORS = (ML, MLR)
 ITEM_ESTIMATORS = (WLSMV, ML, MLR)
 # modsem's latent interactions treat the items as continuous.
@@ -69,7 +71,7 @@ class MediationModel:
     m: Variable
     y: Variable
     covariates: list[Variable] = field(default_factory=list)
-    # One for now; a list so that a second can come later.
+    # Up to two, each on its own paths; with two, their interactions add, with no three-way term.
     moderators: list[Moderator] = field(default_factory=list)
     estimator: str = ML
     bootstrap: int = DEFAULT_BOOTSTRAP
@@ -81,12 +83,25 @@ class MediationModel:
         return {p for m in self.moderators for p in m.paths}
 
     @property
+    def tags(self) -> list[str]:
+        # One moderator keeps the plain names (w, a_xw); two are told apart as w1, a_xw1 and w2.
+        if len(self.moderators) == 1:
+            return [""]
+        return [str(k) for k in range(1, len(self.moderators) + 1)]
+
+    def on(self, path: str) -> list[int]:
+        return [k for k, m in enumerate(self.moderators) if path in m.paths]
+
+    def latent(self, k: int) -> bool:
+        return self.items and bool(self.moderators[k].variable.items)
+
+    @property
     def package(self) -> str:
         return MODSEM if self.items and self.moderators else LAVAAN
 
     @property
     def latent_moderator(self) -> bool:
-        return self.items and bool(self.moderators) and bool(self.moderators[0].variable.items)
+        return bool(self.moderators) and all(self.latent(k) for k in range(len(self.moderators)))
 
     @property
     def method(self) -> str:
@@ -108,12 +123,12 @@ class Effect:
 @dataclass
 class MediationFit:
     n: int
-    # Keyed by label: a, b, c, a_w, a_xw, y_w, b_mw, c_xw, indirect, total, index,
-    # indirect_<k> and direct_<k> at the moderator's k-th value.
+    # Keyed by label: a, b, c, a_w, a_xw, y_w, b_mw, c_xw, indirect, total, index, and the
+    # conditional effects that conditions() names; with two moderators the labels end in 1 or 2.
     effects: dict[str, Effect]
     fit: dict[str, float | None]
-    # The moderator's values, in its own units, at which the conditional effects are taken.
-    at: list[float] = field(default_factory=list)
+    # Each moderator's values, in its own units, at which the conditional effects are taken.
+    at: list[list[float]] = field(default_factory=list)
     estimator: str = ML
     bootstrap: int = DEFAULT_BOOTSTRAP
     resamples: int = DEFAULT_BOOTSTRAP
@@ -141,11 +156,15 @@ def read_fit(found: dict[str, pd.DataFrame], model: MediationModel) -> Mediation
         if model.package == LAVAAN
         else {}
     )
+    values = found["moderator_values"]
     return MediationFit(
         n=int(measures["n"]),
         effects=effects,
         fit=fit,
-        at=[float(v) for v in found["moderator_values"]["value"]],
+        at=[
+            [float(v) for v in values["value"][values["moderator"] == k]]
+            for k in range(1, len(model.moderators) + 1)
+        ],
         estimator=model.estimator,
         bootstrap=model.bootstrap,
         resamples=int(measures["resamples"]),
@@ -155,17 +174,53 @@ def read_fit(found: dict[str, pd.DataFrame], model: MediationModel) -> Mediation
 
 
 def conditional(label: str) -> bool:
-    return label == "index" or label.startswith(("indirect_", "direct_"))
+    return label == "index" or label.startswith(("index_", "indirect_", "direct_"))
 
 
-def at_labels(model: MediationModel, fit: MediationFit) -> list[str]:
-    # Where the conditional effects are taken, in words.
-    if not model.moderators:
+def depends(model: MediationModel, kind: str) -> list[int]:
+    # The moderators a conditional effect varies with: on a or b for the indirect, on c the direct.
+    paths = {"a", "b"} if kind == "indirect" else {"c"}
+    return [k for k, m in enumerate(model.moderators) if paths & set(m.paths)]
+
+
+def conditional_label(model: MediationModel, kind: str, spots: list[tuple[int, int]]) -> str:
+    # spots holds (moderator, its value's place from 1) for each moderator the effect varies with.
+    if len(model.moderators) == 1:
+        return f"{kind}_{spots[0][1]}"
+    return f"{kind}_" + "_".join(f"w{k + 1}_{i}" for k, i in spots)
+
+
+def conditions(
+    model: MediationModel, fit: MediationFit, kind: str
+) -> list[tuple[str, list[tuple[int, int]]]]:
+    # Every combination of the values of the moderators the effect varies with.
+    which = depends(model, kind)
+    if not which:
         return []
-    w = model.moderators[0].variable
-    if len(fit.at) == 2:
-        options = dict(w.options)
-        return [options.get(v, f"{v:g}") for v in fit.at]
+    grid = product(*(range(1, len(fit.at[k]) + 1) for k in which))
+    found = []
+    for places in grid:
+        spots = list(zip(which, places, strict=True))
+        found.append((conditional_label(model, kind, spots), spots))
+    return found
+
+
+def indexed(model: MediationModel) -> list[int]:
+    # A moderator has an index of (partial) moderated mediation when the indirect effect is
+    # linear in it: it moderates one of a and b, and nothing moderates the other.
+    on_a, on_b = model.on("a"), model.on("b")
+    return [k for k in on_a if not on_b] + [k for k in on_b if not on_a]
+
+
+def index_label(model: MediationModel, k: int) -> str:
+    return "index" if len(model.moderators) == 1 else f"index_{k + 1}"
+
+
+def at_labels(variable: Variable, values: list[float]) -> list[str]:
+    # Where the conditional effects are taken, in words.
+    if len(values) == 2:
+        options = dict(variable.options)
+        return [options.get(v, f"{v:g}") for v in values]
     return ["1 SD below the mean", "the mean", "1 SD above the mean"]
 
 

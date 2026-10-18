@@ -19,19 +19,6 @@ from labcatalog.stats.mplus_mediation import mediation_files
 
 NO_MODERATOR = ""
 PATH_NAMES = {"a": "a (X → M)", "b": "b (M → Y)", "c": "c′ (X → Y)"}
-# Rows of the effects table, in order, with what each is.
-ROWS = {
-    "a": "a: X → M",
-    "a_w": "W → M",
-    "a_xw": "X × W → M",
-    "b": "b: M → Y",
-    "c": "c′: X → Y (direct)",
-    "y_w": "W → Y",
-    "b_mw": "M × W → Y",
-    "c_xw": "X × W → Y",
-    "indirect": "a × b: indirect",
-    "total": "c: total",
-}
 
 
 @dataclass
@@ -40,8 +27,11 @@ class Choices:
     m: str | None = None
     y: str | None = None
     covariates: list[str] = field(default_factory=list)
-    moderator: str = NO_MODERATOR
-    paths: list[str] = field(default_factory=lambda: ["a"])
+    # W1 and W2, each with the paths it moderates; W2 is offered once W1 is chosen.
+    moderators: list[str] = field(default_factory=lambda: [NO_MODERATOR] * med.MAX_MODERATORS)
+    paths: list[list[str]] = field(
+        default_factory=lambda: [["a"] for _ in range(med.MAX_MODERATORS)]
+    )
     estimator: str = med.ML
     booted: bool = True
     bootstrap: int = med.DEFAULT_BOOTSTRAP
@@ -69,8 +59,13 @@ def render(
                 setattr(chosen, name, value)
             taken.append(value)
         chosen.covariates = [c for c in chosen.covariates if c in choices]
-        if chosen.moderator not in choices:
-            chosen.moderator = NO_MODERATOR
+        # A W2 left on its own moves up to W1, with its paths.
+        kept = [
+            (w, p) for w, p in zip(chosen.moderators, chosen.paths, strict=True) if w in choices
+        ]
+        kept += [(NO_MODERATOR, ["a"])] * (med.MAX_MODERATORS - len(kept))
+        chosen.moderators = [w for w, _ in kept]
+        chosen.paths = [list(p) for _, p in kept]
         if chosen.estimator not in estimators(chosen):
             chosen.estimator = med.ML
 
@@ -81,11 +76,11 @@ def render(
         return data.variable(key)
 
     def model_of(data: script.AnalysisData) -> med.MediationModel:
-        moderators = (
-            [med.Moderator(variable(data, chosen.moderator), tuple(chosen.paths))]
-            if moderated(chosen)
-            else []
-        )
+        moderators = [
+            med.Moderator(variable(data, w), tuple(paths))
+            for w, paths in zip(chosen.moderators, chosen.paths, strict=True)
+            if w and paths
+        ]
         return med.MediationModel(
             variable(data, chosen.x),
             variable(data, chosen.m),
@@ -104,11 +99,11 @@ def render(
             with body:
                 note("Set the path to Rscript on the Settings page; mediation runs in R only.")
             return
-        used = [chosen.x, chosen.m, chosen.y, chosen.moderator, *chosen.covariates]
+        used = [chosen.x, chosen.m, chosen.y, *chosen.moderators, *chosen.covariates]
         used = [k for k in used if k]
         if len(set(used)) < len(used):
             with body:
-                note("X, M, Y, the moderator and the covariates must all be different variables.")
+                note("X, M, Y, the moderators and the covariates must all be different variables.")
             return
         data = script.AnalysisData(result, sample)
         model = model_of(data)
@@ -162,9 +157,14 @@ def render(
         with body:
             preview()
 
-    def set_path(path: str, on: bool) -> None:
-        kept = set(chosen.paths) - {path} | ({path} if on else set())
-        choose("paths", [p for p in med.PATHS if p in kept])
+    def set_moderator(k: int, value: str | None) -> None:
+        chosen.moderators[k] = value or NO_MODERATOR
+        choose("moderators", chosen.moderators)
+
+    def set_path(k: int, path: str, on: bool) -> None:
+        kept = set(chosen.paths[k]) - {path} | ({path} if on else set())
+        chosen.paths[k] = [p for p in med.PATHS if p in kept]
+        choose("paths", chosen.paths)
 
     def preview() -> None:
         data = script.AnalysisData(result, sample)
@@ -197,21 +197,26 @@ def render(
                 with_input=True,
                 on_change=lambda e: choose("covariates", e.value or []),
             ).props("dense outlined use-chips").classes("min-w-64 grow")
+        # W2 is offered once W1 is chosen; with one moderator it is plain W.
+        shown = 1 + bool(chosen.moderators[0])
+        for k in range(min(shown, med.MAX_MODERATORS)):
+            letter = f"W{k + 1}" if chosen.moderators[1] or k else "W"
+            with ui.row().classes("w-full items-center gap-4"):
+                ui.select(
+                    {NO_MODERATOR: "No moderator", **choices},
+                    value=chosen.moderators[k],
+                    label=f"Moderator {letter}",
+                    with_input=True,
+                    on_change=lambda e, k=k: set_moderator(k, e.value),
+                ).props("dense outlined").classes("w-64")
+                if chosen.moderators[k]:
+                    for path, label in PATH_NAMES.items():
+                        ui.checkbox(
+                            label,
+                            value=path in chosen.paths[k],
+                            on_change=lambda e, k=k, path=path: set_path(k, path, e.value),
+                        ).props("dense")
         with ui.row().classes("w-full items-center gap-4"):
-            ui.select(
-                {NO_MODERATOR: "No moderator", **choices},
-                value=chosen.moderator,
-                label="Moderator W",
-                with_input=True,
-                on_change=lambda e: choose("moderator", e.value or NO_MODERATOR),
-            ).props("dense outlined").classes("w-64")
-            if chosen.moderator:
-                for path, label in PATH_NAMES.items():
-                    ui.checkbox(
-                        label,
-                        value=path in chosen.paths,
-                        on_change=lambda e, path=path: set_path(path, e.value),
-                    ).props("dense")
             ui.space()
             ui.toggle(
                 {e: ESTIMATORS[e] for e in estimators(chosen)},
@@ -252,7 +257,11 @@ def render(
 
 
 def moderated(chosen: Choices) -> bool:
-    return bool(chosen.moderator and chosen.paths)
+    return any(w and paths for w, paths in zip(chosen.moderators, chosen.paths, strict=True))
+
+
+def letters(model: med.MediationModel) -> list[str]:
+    return [f"W{s}" for s in model.tags]
 
 
 def estimators(chosen: Choices) -> tuple[str, ...]:
@@ -268,8 +277,9 @@ def item_problem(model: med.MediationModel) -> str | None:
     roles = {"X": model.x, "M": model.m, "Y": model.y}
     if missing := [r for r, v in roles.items() if not v.items]:
         return f"In Items mode, {' and '.join(missing)} need a score with two or more items."
-    if model.moderators and model.moderators[0].variable.items:
-        roles["W"] = model.moderators[0].variable
+    for letter, moderator in zip(letters(model), model.moderators, strict=True):
+        if moderator.variable.items:
+            roles[letter] = moderator.variable
     seen: dict[str, str] = {}
     for role, v in roles.items():
         for item in v.items:
@@ -305,15 +315,6 @@ def effects_table(
         col("ci", "95% CI", numeric=True),
         col("beta", "β", numeric=True),
     ]
-    places = med.at_labels(model, fit)
-    names = dict(ROWS)
-    if "c" in model.moderated:
-        names["c"] = "c′: X → Y at the mean of W"
-    for k, place in enumerate(places, start=1):
-        names[f"indirect_{k}"] = f"Indirect at W = {place}"
-    for k, place in enumerate(places, start=1):
-        names[f"direct_{k}"] = f"Direct at W = {place}"
-    names["index"] = "Index of moderated mediation"
     rows = [
         {
             "effect": label,
@@ -323,16 +324,47 @@ def effects_table(
             "ci": f"[{fmt(e.low)}, {fmt(e.high)}]" if e.low is not None else "",
             "beta": fmt(e.standardized),
         }
-        for key, label in names.items()
+        for key, label in row_names(model, fit).items()
         if (e := fit.effects.get(key)) is not None
     ]
     return columns, rows
 
 
+def row_names(model: med.MediationModel, fit: med.MediationFit) -> dict[str, str]:
+    # Rows of the effects table, in order, with what each is.
+    named = list(zip(model.tags, letters(model), strict=True))
+    names = {"a": "a: X → M"}
+    for s, w in named:
+        names |= {f"a_w{s}": f"{w} → M", f"a_xw{s}": f"X × {w} → M"}
+    names |= {"b": "b: M → Y", "c": "c′: X → Y (direct)"}
+    if "c" in model.moderated:
+        means = "the mean of W" if len(named) == 1 else "the means of W1 and W2"
+        names["c"] = f"c′: X → Y at {means}"
+    names |= {f"y_w{s}": f"{w} → Y" for s, w in named}
+    names |= {f"b_mw{s}": f"M × {w} → Y" for s, w in named}
+    names |= {f"c_xw{s}": f"X × {w} → Y" for s, w in named}
+    names |= {"indirect": "a × b: indirect", "total": "c: total"}
+    places = [
+        med.at_labels(m.variable, values)
+        for m, values in zip(model.moderators, fit.at, strict=True)
+    ]
+    for kind in ("indirect", "direct"):
+        for label, spots in med.conditions(model, fit, kind):
+            where = ", ".join(f"{named[k][1]} = {places[k][i - 1]}" for k, i in spots)
+            names[label] = f"{kind.capitalize()} at {where}"
+    for k in med.indexed(model):
+        names[med.index_label(model, k)] = (
+            "Index of moderated mediation"
+            if len(named) == 1
+            else f"Index of partial moderated mediation by {named[k][1]}"
+        )
+    return names
+
+
 def table_note(model: med.MediationModel, fit: med.MediationFit) -> str:
     roles = {"X": model.x, "M": model.m, "Y": model.y}
-    if model.moderators:
-        roles["W"] = model.moderators[0].variable
+    roles |= {w: m.variable for w, m in zip(letters(model), model.moderators, strict=True)}
+    ws = results.series(letters(model))
     legend = "; ".join(f"{k} = {v.label}" for k, v in roles.items())
     covariates = (
         f" Covariates on M and Y: {', '.join(v.label for v in model.covariates)}."
@@ -342,10 +374,12 @@ def table_note(model: med.MediationModel, fit: med.MediationFit) -> str:
     factors = [r for r, v in roles.items() if model.items and v.items]
     centred = ""
     if model.moderators:
+        verb, mean = ("is", "its mean") if len(model.moderators) == 1 else ("are", "their means")
         centred = (
-            " The factors have mean 0 and W is centred at its mean."
+            f" The factors have mean 0 and {ws} {verb} centred at {mean}."
             if model.items
-            else " X, M and W are centred at their means."
+            else f" {', '.join(['X', 'M', *letters(model)[:-1]])} and {letters(model)[-1]} are "
+            "centred at their means."
         )
     if factors:
         centred = (
@@ -353,7 +387,7 @@ def table_note(model: med.MediationModel, fit: med.MediationFit) -> str:
             f"fixed at 1.{centred}"
         )
     beta = (
-        " β is fully standardized; effects at values of W have none."
+        f" β is fully standardized; effects at values of {ws} have none."
         if model.moderators
         else " β is fully standardized."
     )
@@ -376,14 +410,20 @@ def table_note(model: med.MediationModel, fit: med.MediationFit) -> str:
 
 # Box centres and size of the conceptual diagram, in its own units.
 BOX_W, BOX_H = 200, 52
-SPOTS = {"x": (130, 230), "m": (450, 70), "y": (770, 230), "w": (450, 330)}
+SPOTS = {
+    "x": (130, 230),
+    "m": (450, 70),
+    "y": (770, 230),
+    "w": (450, 330),
+    "w1": (300, 330),
+    "w2": (600, 330),
+}
 
 
 def diagram(model: med.MediationModel, fit: med.MediationFit | None) -> str:
-    # X, M and Y as a triangle, W below, with W's arrows ending on the paths it moderates.
+    # X, M and Y as a triangle, each W below, with its arrows ending on the paths it moderates.
     labels = {"x": model.x.label, "m": model.m.label, "y": model.y.label}
-    if model.moderators:
-        labels["w"] = model.moderators[0].variable.label
+    labels |= {f"w{s}": m.variable.label for s, m in zip(model.tags, model.moderators, strict=True)}
     e = fit.effects if fit is not None else {}
 
     def value(key: str, symbol: str) -> str:
@@ -401,14 +441,13 @@ def diagram(model: med.MediationModel, fit: med.MediationFit | None) -> str:
         mx, my = (x1 + x2) / 2, (y1 + y2) / 2
         dy = -14 if key != "c" else 22
         parts.append(text_at(mx + (-34 if key == "a" else 34 if key == "b" else 0), my + dy, text))
-    if "w" in labels:
-        wx, wy = SPOTS["w"]
-        for key in model.moderated:
+    for s, moderator in zip(model.tags, model.moderators, strict=True):
+        wx, wy = SPOTS[f"w{s}"]
+        for key in moderator.paths:
             (x1, y1), (x2, y2) = edge(paths[key][0], paths[key][1])
             parts.append(arrow(wx, wy - BOX_H / 2, (x1 + x2) / 2, (y1 + y2) / 2, dashed=True))
     roles = {"x": model.x, "m": model.m, "y": model.y}
-    if model.moderators:
-        roles["w"] = model.moderators[0].variable
+    roles |= {f"w{s}": m.variable for s, m in zip(model.tags, model.moderators, strict=True)}
     for name, text in labels.items():
         cx, cy = SPOTS[name]
         # Factors are ellipses and observed variables boxes, as in path diagrams.
@@ -429,7 +468,7 @@ def diagram(model: med.MediationModel, fit: med.MediationFit | None) -> str:
             f'fill="var(--lc-ink)"><tspan font-weight="600">{name.upper()}</tspan> '
             f"{escape(short)}<title>{escape(text)}</title></text>"
         )
-    height = 380 if "w" in labels else 280
+    height = 380 if model.moderators else 280
     return (
         f'<svg viewBox="0 0 900 {height}" style="max-height: {height}px; width: 100%" '
         'role="img" aria-label="Conceptual diagram of the mediation model">'

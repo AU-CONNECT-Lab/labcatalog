@@ -12,7 +12,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 | Confirmatory factor analysis, ω | lavaan, semTools | semopy |
 | Measurement invariance across waves, reporters and groups, score tests | lavaan, semTools | not available |
 | Multilevel models | lme4, lmerTest, performance | statsmodels |
-| Mediation, with an optional moderator | lavaan; modsem for latent interactions | not available |
+| Mediation, with up to two moderators | lavaan; modsem for latent interactions | not available |
 
 ## Settings that change the numbers
 

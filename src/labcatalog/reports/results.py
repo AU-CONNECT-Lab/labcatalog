@@ -19,6 +19,9 @@ from labcatalog.stats.mediation import (
     MediationFit,
     MediationModel,
     at_labels,
+    conditions,
+    index_label,
+    indexed,
     intervals_text,
     method_text,
 )
@@ -258,12 +261,12 @@ def fit_indices(values: dict[str, float | None], digits: int) -> str:
 def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) -> str:
     x, m, y = model.x.label, model.m.label, model.y.label
     e, moderated = fit.effects, model.moderated
-    w = model.moderators[0].variable.label if model.moderators else ""
+    ws = [moderator.variable.label for moderator in model.moderators]
     how = method_text(fit)
     # Asides about the model, each set off by commas.
     asides = []
-    if w:
-        asides.append(f"with {w} as moderator")
+    if ws:
+        asides.append(f"with {series(ws)} as moderator{'s' if len(ws) > 1 else ''}")
     if model.items:
         asides.append(factors(model))
     moderator = "".join(f", {a}" for a in asides) + ("," if asides else "")
@@ -273,15 +276,19 @@ def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) ->
         f"{how} (N = {fit.n})."
     ]
 
+    means = " at the mean of the moderator" if len(ws) == 1 else " at the means of the moderators"
+
     def path(key: str, symbol: str) -> str:
-        where = " at the mean of the moderator" if key in moderated else ""
-        return f"{symbol} = {estimate(e[key], digits)}{where}"
+        return f"{symbol} = {estimate(e[key], digits)}{means if key in moderated else ''}"
 
     sentences.append(
         f"The path from {x} to {m} was {path('a', 'a')}, and the path from {m} to {y}, with {x} "
         f"held constant, was {path('b', 'b')}."
     )
-    names = {"a_xw": f"{x} × {w} on {m}", "b_mw": f"{m} × {w} on {y}", "c_xw": f"{x} × {w} on {y}"}
+    named = list(zip(model.tags, ws, strict=True))
+    names = {f"a_xw{s}": f"{x} × {w} on {m}" for s, w in named}
+    names |= {f"b_mw{s}": f"{m} × {w} on {y}" for s, w in named}
+    names |= {f"c_xw{s}": f"{x} × {w} on {y}" for s, w in named}
     parts = [f"{name}, {estimate(e[key], digits)}" for key, name in names.items() if key in e]
     if parts:
         word = "interaction was" if len(parts) == 1 else "interactions were"
@@ -295,16 +302,29 @@ def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) ->
         )
     else:
         sentences.append(f"{opening_case(direct)}.")
-    places = at_labels(model, fit)
+    places = [
+        at_labels(moderator.variable, values)
+        for moderator, values in zip(model.moderators, fit.at, strict=True)
+    ]
     for kind in ("indirect", "direct"):
-        found = [e.get(f"{kind}_{k}") for k in range(1, len(places) + 1)]
-        if places and all(found):
+        found = conditions(model, fit, kind)
+        if found and all(label in e for label, _ in found):
+            # One moderator says where; with two, each is named with its value.
             parts = [
-                f"{estimate(f, digits)} at {place}" for f, place in zip(found, places, strict=True)
+                f"{estimate(e[label], digits)} at {places[spots[0][0]][spots[0][1] - 1]}"
+                if len(ws) == 1
+                else f"{estimate(e[label], digits)} with "
+                + " and ".join(f"{ws[k]} at {places[k][i - 1]}" for k, i in spots)
+                for label, spots in found
             ]
             sentences.append(f"The conditional {kind} effect was {series(parts)}.")
-    if "index" in e:
-        sentences.append(f"The index of moderated mediation was {estimate(e['index'], digits)}.")
+    for k in indexed(model):
+        label = index_label(model, k)
+        if label in e:
+            what = (
+                "moderated mediation" if len(ws) == 1 else f"partial moderated mediation by {ws[k]}"
+            )
+            sentences.append(f"The index of {what} was {estimate(e[label], digits)}.")
     sentences.append(f"Confidence intervals are {intervals_text(fit)}.")
     if fit.fit.get("df"):
         sentences.append(

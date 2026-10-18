@@ -8,33 +8,40 @@ from labcatalog.stats.mediation import (
     MODSEM,
     SEED,
     MediationModel,
+    depends,
+    index_label,
+    indexed,
 )
 
 AT = """\
-at <- function(template) {
-  paste(sprintf(template, seq_along(w_at), sprintf("(%.12g)", w_at)), collapse = "\\n")
+# Each conditional effect at every combination of the moderators' values it varies with.
+at <- function(template, ...) {
+  values <- list(...)
+  grid <- expand.grid(lapply(values, seq_along))
+  lines <- apply(grid, 1, function(k) {
+    picked <- mapply(function(v, i) sprintf("(%.12g)", v[i]), values, k)
+    do.call(sprintf, c(list(template), as.list(k), as.list(picked)))
+  })
+  paste(lines, collapse = "\\n")
 }"""
+OBSERVED_NOTE = (
+    "# Conditional effects at the moderator's two answers, or at its mean and 1 SD either side."
+)
 OBSERVED_AT = """\
-# Conditional effects at the moderator's two answers, or at its mean and 1 SD either side.
-w_levels <- sort(unique(med$w))
-w_at <- if (length(w_levels) == 2) w_levels else c(-1, 0, 1) * sd(med$w)"""
-CENTRE_SCORES = """\
-w_mean <- mean(med$w)
-# Centred, so each path is its effect where the other variables are at their means.
-for (v in c("x", "m", "w")) med[[v]] <- med[[v]] - mean(med[[v]])
-med$xw <- med$x * med$w
-med$mw <- med$m * med$w"""
+{w}_levels <- sort(unique(med${w}))
+{w}_at <- if (length({w}_levels) == 2) {w}_levels else c(-1, 0, 1) * sd(med${w})"""
 CENTRE_W = """\
-w_mean <- mean(med$w)
+{w}_mean <- mean(med${w})
 # Centred, so each path is its effect at the moderator's mean; the factors have mean 0.
-med$w <- med$w - w_mean"""
-LATENT_AT = """\
+med${w} <- med${w} - {w}_mean"""
+FIRST_FIT = """\
 # Fitted once without the conditional effects, for the SD of the moderator's factor.
-first <- modsem::modsem(base, data = med, method = "lms")
-found <- modsem::parameter_estimates(first)
-w_sd <- sqrt(found$est[found$lhs == "W" & found$op == "~~" & found$rhs == "W"])
-w_mean <- 0
-w_at <- c(-1, 0, 1) * w_sd"""
+first <- modsem::modsem(base, data = med, method = "{method}")
+found <- modsem::parameter_estimates(first)"""
+LATENT_AT = """\
+{w}_sd <- sqrt(found$est[found$lhs == "{factor}" & found$op == "~~" & found$rhs == "{factor}"])
+{w}_mean <- 0
+{w}_at <- c(-1, 0, 1) * {w}_sd"""
 COUNT = """\
 # Resamples that converged, of those asked for.
 resamples <- sum(complete.cases(lavaan::lavInspect(fit, "boot")))"""
@@ -66,8 +73,9 @@ effects <- data.frame(label = estimates$label, est = estimates$est, se = estimat
 
 
 def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Code:
-    w = model.moderators[0].variable if model.moderators else None
-    roles = {"x": model.x, "m": model.m, "y": model.y} | ({"w": w} if w is not None else {})
+    roles = {"x": model.x, "m": model.m, "y": model.y} | {
+        f"w{s}": m.variable for s, m in zip(model.tags, model.moderators, strict=True)
+    }
     latent = {r for r, v in roles.items() if model.items and v.items}
     columns, measurement = data_columns(model, roles, latent)
     booted = model.bootstrap > 0
@@ -88,7 +96,7 @@ def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Cod
         "model_fit <- data.frame(c(list(n = nrow(med), resamples = resamples),",
         "                          as.list(unclass(measures))), check.names = FALSE)",
         "print(model_fit)",
-        f"moderator_values <- data.frame(value = {'w_at + w_mean' if w else 'numeric(0)'})",
+        moderator_values(model),
         "",
     ]
     return Code(
@@ -100,6 +108,18 @@ def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Cod
     )
 
 
+def moderator_values(model: MediationModel) -> str:
+    if not model.moderators:
+        return "moderator_values <- data.frame(moderator = integer(0), value = numeric(0))"
+    ws = [f"w{s}" for s in model.tags]
+    counts = ", ".join(f"length({w}_at)" for w in ws)
+    values = ", ".join(f"{w}_at + {w}_mean" for w in ws)
+    return (
+        f"moderator_values <- data.frame(moderator = rep(seq_len({len(ws)}), c({counts})),\n"
+        f"                               value = c({values}))"
+    )
+
+
 def name(role: str, latent: set[str]) -> str:
     # Factors are upper case, observed variables lower case, as in the model syntax.
     return role.upper() if role in latent else role
@@ -108,7 +128,7 @@ def name(role: str, latent: set[str]) -> str:
 def title(model: MediationModel) -> str:
     text = f"{model.x.label} to {model.y.label} through {model.m.label}"
     if model.moderators:
-        text += f", moderated by {model.moderators[0].variable.label}"
+        text += f", moderated by {' and '.join(m.variable.label for m in model.moderators)}"
     return text
 
 
@@ -128,28 +148,43 @@ def data_columns(
 
 
 def equations(model: MediationModel, latent: set[str]) -> list[str]:
-    moderated = model.moderated
-    x, m, y, w = (name(r, latent) for r in ("x", "m", "y", "w"))
+    x, m, y = (name(r, latent) for r in ("x", "m", "y"))
     # Observed scores interact through product columns, factors through modsem's colon.
     joined = model.package == MODSEM
-    xw = f"{x}:{w}" if joined else "xw"
-    mw = f"{m}:{w}" if joined else "mw"
     covariates = "".join(f" + cov{i}" for i in range(1, len(model.covariates) + 1))
-    m_terms = [f"a*{x}"] + ([f"a_w*{w}", f"a_xw*{xw}"] if "a" in moderated else [])
-    y_terms = [f"c*{x}", f"b*{m}"]
-    if moderated & {"b", "c"}:
-        y_terms.append(f"y_w*{w}")
-    if "b" in moderated:
-        y_terms.append(f"b_mw*{mw}")
-    if "c" in moderated:
-        y_terms.append(f"c_xw*{xw}")
+    m_terms, y_terms = [f"a*{x}"], [f"c*{x}", f"b*{m}"]
+    for s, moderator in zip(model.tags, model.moderators, strict=True):
+        w, paths = name(f"w{s}", latent), set(moderator.paths)
+        xw = f"{x}:{w}" if joined else f"xw{s}"
+        mw = f"{m}:{w}" if joined else f"mw{s}"
+        if "a" in paths:
+            m_terms += [f"a_w{s}*{w}", f"a_xw{s}*{xw}"]
+        if paths & {"b", "c"}:
+            y_terms.append(f"y_w{s}*{w}")
+        if "b" in paths:
+            y_terms.append(f"b_mw{s}*{mw}")
+        if "c" in paths:
+            y_terms.append(f"c_xw{s}*{xw}")
     return [f"{m} ~ {' + '.join(m_terms)}{covariates}", f"{y} ~ {' + '.join(y_terms)}{covariates}"]
 
 
-def model_lines(structure: list[str], moderated: set[str], base: str = "") -> list[str]:
+def model_lines(model: MediationModel, structure: list[str], base: str = "") -> list[str]:
     parts = [base] if base else [r_string(s) for s in structure]
-    parts += definition_lines(moderated)
+    parts += definition_lines(model)
     return ["model <- paste(", *(f"  {p}," for p in parts), '  sep = "\\n"', ")"]
+
+
+def centre_scores(model: MediationModel) -> str:
+    ws = [f"w{s}" for s in model.tags]
+    lines = [f"{w}_mean <- mean(med${w})" for w in ws]
+    names = ", ".join(f'"{v}"' for v in ("x", "m", *ws))
+    lines += [
+        "# Centred, so each path is its effect where the other variables are at their means.",
+        f"for (v in c({names})) med[[v]] <- med[[v]] - mean(med[[v]])",
+    ]
+    for w in ws:
+        lines += [f"med$x{w} <- med$x * med${w}", f"med$m{w} <- med$m * med${w}"]
+    return "\n".join(lines)
 
 
 def lavaan_lines(
@@ -157,8 +192,10 @@ def lavaan_lines(
 ) -> list[str]:
     lines = []
     if model.moderators:
-        lines += [CENTRE_SCORES, OBSERVED_AT, AT]
-    lines += model_lines(structure, model.moderated)
+        lines.append(centre_scores(model))
+        lines += [OBSERVED_NOTE, *(OBSERVED_AT.format(w=f"w{s}") for s in model.tags)]
+        lines.append(AT)
+    lines += model_lines(model, structure)
     ordered = ""
     if model.estimator == WLSMV:
         names = [
@@ -212,8 +249,15 @@ def modsem_lines(model: MediationModel, structure: list[str], booted: bool) -> l
         '  sep = "\\n"',
         ")",
     ]
-    lines += [LATENT_AT] if model.latent_moderator else [CENTRE_W, OBSERVED_AT]
-    lines += [AT, *model_lines(structure, model.moderated, base="base")]
+    observed = [s for k, s in enumerate(model.tags) if not model.latent(k)]
+    factors = [s for k, s in enumerate(model.tags) if model.latent(k)]
+    lines += [CENTRE_W.format(w=f"w{s}") for s in observed]
+    if factors:
+        lines.append(FIRST_FIT.format(method=model.method))
+        lines += [LATENT_AT.format(w=f"w{s}", factor=f"W{s}") for s in factors]
+    if observed:
+        lines += [OBSERVED_NOTE, *(OBSERVED_AT.format(w=f"w{s}") for s in observed)]
+    lines += [AT, *model_lines(model, structure, base="base")]
     lines += [
         f'fit <- modsem::modsem(model, data = med, method = "{model.method}"{robust})',
         "estimates <- modsem::parameter_estimates(fit)",
@@ -228,24 +272,38 @@ def modsem_lines(model: MediationModel, structure: list[str], booted: bool) -> l
     return lines
 
 
-def definition_lines(moderated: set[str]) -> list[str]:
+def definition_lines(model: MediationModel) -> list[str]:
     # R expressions that give the syntax of the defined effects.
-    if not moderated:
+    if not model.moderated:
         return [r_string("indirect := a*b"), r_string("total := c + a*b")]
-    a = "(a + a_xw*%2$s)" if "a" in moderated else "a"
-    b = "(b + b_mw*%2$s)" if "b" in moderated else "b"
-    lines = (
-        [f"at({r_string(f'indirect_%1$d := {a}*{b}')})"]
-        if moderated & {"a", "b"}
-        else [r_string("indirect := a*b")]
-    )
-    if "c" in moderated:
-        lines.append(f"at({r_string('direct_%1$d := c + c_xw*%2$s')})")
-    # With one of a and b moderated, the indirect effect is linear in the moderator.
-    if moderated & {"a", "b"} == {"a"}:
-        lines.append(r_string("index := a_xw*b"))
-    elif moderated & {"a", "b"} == {"b"}:
-        lines.append(r_string("index := a*b_mw"))
+    tags = model.tags
+    lines = []
+    for kind in ("indirect", "direct"):
+        which = depends(model, kind)
+        if not which:
+            if kind == "indirect":
+                lines.append(r_string("indirect := a*b"))
+            continue
+        # sprintf's arguments: each moderator's place among its values, then the values.
+        place = {k: f"%{len(which) + p + 1}$s" for p, k in enumerate(which)}
+
+        def path(symbol: str, term: str, on: list[int], place=place) -> str:
+            terms = [f"{term}{tags[k]}*{place[k]}" for k in on if k in place]
+            return f"({symbol} + {' + '.join(terms)})" if terms else symbol
+
+        if len(model.moderators) == 1:
+            label = f"{kind}_%1$d"
+        else:
+            label = f"{kind}_" + "_".join(f"w{k + 1}_%{p + 1}$d" for p, k in enumerate(which))
+        if kind == "indirect":
+            effect = f"{path('a', 'a_xw', model.on('a'))}*{path('b', 'b_mw', model.on('b'))}"
+        else:
+            effect = path("c", "c_xw", model.on("c"))[1:-1]
+        values = ", ".join(f"w{tags[k]}_at" for k in which)
+        lines.append(f"at({r_string(f'{label} := {effect}')}, {values})")
+    for k in indexed(model):
+        product = f"a_xw{tags[k]}*b" if k in model.on("a") else f"a*b_mw{tags[k]}"
+        lines.append(r_string(f"{index_label(model, k)} := {product}"))
     return lines
 
 

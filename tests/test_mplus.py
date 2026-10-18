@@ -170,3 +170,18 @@ def test_item_mediation_uses_factors_and_xwith_for_latent_moderation(result):
     assert "BOOTSTRAP" not in text.split("ANALYSIS:")[1] and "  W (v_w);" in text
     assert "  ind1 = (a + a_xw*(-SQRT(v_w)))*b;" in text
     assert all(len(line) <= 90 for line in text.splitlines())
+
+
+def test_two_moderators_get_their_own_products_and_constraints(result):
+    data, keys = mediation_setup(result)
+    x, m, y, w = (data.score(keys[r]) for r in "xmyw")
+    second = data.score("example_parent_stress.eps_strain@parent_w1")
+    model = med.MediationModel(
+        x, m, y, moderators=[med.Moderator(w, ("a",)), med.Moderator(second, ("a", "c"))]
+    )
+    text = mediation_files(model, data.frame(), "EPS")["mplus_mediation.inp"]
+    assert "DEFINE:\n  xw1 = x*w1;\n  xw2 = x*w2;" in text
+    assert "  m ON xw2 (a_xw2);" in text and "  y ON xw2 (c_xw2);" in text
+    assert "  in11 = (a + a_xw1*(-" in text and "  di2_3 = c + c_xw2*(" in text
+    assert "  index1 = a_xw1*b;" in text and "  index2 = a_xw2*b;" in text
+    assert all(len(line) <= 90 for line in text.splitlines())
