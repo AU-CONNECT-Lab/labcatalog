@@ -72,6 +72,8 @@ INK = "#1c2530"
 TITLE_INK = "#34495e"
 LABEL_INK = "#2c3e50"
 MUTED_INK = "#9aa5af"
+# Small text on a chart, a step darker than MUTED_INK so it reads on white and, flipped, on dark.
+NOTE_INK = "#6b7a88"
 CONNECTOR = "#c3cad1"
 GRID = "#f2f2f2"
 

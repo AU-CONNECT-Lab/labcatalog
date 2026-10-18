@@ -9,6 +9,7 @@ from labcatalog.charts.style import (
     CONNECTOR,
     GRID,
     MUTED_INK,
+    NOTE_INK,
     SHARE_SCALE,
     TITLE_INK,
     base_layout,
@@ -100,7 +101,7 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
         yanchor="bottom",
         text="Today",
         showarrow=False,
-        font=dict(size=10, color=MUTED_INK),
+        font=dict(size=10, color=NOTE_INK),
     )
     dates = [d for b in bars for d in (b["start"], b.get("projected") or b["end"])]
     dates += [m["date"] for m in marks] + [today]
@@ -258,7 +259,7 @@ def score_ridges(title: str, rows: list[dict], integer: bool) -> go.Figure:
     fig.update_yaxes(
         tickvals=[len(rows) - 1 - i for i in range(len(rows))],
         ticktext=[
-            f"{r['label']}<br><span style='font-size:11px;color:{MUTED_INK}'>n {r['n']}</span>"
+            f"{r['label']}<br><span style='font-size:11px;color:{NOTE_INK}'>n {r['n']}</span>"
             for r in rows
         ],
         showgrid=False,
