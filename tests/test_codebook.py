@@ -1,4 +1,5 @@
 import csv
+import io
 import sys
 from pathlib import Path
 
@@ -393,6 +394,25 @@ def test_cli_creates_prompts_and_imports(pilot, tmp_path, monkeypatch, capsys):
     assert (code, err.strip()) == (1, "Error: pilot_w1 already has a column map in maps/")
     code, _, err = run_cli(monkeypatch, capsys, "create", "nope", *p)
     assert (code, err.strip()) == (1, "Error: No dataset named nope in labcatalog.yaml")
+
+
+def test_cli_writes_the_ai_answer_from_a_file_or_standard_input(
+    pilot, tmp_path, monkeypatch, capsys
+):
+    write_templates(load_project(pilot), "pilot_w1")
+    answer = "".join(f"```csv\n{FILLED[name]}```\n" for name in (ITEMS, SCORES, INSTRUMENTS))
+    saved = tmp_path / "answer.md"
+    saved.write_text(answer, encoding="utf-8")
+    code, out, _ = run_cli(monkeypatch, capsys, "answer", "pilot_w1", str(saved), "-p", str(pilot))
+    assert code == 0 and out.count("Wrote ") == 3
+    for name, written in codebook_paths(load_project(pilot), "pilot_w1").items():
+        assert written.read_text(encoding="utf-8-sig") == FILLED[name]
+    monkeypatch.setattr(sys, "stdin", io.StringIO(answer.replace("```csv", "```")))
+    code, out, _ = run_cli(monkeypatch, capsys, "answer", "pilot_w1", "-p", str(pilot))
+    assert code == 0 and out.splitlines()[-1].endswith("labcatalog codebook import pilot_w1")
+    monkeypatch.setattr(sys, "stdin", io.StringIO("No code here."))
+    code, _, err = run_cli(monkeypatch, capsys, "answer", "pilot_w1", "-p", str(pilot))
+    assert code == 1 and "no code block for" in err
 
 
 def test_existing_instruments_are_reused_and_the_map_matches(mock_project):

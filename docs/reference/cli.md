@@ -91,6 +91,12 @@ labcatalog codebook prompt DATASET [-p PROJECT]
 Print a prompt that asks a language model to fill in the three files from your codebook.
 
 ```bash
+labcatalog codebook answer DATASET [ANSWER_FILE] [-p PROJECT]
+```
+
+Replace the three files with the three csv code blocks of the model's answer, read from `ANSWER_FILE`, or from standard input when it is left out.
+
+```bash
 labcatalog codebook import DATASET [-p PROJECT]
 ```
 

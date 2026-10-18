@@ -145,6 +145,12 @@ def run_codebook_prompt(root: Path, dataset: str) -> str:
     return codebook.ai_prompt(project, dataset)
 
 
+def run_codebook_answer(root: Path, dataset: str, answer: str) -> list[Path]:
+    project = load_project(root)
+    codebook.require_unmapped(project, dataset)
+    return codebook.split_ai_answer(project, dataset, answer)
+
+
 def run_codebook_import(root: Path, dataset: str) -> ImportResult:
     project = load_project(root)
     codebook.require_unmapped(project, dataset)

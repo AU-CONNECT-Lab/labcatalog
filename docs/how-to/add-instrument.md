@@ -37,7 +37,7 @@ labcatalog codebook import parent_w2
 
 ### Let a language model fill in the files
 
-If the codebook is a PDF or a document, a language model can fill in the three files for you. Under **Fill them in with an AI**, press **Copy AI prompt**, paste the prompt into the chat model of your choice together with the codebook, paste its answer into the box, and press **Replace the three files with this answer**. The prompt contains the format and the data file's column names, but no data. Check the files before you import them: the model can misread a codebook. On the command line, `labcatalog codebook prompt <dataset>` prints the same prompt.
+If the codebook is a PDF or a document, a language model can fill in the three files for you. Under **Fill them in with an AI**, press **Copy AI prompt**, paste the prompt into the chat model of your choice together with the codebook, paste its answer into the box, and press **Replace the three files with this answer**. The prompt contains the format and the data file's column names, but no data. Check the files before you import them: the model can misread a codebook. On the command line, `labcatalog codebook prompt <dataset>` prints the same prompt, and `labcatalog codebook answer <dataset> <file>` replaces the three files with the answer saved in a file (or pasted into standard input when no file is given).
 
 ## Draft an instrument from its PDF
 

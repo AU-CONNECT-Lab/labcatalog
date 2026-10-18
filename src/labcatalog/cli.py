@@ -13,6 +13,7 @@ from labcatalog.exceptions import EXIT_ISSUES, EXIT_OK, EXIT_UNEXPECTED, LabCata
 from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.pipeline import (
     run_check,
+    run_codebook_answer,
     run_codebook_create,
     run_codebook_import,
     run_codebook_prompt,
@@ -178,6 +179,24 @@ def codebook_create(
 def codebook_prompt(dataset: DatasetArgument, project: ProjectOption = Path(".")) -> None:
     """Print a prompt that asks an AI to fill in the three files from your codebook."""
     typer.echo(run_codebook_prompt(project, dataset))
+
+
+@codebook_app.command("answer")
+def codebook_answer(
+    dataset: DatasetArgument,
+    answer: Annotated[
+        Path | None,
+        typer.Argument(
+            help="File holding the AI's answer; read from standard input when left out."
+        ),
+    ] = None,
+    project: ProjectOption = Path("."),
+) -> None:
+    """Replace the three files with the three csv code blocks of the AI's answer."""
+    text = answer.read_text(encoding="utf-8") if answer else sys.stdin.read()
+    for path in run_codebook_answer(project, dataset, text):
+        typer.echo(f"Wrote {path}")
+    typer.echo(f"Look them over, then run: labcatalog codebook import {dataset}")
 
 
 @codebook_app.command("import")
