@@ -34,6 +34,9 @@ TIMELINE_PAD = timedelta(days=30)
 # Bar thickness as a share of a lane, and a lane's height in pixels.
 TIMELINE_BAR = 0.36
 TIMELINE_LANE = 36
+# Room under the last lane, in lanes, for milestone names written below their marks.
+TIMELINE_BELOW = 0.5
+ABOVE, BELOW = "top center", "bottom center"
 # The least distance between the counts at the ends of the pace lines, as a share of the top.
 PACE_LABEL_GAP = 0.07
 # Room beside the first and last wave, in waves.
@@ -43,6 +46,14 @@ TRAJECTORY_PAD = 0.12
 def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date) -> go.Figure:
     # One lane per wave and one per study's milestones on a shared calendar, today dashed across.
     fig = go.Figure()
+    sides = label_sides(marks)
+    below = {m["lane"] for m, side in zip(marks, sides, strict=True) if side == BELOW}
+    # A name under its mark takes the room of the next lane, so an empty lane follows it.
+    rows = []
+    for lane in lanes:
+        rows.append(lane)
+        if lane in below and lane != lanes[-1]:
+            rows.append(" " * len(rows))
     for bar in bars:
         pieces = [(bar["start"], bar["end"], 0.45 if bar["ongoing"] else 1.0)]
         if bar.get("projected"):
@@ -80,7 +91,9 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
                 y=[m["lane"] for m in marks],
                 mode="markers+text",
                 text=[m["name"] for m in marks],
-                textposition=label_sides(marks),
+                textposition=sides,
+                # A name near the end of the calendar may reach past it.
+                cliponaxis=False,
                 textfont=dict(size=10, color=TITLE_INK),
                 marker=dict(symbol="diamond", size=12, color=TITLE_INK),
                 hovertext=[f"<b>{m['name']}</b><br>{m['date']:%Y-%m-%d}" for m in marks],
@@ -117,16 +130,30 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
         gridcolor=GRID,
         tickfont=dict(size=10),
     )
+    # Empty lanes need a point to take their place on the axis.
+    spacers = [r for r in rows if r not in lanes]
+    if spacers:
+        fig.add_trace(
+            go.Scatter(
+                x=[today.isoformat()] * len(spacers),
+                y=spacers,
+                mode="none",
+                hoverinfo="skip",
+                showlegend=False,
+            )
+        )
+    extra = TIMELINE_BELOW if lanes and lanes[-1] in below else 0
     fig.update_yaxes(
         categoryorder="array",
-        categoryarray=lanes,
-        autorange="reversed",
+        categoryarray=rows,
+        # Reversed, the first lane on top, with room under the last.
+        range=[len(rows) - 0.5 + extra, -0.5],
         tickfont=dict(size=11),
         showgrid=False,
     )
     return base_layout(
         fig,
-        60 + TIMELINE_LANE * len(lanes),
+        60 + TIMELINE_LANE * (len(rows) + extra),
         barmode="overlay",
         margin=dict(l=10, r=20, t=30, b=30),
     )
@@ -138,7 +165,7 @@ def label_sides(marks: list[dict]) -> list[str]:
     for lane in {m["lane"] for m in marks}:
         ordered = sorted((m["date"], i) for i, m in enumerate(marks) if m["lane"] == lane)
         for k, (_, i) in enumerate(ordered):
-            sides[i] = "top center" if k % 2 == 0 else "bottom center"
+            sides[i] = ABOVE if k % 2 == 0 else BELOW
     return [sides[i] for i in range(len(marks))]
 
 

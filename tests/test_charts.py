@@ -2,7 +2,7 @@ from datetime import date
 
 import pytest
 
-from labcatalog.charts import network, style, views
+from labcatalog.charts import network, plots, style, views
 from labcatalog.charts.style import STATUS_COLORS
 from labcatalog.gui import charts as gui_charts
 from labcatalog.pipeline import run_catalog
@@ -85,6 +85,8 @@ def test_timeline_draws_waves_up_to_today_and_the_milestones(result):
     today = date(2026, 10, 15)
     fig = views.timeline(result, today)
     assert list(fig.layout.yaxis.categoryarray) == ["Wave 1", "Wave 2", "Wave 3", "Milestones"]
+    # The second milestone's name is under it, so the last lane has room below.
+    assert list(fig.layout.yaxis.range) == [4.0, -0.5]
     bars = [t for t in fig.data if t.type == "bar"]
     # Wave 3 has no end yet: a faint bar as long as wave 2 took, a solid one up to today.
     projected, solid = bars[2], bars[3]
@@ -257,3 +259,23 @@ def test_catalog_map_gives_each_modality_its_own_colour_whatever_the_filter(resu
         alone[0]["name"],
         colors[alone[0]["name"]],
     )
+
+
+def test_a_name_under_a_milestone_keeps_the_next_lane_away():
+    marks = [
+        {"lane": "A milestones", "name": n, "date": d}
+        for n, d in (("One", date(2026, 1, 1)), ("Two", date(2026, 1, 20)))
+    ]
+    bars = [
+        {
+            "lane": "B wave 1",
+            "start": date(2026, 1, 1),
+            "end": date(2026, 6, 1),
+            "ongoing": False,
+            "color": "#336699",
+            "hover": "",
+        }
+    ]
+    fig = plots.timeline(["A milestones", "B wave 1"], bars, marks, date(2026, 3, 1))
+    assert list(fig.layout.yaxis.categoryarray) == ["A milestones", " ", "B wave 1"]
+    assert list(fig.layout.yaxis.range) == [2.5, -0.5]
