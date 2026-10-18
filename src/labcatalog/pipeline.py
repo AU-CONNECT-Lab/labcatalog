@@ -205,10 +205,17 @@ def run_cleaning_fix(
 
 
 def run_analysis_draft(
-    columns: str, wanted: str, language: str, data_file: str, provider: str, model: str, url: str
+    columns: str,
+    wanted: str,
+    language: str,
+    data_file: str,
+    start: str,
+    provider: str,
+    model: str,
+    url: str,
 ) -> AnalysisDraft:
     client = make_llm_client(provider, model, url)
-    return draft_analysis(columns, wanted, language, data_file, client)
+    return draft_analysis(columns, wanted, language, data_file, client, start)
 
 
 def run_analysis_fix(

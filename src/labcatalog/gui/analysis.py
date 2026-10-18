@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from functools import partial
 
@@ -99,7 +99,12 @@ def default_totals(result: CatalogResult, view: AnalysisView, choices: dict[str,
     return [k for k in views.total_choices(result, view.datasets) if k in choices]
 
 
-def render(result: CatalogResult, view: AnalysisView, study: str | None = None) -> None:
+def render(
+    result: CatalogResult,
+    view: AnalysisView,
+    study: str | None,
+    reload: Callable[[], Awaitable[None]],
+) -> None:
     datasets = result.project.config.datasets
     names = views.dataset_order(result, [d.name for d in datasets if study in (None, d.study)])
     if not names:
@@ -141,7 +146,7 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
         elif view.part == "agreement":
             agreement.render(result, sample, view, choices)
         elif view.part == "custom":
-            custom.render(result, sample, view, choices)
+            custom.render(result, sample, view, choices, restore, reload)
         elif view.part == "correlation":
             correlation_section(result, sample, view, choices)
         elif view.part == "regression":
@@ -172,6 +177,12 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
         view.datasets = [n for n in names if n in value]
         sidebar.refresh()
         sample_changed()
+
+    def restore(datasets: list[str], intersect: bool) -> None:
+        view.datasets = [n for n in names if n in datasets] or view.datasets
+        view.intersect = intersect
+        sidebar.refresh()
+        section.refresh()
 
     def set_intersect(value: bool) -> None:
         view.intersect = value

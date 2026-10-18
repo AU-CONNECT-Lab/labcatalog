@@ -30,8 +30,8 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 |---|---|---|
 | `not_in_vocab` | error | A modality, reporter or target is not in `vocab`. |
 | `unknown_reference` | error | Something names an ID that does not exist: a study, wave, dataset, instrument, item, score, response set or facet. Also a column map for a dataset that is not in `labcatalog.yaml`, or one that maps an instrument not given in that dataset. |
-| `duplicate_id` | error | Two things share an ID: datasets, instruments, studies, items, scores, response sets, option values, prepare steps, reference keys, or rows of a column map. |
-| `invalid_value` | error | A value that cannot work, for example a choice item without options, `min` above `max`, a score of text items, `min_valid` out of range, an invalid regular expression in `ids`, a dataset without `path`, or an unknown placeholder in a template. One case is a warning: `min_valid` with `missing_rule: complete`, where it has no effect. |
+| `duplicate_id` | error | Two things share an ID: datasets, instruments, studies, items, scores, response sets, option values, prepare steps, kept analyses, reference keys, or rows of a column map. |
+| `invalid_value` | error | A value that cannot work, for example a choice item without options, `min` above `max`, a score of text items, `min_valid` out of range, an invalid regular expression in `ids`, a dataset without `path`, or an unknown placeholder in a template, or a kept analysis whose script is missing. One case is a warning: `min_valid` with `missing_rule: complete`, where it has no effect. |
 | `undeclared_custom_field` | error | A `custom` value for a field not declared in `custom_fields`, or declared for something else. |
 | `missing_code_collision` | error | A response option has the same value as a missing code of a dataset where the instrument is given. |
 | `map_missing` | error | A dataset has administrations but no column map. |

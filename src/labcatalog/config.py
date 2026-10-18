@@ -213,6 +213,16 @@ class PrepareStep(StrictModel):
     outputs: list[str]
 
 
+class SavedAnalysis(StrictModel):
+    name: str
+    script: str
+    datasets: list[str]
+    variables: list[str] = []
+    # Only people in every dataset, as the Sample's switch on the Analysis page.
+    every_dataset: bool = True
+    request: str = ""
+
+
 class ProjectConfig(StrictModel):
     schema_version: int = defaults.SCHEMA_VERSION
     project: ProjectInfo
@@ -228,6 +238,7 @@ class ProjectConfig(StrictModel):
     stats: StatsConfig = Field(default_factory=StatsConfig)
     llm: LlmConfig = Field(default_factory=LlmConfig)
     prepare: list[PrepareStep] = []
+    analyses: list[SavedAnalysis] = []
     # Runs each prepare step through datalad run, which records it in the dataset's history.
     prepare_with: Literal["datalad"] | None = None
     # Template of each instrument's Measures paragraph, in place of the built-in one.

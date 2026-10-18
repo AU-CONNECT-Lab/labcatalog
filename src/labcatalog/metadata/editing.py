@@ -11,7 +11,13 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
-from labcatalog.config import CustomFieldDef, FreedParameter, PrepareStep, ProjectConfig
+from labcatalog.config import (
+    CustomFieldDef,
+    FreedParameter,
+    PrepareStep,
+    ProjectConfig,
+    SavedAnalysis,
+)
 from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.issues import Issue
 from labcatalog.metadata import records
@@ -124,6 +130,38 @@ def save_step(root: Path, step: PrepareStep) -> None:
     else:
         steps[at] = entry
     save_data(root, opened, data)
+
+
+def save_analysis(root: Path, analysis: SavedAnalysis, script: str) -> None:
+    # Takes the place of an analysis with the same name, or comes last.
+    path = root / analysis.script
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(script, encoding="utf-8")
+    opened = open_file(root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    saved = data.setdefault("analyses", CommentedSeq())
+    entry = CommentedMap(analysis.model_dump(exclude_defaults=True))
+    for key in ("datasets", "variables"):
+        if key in entry:
+            entry[key] = CommentedSeq(entry[key])
+            entry[key].fa.set_flow_style()
+    at = next((n for n, s in enumerate(saved) if s.get("name") == analysis.name), None)
+    if at is None:
+        saved.append(entry)
+    else:
+        saved[at] = entry
+    save_data(root, opened, data)
+
+
+def remove_analysis(root: Path, analysis: SavedAnalysis) -> None:
+    opened = open_file(root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    saved = data["analyses"]
+    saved[:] = [s for s in saved if s.get("name") != analysis.name]
+    if not saved:
+        data.pop("analyses")
+    save_data(root, opened, data)
+    (root / analysis.script).unlink(missing_ok=True)
 
 
 def save_settings(root: Path, changes: dict[str, dict[str, Any]]) -> None:

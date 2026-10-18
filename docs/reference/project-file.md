@@ -161,6 +161,10 @@ The language model the lab uses, set on the Settings page. API keys are never ke
 
 `prepare` is a list of steps, each with a `name`, the command to `run`, its `inputs` and its `outputs`. `prepare_with: datalad` runs each step through `datalad run`. See [Register Prepare Steps](../how-to/prepare-steps.md).
 
+## analyses
+
+The analyses kept from the Custom tab of the Analysis page, each with a `name`, its `script` (in the `analyses` folder, `.R`, `.py` or `.inp`), the `datasets` and `variables` it reads, `every_dataset` (only people in every dataset, the default, or anyone in one) and the `request` it was drafted from. See [Analysis](../app/analysis.md).
+
 ## measures and participants
 
 Templates of the Measures and Participants paragraphs on the Methods page. See [Write the Methods Section](../how-to/write-methods.md).

@@ -5,9 +5,13 @@ import pandas as pd
 import pytest
 
 from labcatalog.ai import custom as ai
+from labcatalog.config import SavedAnalysis
 from labcatalog.llm import CallMetadata, LLMClient
+from labcatalog.metadata import editing
+from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
 from labcatalog.processes import end_tree
+from labcatalog.project import load_project
 from labcatalog.stats import analysis, custom
 from labcatalog.stats import analysis_script as script
 
@@ -141,3 +145,84 @@ def test_an_r_script_runs_in_r():
     code = "d <- read.csv('analysis_data.csv')\ncat('mean', mean(d$x), '\\n')\nwrite.csv(d, 'out.csv')\n"
     ran = custom.run_script("r", code, frame, rscript())
     assert ran.ok and ran.output == "mean 2.333333" and list(ran.files) == ["out.csv"]
+
+
+def test_an_analysis_kept_in_the_project_is_its_script_and_an_entry_and_can_be_removed(
+    result, sample
+):
+    root = result.project.root
+    kept = SavedAnalysis(
+        name="ewt_groups",
+        script="analyses/ewt_groups.R",
+        datasets=[CHILD],
+        variables=[TOTAL],
+        request="Compare the groups",
+    )
+    editing.save_analysis(root, kept, "print(1)\n")
+    assert (root / kept.script).read_text(encoding="utf-8") == "print(1)\n"
+    project = load_project(root)
+    assert project.config.analyses == [kept]
+    assert not [i for i in validate_project(project) if i.location == "labcatalog.yaml"]
+    replaced = kept.model_copy(update={"every_dataset": False})
+    editing.save_analysis(root, replaced, "print(2)\n")
+    assert load_project(root).config.analyses == [replaced]
+    editing.remove_analysis(root, replaced)
+    assert not (root / kept.script).exists()
+    assert "analyses" not in (root / "labcatalog.yaml").read_text(encoding="utf-8")
+
+
+def test_a_kept_analysis_names_datasets_and_a_script_that_exist(result):
+    root = result.project.root
+    for name in ("one", "one"):
+        editing.save_analysis(
+            root, SavedAnalysis(name=name, script=f"analyses/{name}.R", datasets=["nope"]), ""
+        )
+    project = load_project(root)
+    project.config.analyses.append(project.config.analyses[0])
+    (root / "analyses/one.R").unlink()
+    issues = [i for i in validate_project(project) if "analyses" in i.message]
+    found = {i.code: i for i in reversed(issues)}
+    assert found["unknown_reference"].details["path"] == ["analyses", 0, "datasets", 0]
+    assert "file not found: analyses/one.R" in found["invalid_value"].message
+    assert found["duplicate_id"].details["value"] == "one"
+
+
+def test_mplus_gets_short_names_numbers_for_ids_and_the_start_of_the_input(result, sample):
+    names = custom.short_names(["family", "ems_total_child_w1", "ems_total_child_w2", "1st", "a.b"])
+    assert names == {
+        "family": "family",
+        "ems_total_child_w1": "ems_tota",
+        "ems_total_child_w2": "ems_tot2",
+        "1st": "v1st",
+        "a.b": "a_b",
+    }
+    frame, variables, _ = custom.analysis_frame(result, sample, [TOTAL])
+    data = custom.mplus_data(frame)
+    assert all(pd.api.types.is_numeric_dtype(data[c]) for c in data.columns)
+    assert data.iloc[:, 0].nunique() == frame.iloc[:, 0].nunique()
+    start = custom.mplus_start(frame, "A two-factor model\nof worries and temper")
+    lines = start.splitlines()
+    assert lines[0] == "TITLE: A two-factor model of worries and temper"
+    assert "DATA: FILE = analysis_data.dat;" in lines and "  MISSING = ALL (-999);" in lines
+    assert all(len(line) <= 80 for line in lines)
+    short = custom.short_names(list(frame.columns))
+    assert f"! {short[variables[0].column]} = {variables[0].column}" in lines
+    text = custom.columns_text(result, sample, frame, variables, custom.MPLUS)
+    assert text.startswith("analysis_data.dat:")
+    assert f"{short[variables[0].column]} ({variables[0].column}) | the score" in text
+    assert "a number for each ID" in text
+    files = custom.data_files(custom.MPLUS, frame)
+    assert list(files) == ["analysis_data.dat"] and "-999" in files["analysis_data.dat"]
+
+
+def test_an_mplus_draft_follows_the_start_or_is_empty_when_mplus_does_not_fit():
+    client = FakeClient({"script": "MODEL: f BY x1-x3;", "changes": [], "notes": []})
+    found = ai.draft_analysis("COLUMNS", "A CFA", "mplus", "d.dat", client, "TITLE: t\n")
+    assert "Write Mplus only for the models it is for" in client.system
+    assert "The start of the input:\n<input>\nTITLE: t\n</input>" in client.request
+    assert found.script == "TITLE: t\nMODEL: f BY x1-x3;\n"
+    client.output = {"script": "", "changes": [], "notes": ["Use R for a t test."]}
+    declined = ai.draft_analysis("COLUMNS", "A t test", "mplus", "d.dat", client, "TITLE: t\n")
+    assert declined.script == "" and declined.notes == ["Use R for a t test."]
+    with pytest.raises(Exception, match="set the path to Mplus"):
+        custom.run_script("mplus", "TITLE: t", pd.DataFrame({"x": [1]}), None)

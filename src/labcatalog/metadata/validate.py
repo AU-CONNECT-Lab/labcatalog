@@ -32,6 +32,7 @@ def validate_project(project: Project) -> list[Issue]:
         *check_data_settings(project),
         *check_references(project),
         *check_prepare_steps(project),
+        *check_analyses(project),
         *check_templates(project),
     ]
 
@@ -680,6 +681,37 @@ def check_prepare_steps(project: Project) -> list[Issue]:
     for path, names in writers.values():
         if len(names) > 1:
             message = f"prepare: {', '.join(names)} all write {path}; give each its own file"
+            issues.append(problem("invalid_value", message, CONFIG))
+    return issues
+
+
+def check_analyses(project: Project) -> list[Issue]:
+    saved = project.config.analyses
+    issues = [
+        problem(
+            "duplicate_id",
+            f"analyses: the name '{name}' is used more than once",
+            CONFIG,
+            value=name,
+            places=[
+                place(["analyses", n, "name"], analysis.script)
+                for n, analysis in enumerate(saved)
+                if analysis.name == name
+            ],
+        )
+        for name, count in Counter(analysis.name for analysis in saved).items()
+        if count > 1
+    ]
+    names = [d.name for d in project.config.datasets]
+    for n, analysis in enumerate(saved):
+        where = f"analyses[{n + 1}] ({analysis.name})"
+        for k, dataset in enumerate(analysis.datasets):
+            if dataset not in names:
+                message = f"{where}.datasets: no dataset named '{dataset}'"
+                path = ["analyses", n, "datasets", k]
+                issues.append(unknown(message, CONFIG, path=path, value=dataset, choices=names))
+        if not (project.root / analysis.script).is_file():
+            message = f"{where}.script: file not found: {analysis.script}"
             issues.append(problem("invalid_value", message, CONFIG))
     return issues
 

@@ -736,7 +736,7 @@ class Window:
     @ui.refreshable_method
     def analysis_panel(self) -> None:
         if self.has_catalog():
-            analysis.render(self.result, self.analysis, self.scope)
+            analysis.render(self.result, self.analysis, self.scope, self.reload)
 
     @ui.refreshable_method
     def methods_panel(self) -> None:

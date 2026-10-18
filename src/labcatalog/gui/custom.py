@@ -1,25 +1,46 @@
 import base64
 import io
 import subprocess
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
+from functools import partial
 
 import pandas as pd
 from nicegui import ui
 
+from labcatalog import defaults
 from labcatalog.ai.custom import LANGUAGES, AnalysisDraft
+from labcatalog.config import SavedAnalysis
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
-from labcatalog.gui import analysis_tables, common, missing, paper, theme
+from labcatalog.gui import analysis_tables, common, missing, paper, preferences, theme
 from labcatalog.gui.common import caption, computed, note, panel
+from labcatalog.metadata import editing
 from labcatalog.pipeline import CatalogResult, run_analysis_draft, run_analysis_fix
 from labcatalog.processes import end_tree
 from labcatalog.stats import analysis
 from labcatalog.stats.analysis_script import DATA_FILE
-from labcatalog.stats.custom import SCRIPT, Ran, analysis_frame, columns_text, run_script
+from labcatalog.stats.custom import (
+    MPLUS,
+    MPLUS_DATA,
+    MPLUS_OUT,
+    SCRIPT,
+    Ran,
+    analysis_frame,
+    columns_text,
+    data_files,
+    mplus_start,
+    run_script,
+)
 
 LANGUAGE_NAMES = {key: lang.name for key, lang in LANGUAGES.items()}
-EDITOR_LANGUAGES = {"r": "R", "python": "Python"}
+EDITOR_LANGUAGES = {"r": "R", "python": "Python", MPLUS: None}
 IMAGES = {".png": "image/png", ".svg": "image/svg+xml", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
+MPLUS_NOTE = (
+    "Mplus is for models with latent variables or structural equations; for other analyses the "
+    "model suggests R or Python. The input starts with the data file and short names labcatalog "
+    "writes; Run needs the path to Mplus on the Settings page."
+)
 SENT = (
     "Draft sends what you write here, with the chosen columns' names, labels, answer options "
     "and how many people have a value, to the model set on the Settings page; never the data. "
@@ -33,6 +54,8 @@ class Choices:
     wanted: str = ""
     language: str = "r"
     script: str = ""
+    # The name it is kept under in the project, once kept or opened.
+    name: str = ""
 
 
 @dataclass
@@ -43,14 +66,24 @@ class Running:
     ran: Ran | None = None
 
 
-def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[str, str]) -> None:
+def render(
+    result: CatalogResult,
+    sample: analysis.Sample,
+    view,
+    choices: dict[str, str],
+    restore: Callable[[list[str], bool], None],
+    reload: Callable[[], Awaitable[None]],
+) -> None:
+    # restore sets the page's Sample to a saved analysis's; reload rereads the project.
     chosen = view.custom
+    gone = [k for k in chosen.variables if k not in choices]
     chosen.variables = [k for k in chosen.variables if k in choices]
     running = Running()
+    root = result.project.root
 
     async def columns() -> tuple[pd.DataFrame, str]:
         frame, variables, _ = await computed(analysis_frame, result, sample, chosen.variables)
-        running.columns = columns_text(result, sample, frame, variables)
+        running.columns = columns_text(result, sample, frame, variables, chosen.language)
         return frame, running.columns
 
     async def draft() -> None:
@@ -60,13 +93,15 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
         draft_button.disable()
         status.set_text("Drafting the script.")
         try:
-            _, text = await columns()
+            frame, text = await columns()
+            start = mplus_start(frame, chosen.wanted) if chosen.language == MPLUS else ""
             found = await computed(
                 run_analysis_draft,
                 text,
                 chosen.wanted,
                 chosen.language,
-                DATA_FILE,
+                data_name(chosen.language),
+                start,
                 *common.llm_choice(),
             )
         except LabCatalogError as err:
@@ -78,8 +113,10 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
         use(found)
 
     def use(found: AnalysisDraft) -> None:
-        chosen.script = found.script
-        editor.set_value(found.script)
+        # An empty script is the model declining, as for Mplus asked for a plain test.
+        if found.script:
+            chosen.script = found.script
+            editor.set_value(found.script)
         notes.clear()
         with notes:
             for line in found.changes:
@@ -102,7 +139,7 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
                 language,
                 script,
                 frame,
-                analysis_tables.rscript(),
+                program(language),
                 lambda process: setattr(running, "process", process),
             )
         except LabCatalogError as err:
@@ -142,9 +179,9 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
                 else:
                     note(f"It also wrote {name}.")
             texts = {
-                DATA_FILE: frame.to_csv(index=False),
+                **data_files(language, frame),
                 SCRIPT[language]: script,
-                "output.txt": ran.output,
+                MPLUS_OUT if language == MPLUS else "output.txt": ran.output,
             }
             paper.save_button(result, "custom", texts=texts, blobs=ran.files)
 
@@ -157,7 +194,7 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
                 running.columns,
                 chosen.wanted,
                 chosen.language,
-                DATA_FILE,
+                data_name(chosen.language),
                 chosen.script,
                 running.ran.output,
                 *common.llm_choice(),
@@ -188,17 +225,108 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
                 ui.button("Use it", icon="check", on_click=take).props("no-caps")
         dialog.open()
 
+    def keep() -> None:
+        saved = {a.name: a for a in result.project.config.analyses}
+
+        def path_of(name: str) -> str:
+            return f"{defaults.ANALYSES_DIR}/{name}{LANGUAGES[chosen.language].suffix}"
+
+        def changed() -> None:
+            name = (named.value or "").strip()
+            fine = bool(editing.NEW_ID.fullmatch(name))
+            where.set_text(
+                f"Writes {path_of(name)} and lists it under analyses in labcatalog.yaml"
+                + (", in place of the one saved under this name." if name in saved else ".")
+                if fine
+                else "A name of lower-case letters, digits and _, starting with a letter."
+            )
+            save_button.set_enabled(fine)
+
+        async def save() -> None:
+            name = named.value.strip()
+            entry = SavedAnalysis(
+                name=name,
+                script=path_of(name),
+                datasets=list(view.datasets),
+                variables=list(chosen.variables),
+                every_dataset=view.intersect,
+                request=chosen.wanted.strip(),
+            )
+            old = saved.get(name)
+            if old is not None and old.script != entry.script:
+                await computed(editing.remove_analysis, root, old)
+            await computed(editing.save_analysis, root, entry, chosen.script)
+            chosen.name = name
+            dialog.close()
+            ui.notify(f"Saved {entry.script}")
+            await reload()
+
+        with ui.dialog() as dialog, ui.card().classes("w-[36rem] max-w-full gap-3"):
+            ui.label("Keep in the project").classes("text-lg")
+            note(
+                "Keeps the script with the datasets and variables chosen here, so anyone with "
+                "the project can open it and run it again."
+            )
+            named = ui.input("Name", value=chosen.name, on_change=changed).props("dense outlined")
+            where = ui.label().classes("lc-note")
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+                save_button = ui.button("Save", icon="save", on_click=save).props("no-caps")
+        changed()
+        dialog.open()
+
+    def open_saved(saved: SavedAnalysis) -> None:
+        path = root / saved.script
+        if not path.is_file():
+            ui.notify(f"{saved.script} is not there", type="warning")
+            return
+        chosen.name = saved.name
+        chosen.language = language_of(saved.script)
+        chosen.script = path.read_text(encoding="utf-8")
+        chosen.wanted = saved.request
+        chosen.variables = list(saved.variables)
+        restore(saved.datasets, saved.every_dataset)
+
+    def remove(saved: SavedAnalysis) -> None:
+        async def confirmed() -> None:
+            await computed(editing.remove_analysis, root, saved)
+            dialog.close()
+            if chosen.name == saved.name:
+                chosen.name = ""
+            await reload()
+
+        with ui.dialog() as dialog, ui.card().classes("gap-3"):
+            ui.label(f"Remove {saved.name}?").classes("text-lg")
+            note(f"Deletes {saved.script} and its entry under analyses in labcatalog.yaml.")
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+                ui.button("Remove", icon="delete", on_click=confirmed).props("no-caps")
+        dialog.open()
+
     def set_language(value: str) -> None:
         chosen.language = value
-        editor.language = EDITOR_LANGUAGES[value]
+        editor.set_language(EDITOR_LANGUAGES[value])
 
     def set_script(value: str) -> None:
         chosen.script = value
 
     with panel("Custom analysis", "Any analysis, in a script you can read and change"):
+        if saved_list := result.project.config.analyses:
+            with ui.row().classes("w-full items-center gap-2"):
+                caption("Saved")
+                for saved in saved_list:
+                    with ui.button_group().props("flat"):
+                        ui.button(saved.name, on_click=partial(open_saved, saved)).props(
+                            "flat dense no-caps"
+                        ).tooltip(saved.request or saved.script)
+                        ui.button(icon="close", on_click=partial(remove, saved)).props(
+                            "flat dense size=sm"
+                        ).tooltip("Remove")
         note(SENT)
         if missing.imputing(result, view):
             note("The script reads the data as they are, without the imputations.")
+        if gone:
+            note(f"Not in the chosen datasets any more: {', '.join(gone)}.")
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             picked = (
                 ui.select(
@@ -228,6 +356,8 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
             if not common.model_set():
                 draft_button.disable()
                 draft_button.tooltip("Set a language model on the Settings page")
+        if chosen.language == MPLUS:
+            note(MPLUS_NOTE)
         status = ui.label().classes("lc-note")
         notes = ui.column().classes("w-full gap-1")
         editor = (
@@ -249,7 +379,23 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
                 "flat no-caps"
             )
             fix_button.set_visibility(False)
+            ui.button("Keep in project", icon="bookmark_add", on_click=keep).props("flat no-caps")
         shown = ui.column().classes("w-full gap-2")
+
+
+def data_name(language: str) -> str:
+    return MPLUS_DATA if language == MPLUS else DATA_FILE
+
+
+def program(language: str) -> str | None:
+    if language == MPLUS:
+        return preferences.load().get(preferences.MPLUS) or None
+    return analysis_tables.rscript() if language == "r" else None
+
+
+def language_of(script: str) -> str:
+    suffix = script[script.rfind(".") :].lower()
+    return next(k for k, lang in LANGUAGES.items() if lang.suffix.lower() == suffix)
 
 
 def made_by(found: AnalysisDraft) -> str:
