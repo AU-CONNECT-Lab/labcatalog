@@ -156,6 +156,36 @@ for i, x in enumerate(variables):
 correlations = pd.DataFrame(rows, columns=["x", "y", "n", "r", "p"])
 print(correlations)
 """
+R_MISSING = """# Missing data: how many people have and lack each variable, then each pattern of what people
+# have (1) and lack (0), the most common first.
+variables <- c({columns})
+present <- as.data.frame(lapply(d[variables], function(x) as.integer(!is.na(x))),
+                         check.names = FALSE)
+missing_counts <- data.frame(variable = variables, n = colSums(present),
+                             missing = colSums(1L - present), row.names = NULL)
+print(missing_counts)
+key <- do.call(paste0, present)
+counts <- table(key)
+missing_patterns <- present[match(names(counts), key), , drop = FALSE]
+missing_patterns$people <- as.integer(counts)
+missing_patterns <- missing_patterns[order(-missing_patterns$people, names(counts)), , drop = FALSE]
+rownames(missing_patterns) <- NULL
+print(missing_patterns)
+"""
+PYTHON_MISSING = """# Missing data: how many people have and lack each variable, then each pattern of what people
+# have (1) and lack (0), the most common first.
+variables = [{columns}]
+present = d[variables].notna().astype(int)
+missing_counts = pd.DataFrame(dict(variable=variables, n=present.sum().to_numpy(),
+                                   missing=(1 - present).sum().to_numpy()))
+print(missing_counts)
+key = present.astype(str).agg("".join, axis=1)
+missing_patterns = present.groupby(key).first()
+missing_patterns["people"] = key.value_counts()
+missing_patterns = missing_patterns.rename_axis("key").reset_index().sort_values(
+    ["people", "key"], ascending=[False, True]).drop(columns="key").reset_index(drop=True)
+print(missing_patterns)
+"""
 R_REGRESSION = """\
 # Regression: {y_label} on each X by itself (lm), with r and its 95% CI (cor.test).
 y <- {y}
@@ -582,6 +612,43 @@ def table_one_code(datasets: list[str], rows: list[tuple[str, list[Variable]]]) 
         outputs=("table1",),
         packages=("psych",),
     )
+
+
+def missing_code(variables: list[Variable]) -> Code:
+    columns = ", ".join(r_string(v.column) for v in variables)
+    return Code(
+        title="Missing data",
+        r=R_MISSING.format(columns=columns),
+        python=PYTHON_MISSING.format(columns=columns),
+        outputs=("missing_counts", "missing_patterns"),
+    )
+
+
+@dataclass
+class MissingData:
+    # Per variable: its column, people with a value and people without.
+    counts: list[tuple[str, int, int]]
+    # Each pattern of which variables people have, and how many people have it.
+    patterns: list[tuple[tuple[bool, ...], int]]
+
+    @property
+    def people(self) -> int:
+        return sum(n for _, n in self.patterns)
+
+    @property
+    def complete(self) -> int:
+        return sum(n for present, n in self.patterns if all(present))
+
+
+def read_missing(found: dict[str, pd.DataFrame], columns: list[str]) -> MissingData:
+    counts = [
+        (str(r.variable), int(r.n), int(r.missing)) for r in found["missing_counts"].itertuples()
+    ]
+    frame = found["missing_patterns"]
+    patterns = [
+        (tuple(bool(row[c]) for c in columns), int(row["people"])) for _, row in frame.iterrows()
+    ]
+    return MissingData(counts, patterns)
 
 
 def correlation_code(variables: list[Variable], method: str = "pearson") -> Code:

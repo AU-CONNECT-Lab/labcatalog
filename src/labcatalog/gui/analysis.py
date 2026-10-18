@@ -13,6 +13,7 @@ from labcatalog.gui import (
     group_invariance,
     measurement,
     mediation,
+    missing,
     multilevel,
 )
 from labcatalog.gui.common import apa, col, empty, fmt, method_toggle, note, p_value, panel
@@ -32,6 +33,7 @@ from labcatalog.stats import multilevel as ml
 STARS = ((0.001, "***"), (0.01, "**"), (0.05, "*"))
 STARS_NOTE = "*p < .05. **p < .01. ***p < .001."
 PARTS = {
+    "missing": "Missing data",
     "correlation": "Correlation table",
     "regression": "Regression",
     "groups": "Group comparison",
@@ -57,6 +59,7 @@ class AnalysisView:
     invariance_group: str | None = None
     # None keeps the project's stats.cfa_estimator.
     invariance_estimator: str | None = None
+    missing: list[str] = field(default_factory=list)
     # None keeps the project's stats.correlation and stats.t_test.
     correlation: str | None = None
     t_test: str | None = None
@@ -110,6 +113,8 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
                     "Pick datasets and measures with at least two scores or numbers between "
                     "them for correlations."
                 )
+        elif view.part == "missing":
+            missing.render(result, sample, view, choices)
         elif view.part == "correlation":
             correlation_section(result, sample, view, choices)
         elif view.part == "regression":

@@ -1,5 +1,12 @@
 from labcatalog.stats.analysis import Correlation, Fit
-from labcatalog.stats.analysis_script import ANOVA, STUDENT, WELCH, Comparison, GroupStats
+from labcatalog.stats.analysis_script import (
+    ANOVA,
+    STUDENT,
+    WELCH,
+    Comparison,
+    GroupStats,
+    MissingData,
+)
 from labcatalog.stats.cfa import (
     GENERAL_KINDS,
     MEASUREMENT,
@@ -88,6 +95,34 @@ def pair_sentence(a: str, b: str, c: Correlation, symbol: str, digits: int) -> s
 
 def statistic(symbol: str, c: Correlation, digits: int) -> str:
     return f"{symbol}({c.n - 2}) = {bounded(c.r, digits)}, {p_text(c.p)}"
+
+
+def missing_text(missing: MissingData, labels: list[str]) -> str:
+    people, k = missing.people, len(labels)
+    if not people:
+        return ""
+    things = "variable" if k == 1 else f"{k} variables"
+    complete = missing.complete
+    if complete == people:
+        return f"All {people} people had values on the {things}."
+    opening = (
+        f"Of the {people} people, {complete} ({percent(complete, people)}) had values on "
+        f"{'the variable' if k == 1 else f'all {k} variables'}."
+    )
+    if k == 1:
+        return opening
+    shares = sorted(zip(labels, missing.counts, strict=True), key=lambda x: x[1][2])
+    (low_label, low), (high_label, high) = shares[0], shares[-1]
+    if low[2] == high[2]:
+        return f"{opening} Each variable was missing for {high[2]} ({percent(high[2], people)})."
+    return (
+        f"{opening} Missing values ranged from {low[2]} ({percent(low[2], people)}) for "
+        f"{low_label} to {high[2]} ({percent(high[2], people)}) for {high_label}."
+    )
+
+
+def percent(part: int, whole: int) -> str:
+    return f"{100 * part / whole:.1f}%"
 
 
 def regression_text(

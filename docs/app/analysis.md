@@ -1,6 +1,6 @@
 # Analysis
 
-The Analysis page runs the analyses most papers need on the datasets you choose: a correlation table, regressions, a group comparison, a measurement model, measurement invariance across groups, mediation and a multilevel model, each on its own tab beside the Sample. Each result is a table ready for a manuscript, with a chart, a **Copy table** button, **Save to outputs**, and a **Code** section with the R and Python code that reproduces it. Where the result has a chart, the code ends by drawing it again, with ggplot2 in R and matplotlib in Python, and saving it as a PNG beside the data; the correlation chart follows the Heatmap or Dots choice. A note under each result says whether it was computed in R or in Python. The correlation table, the regressions and the group comparison also write a **Results paragraph** in APA style, with a **Copy text** button: the significant correlations (each pair when there are three or fewer, otherwise the five strongest), each predictor's *b*, *SE*, *p* and *R*², or the groups' means with the test and its effect size. Significance is *p* < .05, and the numbers have the decimal places set on the Settings page. With a language model set up (see [Set Up R and Language Models](../how-to/r-and-models.md)), **Interpret with the language model** under any Results paragraph, here or on an instrument's page, asks the model for a short interpretation of the result and a list of things to check. It sends the tables and the paragraph, never any data, and its answer is a draft to check against the tables.
+The Analysis page runs the analyses most papers need on the datasets you choose: a look at missing data, a correlation table, regressions, a group comparison, a measurement model, measurement invariance across groups, mediation and a multilevel model, each on its own tab beside the Sample. Each result is a table ready for a manuscript, with a chart, a **Copy table** button, **Save to outputs**, and a **Code** section with the R and Python code that reproduces it. Where the result has a chart, the code ends by drawing it again, with ggplot2 in R and matplotlib in Python, and saving it as a PNG beside the data; the correlation chart follows the Heatmap or Dots choice. A note under each result says whether it was computed in R or in Python. The correlation table, the regressions and the group comparison also write a **Results paragraph** in APA style, with a **Copy text** button: the significant correlations (each pair when there are three or fewer, otherwise the five strongest), each predictor's *b*, *SE*, *p* and *R*², or the groups' means with the test and its effect size. Significance is *p* < .05, and the numbers have the decimal places set on the Settings page. With a language model set up (see [Set Up R and Language Models](../how-to/r-and-models.md)), **Interpret with the language model** under any Results paragraph, here or on an instrument's page, asks the model for a short interpretation of the result and a list of things to check. It sends the tables and the paragraph, never any data, and its answer is a draft to check against the tables.
 
 ![The Analysis page with a correlation table](../images/app/analysis.png)
 
@@ -16,11 +16,17 @@ The note below says how many people are in the sample and how they were matched 
 
 The variable lists hold every score and number item of the chosen measures in the chosen datasets, labeled with their wave. Type in a list to filter it.
 
+## Missing data
+
+Choose the **Variables**; by default, every score of the chosen measures. The first table gives each variable's *n*, the number of people without a value, and their percentage, among the people in the Sample. The second lists each pattern of which variables people have (1) and lack (0), with how many people have it, the most common first, as `mice::md.pattern` shows them. The Results paragraph gives how many people have every variable and the range of missing values.
+
+The correlation table, regression and group comparison each use everyone with values on what they need, and their table notes give the *n*.
+
 ## Correlation table
 
 Choose the **Variables**; by default, every score of the chosen measures, without the number items. The **Select** menu adds all variables, all of one wave or all of one modality.
 
-The table lists each variable's *n*, *M* and *SD* and the correlation of every pair, with stars for *p* < .05, .01 and .001. Each pair uses everyone with both values. The coefficient is Pearson's *r*, or Spearman's ρ when `stats.correlation` is `spearman`. With three or more variables, a chart above the table shows the correlations as a **Heatmap** or as **Dots**.
+The table lists each variable's *n*, *M* and *SD* and the correlation of every pair, with stars for *p* < .05, .01 and .001. Each pair uses everyone with both values. The coefficient is the project's (Pearson's *r*, or Spearman's ρ when `stats.correlation` is `spearman`); the switch beside the variables tries the other for this table. With three or more variables, a chart above the table shows the correlations as a **Heatmap** or as **Dots**.
 
 Below the Results paragraph, **Measures paragraphs** give one paragraph for each instrument of the chosen variables in each dataset, as the instrument's page writes it, with Cronbach's α from that dataset; **Copy text** copies them all. McDonald's ω is on the instrument's page and the Methods page, which run the factor models. The Regression tab gives the same paragraphs for its outcome and predictors.
 
@@ -30,7 +36,7 @@ Choose one or more predictors (**X**) and an outcome (**Y**). Each predictor get
 
 ## Group comparison
 
-Choose the **Groups**, an answer-option item of a demographics instrument (the roster's items are offered for every chosen file), and the **Outcome**. Groups with fewer than two people are left out. With two groups, the test is Welch's *t* test, or Student's when `stats.t_test` is `student`, with Cohen's *d* and the mean difference, each with a 95% CI. With three or more, it is a one-way ANOVA with η² and ω². The page shows a table of *n*, *M* and *SD* per group, the test table, and a box plot with every person as a point.
+Choose the **Groups**, an answer-option item of a demographics instrument (the roster's items are offered for every chosen file), and the **Outcome**. Groups with fewer than two people are left out. With two groups, the test is the project's (Welch's *t* test, or Student's when `stats.t_test` is `student`; the switch beside the outcome tries the other), with Cohen's *d* and the mean difference, each with a 95% CI. With three or more, it is a one-way ANOVA with η² and ω². The page shows a table of *n*, *M* and *SD* per group, the test table, and a box plot with every person as a point.
 
 ## Measurement model
 
