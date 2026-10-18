@@ -88,9 +88,7 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
                 chosen, page.views.menu_groups(result, view.datasets, page.variables(view))
             )
         body()
-    # The imputation does not take samples of several studies yet.
-    if not analysis.pooling(result, view.datasets):
-        imputation_panel(result, sample, view, choices)
+    imputation_panel(result, sample, view, choices)
 
 
 def imputation_panel(
@@ -151,6 +149,11 @@ def imputation_panel(
             "Every section's code holds this same imputation, so they all use the same imputed "
             "data. Run shows the imputed values beside the observed ones."
         )
+        if analysis.pooling(result, view.datasets):
+            note(
+                "The datasets come from several studies, so each study is imputed by itself "
+                "with these choices, and its people's values come from their own study."
+            )
         ui.select(
             imputable(result, view),
             multiple=True,
@@ -258,16 +261,10 @@ NO_R = (
 
 
 def imputing(result: CatalogResult, view) -> bool:
-    # The imputation does not take samples of several studies yet.
-    if analysis.pooling(result, view.datasets):
-        return False
     return (view.missing_method or result.project.config.stats.missing) == imputation.IMPUTE
 
 
 def method_switch(result: CatalogResult, view, on_change: Callable[[], None]) -> None:
-    if analysis.pooling(result, view.datasets):
-        return
-
     def choose(value: str) -> None:
         view.missing_method = value
         on_change()
@@ -279,10 +276,10 @@ def method_switch(result: CatalogResult, view, on_change: Callable[[], None]) ->
 def imputable(result: CatalogResult, view) -> dict[str, str]:
     # Scores and numbers of the chosen datasets, and the answer options of their demographics.
     labels = {name: page.views.dataset_label(result, name) for name in view.datasets}
-    return {
-        **page.views.variable_choices(result, view.datasets),
-        **script.group_choices(result, view.datasets, labels),
-    }
+    groups = script.group_choices(result, view.datasets, labels)
+    # Pooled studies are imputed each by itself, so the study is not imputed or a predictor.
+    groups.pop(analysis.STUDY_KEY, None)
+    return {**page.views.variable_choices(result, view.datasets), **groups}
 
 
 def imputed_keys(result: CatalogResult, view) -> list[str]:
@@ -292,13 +289,14 @@ def imputed_keys(result: CatalogResult, view) -> list[str]:
         return [k for k in view.imputed if k in options]
     types = {(v.dataset, v.column): v.type for v in result.catalog.variables}
     scores = {s.key: s for s in result.catalog.scores}
-    return [
-        k
-        for k in options
-        if k not in scores
-        or all(types.get((scores[k].dataset, c)) == script.CHOICE for c in scores[k].columns)
-        if k in scores or item_variable(result, k).type == script.CHOICE
-    ]
+
+    def answered(key: str) -> bool:
+        if analysis.first_key(key) not in scores:
+            return item_variable(result, key).type == script.CHOICE
+        parts = [scores[analysis.part_key(key, name)] for name in analysis.parts(key)]
+        return all(types.get((s.dataset, c)) == script.CHOICE for s in parts for c in s.columns)
+
+    return [k for k in options if answered(k)]
 
 
 def auxiliary_keys(result: CatalogResult, view) -> list[str]:

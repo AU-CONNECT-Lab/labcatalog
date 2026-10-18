@@ -8,12 +8,13 @@ from scipy import stats
 from labcatalog.charts import views
 from labcatalog.pipeline import run_catalog
 from labcatalog.reports import results
-from labcatalog.stats import analysis, cfa, group_invariance, invariance, mplus
+from labcatalog.stats import analysis, cfa, group_invariance, imputation, invariance, mplus
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import measurement as mm
 from labcatalog.stats import mediation as med
 from labcatalog.stats.mediation_r import mediation_code
 from tests.test_analysis_script import needs_r, rscript
+from tests.test_imputation import needs_mice
 
 FILES = ["child_w1", "pilot_w1"]
 TOTAL = "example_mood.ems_total@child_w1+pilot_w1"
@@ -307,3 +308,89 @@ def test_the_same_answers_in_two_studies_give_one_studys_measurement_model(
     )
     omega = pd.read_csv(tmp_path / "omega.csv").iloc[0]
     assert [omega[f"f{i}"] for i in (1, 2, 3)] == pytest.approx(list(ordinal.omega.values()))
+
+
+def imputed(result, sample, keys, build, tmp_path):
+    data = script.AnalysisData(result, sample)
+    variables = [data.variable(k) for k in keys]
+    plan = imputation.plan(data, keys, [], 5, 3)
+    frame = data.frame()
+    file = (tmp_path / imputation.file_name(frame, plan)).as_posix()
+    found, _ = script.run_code(result, sample, frame, build(variables, plan, file), rscript())
+    return plan, variables, found
+
+
+def test_pooled_studies_are_imputed_each_by_itself(result, sample):
+    data = script.AnalysisData(result, sample)
+    plan = imputation.plan(data, [TOTAL, WORRIES], [], 5, 3)
+    assert plan.by_study and len(plan.items) == 9 + 4
+    assert plan.scores[0][1] == "sum"
+    code = imputation.impute_r(plan, "kept.rds")
+    assert "studies <- split(seq_len(nrow(d)), d$study)" in code
+    one = analysis.build_sample(result, ["child_w1"], True)
+    alone = imputation.plan(
+        script.AnalysisData(result, one), [TOTAL.replace("+pilot_w1", "")], [], 5, 3
+    )
+    assert not alone.by_study and "studies <-" not in imputation.impute_r(alone, "kept.rds")
+
+
+@needs_mice
+def test_the_same_answers_imputed_in_two_studies_give_one_studys_correlations(
+    result, sample, tmp_path
+):
+    keys = [TOTAL, WORRIES, TEMPER]
+    plan, variables, found = imputed(
+        result,
+        sample,
+        keys,
+        lambda vs, plan, file: imputation.correlation_code(vs, "pearson", plan, file),
+        tmp_path,
+    )
+    _, matrix = script.read_correlations(found, [v.column for v in variables])
+    one = analysis.build_sample(result, ["child_w1"], True)
+    alone_keys = [k.replace("+pilot_w1", "") for k in keys]
+    _, alone_variables, alone_found = imputed(
+        result,
+        one,
+        alone_keys,
+        lambda vs, plan, file: imputation.correlation_code(vs, "pearson", plan, file),
+        tmp_path,
+    )
+    _, alone = script.read_correlations(alone_found, [v.column for v in alone_variables])
+    assert matrix[1][0].r == pytest.approx(alone[1][0].r, abs=1e-6)
+    assert matrix[2][1].r == pytest.approx(alone[2][1].r, abs=1e-6)
+    # Each study on its own has the one study's answers and imputations.
+    pair = (variables[0].column, variables[1].column)
+    each = script.read_study_correlations(found)
+    assert sorted(each) == [1.0, 2.0]
+    assert [each[k][pair].r for k in each] == pytest.approx([alone[1][0].r] * 2, abs=1e-6)
+    data = script.AnalysisData(result, sample)
+    plan = imputation.plan(data, keys, [], 5, 3)
+    summary = imputation.summary_code(plan, (tmp_path / "s.rds").as_posix())
+    found, _ = script.run_code(result, sample, data.frame(), summary, rscript())
+    columns, _ = imputation.read_summary(found)
+    assert {c.column for c in columns} == set(plan.columns)
+
+
+@needs_mice
+def test_a_pooled_regression_after_imputation_takes_the_study_as_fixed(result, sample, tmp_path):
+    keys = [TOTAL, WORRIES]
+    _, _, found = imputed(
+        result,
+        sample,
+        keys,
+        lambda vs, plan, file: imputation.regression_code(vs[1:], vs[0], plan, file),
+        tmp_path,
+    )
+    one = analysis.build_sample(result, ["child_w1"], True)
+    _, _, alone = imputed(
+        result,
+        one,
+        [k.replace("+pilot_w1", "") for k in keys],
+        lambda vs, plan, file: imputation.regression_code(vs[1:], vs[0], plan, file),
+        tmp_path,
+    )
+    pooled_row, alone_row = found["regressions"].iloc[0], alone["regressions"].iloc[0]
+    assert pooled_row["n"] == 2 * alone_row["n"]
+    for column in ("slope", "intercept", "r"):
+        assert pooled_row[column] == pytest.approx(alone_row[column], abs=1e-6)

@@ -406,7 +406,12 @@ def correlation_section(
                 f"{coefficient}, {who}. {STARS_NOTE}",
             )
             tables = {"correlations": shown}
-            if by_study and not imputed:
+            if by_study:
+                each = (
+                    f"pooled over the {plan.m} imputed data sets, each study imputed by itself"
+                    if imputed
+                    else "each pair on everyone with both values"
+                )
                 tables["study_correlations"] = PaperTable(
                     "Correlations in Each Study",
                     *study_table(
@@ -416,8 +421,8 @@ def correlation_section(
                         [v.column for v in variables],
                         labels,
                     ),
-                    f"{coefficient} in each study on its own, each pair on everyone with both "
-                    f"values; Within studies as in the table above. {STARS_NOTE}",
+                    f"{coefficient} in each study on its own, {each}; Within studies as in the "
+                    f"table above. {STARS_NOTE}",
                 )
 
             def content() -> None:
@@ -585,12 +590,12 @@ def pair_section(
                 code = analysis_script.regression_code(list(usable.values()), y, by_study)
                 found, engine = await analysis_tables.compute(result, sample, frame, code)
                 who = "on everyone with both values"
-                if by_study:
-                    first = analysis.study_options(result, sample)[0][1]
-                    who += (
-                        f", with the study as a fixed effect (the intercept is {first}'s); r is "
-                        "within studies"
-                    )
+            if by_study:
+                first = analysis.study_options(result, sample)[0][1]
+                who += (
+                    f", with the study as a fixed effect (the intercept is {first}'s); r is "
+                    "within studies"
+                )
             figure = plot_code.regression(
                 {v.column: choices[x] for x, v in usable.items()}, choices[y_key]
             )
