@@ -20,8 +20,9 @@ def mediation_files(model: MediationModel, frame: pd.DataFrame, title: str) -> d
         else:
             columns[role] = v.column
     columns |= {f"cov{i}": v.column for i, v in enumerate(model.covariates, start=1)}
-    # The people R fits too: everyone with all the model's values.
-    data = frame[list(columns.values())].set_axis(list(columns), axis=1).dropna()
+    # The people R fits too: everyone with any of the model's values for FIML, else all.
+    data = frame[list(columns.values())].set_axis(list(columns), axis=1)
+    data = data.dropna(how="all" if model.full_information else "any")
     at, centred = moderator_values(model, data, latent)
     for role in centred:
         data[role] = data[role] - data[role].mean()
@@ -69,7 +70,7 @@ def moderator_values(
             at.append([])
             continue
         values = data[w] - data[w].mean()
-        levels = sorted(values.unique())
+        levels = sorted(values.dropna().unique())
         found = levels if len(levels) == 2 else [-values.std(), 0.0, values.std()]
         at.append([float(v) for v in found])
     return at, centred
@@ -183,6 +184,12 @@ def model_lines(model: MediationModel, latent: set[str]) -> list[str]:
     for s in model.tags:
         if f"w{s}" in latent:
             lines.append(f"  W{s} (v_w{s});")
+    if model.full_information:
+        # Mplus drops people who lack an observed predictor unless its variance is in the model.
+        predictors = [r for r in ("x", *(f"w{s}" for s in model.tags)) if r not in latent]
+        predictors += [*products(model, latent), *covariates]
+        if predictors:
+            lines += statement(" ".join(predictors))
     return lines
 
 

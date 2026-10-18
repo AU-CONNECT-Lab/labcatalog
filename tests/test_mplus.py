@@ -151,8 +151,15 @@ def test_score_mediation_centres_in_the_data_and_bootstraps_with_ml(result):
     assert "  ind1 = a*(b + b_mw*(-" in text and "CINTERVAL(BOOTSTRAP)" in text
     rows = [list(map(float, r.split())) for r in files["mplus_mediation.dat"].splitlines()]
     assert all(len(r) == 4 for r in rows)
-    assert abs(sum(r[0] for r in rows) / len(rows)) < 1e-4
+    # FIML keeps people who lack a value, and names the observed predictors' variances.
+    seen = [r[0] for r in rows if r[0] != -999]
+    assert len(seen) < len(rows) and abs(sum(seen) / len(seen)) < 1e-4
+    assert "  x w xw mw;" in text
     assert all(len(line) <= 90 for line in text.splitlines())
+    model.fiml = False
+    complete = mediation_files(model, data.frame(), "EPS")
+    assert "-999" not in complete["mplus_mediation.dat"]
+    assert "  x w xw mw;" not in complete["mplus_mediation.inp"]
 
 
 def test_item_mediation_uses_factors_and_xwith_for_latent_moderation(result):

@@ -29,14 +29,14 @@ OBSERVED_NOTE = (
 )
 OBSERVED_AT = """\
 {w}_levels <- sort(unique(med${w}))
-{w}_at <- if (length({w}_levels) == 2) {w}_levels else c(-1, 0, 1) * sd(med${w})"""
+{w}_at <- if (length({w}_levels) == 2) {w}_levels else c(-1, 0, 1) * sd(med${w}, na.rm = TRUE)"""
 CENTRE_W = """\
-{w}_mean <- mean(med${w})
+{w}_mean <- mean(med${w}, na.rm = TRUE)
 # Centred, so each path is its effect at the moderator's mean; the factors have mean 0.
 med${w} <- med${w} - {w}_mean"""
 FIRST_FIT = """\
 # Fitted once without the conditional effects, for the SD of the moderator's factor.
-first <- modsem::modsem(base, data = med, method = "{method}")
+first <- modsem::modsem(base, data = med, method = "{method}"{missing})
 found <- modsem::parameter_estimates(first)"""
 LATENT_AT = """\
 {w}_sd <- sqrt(found$est[found$lhs == "{factor}" & found$op == "~~" & found$rhs == "{factor}"])
@@ -84,7 +84,15 @@ def mediation_code(model: MediationModel, workers: int = DEFAULT_WORKERS) -> Cod
         f"{intervals_phrase(model)}.",
         f"# {'; '.join(f'{name(r, latent)} = {v.label}' for r, v in roles.items())}",
         f"med <- data.frame({', '.join(columns)})",
-        "med <- med[complete.cases(med), ]",
+        *(
+            [
+                "# FIML: everyone with any of the model's values, the rest of their values "
+                "estimated by the model.",
+                "med <- med[rowSums(!is.na(med)) > 0, ]",
+            ]
+            if model.full_information
+            else ["med <- med[complete.cases(med), ]"]
+        ),
     ]
     structure = [*measurement, *equations(model, latent)]
     if model.package == MODSEM:
@@ -176,11 +184,11 @@ def model_lines(model: MediationModel, structure: list[str], base: str = "") -> 
 
 def centre_scores(model: MediationModel) -> str:
     ws = [f"w{s}" for s in model.tags]
-    lines = [f"{w}_mean <- mean(med${w})" for w in ws]
+    lines = [f"{w}_mean <- mean(med${w}, na.rm = TRUE)" for w in ws]
     names = ", ".join(f'"{v}"' for v in ("x", "m", *ws))
     lines += [
         "# Centred, so each path is its effect where the other variables are at their means.",
-        f"for (v in c({names})) med[[v]] <- med[[v]] - mean(med[[v]])",
+        f"for (v in c({names})) med[[v]] <- med[[v]] - mean(med[[v]], na.rm = TRUE)",
     ]
     for w in ws:
         lines += [f"med$x{w} <- med$x * med${w}", f"med$m{w} <- med$m * med${w}"]
@@ -203,6 +211,9 @@ def lavaan_lines(
         ]
         lines.append(f"ordered <- c({', '.join(r_string(n) for n in names)})")
         ordered = ", ordered = ordered"
+    if model.full_information:
+        # fixed.x = FALSE keeps people who lack a predictor, as Mplus does when told.
+        ordered = ', missing = "fiml", fixed.x = FALSE'
     chosen = model.estimator.upper()
     if booted:
         parallel = f', parallel = "snow", ncpus = {workers}' if workers > 1 else ""
@@ -243,6 +254,7 @@ def roles_items(model: MediationModel, role: str) -> list[str]:
 
 def modsem_lines(model: MediationModel, structure: list[str], booted: bool) -> list[str]:
     robust = ", robust.se = TRUE" if model.estimator == MLR else ""
+    missing = ', missing = "fiml"' if model.full_information else ""
     lines = [
         "base <- paste(",
         *(f"  {r_string(s)}," for s in structure),
@@ -253,13 +265,13 @@ def modsem_lines(model: MediationModel, structure: list[str], booted: bool) -> l
     factors = [s for k, s in enumerate(model.tags) if model.latent(k)]
     lines += [CENTRE_W.format(w=f"w{s}") for s in observed]
     if factors:
-        lines.append(FIRST_FIT.format(method=model.method))
+        lines.append(FIRST_FIT.format(method=model.method, missing=missing))
         lines += [LATENT_AT.format(w=f"w{s}", factor=f"W{s}") for s in factors]
     if observed:
         lines += [OBSERVED_NOTE, *(OBSERVED_AT.format(w=f"w{s}") for s in observed)]
     lines += [AT, *model_lines(model, structure, base="base")]
     lines += [
-        f'fit <- modsem::modsem(model, data = med, method = "{model.method}"{robust})',
+        f'fit <- modsem::modsem(model, data = med, method = "{model.method}"{robust}{missing})',
         "estimates <- modsem::parameter_estimates(fit)",
         'estimates <- estimates[estimates$label != "", ]',
     ]

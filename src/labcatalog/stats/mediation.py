@@ -77,6 +77,8 @@ class MediationModel:
     bootstrap: int = DEFAULT_BOOTSTRAP
     # X, M, Y and a moderator with items become factors of their items.
     items: bool = False
+    # Full-information maximum likelihood for missing values, where the fit allows it.
+    fiml: bool = True
 
     @property
     def moderated(self) -> set[str]:
@@ -108,6 +110,12 @@ class MediationModel:
         # LMS needs the moderator to be a factor; QML also takes an observed one.
         return "lms" if self.latent_moderator else "qml"
 
+    @property
+    def full_information(self) -> bool:
+        # WLSMV and modsem's QML have no FIML, so they keep everyone with every value.
+        qml = self.package == MODSEM and self.method == "qml"
+        return self.fiml and self.estimator != WLSMV and not qml
+
 
 @dataclass
 class Effect:
@@ -134,6 +142,7 @@ class MediationFit:
     resamples: int = DEFAULT_BOOTSTRAP
     package: str = LAVAAN
     method: str = ""
+    fiml: bool = False
 
 
 def read_fit(found: dict[str, pd.DataFrame], model: MediationModel) -> MediationFit:
@@ -170,6 +179,7 @@ def read_fit(found: dict[str, pd.DataFrame], model: MediationModel) -> Mediation
         resamples=int(measures["resamples"]),
         package=model.package,
         method=model.method if model.package == MODSEM else "",
+        fiml=model.full_information,
     )
 
 
@@ -236,7 +246,13 @@ def intervals_text(fit: MediationFit) -> str:
 def method_text(fit: MediationFit) -> str:
     name = ESTIMATOR_NAMES[fit.estimator]
     if fit.package == MODSEM:
-        return f"latent interactions by {fit.method.upper()} with {name}"
-    if fit.bootstrap and fit.estimator != ML:
-        return f"{BASE[fit.estimator]} for the estimates and {name} for the fit"
-    return name
+        text = f"latent interactions by {fit.method.upper()} with {name}"
+    elif fit.bootstrap and fit.estimator != ML:
+        text = f"{BASE[fit.estimator]} for the estimates and {name} for the fit"
+    else:
+        text = name
+    return (
+        f"{text}, with full-information maximum likelihood (FIML) for missing values"
+        if fit.fiml
+        else text
+    )

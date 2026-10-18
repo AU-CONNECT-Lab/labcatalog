@@ -36,6 +36,7 @@ class Choices:
     booted: bool = True
     bootstrap: int = med.DEFAULT_BOOTSTRAP
     items: bool = False
+    fiml: bool = True
 
 
 def render(
@@ -94,6 +95,7 @@ def render(
             chosen.estimator,
             chosen.bootstrap if chosen.booted else 0,
             chosen.items,
+            chosen.fiml,
         )
 
     async def run() -> None:
@@ -172,7 +174,11 @@ def render(
 
     def preview() -> None:
         data = script.AnalysisData(result, sample)
-        ui.html(diagram(model_of(data), None), sanitize=False).classes("w-full")
+        model = model_of(data)
+        ui.html(diagram(model, None), sanitize=False).classes("w-full")
+        if model.fiml and not model.full_information:
+            which = "WLSMV" if model.estimator == med.WLSMV else "QML, for an observed moderator,"
+            note(f"{which} has no FIML, so the model keeps everyone with all its values.")
 
     @ui.refreshable
     def controls() -> None:
@@ -227,6 +233,14 @@ def render(
                 value=chosen.estimator,
                 on_change=lambda e: choose("estimator", e.value),
             ).props("dense no-caps")
+            ui.toggle(
+                {True: "FIML", False: "Complete cases"},
+                value=chosen.fiml,
+                on_change=lambda e: choose("fiml", e.value),
+            ).props("dense no-caps").tooltip(
+                "Missing values: everyone with any of the model's values by full-information "
+                "maximum likelihood, or only those with all of them"
+            )
             ui.toggle(
                 {True: "Bootstrap", False: "None"},
                 value=chosen.booted,

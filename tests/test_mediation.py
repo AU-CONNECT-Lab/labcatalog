@@ -198,7 +198,10 @@ def test_without_bootstrap_mlr_gives_wald_intervals_from_one_fit(setup):
     # Wald intervals are symmetric around the estimate.
     assert index.estimate - index.low == pytest.approx(index.high - index.estimate)
     assert med.intervals_text(fit) == "Wald intervals, by the delta method for the defined effects"
-    assert med.method_text(fit) == "robust maximum likelihood (MLR)"
+    assert med.method_text(fit) == (
+        "robust maximum likelihood (MLR), with full-information maximum likelihood (FIML) for "
+        "missing values"
+    )
     assert "Confidence intervals are Wald intervals" in results.mediation_text(model, fit)
 
 
@@ -362,3 +365,25 @@ def test_a_factor_and_an_observed_moderator_run_together_in_modsem(setup):
     fit = med.read_fit(found, model)
     assert fit.at[0][1] == 0 and len(fit.at[1]) == 3
     assert "indirect_w1_2_w2_2" in fit.effects and "index_1" not in fit.effects
+
+
+@needs_r
+def test_fiml_keeps_everyone_with_any_value(setup):
+    result, sample, data = setup
+    model = model_of(data, ("a",), bootstrap=0)
+    code = mediation_code(model)
+    assert 'missing = "fiml", fixed.x = FALSE' in code.r and "complete.cases(med)" not in code.r
+    complete = model_of(data, ("a",), bootstrap=0, fiml=False)
+    assert "complete.cases(med)" in mediation_code(complete).r
+    frame = data.frame()
+    fits = [
+        med.read_fit(script.run_code(result, sample, frame, mediation_code(m), rscript())[0], m)
+        for m in (model, complete)
+    ]
+    columns = [v.column for v in (model.x, model.m, model.y, model.moderators[0].variable)]
+    assert fits[0].n == int(frame[columns].notna().any(axis=1).sum())
+    assert fits[1].n == int(frame[columns].notna().all(axis=1).sum()) < fits[0].n
+    assert fits[0].fiml and not fits[1].fiml
+    assert "FIML" in results.mediation_text(model, fits[0])
+    # WLSMV has no FIML, so it keeps the complete cases.
+    assert not model_of(data, estimator="wlsmv").full_information
