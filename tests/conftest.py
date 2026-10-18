@@ -3,7 +3,8 @@ from pathlib import Path
 
 import pytest
 
-from labcatalog.project import EXAMPLE_DIR
+from labcatalog.metadata import changes, studies
+from labcatalog.project import EXAMPLE_DIR, load_project
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
 
@@ -15,10 +16,32 @@ def demo_project(tmp_path: Path) -> Path:
     return root
 
 
+SECOND_STUDY = "mock_study_2"
+
+
+@pytest.fixture
+def example_project(tmp_path: Path) -> Path:
+    root = tmp_path / "example"
+    shutil.copytree(EXAMPLE_DIR, root)
+    return root
+
+
 @pytest.fixture
 def mock_project(tmp_path: Path) -> Path:
+    # The example's first study alone, which most tests count on; example_project has both.
     root = tmp_path / "mock_study"
     shutil.copytree(EXAMPLE_DIR, root)
+    project = load_project(root)
+    changes.write(project, studies.delete_study(project, SECOND_STUDY))
+    for path in [
+        *(root / "data").glob("s2_*.csv"),
+        root / "data" / f"participants_{SECOND_STUDY}.csv",
+    ]:
+        path.unlink()
+    (root / "instruments" / "sleep_watch.yaml").unlink()
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    config.write_text(text.replace(", actigraphy]", "]"), encoding="utf-8")
     return root
 
 

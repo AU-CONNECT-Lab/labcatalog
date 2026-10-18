@@ -1,0 +1,15 @@
+column,instrument,item
+pid,,
+visit_date,,
+eps_1,example_parent_stress,eps_1
+eps_2,example_parent_stress,eps_2
+eps_3,example_parent_stress,eps_3
+eps_4,example_parent_stress,eps_4
+eps_5,example_parent_stress,eps_5
+eps_6,example_parent_stress,eps_6
+ecs_1,example_child_sleep,ecs_1
+ecs_2,example_child_sleep,ecs_2
+ecs_3,example_child_sleep,ecs_3
+ecs_4,example_child_sleep,ecs_4
+ecs_5,example_child_sleep,ecs_5
+ecs_6,example_child_sleep,ecs_6

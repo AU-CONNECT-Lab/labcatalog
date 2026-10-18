@@ -575,8 +575,9 @@ def check_data_settings(project: Project) -> list[Issue]:
         if group and group.from_id and group_column:
             message = f"ids.group.from_id and {where}.group_column: read the group in one way only"
             issues.append(problem("invalid_value", message, CONFIG))
-    # A study whose roster gives no group links its files by ID.
-    if group and not group.from_id and not any(r.group_column for r in rosters(config).values()):
+    # A study whose roster gives no group links its files by ID; with no data, nothing needs one.
+    grouped = any(r.group_column for r in rosters(config).values())
+    if group and not group.from_id and config.datasets and not grouped:
         message = "ids.group: needs from_id, or a study roster with a group_column"
         issues.append(problem("invalid_value", message, CONFIG))
     allowed = {"id", "none"} | ({group.name} if group else set())

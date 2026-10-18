@@ -1,6 +1,6 @@
 # Tour of the Example Project
 
-labcatalog comes with a fictional project, the Mock Family Study: three yearly waves in which parents and their children answer questionnaires about stress, sleep, mood, worries and screen time, some families with two children, plus simulated EEG, fMRI, fNIRS, eye tracking, video coding, ECG and salivary cortisol data. It is small enough to read in full and has every part a real project has. It also contains a few deliberate data problems so that you can see how labcatalog reports them.
+labcatalog comes with a fictional project of two studies. The Mock Family Study has three yearly waves in which parents and their children answer questionnaires about stress, sleep, mood, worries and screen time, some families with two children, plus simulated EEG, fMRI, fNIRS, eye tracking, video coding, ECG and salivary cortisol data. Mock Study 2 is smaller: a baseline and a follow-up in which parents report their child's sleep and their own stress, children their mood, and children wear a sleep watch for a week. Its IDs are written like the first study's, but they are other people. It is small enough to read in full and has every part a real project has. It also contains a few deliberate data problems so that you can see how labcatalog reports them.
 
 ## Open the example
 
@@ -19,11 +19,11 @@ labcatalog gui -p my_example
 
 Open `my_example` in a file browser or editor. The parts you will meet in every project:
 
-- `labcatalog.yaml`: the project's settings, its study and waves, and one entry per data file.
+- `labcatalog.yaml`: the project's settings, its studies and their waves, and one entry per data file.
 - `instruments/`: one YAML file per questionnaire or measure.
-- `studies/mock_study.yaml`: which instruments were given in which data files, and how each modality's data were collected.
+- `studies/`: for each study, which instruments were given in which data files, and how each modality's data were collected.
 - `maps/`: one CSV file per data file, linking each column to an item.
-- `data/`: the cleaned data files the catalog reads, and `participants.csv`, the roster that gives each person's family.
+- `data/`: the cleaned data files the catalog reads, and each study's roster, `participants.csv` and `participants_mock_study_2.csv`, which gives each person's family.
 - `raw/`, `derivatives/` and `scripts/`: the raw exports, the pipeline outputs, and the scripts that turn them into `data/`.
 - `references/`: the instruments' references and their PDFs.
 
@@ -31,15 +31,15 @@ Open `my_example` in a file browser or editor. The parts you will meet in every 
 
 ## Browse instruments
 
-The **Instruments** page lists the fourteen instruments, one of them describing the roster. Use the filters at the top to narrow the list by wave, reporter or domain, then click **Example Mood Scale**. Its page shows the items and response options, the scores and how they are computed, their reliability in each wave, and how the scores change across waves. Under **One dataset**, pick `child_w1` to see item statistics, the R and Python code that computes the scores, and a draft Measures paragraph.
+The **Instruments** page lists the fifteen instruments, one of them describing the rosters. Use the filters at the top to narrow the list by wave, reporter or domain, then click **Example Mood Scale**. Its page shows the items and response options, the scores and how they are computed, their reliability in each wave, and how the scores change across waves. Under **One dataset**, pick `child_w1` to see item statistics, the R and Python code that computes the scores, and a draft Measures paragraph.
 
 ## Look at a dataset
 
-The **Datasets** page shows the study and each of its twenty-one data files. Click `parent_w1` to see which instruments it holds, how many values are missing and why, when the data were collected, and the problems found in this file.
+The **Datasets** page shows each study and its data files, twenty-one in the first and six in the second. The picker at the top right of the window shows one study or both. Click `parent_w1` to see which instruments it holds, how many values are missing and why, when the data were collected, and the problems found in this file.
 
 ## Run an analysis
 
-The **Analysis** page works on the datasets you pick under **Sample**. Pick `child_w1` and `parent_w1`: the correlation table shows how the children's mood scores relate to their parents' stress, linked through the family each ID belongs to. Below it are regression, group comparisons and a multilevel model. Each result has a **Copy** button for pasting into a manuscript and a **Code** section with the R and Python code that reproduces it.
+The **Analysis** page works on the datasets you pick under **Sample**. Pick `child_w1` and `parent_w1`: the correlation table shows how the children's mood scores relate to their parents' stress, linked through the family each ID belongs to. Below it are regression, group comparisons and a multilevel model. Each result has a **Copy** button for pasting into a manuscript and a **Code** section with the R and Python code that reproduces it. Pick `parent_w1` and `s2_parent_baseline` as well to pool the two studies: the child sleep and parent stress scores are then correlated within studies, since the second study's families report more of both.
 
 ## Read the Methods page
 

@@ -7,7 +7,7 @@ project:
 
 # Allowed words for each dataset's modality and reporter, and for each administration's target.
 vocab:
-  modalities: [questionnaire, eeg, fmri, fnirs, eyetracking, video, ecg, saliva]
+  modalities: [questionnaire, eeg, fmri, fnirs, eyetracking, video, ecg, saliva, actigraphy]
   # How each modality reads in tables and in the Methods text; the plain word when left out.
   modality_labels: {questionnaire: questionnaires, eeg: EEG, fmri: fMRI, fnirs: fNIRS, eyetracking: eye tracking, video: video coding, ecg: ECG, saliva: salivary cortisol}
   reporters: [parent, child]
@@ -60,6 +60,16 @@ studies:
     milestones:
       - {name: Interim report, date: 2026-12-15}
       - {name: Wave 3 data freeze, date: 2027-01-31}
+  mock_study_2:
+    label: Mock Study 2
+    description: A smaller fictional two-wave study of children's sleep. Parents answer questionnaires about their child's sleep and their own stress, children about their mood, and children wear a sleep watch for a week after each visit. Its IDs are written like the first study's, but they are other people.
+    # Its own people: 1001P here is not 1001P of Mock Family Study.
+    roster: {path: data/participants_mock_study_2.csv, id_column: pid, group_column: family_id, role_column: role, instrument: example_participants}
+    waves:
+      baseline: {start: 2025-09-08, end: 2025-12-12}
+      followup: {start: 2026-03-09, end: 2026-06-12}
+    milestones:
+      - {name: Sleep paper draft, date: 2026-12-01}
 
 # One entry per data file: which study, wave and reporter it holds, and where it is.
 datasets:
@@ -84,6 +94,12 @@ datasets:
   - {name: ecg_w3, modality: ecg, study: mock_study, wave: 3, reporter: child, source: csv, path: data/ecg_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: saliva_w1, modality: saliva, study: mock_study, wave: 1, reporter: child, source: csv, path: data/saliva_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: saliva_w3, modality: saliva, study: mock_study, wave: 3, reporter: child, source: csv, path: data/saliva_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: s2_parent_baseline, modality: questionnaire, study: mock_study_2, wave: baseline, reporter: parent, source: csv, path: data/s2_parent_baseline.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: s2_parent_followup, modality: questionnaire, study: mock_study_2, wave: followup, reporter: parent, source: csv, path: data/s2_parent_followup.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: s2_child_baseline, modality: questionnaire, study: mock_study_2, wave: baseline, reporter: child, source: csv, path: data/s2_child_baseline.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: s2_child_followup, modality: questionnaire, study: mock_study_2, wave: followup, reporter: child, source: csv, path: data/s2_child_followup.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: s2_watch_baseline, modality: actigraphy, study: mock_study_2, wave: baseline, reporter: child, source: csv, path: data/s2_watch_baseline.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: s2_watch_followup, modality: actigraphy, study: mock_study_2, wave: followup, reporter: child, source: csv, path: data/s2_watch_followup.csv, date_column: visit_date, snapshot_date: 2026-10-10}
 
 # Extra fields your lab wants on instruments, scores, administrations or datasets; choice and tags fields can be used as filters.
 custom_fields:

@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: sleep_watch
+name: Sleep watch week
+abbreviation: Watch
+kind: actigraphy
+construct_name: Sleep
+description: Children wore a wrist sleep watch for a week; the device software scores each night, and the nightly values are averaged over the nights worn.
+items:
+  - {id: nights, label: "Nights", text: "Nights the watch was worn", type: number, min: 0, max: 14}
+  - {id: total_sleep, label: "Total sleep", text: "Mean total sleep time per night (minutes)", type: number, min: 0, max: 900}
+  - {id: efficiency, label: "Sleep efficiency", text: "Mean share of time in bed spent asleep", type: number, min: 0, max: 1}
+  - {id: waking, label: "Wake after sleep onset", text: "Mean minutes awake after first falling asleep", type: number, min: 0, max: 300}
+  - {id: onset, label: "Sleep onset latency", text: "Mean minutes from lights out to falling asleep", type: number, min: 0, max: 180}
+license: Fictional example measures
+custom:
+  domain: health

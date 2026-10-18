@@ -137,3 +137,18 @@ def test_r_and_python_agree_within_studies(result, sample):
     assert (fits[0].slope, fits[0].slope_se, fits[0].correlation.p) == pytest.approx(
         (fits[1].slope, fits[1].slope_se, fits[1].correlation.p)
     )
+
+
+def test_the_example_pools_its_two_studies(example_project):
+    result = run_catalog(example_project)
+    assert list(result.project.config.studies) == ["mock_study", "mock_study_2"]
+    # The second study adds no errors of its own.
+    assert not [
+        i for i in result.report.issues if i.level == "error" and "s2_" in (i.location or "")
+    ]
+    files = ["parent_w1", "s2_parent_baseline"]
+    choices = views.variable_choices(result, files)
+    assert "example_child_sleep.ecs_total@parent_w1+s2_parent_baseline" in choices
+    # 1001P of each study is someone else, with a parent of their own family.
+    people = analysis.build_sample(result, files, True).people
+    assert {"mock_study/1001", "mock_study_2/1001"} <= set(people)

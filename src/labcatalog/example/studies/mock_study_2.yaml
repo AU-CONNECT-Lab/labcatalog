@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=../schemas/study.schema.json
+study: mock_study_2
+# How each modality's data were collected and processed in this study; one paragraph per line, a blank line between paragraphs.
+methods:
+  questionnaire: |
+    Parents answered questionnaires about their child's sleep and their own stress online in the week of each visit, and children answered theirs on a tablet at the visit.
+  actigraphy: |
+    Children wore a wrist sleep watch for the week after each visit. The device software scored each night; nights with less than four hours of wear were not scored, and a child's values are the means over the scored nights.
+administrations:
+  - {instrument: example_parent_stress, datasets: [s2_parent_baseline, s2_parent_followup], target: self}
+  - {instrument: example_child_sleep, datasets: [s2_parent_baseline, s2_parent_followup], target: child}
+  - {instrument: example_mood, datasets: [s2_child_baseline, s2_child_followup], target: self}
+  - {instrument: sleep_watch, datasets: [s2_watch_baseline, s2_watch_followup], target: self}

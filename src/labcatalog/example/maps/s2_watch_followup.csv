@@ -1,0 +1,8 @@
+column,instrument,item
+pid,,
+visit_date,,
+nights,sleep_watch,nights
+total_sleep,sleep_watch,total_sleep
+efficiency,sleep_watch,efficiency
+waking,sleep_watch,waking
+onset,sleep_watch,onset
