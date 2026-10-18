@@ -24,6 +24,8 @@ TABS = {"study": "Study", "text": "Text", "datasets": "Datasets"}
 class StudiesView:
     study: str | None = None
     tab: str = "study"
+    # Unsaved changes on the page, which another page's choice of study must not drop unasked.
+    edited: bool = False
 
 
 def render(
@@ -35,15 +37,15 @@ def render(
 ) -> None:
     project = result.project
     config = project.config
-    edited = {"now": False}
+    view.edited = False
 
     def touched() -> None:
-        edited["now"] = True
+        view.edited = True
         for button in buttons:
             button.enable()
 
     def leave(then: Callable[[], None]) -> None:
-        if not edited["now"]:
+        if not view.edited:
             then()
             return
         with frame, ui.dialog() as dialog, ui.card():
@@ -55,7 +57,7 @@ def render(
 
     def go(study: str | None) -> None:
         view.study = study
-        edited["now"] = False
+        view.edited = False
         page.refresh()
 
     def choose(study: str) -> None:

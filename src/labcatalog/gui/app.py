@@ -449,6 +449,9 @@ class Window:
         scope = None if value == ALL_STUDIES else value
         if scope == self.scope:
             return
+        if self.studying.edited:
+            self.confirm_scope(scope)
+            return
         self.scope = scope
         saved = preferences.load().get(preferences.STUDY_SCOPE, {})
         preferences.save({preferences.STUDY_SCOPE: {**saved, str(self.root): scope}})
@@ -462,6 +465,24 @@ class Window:
             self.methods_panel,
         ):
             panel.refresh()
+
+    def confirm_scope(self, scope: str | None) -> None:
+        # Narrowing the pages draws the Studies page again, which would drop its unsaved changes.
+        def discard() -> None:
+            dialog.close()
+            self.studying.edited = False
+            self.set_scope(scope or ALL_STUDIES)
+
+        def keep() -> None:
+            dialog.close()
+            self.scope_select.set_value(self.scope or ALL_STUDIES)
+
+        with ui.dialog().props("persistent") as dialog, ui.card():
+            ui.label(f"Discard your changes to {self.studying.study}?")
+            with ui.row():
+                ui.button("Discard", on_click=discard)
+                ui.button("Keep editing", on_click=keep).props("flat")
+        dialog.open()
 
     def follow_scope(self) -> None:
         # The pages that keep their own choice of study start from the one picked at the top.
