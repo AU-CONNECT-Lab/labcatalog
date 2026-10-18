@@ -26,6 +26,7 @@ from labcatalog.gui import (
     prepare,
     problems,
     settings,
+    setup,
     studies,
     theme,
 )
@@ -43,6 +44,7 @@ from labcatalog.gui.instruments import (
 )
 from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
+from labcatalog.gui.setup import SetupView
 from labcatalog.gui.studies import StudiesView
 from labcatalog.issues import Issue
 from labcatalog.metadata.browse import BrowseIndex, build_index
@@ -66,7 +68,7 @@ PAGES = (
         ("datasets", "Datasets"),
     ),
     (("analysis", "Analysis"), ("methods", "Methods")),
-    (("prepare", "Prepare"), ("import", "Import"), ("edit", "Edit")),
+    (("setup", "Set up"),),
     (("problems", "Problems"),),
 )
 SETTINGS = "settings"
@@ -117,6 +119,9 @@ class Window:
         self.importing = ImportView()
         self.editing = EditView()
         self.preparing = PrepareView()
+        self.setting_up = SetupView()
+        self.step_tabs: ui.tabs | None = None
+        self.steps: dict[str, ui.column] = {}
         self.cfa = CfaView(
             open_settings=lambda: self.tabs.set_value("settings"),
             reload=self.reload,
@@ -203,12 +208,18 @@ class Window:
                 self.analysis_panel()
             with ui.tab_panel("methods").classes("lc-page"):
                 self.methods_panel()
-            with ui.tab_panel("prepare").classes("lc-page"):
-                self.prepare_panel()
-            with ui.tab_panel("import").classes("lc-page"):
-                self.import_panel()
-            with ui.tab_panel("edit").classes("lc-page"):
-                self.edit_panel()
+            with ui.tab_panel("setup").classes("lc-page"):
+                self.setup_bar()
+                # All three stay built, so an unsaved edit survives a look at another step.
+                for name, part in (
+                    (setup.PREPARE, self.prepare_panel),
+                    (setup.IMPORT, self.import_panel),
+                    (setup.EDIT, self.edit_panel),
+                ):
+                    with ui.column().classes("lc-step w-full") as self.steps[name]:
+                        part()
+                        setup.next_button(name, self.pick_step)
+                self.show_step()
             with ui.tab_panel("problems").classes("lc-page"):
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-page"):
@@ -265,6 +276,7 @@ class Window:
                 self.importing = ImportView()
                 self.editing = EditView()
                 self.preparing = PrepareView()
+                self.setting_up = SetupView()
                 self.cfa.estimator = self.cfa.invariance_estimator = None
                 self.root = root
             self.set_busy(False)
@@ -405,6 +417,7 @@ class Window:
             self.datasets_panel,
             self.analysis_panel,
             self.methods_panel,
+            self.setup_bar,
             self.prepare_panel,
             self.import_panel,
             self.edit_panel,
@@ -418,8 +431,27 @@ class Window:
         self.tabs.set_value("instruments")
 
     def edit_location(self, path: str, line: int | None) -> None:
-        self.tabs.set_value("edit")
+        self.tabs.set_value("setup")
+        self.pick_step(setup.EDIT)
         self.editing.open(path, line)
+
+    def pick_step(self, name: str) -> None:
+        if name not in setup.STEPS:
+            self.tabs.set_value(name)
+            return
+        self.setting_up.step = name
+        self.step_tabs.set_value(name)
+        self.show_step()
+
+    def show_step(self) -> None:
+        for name, part in self.steps.items():
+            part.visible = name == self.setting_up.step
+
+    @ui.refreshable_method
+    def setup_bar(self) -> None:
+        counts = setup.to_do(self.result)
+        self.step_tabs = setup.step_bar(self.setting_up, counts, self.pick_step)
+        self.show_step()
 
     async def dataset_added(self, dataset: str) -> None:
         ui.notify(f"Added {dataset}")

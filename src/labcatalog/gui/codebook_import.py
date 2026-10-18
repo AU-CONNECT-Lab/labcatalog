@@ -36,6 +36,11 @@ def render(
                 f"{defaults.CONFIG_FILENAME}, then press Refresh.",
                 "task_alt",
             )
+            ui.button(
+                f"Add the file in {defaults.CONFIG_FILENAME}",
+                icon="edit_note",
+                on_click=lambda: on_edit(defaults.CONFIG_FILENAME, None),
+            ).props("flat no-caps").classes("lc-quiet-btn self-center")
         pipeline_table.render(project, view.pipeline)
         return
     if view.dataset not in names:

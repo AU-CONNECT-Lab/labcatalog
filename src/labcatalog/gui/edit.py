@@ -87,7 +87,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         if path == view.path and shown.editor is not None:
             mark(line)
         else:
-            leave(partial(go, path, TEXT, line))
+            # A line to mark needs the text; otherwise the form is the friendlier start.
+            leave(partial(go, path, FORM if line is None else TEXT, line))
 
     def mark(line: int | None) -> None:
         if line is None:

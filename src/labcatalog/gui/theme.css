@@ -314,6 +314,21 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .q-tabs.lc-subnav .q-tab--active .q-tab__label { font-weight: 600; }
 .q-tabs.lc-subnav .q-tab__indicator { height: 2px; background: var(--lc-accent); }
 .q-tab-panel.lc-part { padding: 0; gap: 16px; }
+.q-tabs.lc-steps .q-tab__content { gap: 0.5rem; }
+.lc-step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--lc-border);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--lc-muted);
+}
+.q-tab--active .lc-step-num { background: var(--lc-accent); border-color: var(--lc-accent); color: var(--lc-on-accent); }
+.lc-step-arrow { align-self: center; color: var(--lc-faint); font-size: 1.1rem; }
 
 .lc-subhead {
   width: 100%;
