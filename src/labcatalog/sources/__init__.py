@@ -32,6 +32,9 @@ class LoadedDataset:
     numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
     answer_cache: dict[tuple, pd.Series] = field(default_factory=dict, repr=False)
 
+    def respondents(self) -> pd.Series:
+        return self.frame[self.config.respondent_column or self.id_column]
+
     def numbers(self, column: str) -> pd.Series:
         # Converting text to numbers is the slowest step on wide data, so each column is done once.
         if column not in self.numeric_cache:
@@ -93,6 +96,8 @@ def load_dataset(
         frame = frame[frame[dataset.wave_column] == dataset.wave]
     if id_column not in frame:
         raise DataSourceError(f"{dataset.name}: no ID column '{id_column}'")
+    if dataset.respondent_column and dataset.respondent_column not in frame:
+        raise DataSourceError(f"{dataset.name}: no respondent column '{dataset.respondent_column}'")
     ids = frame[id_column]
 
     group = None

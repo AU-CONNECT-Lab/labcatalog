@@ -213,7 +213,11 @@ def exported_scores(
 def data_frame(result: CatalogResult, dataset: str, instrument_ids: list[str]) -> pd.DataFrame:
     loaded = result.datasets[dataset]
     config = loaded.config
-    keys = [id_column_for(result.project.config, config), config.date_column]
+    keys = [
+        id_column_for(result.project.config, config),
+        config.respondent_column,
+        config.date_column,
+    ]
     # Open answers are never shown or exported, since they can identify people.
     items = [
         v.column

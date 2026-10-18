@@ -67,9 +67,9 @@ datasets:
   - {name: child_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: child, source: csv, path: data/child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: child_w3, modality: questionnaire, study: mock_study, wave: 3, reporter: child, source: csv, path: data/child_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
-  - {name: parent_child_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: parent, source: csv, path: data/parent_child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
-  - {name: parent_child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
-  - {name: parent_child_w3, modality: questionnaire, study: mock_study, wave: 3, reporter: parent, source: csv, path: data/parent_child_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: parent_child_w1, modality: questionnaire, study: mock_study, wave: 1, reporter: parent, source: csv, path: data/parent_child_w1.csv, respondent_column: parent_pid, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: parent_child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_child_w2.csv, respondent_column: parent_pid, date_column: visit_date, snapshot_date: 2026-10-10}
+  - {name: parent_child_w3, modality: questionnaire, study: mock_study, wave: 3, reporter: parent, source: csv, path: data/parent_child_w3.csv, respondent_column: parent_pid, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: eeg_w1, modality: eeg, study: mock_study, wave: 1, reporter: child, source: csv, path: data/eeg_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: eeg_w3, modality: eeg, study: mock_study, wave: 3, reporter: child, source: csv, path: data/eeg_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: fmri_w1, modality: fmri, study: mock_study, wave: 1, reporter: child, source: csv, path: data/fmri_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}

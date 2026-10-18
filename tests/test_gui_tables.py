@@ -37,9 +37,9 @@ def test_instrument_list_shows_only_the_matched_datasets(mock_project):
     columns, rows = instruments.list_table(result, found)
     assert [c["label"] for c in columns[-3:]] == ["child_w1", "child_w2", "child_w3"]
     by_id = {r["id"]: r for r in rows}
-    assert set(by_id) == {"example_mood", "example_screen_time"}
+    assert set(by_id) == {"example_mood", "example_screen_time", "example_worries_temper"}
     screen = by_id["example_screen_time"]
-    assert (screen["d0"], screen["d1"], screen["d2"]) == ("", 153, 148)
+    assert (screen["d0"], screen["d1"], screen["d2"]) == ("", 182, 174)
     assert by_id["example_mood"]["reporters"] == "child"
 
 
@@ -66,7 +66,7 @@ def test_instrument_items_list_each_dataset_column(mock_project):
 def test_dataset_issues_cover_its_data_file_only(mock_project):
     result = run_catalog(mock_project)
     codes = [i.code for i in datasets.dataset_issues(result, "child_w1")]
-    assert sorted(codes) == ["same_answer", "unexpected_value"]
+    assert sorted(codes) == ["same_answer", "same_answer", "unexpected_value"]
 
 
 def test_dataset_page_lists_each_file_with_the_study_citation(mock_project):
@@ -96,7 +96,7 @@ def test_item_total_and_stability_tables_have_a_column_per_wave(mock_project):
     assert [c["label"] for c in columns[2:]] == [
         "Wave 1 (α 0.90)",
         "Wave 2 (α 0.91)",
-        "Wave 3 (α 0.90)",
+        "Wave 3 (α 0.89)",
     ]
     assert [r["item"] for r in rows] == [f"ems_{i}" for i in range(1, 10)]
     assert all(r["d0"] and r["d2"] for r in rows)

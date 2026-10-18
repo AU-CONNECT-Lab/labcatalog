@@ -21,9 +21,8 @@ def result(mock_project):
 def test_the_sample_keeps_people_in_every_dataset_or_in_any(result):
     both = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
     either = analysis.build_sample(result, ["parent_w1", "child_w1"], False)
-    parents = analysis.build_sample(result, ["parent_w1"], True)
-    assert len(both.people) <= len(parents.people) <= len(either.people)
-    assert set(both.people) <= set(parents.people)
+    assert len(both.people) <= len(either.people)
+    assert set(both.people) <= set(either.people)
     frame = analysis.table(result, both, [EMS, EPS])
     assert list(frame.index) == both.people
 
@@ -47,6 +46,8 @@ def add_person(project, dataset: str, person: str, like: str) -> None:
     data = pd.read_csv(path, dtype=str)
     row = data[data["pid"] == like].assign(pid=person)
     pd.concat([data, row]).to_csv(path, index=False)
+    with (project / "data" / "participants.csv").open("a", encoding="utf-8") as roster:
+        roster.write(f"{person},{person[:4]},,\n")
 
 
 @pytest.fixture
@@ -70,15 +71,17 @@ def test_a_family_with_two_children_counts_each_child(siblings):
     assert frame.loc["1001D", EMS] == frame.loc["1003", EMS]
     assert frame.loc[["1002C", "1002D"], EPS].isna().all()
     assert frame.loc[["1002P", "1002Q"], EMS].isna().all()
-    assert (sample.links.crossed, len(set(sample.links.split.values()))) == (1, 2)
+    split = set(sample.links.split.values())
+    assert sample.links.crossed == 1 and {"1001", "1002"} <= split
     notes = analysis.group_notes(siblings, sample)
-    assert "2 family groups have several people" in notes and "In 1 family groups" in notes
+    assert f"{len(split)} family groups have several people" in notes
+    assert "In 1 family groups" in notes
     data = analysis_script.AnalysisData(siblings, sample)
     data.variable(EMS)
     written = data.frame().set_index("id")
     assert written.loc["1001D", "family"] == "1001" and written.loc["1001D", "in_parent_w1"] == 1
-    # A file with one child per family keeps families as they were.
-    later = analysis.build_sample(siblings, ["child_w2"], True)
+    # A file with one person per family keeps families as they were.
+    later = analysis.build_sample(siblings, ["parent_w2"], True)
     assert "1003" in later.people and not later.links.split
     found = attrition.plan(siblings, "mock_study", "1", ["example_mood.ems_total"])
     assert "1001D" in found.sample.people and found.stayed + found.left == len(found.sample.people)

@@ -26,7 +26,7 @@ def test_mock_reports_only_the_planted_problems(mock_project):
     report = run_check(mock_project)
     errors = {i.code for i in report.issues if i.level == "error"}
     assert errors == {"unexpected_value", "id_whitespace", "id_duplicate"}
-    assert "1021C" in found(report)["same_answer"][-1]
+    assert any("1021C" in m and "ems_total@child_w1" in m for m in found(report)["same_answer"])
 
 
 def test_metadata_errors_stop_before_reading_data(mock_project):
@@ -53,7 +53,8 @@ def test_duplicate_and_malformed_ids(mock_project):
 
     change_csv(mock_project / "data" / "child_w2.csv", change)
     codes = found(run_check(mock_project))
-    assert "id_duplicate" in codes and "id_pattern" in codes and "group_missing" in codes
+    # P1003 has no family: the roster does not list it.
+    assert {"id_duplicate", "id_pattern", "id_not_in_roster"} <= set(codes)
 
 
 def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):
@@ -65,8 +66,9 @@ def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):
     )
     messages = found(run_check(mock_project))["excluded_present"]
     # 1032P is in all three parent waves; family 1003 has a parent and a child in all three,
-    # and the child also has files from seven other modalities.
-    assert len(messages) == 16
+    # a parent's checklist on the child in all three, and the child's files from seven other
+    # modalities.
+    assert len(messages) == 19
     assert any("1032P" in m and "1003P" in m for m in messages)
 
 

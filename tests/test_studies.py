@@ -132,7 +132,7 @@ def test_a_dataset_can_have_its_own_methods(mock_project):
     written = project.studies["mock_study"].methods
     first = studies.wave_methods(project, "mock_study", "1")
     assert [(m, names) for m, names, _ in first[:2]] == [
-        ("questionnaire", ["parent_w1"]),
+        ("questionnaire", ["parent_w1", "parent_child_w1"]),
         ("questionnaire", ["child_w1"]),
     ]
     assert first[1][2] == written["child_w1"]

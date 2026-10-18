@@ -111,14 +111,16 @@ def test_renaming_a_set_or_moving_one_option(mock_project):
 
 def test_administrations_keep_their_overrides(mock_project):
     dropped = "overrides: [{item: ecs_1, dropped: true}]"
+    sleep_line = "datasets: [parent_w1, parent_w2, parent_w3], target: child}"
     text = editing.open_file(mock_project, STUDY).text.replace(
-        "target: child}", f"target: child, {dropped}}}"
+        sleep_line, sleep_line.replace("}", f", {dropped}}}")
     )
     rows = records.read_rows(text, "administrations", records.ADMINISTRATIONS)
     assert rows[1]["datasets"] == "parent_w1, parent_w2, parent_w3"
     rows[1]["reversed_in_data"] = True
     rows[1]["datasets"] = "parent_w1, parent_w2"
-    rows[4]["target"] = "self"
+    assert rows[6]["instrument"] == "example_demographics"
+    rows[6]["target"] = "self"
     written = records.write_rows(text, "administrations", records.ADMINISTRATIONS, rows)
     [_, sleep, _, demographics] = changes(text, written)
     assert sleep.endswith(

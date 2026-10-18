@@ -19,9 +19,12 @@ def test_loads_every_dataset_as_text(mock_project):
         "parent_w1": 191,
         "parent_w2": 170,
         "parent_w3": 160,
-        "child_w1": 182,
-        "child_w2": 153,
-        "child_w3": 148,
+        "child_w1": 217,
+        "child_w2": 182,
+        "child_w3": 174,
+        "parent_child_w1": 222,
+        "parent_child_w2": 187,
+        "parent_child_w3": 176,
     }
     frame = datasets["parent_w1"].frame
     assert all(pd.api.types.is_string_dtype(dtype) for dtype in frame.dtypes)
@@ -50,6 +53,10 @@ def test_data_file_not_saved_as_utf8(mock_project):
 
 
 def test_missing_id_column(mock_project):
-    edit(mock_project / "labcatalog.yaml", "id_column: pid", "id_column: participant")
+    edit(
+        mock_project / "labcatalog.yaml",
+        "defaults:\n  id_column: pid",
+        "defaults:\n  id_column: participant",
+    )
     with pytest.raises(DataSourceError, match="no ID column 'participant'"):
         load_datasets(load_project(mock_project))

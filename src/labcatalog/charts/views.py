@@ -1091,9 +1091,6 @@ def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> 
         ("All items", [i.id for i in instrument.items if i.type == "choice"])
     ]
     loaded = result.datasets[dataset]
-    rows = len(loaded.frame)
-    step = max(1, -(-rows // defaults.CHART_PEOPLE_PER_PAGE))
-    shown = list(range(0, rows, step))
     color = series_color(result, dataset)
     panels = []
     for title, item_ids in groups:
@@ -1112,10 +1109,10 @@ def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> 
         )
         panels.append(
             {
-                "title": title if step == 1 else f"{title} ({len(shown)} of {rows} people)",
+                "title": title,
                 "x": item_ids,
                 "hover": [f"{i}: {item_text(instrument, i)}" for i in item_ids],
-                "background": answers.iloc[shown].to_numpy(dtype=float).tolist(),
+                "background": answers.to_numpy(dtype=float).tolist(),
                 "highlight": {"name": "Mean", "color": color, "values": answers.mean().tolist()},
             }
         )

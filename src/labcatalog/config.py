@@ -80,6 +80,8 @@ class DatasetConfig(StrictModel):
     url: str | None = None
     table: str | None = None
     id_column: str | None = None
+    # Who filled in each row, when the ID is the person the row is about.
+    respondent_column: str | None = None
     date_column: str | None = None
     # In a file holding several waves, the column that names each row's wave.
     wave_column: str | None = None

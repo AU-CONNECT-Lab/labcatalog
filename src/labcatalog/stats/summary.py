@@ -422,7 +422,7 @@ def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
     groups: dict[tuple[str, str], dict[str, set]] = {}
     for loaded in datasets.values():
         waves = groups.setdefault((loaded.config.study, loaded.config.reporter), {})
-        waves.setdefault(loaded.config.wave, set()).update(loaded.frame[loaded.id_column])
+        waves.setdefault(loaded.config.wave, set()).update(loaded.respondents())
     rows = []
     for (study, reporter), waves in groups.items():
         previous: set[str] | None = None
@@ -448,7 +448,7 @@ def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
     for loaded in datasets.values():
         c = loaded.config
         waves = found.setdefault((c.study, c.reporter, c.modality), {})
-        waves.setdefault(c.wave, set()).update(loaded.frame[loaded.id_column])
+        waves.setdefault(c.wave, set()).update(loaded.respondents())
     rows = []
     for (study, reporter, modality), waves in found.items():
         # Returning counts against the last wave that collected this modality.

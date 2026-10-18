@@ -165,7 +165,7 @@ def test_step_names_are_unique_and_steps_need_outputs(project_root):
 
 def test_example_steps_rebuild_the_example_data(mock_project, tmp_path):
     steps = load_project(mock_project).config.prepare
-    assert len(steps) == 18
+    assert len(steps) == 21
     for step in steps:
         _, script, export, clean = step.run.split()
         out = tmp_path / Path(clean).name

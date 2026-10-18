@@ -96,3 +96,16 @@ def test_the_manifest_records_the_roster(mock_project):
     result = run_catalog(mock_project)
     [record] = [f for f in result.manifest.files if f.dataset == "roster"]
     assert (record.path, record.rows) == ("data/participants.csv", len(roster(mock_project)))
+
+
+def test_a_parent_answering_for_each_child_counts_once(mock_project):
+    summary = run_catalog(mock_project).summary
+    parents = next(r for r in summary.retention if (r.reporter, r.wave) == ("parent", "2"))
+    # Every parent of a checklist row also filled in parent_w2, so the count stays theirs.
+    assert parents.n == 170
+    path = mock_project / "data" / "parent_child_w2.csv"
+    frame = pd.read_csv(path, dtype=str, keep_default_na=False)
+    frame.loc[0, "parent_pid"] = "9999P"
+    frame.to_csv(path, index=False)
+    issues = [i for i in run_check(mock_project).issues if i.code == "id_not_in_roster"]
+    assert any(i.location == "data/parent_child_w2.csv" and "9999P" in i.message for i in issues)

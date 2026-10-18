@@ -89,6 +89,7 @@ A list with one entry per data file.
 | `path` | path | The file, or the folder. |
 | `files` | text | For a folder dataset: the files to count, with `{id}` where the path holds the ID. |
 | `id_column` | text | The ID column, when it is not `defaults.id_column`. |
+| `respondent_column` | text | The column with the ID of whoever filled in each row, when that is not the person the row is about. Counts of respondents use it. |
 | `date_column` | text | A column with the date each row was collected. |
 | `wave_column` | text | In a file that holds several waves, the column naming each row's wave; the dataset reads only the rows of its own `wave`. |
 | `snapshot_date` | date | The date the file was exported. |

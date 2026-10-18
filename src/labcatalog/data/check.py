@@ -240,12 +240,17 @@ def check_roster(project: Project, datasets: dict[str, LoadedDataset]) -> list[I
     listed = set(ids[clean])
     seen = set()
     for loaded in datasets.values():
-        found = loaded.frame[loaded.id_column]
-        seen.update(found.str.strip())
-        # Blank and spaced IDs are reported by check_ids already.
-        unlisted = (found.str.strip() == found) & (found != "") & ~found.isin(listed)
+        unlisted = pd.Series(False, index=loaded.frame.index)
+        names: list[str] = []
+        for column in filter(None, (loaded.id_column, loaded.config.respondent_column)):
+            found = loaded.frame[column]
+            seen.update(found.str.strip())
+            # Blank and spaced IDs are reported by check_ids already.
+            missing = (found.str.strip() == found) & (found != "") & ~found.isin(listed)
+            unlisted |= missing
+            names += list(dict.fromkeys(found[missing]))
         if unlisted.any():
-            message = f"{unlisted.sum()} ID(s) are not in the roster: {examples(found[unlisted])}"
+            message = f"{len(names)} ID(s) are not in the roster: {examples(names)}"
             issues.append(
                 problem(
                     "id_not_in_roster",

@@ -14,13 +14,14 @@ def test_default_paragraph_gives_waves_counts_and_retention(mock_project):
         "Data were collected in three waves: Wave 1 (2024-03-01 to 2024-10-31), Wave 2"
     )
     assert "Wave 3 (since 2026-03-01)." in text
-    assert "At Wave 1, 191 parent and 182 child respondents from 191 family groups" in text
-    assert "At Wave 2, 155 of 191 parent respondents (81%) and 143 of 182 child" in text
-    assert "12 parent and 15 child respondents were new. Data from EEG" in text
+    # The parents' checklists on each child count by the parent who filled them in.
+    assert "At Wave 1, 192 parent and 217 child respondents from 191 family groups" in text
+    assert "At Wave 2, 155 of 192 parent respondents (81%) and 169 of 217 child" in text
+    assert "12 parent and 19 child respondents were new. Data from EEG" in text
     assert "Data from questionnaires" not in text
     assert text.endswith(
-        "Data from salivary cortisol were available for 131 of 182 child respondents at Wave 1 "
-        "(72%) and 101 of 148 at Wave 3 (68%)."
+        "Data from salivary cortisol were available for 131 of 217 child respondents at Wave 1 "
+        "(60%) and 101 of 174 at Wave 3 (58%)."
     )
 
 
@@ -37,7 +38,7 @@ def test_modality_table_counts_each_modality_against_its_wave(mock_project):
         "Wave 3 returning",
     ]
     eeg = next(r for r in rows if r["modality"] == "EEG")
-    assert (eeg["w0"], eeg["w2"]) == ("141 (77%)", "125 (84%)") and "w1" not in eeg
+    assert (eeg["w0"], eeg["w2"]) == ("141 (65%)", "125 (72%)") and "w1" not in eeg
     # EEG skipped wave 2, so its returning count is against wave 1.
     ids = {
         d.config.wave: set(d.frame[d.id_column])
@@ -49,10 +50,10 @@ def test_modality_table_counts_each_modality_against_its_wave(mock_project):
     assert rows[0] == {
         "modality": "questionnaires",
         "reporter": "parent",
-        "w0": "191 (100%)",
+        "w0": "192 (100%)",
         "w1": "170 (100%)",
         "back1": "155 (81%)",
-        "w2": "159 (100%)",
+        "w2": "160 (100%)",
         "back2": next(
             f"{r.n_from_previous} ({round(100 * r.n_from_previous / 170)}%)"
             for r in result.summary.retention
@@ -101,7 +102,7 @@ def test_retention_table_shows_who_came_back(mock_project):
     labels = [c["label"] for c in columns]
     assert labels[:4] == ["Wave", "Dates", "Parent n", "Parent returning"]
     assert labels[-2:] == ["Family groups", "With every reporter"]
-    assert (rows[0]["n_parent"], rows[0]["back_parent"]) == (191, "")
+    assert (rows[0]["n_parent"], rows[0]["back_parent"]) == (192, "")
     assert rows[1]["back_parent"] == "155 (81%)"
 
 
@@ -116,7 +117,7 @@ def test_one_reporter_is_not_named_in_the_paragraph(mock_project):
         }
     )
     text = participants.paragraph(result.project, children, "mock_study")
-    assert "At Wave 1, 182 respondents took part." in text
-    assert "At Wave 2, 143 of 182 respondents (79%) from Wave 1 took part again" in text
-    assert "15 respondents were new" in text
-    assert "131 of 182 respondents at Wave 1" in text and "child" not in text
+    assert "At Wave 1, 217 respondents took part." in text
+    assert "At Wave 2, 169 of 217 respondents (78%) from Wave 1 took part again" in text
+    assert "19 respondents were new" in text
+    assert "131 of 217 respondents at Wave 1" in text and "child" not in text

@@ -40,7 +40,7 @@ def test_a_new_wave_follows_its_template_into_every_file(project_root, export):
     project = load_project(project_root)
     # Datasets cut from a pipeline's folder are left out.
     usable = new_dataset.templates(project)
-    assert usable[-1] == "child_w3" and "eeg_w3" not in usable
+    assert usable[-1] == "parent_child_w3" and "child_w3" in usable and "eeg_w3" not in usable
     draft = new_dataset.suggest(project, "child_w3")
     assert (draft.name, draft.wave) == ("child_w4", "4")
     new_dataset.check_draft(project, draft)

@@ -9,7 +9,8 @@ def test_catalog_has_everything_the_gui_shows(mock_project):
         d.name for d in result.project.config.datasets
     }
     assert set(result.snippets) == {(s.instrument_id, s.dataset) for s in result.catalog.scores}
-    assert len(result.manifest.files) == 18
+    # Every dataset and the roster.
+    assert len(result.manifest.files) == len(result.project.config.datasets) + 1
 
 
 def test_metadata_errors_return_only_the_report(mock_project):

@@ -40,6 +40,7 @@ datasets:
 | `source` | `csv` for a table, `folder` for a folder of files. |
 | `path` | The file, or for a folder dataset the folder. |
 | `id_column` | The column with participant IDs, when it is not `defaults.id_column`. |
+| `respondent_column` | The column with the ID of whoever filled in each row, when the row's ID is the person it is about: a parent's answers on each of their children, one row per child. Participant counts and retention count the respondents; linking still uses `id_column`. |
 | `date_column` | A column with the date each row was collected, for the "collected by month" chart. |
 | `wave_column` | In a file that holds several waves, the column naming each row's wave. |
 | `snapshot_date` | The date the file was exported, shown as "data as of". |

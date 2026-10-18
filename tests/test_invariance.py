@@ -41,7 +41,12 @@ def models_of(result):
 
 def test_each_instrument_given_in_several_waves_gets_its_subscale_model(result):
     models = models_of(result)
-    assert set(models) == {"example_mood", "example_parent_stress", "example_child_sleep"}
+    assert set(models) == {
+        "example_mood",
+        "example_parent_stress",
+        "example_child_sleep",
+        "example_worries_temper",
+    }
     mood = models["example_mood"]
     assert (mood.study, mood.reporter, mood.kind) == ("mock_study", "child", SUBSCALES)
     assert list(mood.factors) == ["ems_sadness", "ems_worry", "ems_low_positive"]
@@ -196,15 +201,17 @@ def test_two_reporters_of_one_wave_pair_through_the_family(mock_project):
     found = add_parent_mood(mock_project)
     models = invariance.build_models(found.project, found.catalog, found.datasets)
     across = [m for m in models if m.across == invariance.REPORTERS]
-    [mood] = across
-    assert (mood.instrument_id, mood.wave, mood.reporter) == ("example_mood", "1", "")
+    [mood] = [m for m in across if m.instrument_id == "example_mood"]
+    assert (mood.wave, mood.reporter) == ("1", "")
     assert list(mood.occasions) == ["child", "parent"]
     child, parent = mood.occasions["child"], mood.occasions["parent"]
-    # The same index is the same family in both.
-    assert set(child.index) & set(parent.index) and all(len(i) == 4 for i in child.index)
+    # The same index is the same family in both; a family with two children is taken by child.
+    assert set(child.index) & set(parent.index)
+    assert any(len(i) == 4 for i in child.index) and "1301C" in child.index
     # The parents gave the children's wave 2 answers, reversed the same way.
     later = next(m for m in models if m.instrument_id == "example_mood" and m.across == "waves")
-    family = next(iter(set(parent.index) & {i[:4] for i in later.occasions["2"].index}))
+    families = {i for i in parent.index if len(i) == 4}
+    family = next(iter(families & {i[:4] for i in later.occasions["2"].index}))
     assert parent.loc[family].equals(later.occasions["2"].loc[f"{family}C"].rename(family))
 
 

@@ -60,6 +60,7 @@ def test_small_multiples(result):
         "Worry and fatigue",
         "Low positive affect",
     ]
+    # Everyone is drawn, however many people the file holds.
     background = people.data[0].y
     assert sum(value is None for value in background) == len(result.datasets["child_w1"].frame)
 
@@ -94,9 +95,9 @@ def test_timeline_draws_waves_up_to_today_and_the_milestones(result):
     assert list(marks.text) == ["Interim report", "Wave 3 data freeze"]
     texts = [a.text for a in fig.layout.annotations if a.text != "Today"]
     assert texts == [
-        "parent 191, child 182",
-        "parent 170, child 153",
-        "parent 159 of 170 (94%), child 148 of 153 (97%)",
+        "parent 192, child 217",
+        "parent 170, child 182",
+        "parent 160 of 170 (94%), child 174 of 182 (96%)",
     ]
 
 
@@ -149,6 +150,7 @@ def test_pair_scatter_plots_the_people_of_the_sample(result):
     assert choices[y] == "EPS mean score (Wave 1 · parent)"
     assert views.total_choices(result, sample.datasets) == [
         x,
+        "example_worries_temper.ewt_total@child_w1",
         y,
         "example_child_sleep.ecs_total@parent_w1",
     ]

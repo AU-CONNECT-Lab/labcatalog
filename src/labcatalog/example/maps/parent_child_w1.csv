@@ -1,6 +1,7 @@
 column,instrument,item
 pid,,
 visit_date,,
+parent_pid,,
 ewt_1_w1,example_worries_temper,ewt_1
 ewt_2_w1,example_worries_temper,ewt_2
 ewt_3_w1,example_worries_temper,ewt_3

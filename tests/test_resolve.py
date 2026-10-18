@@ -17,9 +17,9 @@ def test_every_mapped_item_becomes_a_variable(mock_project):
     assert counts == {
         "parent_w1": 17,
         "parent_w3": 17,
-        "child_w1": 9,
-        "child_w2": 12,
-        "child_w3": 12,
+        "child_w1": 17,
+        "child_w2": 20,
+        "child_w3": 20,
     }
     variable = next(v for v in catalog.variables if v.column == "ecs_1_w2")
     assert (variable.study, variable.wave, variable.reporter, variable.target) == (
@@ -42,7 +42,7 @@ def test_scores_know_their_columns_and_reverse_bounds(mock_project):
         "ems_9_w1": (0.0, 3.0),
     }
     assert (score.missing_rule, score.min_valid, score.unavailable_items) == ("prorate", 7, [])
-    assert len(catalog.scores) == 30
+    assert len(catalog.scores) == 48
 
 
 def test_overrides_change_one_wave_only(mock_project):

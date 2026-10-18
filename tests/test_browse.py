@@ -63,6 +63,7 @@ def test_selections_must_hold_within_one_administration(mock_project):
         "example_demographics",
         "example_mood",
         "example_parent_stress",
+        "example_worries_temper",
         "eyetracking_faces",
         "fmri_resting",
         "saliva_cortisol",
@@ -70,6 +71,7 @@ def test_selections_must_hold_within_one_administration(mock_project):
     assert matches(index, {"wave": {WAVE_1}, "reporter": {"child"}}) == {
         "eeg_resting": ["eeg_w1"],
         "example_mood": ["child_w1"],
+        "example_worries_temper": ["child_w1"],
         "eyetracking_faces": ["eyetracking_w1"],
         "fmri_resting": ["fmri_w1"],
         "saliva_cortisol": ["saliva_w1"],
@@ -77,15 +79,23 @@ def test_selections_must_hold_within_one_administration(mock_project):
     assert matches(index, {"domain": {"media", "emotion"}, "wave": set()}) == {
         "example_mood": ["child_w1", "child_w2", "child_w3"],
         "example_screen_time": ["child_w2", "child_w3"],
+        "example_worries_temper": [
+            "parent_child_w1",
+            "parent_child_w2",
+            "parent_child_w3",
+            "child_w1",
+            "child_w2",
+            "child_w3",
+        ],
     }
 
 
 def test_counts_keep_the_facets_own_values_open(mock_project):
     index = index_for(mock_project)
     found = counts(index, {"wave": {WAVE_1}})
-    assert found["wave"] == {WAVE_1: 8, WAVE_2: 9, WAVE_3: 9}
-    assert found["reporter"] == {"parent": 3, "child": 5}
-    assert found["domain"] == {"emotion": 1, "family": 2, "health": 1, "media": 0}
+    assert found["wave"] == {WAVE_1: 9, WAVE_2: 10, WAVE_3: 10}
+    assert found["reporter"] == {"parent": 4, "child": 6}
+    assert found["domain"] == {"emotion": 2, "family": 2, "health": 1, "media": 0}
 
 
 def test_score_fields_describe_their_instrument(mock_project):

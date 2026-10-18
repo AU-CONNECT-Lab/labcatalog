@@ -86,5 +86,5 @@ def test_example_scores(mock_project):
     project = load_project(mock_project)
     scores = compute_scores(resolve_catalog(project), load_datasets(project))
     ems = scores["child_w1"]["example_mood.ems_total@child_w1"]
-    assert ems.notna().sum() == 181
-    assert round(ems.mean(), 2) == 11.52
+    assert ems.notna().sum() == 216
+    assert round(ems.mean(), 2) == 11.46
