@@ -1,11 +1,10 @@
 from collections.abc import Awaitable, Callable
-from pathlib import Path
 
 from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.charts import views
-from labcatalog.config import dataset_by_name
+from labcatalog.config import dataset_by_name, map_name_of
 from labcatalog.gui import datalad, id_fix, new_dataset, problems
 from labcatalog.gui.common import (
     code_tabs,
@@ -263,7 +262,7 @@ def data_path(result: CatalogResult, dataset: str) -> str | None:
 
 def dataset_issues(result: CatalogResult, dataset: str) -> list[Issue]:
     data = data_path(result, dataset)
-    variable_map = Path(defaults.MAPS_DIR, f"{dataset}.csv").as_posix()
+    variable_map = f"{defaults.MAPS_DIR}/{map_name_of(result.project.config, dataset)}.csv"
     return [
         issue
         for issue in result.report.issues

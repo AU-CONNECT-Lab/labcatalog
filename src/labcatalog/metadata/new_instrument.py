@@ -8,7 +8,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE, read_data
-from labcatalog.config import dataset_by_name
+from labcatalog.config import dataset_by_name, map_name_of
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
 from labcatalog.metadata.changes import Change
@@ -222,14 +222,19 @@ def references(data: CommentedMap, keys: list[str], pdfs: dict[str, str]) -> Com
 
 def given_changes(project: Project, draft: Draft) -> list[Change]:
     found = []
+    # Datasets that share a map add their rows to it once.
+    by_map: dict[str, tuple[str, list[tuple[str, str, str]]]] = {}
     for dataset, columns in draft.given.items():
         rows = [(column, draft.id, item) for item, column in columns.items() if column]
-        if dataset in project.maps:
+        held = by_map.setdefault(map_name_of(project.config, dataset), (dataset, []))[1]
+        held.extend(row for row in rows if row not in held)
+    for name, (dataset, rows) in by_map.items():
+        if name in project.maps:
             found.append(map_rows(project, dataset, rows))
         else:
             out = io.StringIO()
             csv.writer(out, lineterminator="\n").writerows([MAP_COLUMNS, *rows])
-            found.append(Change(f"{defaults.MAPS_DIR}/{dataset}.csv", out.getvalue()))
+            found.append(Change(f"{defaults.MAPS_DIR}/{name}.csv", out.getvalue()))
     studies: dict[str, list[str]] = {}
     for dataset in draft.given:
         studies.setdefault(dataset_by_name(project.config, dataset).study, []).append(dataset)

@@ -72,6 +72,8 @@ The roster's values are then checked against the instrument's options and ranges
 
 With a roster, `labcatalog check` also reports IDs in the data that the roster does not list (`id_not_in_roster`), people the roster lists twice (`id_duplicate`) or without a group (`group_missing`), and, for information, people in the roster who are in no dataset yet (`roster_unused`).
 
+A roster with a column of roles, one of `vocab.reporters` for each person, can name it as `role_column: role`. Each dataset's respondents are then checked against its `reporter`: a child's ID in a file of parents is reported (`reporter_mismatch`). The respondent is read from the dataset's `respondent_column` when it has one, so a parent's file about each child is checked against the parents. Roles that are not reporters are reported once (`role_unknown`), and the people with them are not checked.
+
 Groups are used in three places:
 
 - Correlations between datasets. A parent's stress and their child's mood are in different files with different IDs. `stats.correlate_by: family` pairs rows by family instead of by ID. The default is `id`; `none` turns off the correlations between scores on the instrument pages.

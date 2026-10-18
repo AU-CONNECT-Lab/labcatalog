@@ -182,3 +182,43 @@ def test_the_roster_instrument_and_its_map_are_validated(mock_project):
     edit(mock_project / "labcatalog.yaml", "instrument: example_participants", "instrument: nobody")
     messages = [i.message for i in run_validate(mock_project)]
     assert "roster.instrument: no instrument 'nobody'" in messages
+
+
+def test_every_respondent_has_the_role_of_their_datasets_reporter(mock_project):
+    # The parent_child files hold children's IDs; their respondent column holds the parents'.
+    issues = run_check(mock_project).issues
+    assert not [i for i in issues if i.code in ("reporter_mismatch", "role_unknown")]
+
+
+def test_a_respondent_with_another_role_is_reported(mock_project):
+    path = mock_project / "data" / "participants.csv"
+    edit(path, "1002C,1002,child,", "1002C,1002,parent,")
+    issues = run_check(mock_project).issues
+    found = [i for i in issues if i.code == "reporter_mismatch"]
+    config = load_project(mock_project).config
+    named = {i.details["dataset"] for i in found}
+    assert "child_w1" in named
+    assert {d.reporter for d in config.datasets if d.name in named} == {"child"}
+    child = next(i for i in found if i.details["dataset"] == "child_w1")
+    assert child.level == "warning"
+    assert (
+        child.message
+        == "1 respondent(s) have another role than child in the roster: 1002C (parent)"
+    )
+    frame = load_datasets(load_project(mock_project))["child_w1"].frame
+    assert frame.loc[child.details["rows"], "pid"].tolist() == ["1002C"]
+
+
+def test_a_role_that_is_no_reporter_is_reported_once(mock_project):
+    path = mock_project / "data" / "participants.csv"
+    edit(path, "1002C,1002,child,", "1002C,1002,teacher,")
+    issues = run_check(mock_project).issues
+    [unknown] = [i for i in issues if i.code == "role_unknown"]
+    assert unknown.message == "role has roles that are not reporters: teacher"
+    assert not [i for i in issues if i.code == "reporter_mismatch"]
+
+
+def test_a_missing_role_column_is_named(mock_project):
+    edit(mock_project / "labcatalog.yaml", "role_column: role", "role_column: kind")
+    with pytest.raises(DataSourceError, match="roster: no column 'kind'"):
+        load_datasets(load_project(mock_project))

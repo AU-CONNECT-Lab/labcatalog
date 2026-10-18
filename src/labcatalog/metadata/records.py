@@ -119,6 +119,7 @@ DATASETS = Table(
         Column("files", "Files"),
         Column("wave_column", "Wave column"),
         Column("wave_value", "Wave in the file"),
+        Column("map", "Column map"),
         Column("id_column", "ID column"),
         Column("respondent_column", "Respondent column"),
         Column("date_column", "Date column"),

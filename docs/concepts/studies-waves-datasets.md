@@ -33,7 +33,7 @@ datasets:
 
 | Key | Meaning |
 |---|---|
-| `name` | The dataset's ID. Its column map is `maps/<name>.csv`. |
+| `name` | The dataset's ID. Its column map is `maps/<name>.csv`, unless `map` names another. |
 | `modality` | What kind of data it holds; one of `vocab.modalities`. |
 | `study`, `wave` | The study and wave it belongs to. |
 | `reporter` | Who provided the data; one of `vocab.reporters`. |
@@ -57,7 +57,7 @@ datasets:
   - {name: parent_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: parent, source: csv, path: data/parent_long.csv, wave_column: wave}
 ```
 
-Each dataset reads only the rows whose `wave` column matches its own `wave`, written the same way (`1` matches `1`, not `01` or `T1`). When the column writes the waves another way, give each dataset its `wave_value`, such as `wave_value: T1` on wave `1`; the dataset then reads the rows with `T1`, and the rest of labcatalog still calls it wave 1. Everything else treats it as a file of its own: each dataset has its own column map in `maps/`, where the wave column is listed like the ID column, with no instrument. If the file has rows for a wave that no dataset reads, `labcatalog check` warns with `wave_unclaimed`. Problems point to the row's line in the shared file. When the file gains a wave, **Repeat a dataset** on the [Datasets](../app/datasets.md#add-a-dataset) page adds the next dataset for it, and the Datasets table in the **Edit files** step of the Set up page has **Wave column** and **Wave in the file** columns.
+Each dataset reads only the rows whose `wave` column matches its own `wave`, written the same way (`1` matches `1`, not `01` or `T1`). When the column writes the waves another way, give each dataset its `wave_value`, such as `wave_value: T1` on wave `1`; the dataset then reads the rows with `T1`, and the rest of labcatalog still calls it wave 1. Everything else treats it as a file of its own: each dataset has its own column map in `maps/`, where the wave column is listed like the ID column, with no instrument. When the waves have the same columns, they can share one map (see [One map for several datasets](variable-maps.md#one-map-for-several-datasets)). If the file has rows for a wave that no dataset reads, `labcatalog check` warns with `wave_unclaimed`. Problems point to the row's line in the shared file. When the file gains a wave, **Repeat a dataset** on the [Datasets](../app/datasets.md#add-a-dataset) page adds the next dataset for it, and the Datasets table in the **Edit files** step of the Set up page has **Wave column** and **Wave in the file** columns.
 
 ## Modalities
 

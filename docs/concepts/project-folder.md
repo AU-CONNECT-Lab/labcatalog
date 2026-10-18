@@ -33,7 +33,7 @@ One file per study, for example `studies/mock_study.yaml`. It says which instrum
 
 ## maps/
 
-One CSV file per dataset, named after the dataset, for example `maps/parent_w1.csv`. It links each column of the data file to an item of an instrument. See [Column Maps and Overrides](variable-maps.md).
+One CSV file per dataset, named after the dataset, for example `maps/parent_w1.csv`; datasets with the same columns can share one. It links each column of the data file to an item of an instrument. See [Column Maps and Overrides](variable-maps.md).
 
 ## data/ and raw/
 

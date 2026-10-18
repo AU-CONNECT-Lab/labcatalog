@@ -1,6 +1,6 @@
 # Column Maps
 
-One CSV file per dataset in `maps/`, named after the dataset: `maps/<dataset>.csv`. The file is UTF-8; from Excel, save it as "CSV UTF-8".
+One CSV file per dataset in `maps/`, named after the dataset: `maps/<dataset>.csv`. Datasets with the same columns can share one, named with the dataset's `map` (see [One map for several datasets](../concepts/variable-maps.md#one-map-for-several-datasets)). The file is UTF-8; from Excel, save it as "CSV UTF-8".
 
 The header must contain three columns:
 

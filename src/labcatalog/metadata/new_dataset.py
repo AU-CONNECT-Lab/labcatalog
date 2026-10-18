@@ -11,7 +11,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE, read_data, template_items
-from labcatalog.config import DatasetConfig, PrepareStep, dataset_by_name
+from labcatalog.config import DatasetConfig, PrepareStep, dataset_by_name, map_name_of
 from labcatalog.data.prepare import Session, StepRun, execute
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
@@ -320,7 +320,7 @@ def template_rows(project: Project, template: str) -> list[dict[str, str]]:
     # A file of every wave holds the next wave in the template's own columns.
     return [
         {"column": e.column, "instrument": e.instrument or "", "item": e.item or ""}
-        for e in project.maps.get(template, [])
+        for e in project.maps.get(map_name_of(project.config, template), [])
     ]
 
 
@@ -332,7 +332,11 @@ def coverage(
     for row in rows:
         if row["instrument"]:
             found.setdefault(row["instrument"], set()).add(row["item"])
-    before = {e.instrument for e in project.maps.get(template, []) if e.instrument}
+    before = {
+        e.instrument
+        for e in project.maps.get(map_name_of(project.config, template), [])
+        if e.instrument
+    }
     return {
         instrument_id: (
             len(found.get(instrument_id, set())),
@@ -363,14 +367,23 @@ def changes(
         # A folder's only column counts files, so there is nothing to map or administer.
         return [settings_change(project, draft, placement)]
     instruments = list(dict.fromkeys(r["instrument"].strip() for r in rows if r["instrument"]))
-    return [
-        settings_change(project, draft, placement),
-        map_change(draft, rows),
-        study_change(project, draft, instruments),
-    ]
+    shares = shares_map(project, draft, rows)
+    found = [settings_change(project, draft, placement, shares)]
+    if not shares:
+        found.append(map_change(draft, rows))
+    return [*found, study_change(project, draft, instruments)]
 
 
-def settings_change(project: Project, draft: Draft, placement: Placement) -> Change:
+def shares_map(project: Project, draft: Draft, rows: list[dict[str, str]]) -> bool:
+    # The new dataset reads the template's shared map while its columns are the same.
+    if draft.blank is not None or dataset_by_name(project.config, draft.template).map is None:
+        return False
+    return rows == template_rows(project, draft.template)
+
+
+def settings_change(
+    project: Project, draft: Draft, placement: Placement, shares: bool = False
+) -> Change:
     opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
     data = records.load(opened.text)
     if not data.get("datasets"):
@@ -384,10 +397,12 @@ def settings_change(project: Project, draft: Draft, placement: Placement) -> Cha
         for key, value in datasets[at].items():
             if key == "files" and is_folder(draft):
                 entry[key] = draft.files
-            elif key not in OWN_FILE and key != "wave_value":
+            elif key not in OWN_FILE and key not in ("wave_value", "map"):
                 entry[key] = value
             if key == "wave_column" and draft.wave_value is not None:
                 entry["wave_value"] = records.as_text(draft.wave_value)
+            if key == "map" and shares:
+                entry[key] = value
         numeric = isinstance(entry.get("wave"), int)
     else:
         # After the study's other datasets, or last when it has none yet.

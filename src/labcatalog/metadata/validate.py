@@ -5,7 +5,7 @@ from datetime import date
 from typing import Any
 
 from labcatalog import defaults
-from labcatalog.config import CustomFieldDef, missing_codes_for
+from labcatalog.config import CustomFieldDef, missing_codes_for, roster_dataset
 from labcatalog.issues import Issue, IssueLevel
 from labcatalog.metadata.varmap import MapEntry
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
@@ -427,14 +427,18 @@ def check_variable_maps(project: Project) -> list[Issue]:
         expected_in[defaults.ROSTER] = {
             instrument_id: Administration(instrument=instrument_id, datasets=[defaults.ROSTER])
         }
+    readers = {d.name: d for d in config.datasets}
+    if defaults.ROSTER in expected_in:
+        readers[defaults.ROSTER] = roster_dataset(config)
+    used = {d.map_name() for d in readers.values()}
     issues = [
         unknown(f"no dataset named '{name}' in {CONFIG}", f"{defaults.MAPS_DIR}/{name}.csv")
         for name in project.maps
-        if name not in expected_in
+        if name not in used
     ]
     for name, expected in expected_in.items():
-        entries = project.maps.get(name)
-        location = f"{defaults.MAPS_DIR}/{name}.csv"
+        entries = project.maps.get(readers[name].map_name())
+        location = readers[name].map_file()
         if entries is None:
             if expected:
                 message = f"dataset {name} has administrations but no {location}"
@@ -478,8 +482,10 @@ def check_variable_maps(project: Project) -> list[Issue]:
                 issues.append(problem("duplicate_id", message, where, dataset=name, lines=lines))
             seen_items[key] = entry
         # One issue per instrument, so a single typo upstream does not flood the list.
-        for name, lines in stray_rows.items():
-            message = f"instrument '{name}' is not administered in {name} ({len(lines)} rows)"
+        for instrument_id, lines in stray_rows.items():
+            message = (
+                f"instrument '{instrument_id}' is not administered in {name} ({len(lines)} rows)"
+            )
             issues.append(unknown(message, f"{location}:{lines[0]}"))
         for instrument_id, administration in expected.items():
             instrument = project.instruments.get(instrument_id)
@@ -510,7 +516,8 @@ def check_variable_maps(project: Project) -> list[Issue]:
                         items=unmapped,
                     )
                 )
-    return issues
+    # Datasets that share a map would each report the same row.
+    return list({(i.code, i.message, i.location): i for i in issues}.values())
 
 
 def check_data_settings(project: Project) -> list[Issue]:

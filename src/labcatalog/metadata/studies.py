@@ -10,7 +10,7 @@ from ruamel.yaml.tokens import CommentToken
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
-from labcatalog.config import StudyConfig, WaveConfig
+from labcatalog.config import StudyConfig, WaveConfig, map_name_of
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
 from labcatalog.metadata.changes import Change
@@ -241,7 +241,9 @@ def delete_study(project: Project, study: str) -> list[Change]:
         if str(datasets[n].get("study")) == study:
             del datasets[n]
     found = [Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)]
-    files = [f"{defaults.MAPS_DIR}/{name}.csv" for name in names]
+    kept = {d.map_name() for d in project.config.datasets if d.study != study}
+    gone = {map_name_of(project.config, name) for name in names} - kept
+    files = [f"{defaults.MAPS_DIR}/{name}.csv" for name in sorted(gone)]
     if study in project.study_files:
         files.append(project.study_files[study])
     for relative in files:

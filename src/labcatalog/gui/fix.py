@@ -6,7 +6,7 @@ from nicegui import ui
 
 from labcatalog.ai.cleaning import cleaning_step
 from labcatalog.codebook.core import holds
-from labcatalog.config import dataset_by_name
+from labcatalog.config import dataset_by_name, map_sharers
 from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import cleaning as cleaning_view
@@ -115,6 +115,15 @@ EXPLAIN: dict[str, tuple[str, str]] = {
         "IDs in the data that the roster does not list: a typo, or a person not yet added to "
         "the roster.",
         IDS,
+    ),
+    "reporter_mismatch": (
+        "People whose role in the roster is not this dataset's reporter: a wrong ID, a file "
+        "of another reporter, or a role or reporter set wrong.",
+        IDS,
+    ),
+    "role_unknown": (
+        "Roles in the roster that are not one of the reporters, so nobody with them is checked.",
+        PICK,
     ),
     "excluded_present": ("Rows of people on the exclusion list are still in the data.", SCRIPTS),
     "possible_identifier": (
@@ -342,6 +351,15 @@ def loaded(root: Path) -> Project | None:
         return None
 
 
+def shared_map_note(project: Project, dataset: str) -> None:
+    sharers = map_sharers(project.config, dataset)
+    if sharers:
+        note(
+            f"{fixes.map_file(project, dataset)} is also the column map of "
+            f"{', '.join(sharers)}, so the change applies to them too."
+        )
+
+
 def unlisted_columns(project: Project, result: CatalogResult, issue: Issue, save) -> None:
     dataset = issue.details["dataset"]
     items = {
@@ -350,6 +368,7 @@ def unlisted_columns(project: Project, result: CatalogResult, issue: Issue, save
     }
     caption("Add to the column map")
     note("Leave Instrument empty for a column that is not an item, such as notes or a date.")
+    shared_map_note(project, dataset)
     picks = []
     for column in issue.details["columns"]:
         with ui.row().classes("items-center gap-3 no-wrap"):
@@ -422,6 +441,7 @@ def unmapped_items(project: Project, result: CatalogResult, issue: Issue, save) 
     }
     caption("Where each item is")
     note(f"Pick the data column that holds the item, or record that {dataset} did not ask it.")
+    shared_map_note(project, dataset)
     picks = []
     for item in issue.details["items"]:
         guess = next((c for c in columns if holds(c, item)), "")
@@ -524,6 +544,7 @@ def missing_column(project: Project, result: CatalogResult, issue: Issue, save) 
         "Pick the name the column has in the data file now, or take the row out of the column "
         "map if the file does not hold it."
     )
+    shared_map_note(project, dataset)
     with ui.row().classes("items-center gap-3"):
         if columns:
             choice = ui.select(
@@ -555,6 +576,7 @@ def repeated_row(project: Project, result: CatalogResult, issue: Issue, save) ->
     dataset = details["dataset"]
     lines = fixes.map_lines(project, dataset)
     caption("Keep one row")
+    shared_map_note(project, dataset)
     for n in details["lines"]:
         with ui.row().classes("items-center gap-3 no-wrap"):
             ui.label(f"Line {n}").classes("w-16 lc-faint")

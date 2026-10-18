@@ -61,6 +61,7 @@ A CSV file listing everyone once, one row per person. Optional.
 | `path` | | The file, relative to the project folder. |
 | `id_column` | `defaults.id_column` | The column with each person's ID. |
 | `group_column` | none | The column with each person's group, named by `ids.group.name`. Every dataset takes its groups from here; a project gives `ids.group.from_id` or this, not both. |
+| `role_column` | none | The column with each person's role, one of `vocab.reporters`. Each dataset's respondents are then checked against its `reporter`. |
 | `instrument` | none | A demographics instrument describing the roster's other columns, mapped to them in `maps/roster.csv`. The Analysis page offers its items for the people of every file. |
 
 ## studies
@@ -93,6 +94,7 @@ A list with one entry per data file.
 | `respondent_column` | text | The column with the ID of whoever filled in each row, when that is not the person the row is about. Counts of respondents use it. |
 | `date_column` | text | A column with the date each row was collected. |
 | `wave_column` | text | In a file that holds several waves, the column naming each row's wave; the dataset reads only the rows of its own `wave`. |
+| `map` | text | The column map to read, as `maps/<map>.csv`, when the dataset shares one with others. Default: the dataset's name. |
 | `wave_value` | text | How the wave column writes this dataset's wave, such as `T1`, when not the same as `wave`. |
 | `snapshot_date` | date | The date the file was exported. |
 | `missing_codes` | list | Missing codes for this dataset only. |

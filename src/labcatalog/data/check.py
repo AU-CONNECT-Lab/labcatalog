@@ -16,7 +16,7 @@ from labcatalog.datalad.check import check_git_annex
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
-from labcatalog.sources import LoadedDataset, load_roster, load_roster_dataset
+from labcatalog.sources import LoadedDataset, Roster, load_roster, load_roster_dataset
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
 PHONE = re.compile(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
@@ -60,10 +60,10 @@ def check_project(
 def check_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
     issues = []
     for name, loaded in datasets.items():
-        entries = project.maps.get(name)
+        entries = project.maps.get(loaded.config.map_name())
         if entries is None:
             continue
-        map_file = f"{defaults.MAPS_DIR}/{name}.csv"
+        map_file = loaded.config.map_file()
         for entry in entries:
             if entry.column not in loaded.frame:
                 message = f"{entry.column} is listed in the map but not in the data"
@@ -278,6 +278,45 @@ def check_roster(project: Project, datasets: dict[str, LoadedDataset]) -> list[I
     if unused:
         message = f"{len(unused)} person(s) in the roster are in no dataset: {examples(unused)}"
         issues.append(problem("roster_unused", message, where, "info"))
+    if roster.role_column:
+        issues += check_roles(project, roster, datasets, where)
+    return issues
+
+
+def check_roles(
+    project: Project, roster: Roster, datasets: dict[str, LoadedDataset], where: str
+) -> list[Issue]:
+    roles = roster.roles()
+    reporters = set(project.config.vocab.reporters)
+    unknown = sorted(set(roles[(roles != "") & ~roles.isin(reporters)]))
+    issues = []
+    if unknown:
+        message = f"{roster.role_column} has roles that are not reporters: {examples(unknown)}"
+        issues.append(problem("role_unknown", message, where, "warning", values=unknown))
+    known = roles[roles.isin(reporters)]
+    for loaded in datasets.values():
+        # Who filled in the row, which is the ID unless a respondent column says otherwise.
+        who = loaded.frame[loaded.config.respondent_column or loaded.id_column]
+        role = who.map(known)
+        other = role.notna() & (role != loaded.config.reporter)
+        if other.any():
+            names = [
+                f"{i} ({r})" for i, r in dict.fromkeys(zip(who[other], role[other], strict=True))
+            ]
+            message = (
+                f"{len(names)} respondent(s) have another role than {loaded.config.reporter} "
+                f"in the roster: {examples(names)}"
+            )
+            issues.append(
+                problem(
+                    "reporter_mismatch",
+                    message,
+                    location(project, loaded),
+                    "warning",
+                    dataset=loaded.config.name,
+                    rows=rows_of(other),
+                )
+            )
     return issues
 
 
@@ -321,7 +360,7 @@ def check_identifier_columns(project: Project, datasets: dict[str, LoadedDataset
         # Choice and number columns are already held to their allowed values by check_values.
         items = {
             e.column
-            for e in project.maps.get(name, [])
+            for e in project.maps.get(loaded.config.map_name(), [])
             if e.instrument is not None and (e.instrument, e.item) not in free_text
         }
         for column in loaded.frame:

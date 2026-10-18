@@ -47,6 +47,8 @@ class RosterConfig(StrictModel):
     path: str
     id_column: str | None = None
     group_column: str | None = None
+    # Each person's role, one of vocab.reporters, held against the reporter of their datasets.
+    role_column: str | None = None
     # The demographics instrument that describes the other columns, mapped in maps/roster.csv.
     instrument: str | None = None
 
@@ -89,12 +91,20 @@ class DatasetConfig(StrictModel):
     wave_column: str | None = None
     # How the wave column writes this dataset's wave, when not as `wave`.
     wave_value: str | None = None
+    # The column map in maps/ this dataset reads, when it shares one with other datasets.
+    map: str | None = None
     snapshot_date: date | None = None
     missing_codes: list[MissingCode] | None = None
     custom: dict[str, Any] = {}
 
     def wave_in_file(self) -> str:
         return self.wave if self.wave_value is None else self.wave_value
+
+    def map_name(self) -> str:
+        return self.name if self.map is None else self.map
+
+    def map_file(self) -> str:
+        return f"{defaults.MAPS_DIR}/{self.map_name()}.csv"
 
 
 class CustomFieldDef(StrictModel):
@@ -185,6 +195,18 @@ class ProjectConfig(StrictModel):
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:
     return next(dataset for dataset in config.datasets if dataset.name == name)
+
+
+def map_name_of(config: ProjectConfig, name: str) -> str:
+    # The roster is no listed dataset and reads maps/roster.csv.
+    found = next((dataset for dataset in config.datasets if dataset.name == name), None)
+    return name if found is None else found.map_name()
+
+
+def map_sharers(config: ProjectConfig, name: str) -> list[str]:
+    # The other datasets that read the same column map.
+    shared = map_name_of(config, name)
+    return [d.name for d in config.datasets if d.name != name and d.map_name() == shared]
 
 
 def missing_codes_for(config: ProjectConfig, dataset: DatasetConfig) -> list[MissingCode]:

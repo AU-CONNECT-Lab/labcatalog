@@ -63,12 +63,18 @@ class Roster:
     id_column: str
     group_column: str | None
     path: Path
+    role_column: str | None = None
 
     def groups(self) -> pd.Series:
         # A person listed twice has no known group; the checks report them.
         ids = self.frame[self.id_column]
         listed = self.frame[(ids != "") & ~ids.duplicated(keep=False)]
         return listed.set_index(self.id_column)[self.group_column].replace("", pd.NA)
+
+    def roles(self) -> pd.Series:
+        ids = self.frame[self.id_column]
+        listed = self.frame[(ids != "") & ~ids.duplicated(keep=False)]
+        return listed.set_index(self.id_column)[self.role_column].str.strip()
 
 
 def load_roster(project: Project) -> Roster | None:
@@ -78,10 +84,10 @@ def load_roster(project: Project) -> Roster | None:
     path = expand_path(roster.path, project.root)
     frame = read_csv(path, "roster")
     id_column = roster.id_column or project.config.defaults.id_column
-    for column in (id_column, roster.group_column):
+    for column in (id_column, roster.group_column, roster.role_column):
         if column and column not in frame:
             raise DataSourceError(f"roster: no column '{column}' in {path}")
-    return Roster(frame, id_column, roster.group_column, path)
+    return Roster(frame, id_column, roster.group_column, path, roster.role_column)
 
 
 def load_roster_dataset(project: Project) -> LoadedDataset | None:

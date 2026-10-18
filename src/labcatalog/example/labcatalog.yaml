@@ -36,6 +36,7 @@ roster:
   path: data/participants.csv
   id_column: pid
   group_column: family_id
+  role_column: role
   instrument: example_participants
 
 # Score correlations link a parent and a child through their family. The other three are the defaults:

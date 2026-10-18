@@ -129,13 +129,13 @@ def codebook_paths(project: Project, dataset: str) -> dict[str, Path]:
 
 
 def unmapped_datasets(project: Project) -> list[str]:
-    return [d.name for d in project.config.datasets if d.name not in project.maps]
+    return [d.name for d in project.config.datasets if d.map_name() not in project.maps]
 
 
 def require_unmapped(project: Project, dataset: str) -> None:
     if dataset in unmapped_datasets(project):
         return
-    if dataset in project.maps:
+    if dataset in {d.name for d in project.config.datasets}:
         raise CodebookError(f"{dataset} already has a column map in {defaults.MAPS_DIR}/")
     raise CodebookError(f"No dataset named {dataset} in {defaults.CONFIG_FILENAME}")
 
@@ -373,7 +373,7 @@ class Importer:
         self.score_columns: list[tuple[int, str, str]] = []
 
     def run(self) -> ImportResult:
-        map_path = self.project.root / defaults.MAPS_DIR / f"{self.dataset.name}.csv"
+        map_path = self.project.root / self.dataset.map_file()
         if map_path.exists():
             message = f"{self.dataset.name} already has a column map; importing would replace it"
             self.issues.append(

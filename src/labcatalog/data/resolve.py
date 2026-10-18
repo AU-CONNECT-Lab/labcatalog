@@ -80,7 +80,7 @@ def resolve_catalog(project: Project) -> Catalog:
             instrument = project.instruments[administration.instrument]
             for dataset_name in administration.datasets:
                 dataset = datasets[dataset_name]
-                columns = mapped_columns(project, dataset_name, instrument.id)
+                columns = mapped_columns(project, dataset, instrument.id)
                 resolved = resolve_items(instrument, administration, dataset, columns)
                 variables.extend(resolved)
                 scores.extend(
@@ -91,18 +91,21 @@ def resolve_catalog(project: Project) -> Catalog:
 
 def resolve_roster(project: Project) -> list[ResolvedVariable]:
     roster = project.config.roster
-    instrument = project.instruments.get(roster.instrument) if roster and roster.instrument else None
+    instrument = (
+        project.instruments.get(roster.instrument) if roster and roster.instrument else None
+    )
     if instrument is None:
         return []
     administration = Administration(instrument=instrument.id, datasets=[defaults.ROSTER])
-    columns = mapped_columns(project, defaults.ROSTER, instrument.id)
-    return resolve_items(instrument, administration, roster_dataset(project.config), columns)
+    dataset = roster_dataset(project.config)
+    columns = mapped_columns(project, dataset, instrument.id)
+    return resolve_items(instrument, administration, dataset, columns)
 
 
-def mapped_columns(project: Project, dataset: str, instrument_id: str) -> dict[str, str]:
+def mapped_columns(project: Project, dataset: DatasetConfig, instrument_id: str) -> dict[str, str]:
     return {
         entry.item: entry.column
-        for entry in project.maps.get(dataset, [])
+        for entry in project.maps.get(dataset.map_name(), [])
         if entry.instrument == instrument_id
     }
 

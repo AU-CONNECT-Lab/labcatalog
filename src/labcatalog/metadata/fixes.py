@@ -5,7 +5,7 @@ import io
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
-from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.config import dataset_by_name, map_name_of, missing_codes_for
 from labcatalog.exceptions import EditError
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
@@ -25,7 +25,7 @@ def closest(word: str, choices: list[str]) -> str | None:
 
 def map_rows(project: Project, dataset: str, rows: list[tuple[str, str, str]]) -> Change:
     # New rows go at the end of the dataset's column map; the rows already there stay as written.
-    relative = f"{defaults.MAPS_DIR}/{dataset}.csv"
+    relative = map_file(project, dataset)
     opened = editing.open_file(project.root, relative)
     out = io.StringIO()
     csv.writer(out, lineterminator="\n").writerows(rows)
@@ -35,7 +35,7 @@ def map_rows(project: Project, dataset: str, rows: list[tuple[str, str, str]]) -
 
 def map_line(project: Project, dataset: str, line: int, column: str | None) -> Change:
     # One row of the column map given another data column, or taken out when column is None.
-    relative = f"{defaults.MAPS_DIR}/{dataset}.csv"
+    relative = map_file(project, dataset)
     opened = editing.open_file(project.root, relative)
     lines = opened.text.split("\n")
     if column is None:
@@ -50,7 +50,11 @@ def map_line(project: Project, dataset: str, line: int, column: str | None) -> C
 
 
 def map_lines(project: Project, dataset: str) -> list[str]:
-    return editing.open_file(project.root, f"{defaults.MAPS_DIR}/{dataset}.csv").text.split("\n")
+    return editing.open_file(project.root, map_file(project, dataset)).text.split("\n")
+
+
+def map_file(project: Project, dataset: str) -> str:
+    return f"{defaults.MAPS_DIR}/{map_name_of(project.config, dataset)}.csv"
 
 
 def add_to_vocab(project: Project, kind: str, value: str) -> Change:
@@ -125,7 +129,7 @@ def administered(project: Project, dataset: str) -> list[str]:
 
 def free_columns(project: Project, dataset: str, columns: list[str]) -> list[str]:
     # Data columns the map does not list yet, in the order of the data file.
-    listed = {entry.column for entry in project.maps.get(dataset, [])}
+    listed = {entry.column for entry in project.maps.get(map_name_of(project.config, dataset), [])}
     return [c for c in columns if c not in listed]
 
 
