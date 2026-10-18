@@ -16,7 +16,7 @@ from labcatalog.stats.analysis_script import (
 
 ICC = "icc"
 KAPPA = "kappa"
-# psych::ICC's rows, as Shrout and Fleiss name them.
+# psych::ICC's rows and the names they go by.
 ICC_TYPES = {
     "ICC1": "ICC(1,1): one-way random, single rater",
     "ICC2": "ICC(2,1): two-way random, absolute agreement, single rater",
@@ -27,8 +27,8 @@ ICC_TYPES = {
 }
 
 R_ICC = """\
-# Rater agreement: intraclass correlations of the {k} raters with their 95% CIs (psych::ICC, as
-# Shrout and Fleiss define them), on everyone all of them rated.
+# Rater agreement: the intraclass correlations of the {k} raters with their 95% CIs
+# (psych::ICC), on everyone all of them rated.
 raters <- c({columns})
 ratings <- na.omit(d[raters])
 found <- psych::ICC(ratings, lmer = FALSE)$results

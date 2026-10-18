@@ -122,7 +122,7 @@ def common_waves(result: CatalogResult, x: str, y: str) -> list[tuple[str, str, 
 
 
 def syntax(t: int, intercepts: bool, equal: bool) -> list[str]:
-    # Hamaker, Kuiper and Grasman's model as Mulder and Hamaker write it for lavaan.
+    # Random intercepts load 1 on every wave; within-person parts carry the lagged paths.
     xs, ys = [f"x{i}" for i in range(1, t + 1)], [f"y{i}" for i in range(1, t + 1)]
     lines = []
     if intercepts:
