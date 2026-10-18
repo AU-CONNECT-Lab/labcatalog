@@ -102,7 +102,7 @@ def render(project: Project, form: PipelineForm) -> None:
                 "Entities whose values become separate instruments"
             )
             field(ui.input("Columns", placeholder="raw_* motion_*"), form, "columns").tooltip(
-                "Patterns of the columns to take; every numeric column if empty"
+                "Patterns of the columns to take; every column of numbers or with Levels if empty"
             )
             field(ui.input("Wave", placeholder="from ses-"), form, "wave").tooltip(
                 "Only for a table without sessions"
@@ -125,7 +125,7 @@ def written_dialog(root: Path, done: Derived, command: str) -> None:
                     "text-primary cursor-pointer"
                 ).on("click", lambda p=path: open_path(p))
         if done.left_out:
-            note(f"Not numbers, so left out: {', '.join(done.left_out)}")
+            note(f"Neither numbers nor given Levels, so left out: {', '.join(done.left_out)}")
         if done.steps:
             ui.label(
                 "labcatalog does not edit labcatalog.yaml or the study files, so add these "
