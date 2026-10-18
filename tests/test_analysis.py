@@ -2,6 +2,7 @@ import pandas as pd
 import pytest
 
 from labcatalog.charts import matrices, views
+from labcatalog.config import ProjectConfig
 from labcatalog.gui import analysis as page
 from labcatalog.gui import common
 from labcatalog.gui.common import p_value
@@ -184,11 +185,11 @@ def test_apa_numbers():
 
 
 def test_decimal_places_follow_the_setting():
-    common.set_decimals(3)
+    common.use_project(ProjectConfig(project={"name": "x"}, stats={"decimals": 3}))
     try:
         assert page.apa(0.4512) == ".451"
         assert page.number(1.23456) == "1.235"
         assert p_value(0.0234) == ".023"
     finally:
-        common.set_decimals(2)
+        common.use_project(None)
     assert page.apa(0.4512) == ".45"
