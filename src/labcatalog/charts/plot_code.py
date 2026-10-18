@@ -3,8 +3,6 @@ import json
 from labcatalog.charts import style
 
 FIGURE_DPI = 300
-NEGATIVE = "#2166ac"
-POSITIVE = "#b2182b"
 
 R_SETUP = """\
 # Figure: {what}, saved as {file} (ggplot2).
@@ -17,7 +15,7 @@ PYTHON_SETUP = """\
 import matplotlib.pyplot as plt
 """
 R_SAVE = """\
-print(figure)
+if (interactive()) print(figure)
 ggsave({file}, figure, width = {width}, height = {height}, dpi = {dpi}, bg = "white")
 """
 PYTHON_SAVE = """\
@@ -35,8 +33,8 @@ R_HEATMAP = """\
 figure <- ggplot(cells, aes(x, y, fill = r)) +
   geom_tile(colour = "white") +
   geom_text(aes(label = ifelse(is.na(r), "", sprintf("%.2f", r))), size = 3) +
-  scale_fill_gradient2(low = "{negative}", mid = "white", high = "{positive}",
-                       limits = c(-1, 1), name = {coefficient}) +
+  # RdBu with red for positive r, as on the Analysis page.
+  scale_fill_distiller(palette = "RdBu", limits = c(-1, 1), name = {coefficient}) +
   coord_fixed() +
   labs(x = NULL, y = NULL) +
   theme_minimal() +
@@ -46,8 +44,7 @@ R_DOTS = """\
 figure <- ggplot(cells, aes(x, y)) +
   geom_point(aes(size = abs(r), colour = r)) +
   scale_size_area(max_size = 12, limits = c(0, 1), guide = "none") +
-  scale_colour_gradient2(low = "{negative}", mid = "#f7f7f7", high = "{positive}",
-                         limits = c(-1, 1), name = {coefficient}) +
+  scale_colour_distiller(palette = "RdBu", limits = c(-1, 1), name = {coefficient}) +
   coord_fixed() +
   labs(x = NULL, y = NULL) +
   theme_minimal() +
@@ -128,9 +125,10 @@ PYTHON_BOXES = """\
 values = [data.loc[data["group"] == g, "y"] for g in levels]
 places = range(1, len(levels) + 1)
 fig, ax = plt.subplots(figsize=({width}, {height}))
+line = dict(color="{colour}")
 ax.boxplot(values, positions=places, widths=0.5, showfliers=False, showmeans=True,
-           medianprops=dict(color="{colour}"), meanprops=dict(marker="D",
-           markerfacecolor="white", markeredgecolor="{colour}"))
+           boxprops=line, whiskerprops=line, capprops=line, medianprops=line,
+           meanprops=dict(marker="D", markerfacecolor="white", markeredgecolor="{colour}"))
 jitter = np.random.default_rng(1)
 for place, group in zip(places, values):
     ax.scatter(place + jitter.uniform(-0.12, 0.12, len(group)), group, color="{colour}",
@@ -196,8 +194,6 @@ def correlation(labels: dict[str, str], coefficient: str, dots: bool) -> tuple[s
     fields = dict(
         labels=r_named(labels),
         coefficient=text(coefficient),
-        negative=NEGATIVE,
-        positive=POSITIVE,
         width=f"{side + 1.5:g}",
         height=f"{side:g}",
     )

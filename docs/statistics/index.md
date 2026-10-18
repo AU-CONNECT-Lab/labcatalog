@@ -36,4 +36,4 @@ The number of decimal places is a setting of your computer, on the Settings page
 
 ## Get the code
 
-Every analysis has a **Code** section with R and Python code that reproduces it from the data files, and the Analysis page's **Script** section writes one script for the whole page. The factor models and invariance tests on the instrument pages, and the mediation models on the Analysis page, are saved as Mplus inputs as well; see [Instruments](../app/instruments.md) and [Analysis](../app/analysis.md). Use them to rerun an analysis outside labcatalog, extend it, or share it with a co-author or reviewer.
+Every analysis has a **Code** section with R and Python code that reproduces it from the data files, and draws its chart again with ggplot2 or matplotlib where it has one. The factor models and invariance tests on the instrument pages, and the mediation models on the Analysis page, are saved as Mplus inputs as well; see [Instruments](../app/instruments.md) and [Analysis](../app/analysis.md). Use them to rerun an analysis outside labcatalog, extend it, or share it with a co-author or reviewer.

@@ -388,10 +388,13 @@ def test_number_items_analyse_beside_scores(result, tmp_path, monkeypatch):
     sample = analysis.build_sample(result, ["child_w1", "eeg_w1"], True)
     choices = views.variable_choices(result, sample.datasets)
     assert FAA in choices and FAA not in views.total_choices(result, sample.datasets)
-    # Children link by family under the example's correlate_by.
+    # Children link by their roster family, or by their own ID where a family has siblings.
     eeg = result.datasets["eeg_w1"].frame
+    roster = pd.read_csv(result.project.root / "data" / "participants.csv", dtype=str)
+    family = roster.set_index("pid")["family_id"]
+    keys = [pid if pid in sample.people else family.get(pid, pid) for pid in eeg["pid"]]
     expected = pd.Series(
-        pd.to_numeric(eeg["frontal_alpha_asymmetry"]).to_numpy(), index=eeg["pid"].str[:4]
+        pd.to_numeric(eeg["frontal_alpha_asymmetry"]).to_numpy(), index=keys
     ).reindex(sample.people)
     pd.testing.assert_series_equal(
         analysis.values(result, sample, FAA), expected, check_names=False
