@@ -30,7 +30,7 @@ On the Problems page, **Fix** at the end of a row opens a panel for that problem
 | YAML errors, unknown keys | A file cannot be read, or a key is misspelled. | Fix the file at the line shown. Every key labcatalog does not know is an error, so typos never pass silently. |
 | `not_in_vocab` | A modality, reporter or target is not in `vocab`. | In the Fix panel, pick the word it should be, or add the new word to `vocab`. |
 | `unknown_reference` | Something names an ID that does not exist: an instrument, item, response set, dataset or study. | In the Fix panel, pick the ID it should be; or add what it names. |
-| `duplicate_id` | Two things share an ID. | Rename one. For a column map that lists a row twice, the Fix panel takes one out. |
+| `duplicate_id` | Two things share an ID. | Rename one; the Fix panel renames an entry in place. For a column map row, an answer value or a facet listed twice, it takes one out. |
 | `map_missing` | A dataset has administrations but no column map. | Create `maps/<dataset>.csv`, for example with a codebook import. |
 | `unmapped_item` | An administered instrument has items with no column in the map. | In the Fix panel, pick each item's column, or record that the dataset did not ask it (a dropped override). |
 | `missing_code_collision` | A missing code is also a response option. | If the value is an answer, take it out of the missing codes in the Fix panel (for one dataset or all). Otherwise change the response set. |
