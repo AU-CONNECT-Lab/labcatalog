@@ -119,13 +119,7 @@ def render(result: CatalogResult, view) -> None:
             body.refresh()
 
         def choose_outcome(value: str) -> None:
-            names = ml.occasions(result, value)
-            study = result.project.config.datasets
-            first = next(d.study for d in study if d.name == names[0])
-            change(
-                outcome=value,
-                datasets=[n for n in names if any(d.name == n and d.study == first for d in study)],
-            )
+            change(outcome=value, datasets=ml.wave_datasets(result, value))
             waves.set_options(
                 {n: labels[n] for n in ml.occasions(result, value)}, value=model.datasets
             )

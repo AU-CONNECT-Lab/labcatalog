@@ -72,6 +72,14 @@ def test_default_model_follows_a_total_score_over_waves(result):
     assert ml.problem(result, model) is None
 
 
+def test_an_outcome_two_reporters_give_starts_from_one_dataset_per_wave(result):
+    ewt = "example_worries_temper.ewt_total"
+    assert "parent_child_w1" in ml.occasions(result, ewt)
+    model = ml.default_model(result, [ewt])
+    assert model.datasets == ["child_w1", "child_w2", "child_w3"]
+    assert ml.problem(result, model) is None
+
+
 def eeg_model(covariates: list[str]) -> ml.Model:
     return ml.Model(FAA, ["eeg_w1", "eeg_w3"], covariates=covariates, slope=False)
 

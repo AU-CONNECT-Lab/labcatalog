@@ -313,10 +313,19 @@ def default_model(result: CatalogResult, choices: list[str] | None = None) -> Mo
         return is_total(instruments[instrument_id], score_id) and len(occasions(result, key)) > 1
 
     outcome = next((k for k in choices if repeated_total(k)), choices[0])
+    return Model(outcome, wave_datasets(result, outcome))
+
+
+def wave_datasets(result: CatalogResult, outcome: str) -> list[str]:
+    # One dataset per wave of the first one's study, from the first one's reporter.
     configs = {d.name: d for d in result.project.config.datasets}
     names = occasions(result, outcome)
-    study = configs[names[0]].study
-    return Model(outcome, [n for n in names if configs[n].study == study])
+    first = configs[names[0]]
+    found: dict[str, str] = {}
+    for n in names:
+        if configs[n].study == first.study and configs[n].reporter == first.reporter:
+            found.setdefault(configs[n].wave, n)
+    return list(found.values())
 
 
 def covariate_keys(result: CatalogResult) -> list[str]:
