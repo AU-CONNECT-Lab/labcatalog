@@ -22,6 +22,8 @@ ITEM_STATISTICS = "item_statistics.csv"
 BY_DATASET = "dataset"
 BY_ID = "id"
 BY_GROUP = "group"
+# The first column of a wide table, since IDs belong to their study.
+STUDY = "study"
 COLUMNS = [
     "dataset",
     "study",
@@ -298,7 +300,7 @@ def key_name(result: CatalogResult, layout: str) -> str:
 def wide_frame(
     result: CatalogResult, plan: dict[str, list[str]], layout: str
 ) -> tuple[pd.DataFrame, dict[str, int]]:
-    # One row per person or group; a row whose key repeats within a file cannot be placed.
+    # One row per person or group of a study; a row whose key repeats within a file cannot be placed.
     parts = []
     left_out = {}
     for dataset, instrument_ids in plan.items():
@@ -315,6 +317,7 @@ def wide_frame(
         elif key_name(result, layout) in frame:
             frame = frame.drop(columns=key_name(result, layout))
         frame = frame.add_prefix(f"{dataset}_")[keep]
-        parts.append(frame.set_axis(keys[keep].to_numpy()))
+        study = [loaded.config.study] * int(keep.sum())
+        parts.append(frame.set_axis(pd.MultiIndex.from_arrays([study, keys[keep].to_numpy()])))
     wide = pd.concat(parts, axis=1).sort_index()
-    return wide.rename_axis(key_name(result, layout)).reset_index(), left_out
+    return wide.rename_axis([STUDY, key_name(result, layout)]).reset_index(), left_out

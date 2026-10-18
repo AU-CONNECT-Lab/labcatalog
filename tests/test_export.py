@@ -111,7 +111,7 @@ def test_wide_table_by_id_has_a_row_per_person_and_leaves_out_repeated_ids(resul
     data = pd.read_csv(done.folder / "data_by_id.csv", dtype=str, keep_default_na=False)
     variables = pd.read_csv(done.folder / VARIABLES, dtype=str, keep_default_na=False)
     assert done.left_out == {"parent_w3": 2}
-    assert data.columns[0] == "id" and data["id"].is_unique
+    assert list(data.columns[:2]) == ["study", "id"] and data["id"].is_unique
     assert {"parent_w2_eps_1_w2", "parent_w3_eps_1_w3", "parent_w3_visit_date"} <= set(data)
     assert "parent_w2_pid" not in data
     assert set(variables["column"]) <= set(data)
@@ -127,7 +127,7 @@ def test_wide_table_by_group_puts_parent_and_child_side_by_side(result):
     assert layouts(result, plan) == [BY_DATASET, BY_ID, BY_GROUP]
     done = write_export(result, plan, BY_GROUP)
     data = pd.read_csv(done.folder / "data_by_family.csv", dtype=str, keep_default_na=False)
-    assert data.columns[0] == "family" and data["family"].is_unique
+    assert list(data.columns[:2]) == ["study", "family"] and data["family"].is_unique
     row = data.set_index("family").loc["1001"]
     assert (row["parent_w1_pid"], row["child_w1_pid"]) == ("1001P", "1001C")
 

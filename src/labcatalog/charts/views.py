@@ -573,8 +573,9 @@ def banner(result: CatalogResult) -> Banner:
     else:
         kicker = f"{len(studies)} studies" if studies else ""
         description = ", ".join(s.label or i for i, s in studies.items())
+    # IDs belong to their study.
     people = {
-        str(person)
+        (loaded.config.study, str(person))
         for loaded in result.datasets.values()
         for person in loaded.respondents().dropna()
     }

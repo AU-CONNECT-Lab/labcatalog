@@ -1,14 +1,14 @@
-import shutil
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
+from labcatalog.charts import views
 from labcatalog.exceptions import DataSourceError
 from labcatalog.gui import instruments
 from labcatalog.pipeline import run_catalog, run_check, run_validate
 from labcatalog.project import load_project
-from labcatalog.reports.export import data_frame
+from labcatalog.reports.export import BY_ID, data_frame, wide_frame
 from labcatalog.sources import load_datasets
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
@@ -225,38 +225,12 @@ def test_a_missing_role_column_is_named(mock_project):
         load_datasets(load_project(mock_project))
 
 
-def add_pilot(root: Path) -> None:
-    # A second study whose IDs repeat the first's, with its own roster.
-    (root / "data" / "pilot_roster.csv").write_text(
-        "pid,family_id,role,birth_year,gender\n1001C,9001,child,2017,1\n1001P,9001,parent,1980,2\n",
-        encoding="utf-8",
-    )
-    shutil.copy(root / "maps" / "roster_mock_study.csv", root / "maps" / "roster_pilot.csv")
-    (root / "maps" / "pilot_w1.csv").write_text(
-        "column,instrument,item\npid,,\nvisit_date,,\n", encoding="utf-8"
-    )
-    edit(
-        root / "labcatalog.yaml",
-        "\n# One entry per data file",
-        "  pilot:\n    waves: {1: {}}\n    roster: {path: data/pilot_roster.csv, id_column: pid, "
-        "group_column: family_id, role_column: role, instrument: example_participants}\n"
-        "\n# One entry per data file",
-    )
-    edit(
-        root / "labcatalog.yaml",
-        "datasets:\n",
-        "datasets:\n  - {name: pilot_w1, modality: questionnaire, study: pilot, wave: 1, "
-        "reporter: child, source: csv, path: data/child_w1.csv}\n",
-    )
-
-
-def test_each_study_reads_its_own_roster(mock_project):
-    add_pilot(mock_project)
-    datasets = load_datasets(load_project(mock_project))
+def test_each_study_reads_its_own_roster(pilot_project):
+    datasets = load_datasets(load_project(pilot_project))
     for name, family in (("child_w1", "1001"), ("pilot_w1", "9001")):
         loaded = datasets[name]
         assert loaded.group[loaded.frame[loaded.id_column] == "1001C"].tolist() == [family]
-    issues = run_check(mock_project).issues
+    issues = run_check(pilot_project).issues
     [unlisted] = [
         i for i in issues if i.code == "id_not_in_roster" and i.details["dataset"] == "pilot_w1"
     ]
@@ -266,9 +240,8 @@ def test_each_study_reads_its_own_roster(mock_project):
     assert unused.message.endswith(": 1001P")
 
 
-def test_the_analysis_reads_roster_values_from_the_files_study(mock_project):
-    add_pilot(mock_project)
-    result = run_catalog(mock_project)
+def test_the_analysis_reads_roster_values_from_the_files_study(pilot_project):
+    result = run_catalog(pilot_project)
     assert {v.dataset for v in result.catalog.roster_variables} == {
         "roster_mock_study",
         "roster_pilot",
@@ -278,3 +251,28 @@ def test_the_analysis_reads_roster_values_from_the_files_study(mock_project):
         values = analysis.item_numbers(result, birth)
         ids = result.datasets[name].frame["pid"]
         assert values[ids == "1001C"].tolist() == [year]
+
+
+def test_people_of_two_studies_are_never_the_same(pilot_project):
+    result = run_catalog(pilot_project)
+    files = ["child_w1", "pilot_w1"]
+    assert analysis.build_sample(result, files, True).people == []
+    union = analysis.build_sample(result, files, False).people
+    # The example links by family; 1001C is in family 1001 of one study and 9001 of the other.
+    assert {"mock_study/1001", "pilot/9001"} <= set(union)
+    assert all(p.startswith(("mock_study/", "pilot/")) for p in union)
+    plan = {name: ["example_mood"] for name in files}
+    data, _ = wide_frame(result, plan, BY_ID)
+    assert list(data.columns[:2]) == ["study", "id"]
+    assert len(data[data["id"] == "1001C"]) == 2
+    facts = {label: n for n, label in views.banner(result).facts}
+    assert facts["people"] == len(people_of(result, "mock_study")) + len(people_of(result, "pilot"))
+
+
+def people_of(result, study: str) -> set[str]:
+    return {
+        p
+        for loaded in result.datasets.values()
+        if loaded.config.study == study
+        for p in loaded.respondents().dropna()
+    }

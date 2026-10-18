@@ -21,11 +21,15 @@ class Links:
 
 def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str) -> Links:
     by_group = correlate_by not in ("id", "none")
+    # IDs belong to their study, so files of several studies share no one.
+    several = len({datasets[name].config.study for name in names}) > 1
     parts, repeated = [], 0
     for name in names:
         loaded = datasets[name]
         ids = loaded.frame[loaded.id_column].astype("string")
         groups = loaded.group.astype("string") if by_group and loaded.group is not None else ids
+        if several:
+            ids, groups = study_keys(loaded, ids), study_keys(loaded, groups)
         rows = pd.DataFrame(
             {"name": name, "id": ids.to_numpy(), "group": groups.to_numpy(), "row": range(len(ids))}
         )
@@ -66,3 +70,7 @@ def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str
         split |= dict.fromkeys(people, group)
     rows = {name: pd.Series(found[name], dtype=int) for name in names}
     return Links(rows, split, repeated, crossed)
+
+
+def study_keys(loaded: LoadedDataset, keys: pd.Series) -> pd.Series:
+    return f"{loaded.config.study}/" + keys
