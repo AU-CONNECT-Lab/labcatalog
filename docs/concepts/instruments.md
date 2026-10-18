@@ -77,7 +77,7 @@ Items marked `reverse: true` are reversed before scoring, using their response o
 
 labcatalog computes every summed or averaged score itself from the items. If your data also contain a score your lab computed, map that column to `score:<id>` and labcatalog reports every row where the two disagree.
 
-A score that is not a sum or a mean, such as one looked up in a norm table or weighted, is computed by a script you write, or have a language model write: give it `method: script`. The script, usually a [prepare step](../how-to/prepare-steps.md), reads the dataset's data and writes a CSV with the ID column and one column per score, named by the score's ID; name that file in the dataset's `scores` in `labcatalog.yaml`. labcatalog then reads the score from there, matched by ID, and shows and analyses it like any other. A column of that file for a summed or averaged score is checked against labcatalog's own, as above.
+A score that is not a sum or a mean, such as one looked up in a norm table or weighted, is computed by a script you write, or have a language model write: give it `method: script`. The script, usually a [prepare step](../how-to/prepare-steps.md), reads the dataset's data and writes a CSV with the ID column and one column per score, named by the score's ID; name that file in the dataset's `scores` in `labcatalog.yaml`. The instrument's page sets this up: its **Scoring step** starts a script from a template, or takes yours, and registers the step and the file. labcatalog then reads the score from there, matched by ID, and shows and analyses it like any other. A column of that file for a summed or averaged score is checked against labcatalog's own, as above.
 
 ## References and license
 

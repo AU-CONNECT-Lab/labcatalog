@@ -2,24 +2,29 @@ from datetime import date
 from pathlib import Path
 
 from labcatalog import defaults
-from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.data.resolve import Catalog, as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LLMError
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
 from labcatalog.metadata.bibliography import citation
+from labcatalog.metadata.scoring_steps import scoring_step
+from labcatalog.paths import posix_str
 from labcatalog.project import Project, reference_pdf
-from labcatalog.schema import Instrument, Item, Reference
+from labcatalog.schema import SCRIPT, Instrument, Item, Reference, Score
 
 SYSTEM = """You write scoring scripts for questionnaires used in research. You are given an \
-instrument's reference (its paper or manual, converted from PDF), the instrument's items, and \
-how one dataset stores them. Write an R script and a Python script that compute every score the \
-reference defines, the way the reference says to compute it.
+instrument's reference (its paper or manual, converted from PDF), the instrument's items and \
+scores as the catalog lists them, and how one dataset stores them. Write an R script and a \
+Python script that compute every score the reference defines, the way the reference says to \
+compute it.
 
-The scripts run on a data frame `d` that already holds the dataset (R: read with read.csv(); \
-Python: read with pandas.read_csv()). Add one new column per score to `d`, named \
-<score>_<dataset> in lower case with underscores, for example total_child_w1. Do not read or \
-write files, and use only base R, pandas and numpy.
+Each script takes two arguments, the dataset's data file and the scores file to write (R: \
+commandArgs(trailingOnly = TRUE); Python: sys.argv). It reads the data file, keeping the ID \
+column as text, and writes a CSV file with the ID column, then one column per score, leaving a \
+cell empty where a person has no score. Name a score's column by its ID in the catalog when the \
+catalog lists that score, and otherwise by a short ID in lower case with underscores. Read and \
+write no other file, and use only base R, pandas and numpy.
 
 Treat the dataset's missing codes, and any value that is not one of an item's options, as \
 missing. Reverse-score items as the reference says. Apply the reference's rule for missing \
@@ -49,7 +54,6 @@ SCHEMA = ToolSchema(
         "additionalProperties": False,
     },
 )
-READERS = {"r": "read.csv()", "python": "pandas.read_csv()"}
 SUFFIXES = {"r": ".R", "python": ".py"}
 
 
@@ -97,11 +101,21 @@ def scoring_request(project: Project, catalog: Catalog, instrument_id: str, data
     codes = missing_codes_for(config, dataset_by_name(config, dataset))
     listed = ", ".join(f"{c.code} = {c.label}" for c in codes) or "none"
     lines += ["", f"Missing codes in this dataset: {listed}"]
+    lines.append(f"ID column: {id_column_for(config, dataset_by_name(config, dataset))}")
+    if instrument.scores:
+        lines += ["", "Scores in the catalog (id | label | how):"]
+        lines += [f"{s.id} | {s.label} | {how(s)}" for s in instrument.scores]
     for reference, path in reference_pdfs(project, instrument):
         cited = citation(project.bibliography, reference.key)
         lines += ["", f"Reference: {cited}", "<reference>", pdf_text(path)]
         lines.append("</reference>")
     return "\n".join(lines)
+
+
+def how(score: Score) -> str:
+    if score.method == SCRIPT:
+        return "computed by this script"
+    return f"{score.method} of {', '.join(score.items)}, missing items: {score.missing_rule}"
 
 
 def answer(instrument: Instrument, item: Item) -> str:
@@ -127,11 +141,13 @@ def write_scoring_scripts(
     instrument = project.instruments[instrument_id]
     sources = ", ".join(path.name for _, path in reference_pdfs(project, instrument))
     for language, path in script_paths(project, instrument_id, dataset).items():
+        script = posix_str(path.relative_to(project.root))
+        step = scoring_step(project, instrument_id, dataset, script)
         header = [
             f"# {instrument.name}, dataset {dataset}: written by {meta.provider} {meta.model} "
             f"on {date.today().isoformat()} from {sources}.",
             "# Check it against the reference before using it.",
-            f"# d is the dataset read with {READERS[language]}",
+            f"# {step.run}",
             *(["# Notes from the model:"] if output["notes"] else []),
             *[f"# - {line}" for line in output["notes"]],
         ]

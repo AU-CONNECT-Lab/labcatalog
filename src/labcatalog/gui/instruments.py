@@ -13,7 +13,7 @@ from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, common, new_instrument
+from labcatalog.gui import charts, common, new_instrument, scoring_step
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
@@ -44,7 +44,7 @@ from labcatalog.gui.paper import (
 from labcatalog.metadata.browse import BrowseIndex, counts, matches
 from labcatalog.metadata.completeness import gaps
 from labcatalog.metadata.history import Change, file_history
-from labcatalog.paths import portable_path
+from labcatalog.paths import portable_path, posix_str
 from labcatalog.pipeline import (
     CatalogResult,
     run_description_draft,
@@ -770,7 +770,7 @@ def dataset_part(
         measures_section(result, instrument, dataset, cfa)
         description_draft(result, instrument)
         charts.instrument_dataset_section(result, instrument.id, dataset)
-        scoring_code(result, instrument, dataset)
+        scoring_code(result, instrument, dataset, cfa.reload)
 
     with ui.row().classes("items-center gap-3"):
         ui.label("Dataset").classes("lc-facet")
@@ -998,17 +998,28 @@ def score_statistics(result: CatalogResult, instrument: Instrument, cfa: CfaView
     table(*score_table(result, instrument, cfa.fits))
 
 
-def scoring_code(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
+def scoring_code(
+    result: CatalogResult,
+    instrument: Instrument,
+    dataset: str,
+    reload: Callable[[], Awaitable[None]],
+) -> None:
     snippets = result.snippets.get((instrument.id, dataset))
     if snippets is not None:
         with panel(
             "Scoring code", f"R and Python that compute this instrument's scores in {dataset}"
         ):
             code_tabs(snippets)
-    written_scripts(result, instrument, dataset)
+    scoring_step.render(result, instrument, dataset, reload)
+    written_scripts(result, instrument, dataset, reload)
 
 
-def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str) -> None:
+def written_scripts(
+    result: CatalogResult,
+    instrument: Instrument,
+    dataset: str,
+    reload: Callable[[], Awaitable[None]],
+) -> None:
     if not ai_scoring.reference_pdfs(result.project, instrument):
         return
     paths = ai_scoring.script_paths(result.project, instrument.id, dataset)
@@ -1018,6 +1029,10 @@ def written_scripts(result: CatalogResult, instrument: Instrument, dataset: str)
         if paths["r"].is_file():
             note(f"Saved as {paths['r'].name} and {paths['python'].name} in {paths['r'].parent}.")
             code_tabs({k: path.read_text(encoding="utf-8") for k, path in paths.items()})
+            with ui.row().classes("items-center gap-2"):
+                for path in paths.values():
+                    script = posix_str(path.relative_to(result.project.root))
+                    scoring_step.use_button(result, instrument, dataset, script, reload)
 
     async def write() -> None:
         button.disable()

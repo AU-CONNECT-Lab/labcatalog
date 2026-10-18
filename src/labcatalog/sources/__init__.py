@@ -32,10 +32,10 @@ class LoadedDataset:
     file_waves: set[str] | None = None
     # The IDs as the file writes them, before id_map.csv corrects them.
     original_ids: pd.Series | None = None
-    # The scores file's columns, one row per row of the data; None when there is no such file.
+    # The scores files' columns, one row per row of the data; None when the dataset names none.
     scores: pd.DataFrame | None = None
-    # Every ID of the scores file, to find those the data do not have.
-    score_ids: set[str] | None = None
+    # Each scores file found and its IDs, to find those the data do not have.
+    score_ids: dict[str, set[str]] = field(default_factory=dict)
     numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
     answer_cache: dict[tuple, pd.Series] = field(default_factory=dict, repr=False)
 
@@ -161,22 +161,25 @@ def read_scores(
     id_column: str,
     ids: pd.Series,
     corrected: dict[str, str],
-) -> tuple[pd.DataFrame | None, set[str] | None]:
-    # Before its prepare step has run the file is not there; the checks say so.
-    if dataset.scores is None:
-        return None, None
-    path = expand_path(dataset.scores, project.root)
-    if not path.is_file():
-        return None, None
-    table = read_csv(path, dataset.name)
-    if id_column not in table:
-        raise DataSourceError(
-            f"{dataset.name}: the scores file {dataset.scores} has no column '{id_column}'"
-        )
-    table[id_column] = id_map.apply(table[id_column], corrected)
-    found = set(table[id_column])
-    by_id = table.drop_duplicates(id_column).set_index(id_column)
-    return by_id.reindex(ids.to_numpy()).set_axis(ids.index), found
+) -> tuple[pd.DataFrame | None, dict[str, set[str]]]:
+    if not dataset.scores:
+        return None, {}
+    parts, found = [], {}
+    for name in dataset.scores:
+        path = expand_path(name, project.root)
+        # Before its prepare step has run the file is not there; the checks say so.
+        if not path.is_file():
+            continue
+        table = read_csv(path, dataset.name)
+        if id_column not in table:
+            raise DataSourceError(
+                f"{dataset.name}: the scores file {name} has no column '{id_column}'"
+            )
+        table[id_column] = id_map.apply(table[id_column], corrected)
+        found[name] = set(table[id_column])
+        by_id = table.drop_duplicates(id_column).set_index(id_column)
+        parts.append(by_id.reindex(ids.to_numpy()).set_axis(ids.index))
+    return pd.concat(parts, axis=1) if parts else pd.DataFrame(index=ids.index), found
 
 
 def load_datasets(project: Project) -> dict[str, LoadedDataset]:

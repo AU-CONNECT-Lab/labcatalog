@@ -38,6 +38,8 @@ def test_the_request_holds_the_items_columns_codes_and_reference(result):
     assert "ems_1 | ems_1_w1 | I felt happy. | options 0 = Never" in request
     assert request.count(" | yes") == 3
     assert "Missing codes in this dataset: -99 = refused" in request
+    assert "ID column: pid" in request
+    assert "ems_total | Total score | sum of ems_1, ems_2" in request
     assert "<reference>" in request and "Example Mood Scale" in request
 
 
@@ -52,5 +54,8 @@ def test_the_scripts_are_saved_with_who_wrote_them_and_the_notes(result):
     assert r.startswith("# Example Mood Scale, dataset child_w1: written by fake fake-model")
     assert "# - The reference lists six items; the catalog has nine." in r
     assert r.rstrip().endswith("d$total_child_w1 <- rowSums(d[items])")
-    assert "pandas.read_csv()" in paths["python"].read_text(encoding="utf-8")
+    assert (
+        "# python scoring/example_mood_child_w1.py data/child_w1.csv "
+        "data/child_w1_example_mood_scores.csv" in paths["python"].read_text(encoding="utf-8")
+    )
     assert paths["r"].parent.name == "scoring"

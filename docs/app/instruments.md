@@ -71,7 +71,8 @@ Pick a dataset to see the instrument in that file alone:
 - **Measures paragraph**: a draft paragraph for the paper, with α and ω in this dataset, and a **Copy text** button. With a language model and the reference PDF, **Draft the description from the reference PDF** drafts the instrument's `description` for you to check.
 - **Everyone's answers**, **Answers by participant** and **Standardized scores**: each person's answers and scores, to spot unusual response patterns.
 - **Scoring code**: R and Python code that computes the scores from this data file.
-- **Scoring script from the reference PDF**: with a language model, **Write with the language model** writes scoring scripts from the instrument's manual, saved in `scoring/`, to compare with labcatalog's own scoring.
+- **Scoring step**: for an instrument with a score computed by a script (`method: script`), the script that computes it in this dataset. **Start an R script** or **Start a Python script** writes a template in `scripts/` that reads the data file and writes the ID and each score's column, for you to fill in; **Use my own script** takes a script of yours that does the same. Either becomes a step of [Prepare data](prepare.md) that writes `data/<dataset>_<instrument>_scores.csv`, and the dataset's `scores` in `labcatalog.yaml` names that file. Once there is a step, the panel shows its command and opens the script.
+- **Scoring script from the reference PDF**: with a language model, **Write with the language model** writes an R and a Python scoring script from the instrument's manual, saved in `scoring/`. They read the data file and write the scores file like a scoring step's script, and **Use ... as the scoring step** makes one of them the step: its scores with `method: script` are then read from it, and its columns for summed or averaged scores are checked against labcatalog's own, each row that differs reported in Problems.
 
 ### History
 

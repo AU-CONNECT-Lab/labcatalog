@@ -485,7 +485,7 @@ def given_scores(loaded: LoadedDataset, score: ResolvedScore) -> list[tuple[str,
     if column is not None and column in loaded.frame:
         found.append((column, loaded.frame[column]))
     if loaded.scores is not None and score.score_id in loaded.scores:
-        name = f"{loaded.config.scores}, {score.score_id}"
+        name = f"the scores file's {score.score_id}"
         found.append((name, loaded.scores[score.score_id].fillna("")))
     return found
 
@@ -527,30 +527,32 @@ def check_scores_files(
     # Scores a script computes need its file, a column each, and the data's own IDs.
     issues = []
     for name, loaded in datasets.items():
-        where = location(project, loaded)
-        scripted = [s for s in catalog.scores_for(name) if s.method == SCRIPT]
-        path = loaded.config.scores
-        if path is not None and loaded.scores is None:
+        found: list[tuple[str, str]] = []
+        absent = [p for p in loaded.config.scores if p not in loaded.score_ids]
+        for path in absent:
             message = (
                 f"{name}: the scores file {path} is not there yet; run the step that writes it"
             )
-            issues.append(problem("scores_missing", message, where, "warning", dataset=name))
-            continue
-        for score in scripted:
-            if path is None:
-                message = f"{score.key}: computed by a script, but {name} names no scores file"
-            elif score.score_id not in loaded.scores:
-                message = f"{score.key}: the scores file {path} has no column {score.score_id}"
-            else:
+            found.append(("scores_missing", message))
+        for score in catalog.scores_for(name):
+            held = loaded.scores is not None and score.score_id in loaded.scores
+            if score.method != SCRIPT or held:
                 continue
-            issues.append(problem("scores_missing", message, where, "warning", dataset=name))
-        if loaded.score_ids:
-            stray = sorted(loaded.score_ids - set(loaded.frame[loaded.id_column]))
-            if stray:
+            if not loaded.config.scores:
+                message = f"{score.key}: computed by a script, but {name} names no scores file"
+                found.append(("scores_missing", message))
+            elif not absent:
+                message = f"{score.key}: no scores file of {name} has a column {score.score_id}"
+                found.append(("scores_missing", message))
+        data_ids = set(loaded.frame[loaded.id_column])
+        for path, ids in loaded.score_ids.items():
+            if stray := sorted(ids - data_ids):
                 message = (
                     f"{name}: {len(stray)} ID(s) of {path} are not in the data: {examples(stray)}"
                 )
-                issues.append(problem("scores_unmatched", message, where, "warning", dataset=name))
+                found.append(("scores_unmatched", message))
+        where = location(project, loaded)
+        issues += [problem(c, m, where, "warning", dataset=name) for c, m in found]
     return issues
 
 

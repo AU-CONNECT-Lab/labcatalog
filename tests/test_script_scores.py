@@ -1,6 +1,13 @@
+import shutil
+import subprocess
+import sys
+from glob import glob
+
 import pandas as pd
 import pytest
 
+from labcatalog.config import dataset_by_name
+from labcatalog.metadata import scoring_steps
 from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
@@ -8,6 +15,12 @@ from labcatalog.project import load_project
 INSTRUMENT = "instruments/example_parent_stress.yaml"
 SCRIPTED = "  - {id: eps_t, label: T score, method: script}\n"
 KEY = "example_parent_stress.eps_t@parent_w1"
+
+
+def rscript() -> str | None:
+    return shutil.which("Rscript") or next(
+        iter(glob("C:/Program Files/R/R-*/bin/Rscript.exe")), None
+    )
 
 
 def score_by_script(root, scores_file: str | None = "data/parent_w1_scores.csv") -> None:
@@ -18,7 +31,9 @@ def score_by_script(root, scores_file: str | None = "data/parent_w1_scores.csv")
         config = root / "labcatalog.yaml"
         entry = "path: data/parent_w1.csv,"
         config.write_text(
-            config.read_text(encoding="utf-8").replace(entry, f"{entry} scores: {scores_file},", 1),
+            config.read_text(encoding="utf-8").replace(
+                entry, f"{entry} scores: [{scores_file}],", 1
+            ),
             encoding="utf-8",
         )
 
@@ -62,7 +77,7 @@ def test_a_missing_scores_file_or_column_is_a_warning(mock_project):
         mock_project / "data" / "parent_w1_scores.csv", index=False
     )
     [missing] = issues_of(run_catalog(mock_project), "scores_missing")
-    assert missing == f"{KEY}: the scores file data/parent_w1_scores.csv has no column eps_t"
+    assert missing == f"{KEY}: no scores file of parent_w1 has a column eps_t"
 
 
 def test_without_a_scores_file_a_script_score_says_so(mock_project):
@@ -86,7 +101,7 @@ def test_a_scores_file_column_for_a_summed_score_is_held_to_labcatalogs(mock_pro
     [mismatch] = issues_of(run_catalog(mock_project), "score_mismatch")
     assert mismatch.startswith(
         "example_parent_stress.eps_strain@parent_w1: 1 row(s) differ from "
-        "data/parent_w1_scores.csv, eps_strain"
+        "the scores file's eps_strain"
     )
 
 
@@ -102,3 +117,55 @@ def test_a_summed_or_averaged_score_needs_items(mock_project, method):
     )
     messages = [i.message for i in validate_project(load_project(mock_project))]
     assert f"scores[4] (none).items: list the items it is the {method} of" in messages
+
+
+def test_a_started_script_becomes_a_step_whose_scores_the_dataset_reads(mock_project):
+    score_by_script(mock_project, None)
+    project = load_project(mock_project)
+    result = run_catalog(mock_project)
+    script = scoring_steps.start_script(
+        project, result.catalog, "example_parent_stress", "parent_w1", "python"
+    )
+    assert script == "scripts/score_example_parent_stress_parent_w1.py"
+    text = (mock_project / script).read_text(encoding="utf-8")
+    assert "# python scripts/score_example_parent_stress_parent_w1.py data/parent_w1.csv " in text
+    assert "# T score (eps_t), from eps_1_w1, eps_2_w1" in text
+    assert 'scores["eps_t"] = pd.NA' in text
+    assert "Missing codes in this dataset: -99 = refused" in text
+    step = scoring_steps.register(project, "example_parent_stress", "parent_w1", script)
+    assert step.outputs == ["data/parent_w1_example_parent_stress_scores.csv"]
+    assert step.inputs == ["data/parent_w1.csv", script]
+    project = load_project(mock_project)
+    assert project.config.prepare[-1] == step
+    assert dataset_by_name(project.config, "parent_w1").scores == step.outputs
+    # Registering again changes nothing.
+    scoring_steps.register(project, "example_parent_stress", "parent_w1", script)
+    assert dataset_by_name(load_project(mock_project).config, "parent_w1").scores == step.outputs
+    filled = text.replace('scores["eps_t"] = pd.NA', 'scores["eps_t"] = 50')
+    (mock_project / script).write_text(filled, encoding="utf-8")
+    subprocess.run(
+        [sys.executable, script, "data/parent_w1.csv", step.outputs[0]],
+        cwd=mock_project,
+        check=True,
+    )
+    result = run_catalog(mock_project)
+    assert not issues_of(result, "scores_missing")
+    values = result.scores["parent_w1"][KEY]
+    assert (values == 50).all()
+
+
+@pytest.mark.skipif(rscript() is None, reason="R is not installed")
+def test_the_r_template_runs(mock_project):
+    score_by_script(mock_project, None)
+    project = load_project(mock_project)
+    result = run_catalog(mock_project)
+    script = scoring_steps.start_script(
+        project, result.catalog, "example_parent_stress", "parent_w1", "r"
+    )
+    output = mock_project / "out.csv"
+    subprocess.run(
+        [rscript(), script, "data/parent_w1.csv", str(output)], cwd=mock_project, check=True
+    )
+    written = pd.read_csv(output, dtype=str, keep_default_na=False)
+    assert list(written.columns) == ["pid", "eps_t"]
+    assert written["pid"].tolist() == result.datasets["parent_w1"].frame["pid"].tolist()
