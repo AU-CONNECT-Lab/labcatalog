@@ -2,15 +2,19 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from nicegui import ui
+import webview
+from nicegui import app, ui
 
 from labcatalog import defaults
+from labcatalog.ai.cleaning import cleaning_step, raw_of
 from labcatalog.data.prepare import FileState, Session, StepState, run_steps, step_states, stop
 from labcatalog.exceptions import DataladError, LabCatalogError
-from labcatalog.gui import preferences
-from labcatalog.gui.common import computed, empty, open_path, page_head, panel
+from labcatalog.gui import common, preferences
+from labcatalog.gui.cleaning import LANGUAGE_NAMES, review, sent_text
+from labcatalog.gui.common import computed, empty, note, open_path, page_head, panel, path_input
 from labcatalog.gui.datalad import get_button
-from labcatalog.pipeline import run_get
+from labcatalog.paths import portable_path, posix_str
+from labcatalog.pipeline import CatalogResult, run_cleaning_draft, run_get
 from labcatalog.project import load_project
 
 EXAMPLE = """\
@@ -37,7 +41,12 @@ class PrepareView:
     shown: str | None = None
 
 
-def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[None]]) -> None:
+def render(
+    root: Path,
+    result: CatalogResult | None,
+    view: PrepareView,
+    on_success: Callable[[], Awaitable[None]],
+) -> None:
     try:
         project = load_project(root)
     except LabCatalogError as err:
@@ -56,6 +65,7 @@ def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[Non
             ui.button(
                 f"Open {defaults.CONFIG_FILENAME}", on_click=lambda: open_path(config_path)
             ).props("flat no-caps").classes("lc-quiet-btn")
+        draft_panel(result, on_success)
         return
     names = [step.name for step in project.config.prepare]
 
@@ -143,6 +153,7 @@ def render(root: Path, view: PrepareView, on_success: Callable[[], Awaitable[Non
             for state in states:
                 step_row(state, view, start, show_log, on_success)
         log_panel(view)
+        draft_panel(result, on_success)
 
     steps()
 
@@ -234,3 +245,85 @@ def log_panel(view: PrepareView) -> None:
 
     poll()
     ui.timer(POLL_SECONDS, poll)
+
+
+def draft_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable[None]]) -> None:
+    with panel(
+        "Draft a cleaning step",
+        "A language model writes a script that turns a raw export into a dataset's file",
+    ):
+        if result is None or result.project is None:
+            note("Open a project that reads without errors to draft a step.")
+            return
+        if not common.model_set():
+            note("Set a language model on the Settings page to draft a cleaning script.")
+            return
+        project = result.project
+        names = [d.name for d in project.config.datasets if d.source == "csv" and d.path]
+        if not names:
+            note("No dataset reads a CSV file yet; add one first.")
+            return
+        root = project.root
+        steps = {n: cleaning_step(project, n) for n in names}
+        first = next((n for n in names if steps[n] is None), names[0])
+
+        def raw_for(name: str) -> str:
+            step = steps[name]
+            return (raw_of(step) if step else None) or ""
+
+        note(
+            "Choose the dataset and the raw export it comes from. Nothing is saved until you have "
+            "read the script; it then joins the steps above as clean_<dataset>, writing the "
+            "dataset's file and never the export. " + sent_text(project.config.llm.raw_data)
+        )
+        with ui.row().classes("w-full items-start gap-2"):
+            dataset = (
+                ui.select(
+                    names,
+                    value=first,
+                    label="Dataset",
+                    with_input=True,
+                    on_change=lambda e: raw.set_value(raw_for(e.value)),
+                )
+                .props("outlined dense")
+                .classes("w-72")
+            )
+            raw = path_input("Raw export", raw_for(first), "In the project folder, such as raw/")
+
+            async def choose() -> None:
+                selection = await app.native.main_window.create_file_dialog(
+                    webview.FileDialog.OPEN,
+                    directory=str(root),
+                    file_types=("CSV files (*.csv;*.tsv;*.txt)",),
+                )
+                if selection:
+                    raw.set_value(posix_str(portable_path(Path(selection[0]), root)))
+
+            ui.button("Choose", on_click=choose).props("flat no-caps")
+            language = ui.toggle(LANGUAGE_NAMES, value="r").props("dense no-caps")
+            button = ui.button("Draft", icon="edit_note", on_click=lambda: draft())
+        status = ui.label().classes("lc-note")
+
+        async def draft() -> None:
+            chosen = (raw.value or "").strip().strip('"')
+            if not chosen or not (root / chosen).is_file():
+                status.set_text("Choose a raw export inside the project folder.")
+                return
+            button.disable()
+            status.set_text("Reading the export and drafting the script.")
+            try:
+                found = await computed(
+                    run_cleaning_draft,
+                    result,
+                    dataset.value,
+                    chosen,
+                    language.value,
+                    *common.llm_choice(),
+                )
+            except LabCatalogError as err:
+                status.set_text(str(err))
+                return
+            finally:
+                button.enable()
+            status.set_text("")
+            review(found, root, on_saved)

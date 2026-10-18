@@ -4,16 +4,18 @@ from pathlib import Path
 
 from nicegui import ui
 
+from labcatalog.ai.cleaning import cleaning_step
 from labcatalog.codebook.core import holds
 from labcatalog.config import dataset_by_name
 from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import id_fix, preferences
+from labcatalog.gui import cleaning as cleaning_view
+from labcatalog.gui import common, id_fix, preferences
 from labcatalog.gui.common import caption, col, computed, note, split_location, table
 from labcatalog.issues import Issue
 from labcatalog.metadata import accepted, changes, fixes
 from labcatalog.metadata.changes import Change
-from labcatalog.pipeline import CatalogResult
+from labcatalog.pipeline import CatalogResult, run_cleaning_fix
 from labcatalog.project import Project, load_project
 
 YOU = "You can fix this yourself."
@@ -254,6 +256,19 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
         ui.clipboard.write(note_text(issue, rows))
         ui.notify("Note copied")
 
+    async def draft_fix() -> None:
+        if not common.model_set():
+            status.set_text("Set a language model on the Settings page to draft a fix.")
+            return
+        status.set_text("Asking the language model for a fix to the script.")
+        try:
+            draft = await computed(run_cleaning_fix, result, issue, rows, *common.llm_choice())
+        except LabCatalogError as err:
+            status.set_text(str(err))
+            return
+        status.set_text("")
+        cleaning_view.review(draft, root, actions.reload)
+
     with ui.dialog() as dialog, ui.card().classes("w-[44rem] max-w-full gap-3"):
         with ui.row().classes("items-center gap-2"):
             kind = {"error": "lc-bad", "warning": "lc-warn"}.get(issue.level, "lc-info")
@@ -290,6 +305,13 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
                     )
             if issue.code in ID_CODES and issue.details.get("dataset") in result.datasets:
                 ui.button("Fix IDs", icon="badge", on_click=fix_ids)
+            if scripted(project, result, issue, who):
+                ui.button("Draft a fix to the script", icon="edit_note", on_click=draft_fix).props(
+                    "flat"
+                ).tooltip(
+                    "A language model revises the cleaning script that writes this file; you "
+                    "read the change before it is saved"
+                )
             if issue.location:
                 ui.button(
                     f"Open {split_location(issue.location)[0]}", icon="open_in_new", on_click=follow
@@ -300,6 +322,16 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
                 ui.button("It is fine", icon="check", on_click=accept).props("flat")
             ui.button("Close", on_click=dialog.close).props("flat")
     dialog.open()
+
+
+def scripted(project: Project | None, result: CatalogResult, issue: Issue, who: str) -> bool:
+    # A data problem a cleaning script can mend, in a file a registered script writes.
+    dataset = issue.details.get("dataset")
+    if project is None or dataset not in result.datasets:
+        return False
+    if who != SCRIPTS and issue.code not in ID_CODES:
+        return False
+    return cleaning_step(project, dataset) is not None
 
 
 def loaded(root: Path) -> Project | None:

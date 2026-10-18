@@ -41,6 +41,16 @@ labcatalog prepare
 
 `labcatalog check` also warns about outdated steps (`prepare_outdated`).
 
+## Draft a step with a language model
+
+With a language model set on the Settings page (see [Set Up R and Language Models](r-and-models.md)), **Draft a cleaning step** at the bottom of the **Prepare data** step writes a first script for you. Choose the **Dataset**, the **Raw export** it comes from (a CSV file in the project folder) and **R** or **Python**, and press **Draft**.
+
+The model is given the raw file's column names and, as the project sets on the Settings page, either each column's different values or its first 20 lines; and the dataset's columns from its column map, with each item's answer options, the missing codes and the ID pattern. It writes a script that takes the raw file and the clean file as arguments, as in `Rscript scripts/clean_parent_w1.R raw/parent_w1_export.csv data/parent_w1.csv`.
+
+The script and the model's notes open in a window, and nothing is written until you press **Save**. Saving writes `scripts/clean_<dataset>.R` or `.py` and adds the step `clean_<dataset>` to `labcatalog.yaml`, with the raw file and the script as inputs and the dataset's file as output, in place of a step of the same name. Run the step and check the data as with any other.
+
+When the Problems page reports a problem in a file a registered script writes, such as an ID with a space or a value outside the options, its panel has **Draft a fix to the script**: the model is given the script, the raw file, the dataset's columns and the problem with its rows, and returns the script changed. The window shows the change line by line, with what the model changed and what it left open, and **Save** writes the script. Then run the step again.
+
 ## Run in R
 
 A step can call `Rscript` directly. When the window runs a step, it puts the folder of the Rscript set on the Settings page first on the PATH, so `Rscript` is found even when R is not on your PATH. The command line uses the `Rscript` on your PATH.

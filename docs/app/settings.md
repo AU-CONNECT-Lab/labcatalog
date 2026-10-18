@@ -13,6 +13,7 @@ Saved in `labcatalog.yaml` with **Save**, after which the project reloads:
 - **Correlations**: Pearson's *r* or Spearman's ρ.
 - **Factor models**: WLSMV (items as ordered categories), ML or MLR (items as continuous).
 - **Language model provider** and **Model**: Anthropic, OpenAI, Gemini, or a local OpenAI-compatible server, and the model's name.
+- **What a cleaning script's model sees of a raw file**: each column's different values (the default), or the raw file's first 20 rows.
 
 These are where each page starts. A switch on a section of the Analysis page, or on the factor model panels, tries another choice for what that section shows, without changing the project; the table notes say which was used. See [Statistics](../statistics/index.md).
 

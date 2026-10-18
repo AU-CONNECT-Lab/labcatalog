@@ -24,7 +24,8 @@ A language model can:
 
 - draft an instrument file, scores included, from the instrument's PDF (Edit files on the Set up page);
 - draft the description for the Measures paragraph and write scoring scripts from the reference PDF (an instrument's page);
-- find items by what they ask about (the Instruments page).
+- find items by what they ask about (the Instruments page);
+- draft a cleaning script from a raw export, and a fix to a cleaning script for a reported problem (the Set up and Problems pages; see [Register Prepare Steps](prepare-steps.md#draft-a-step-with-a-language-model)).
 
 What it writes is always a draft for you to check, and the references, license and tags are always filled in by hand. These features need the `ai` extra (see [Installation](../getting-started/installation.md)).
 

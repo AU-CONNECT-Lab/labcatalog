@@ -33,7 +33,7 @@ Where the fix is a change to the project files, the panel makes it for you:
 
 A change is checked before it is saved, the same way loading the project checks the files. If the change would leave a new error, the panel says what labcatalog would report and saves nothing. Sometimes that error was already there and the first one hid it: a misspelled instrument in an administration stops labcatalog from checking that administration's datasets, so a misspelled dataset next to it only shows once the instrument is right. Then **Save anyway** saves the change, and the hidden problem appears in the table to fix next.
 
-Every panel also has **Open** for the file the problem is in and **Copy a note**, which copies the problem, its file and its rows as text to send to whoever fixes it.
+Every panel also has **Open** for the file the problem is in and **Copy a note**, which copies the problem, its file and its rows as text to send to whoever fixes it. A problem in a file that a registered prepare step writes with an R or Python script also has **Draft a fix to the script**, which asks the language model for a change to that script and shows it before saving; see [Register Prepare Steps](../how-to/prepare-steps.md#draft-a-step-with-a-language-model).
 
 ## Warnings that are fine
 

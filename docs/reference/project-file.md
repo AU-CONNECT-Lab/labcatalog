@@ -147,6 +147,7 @@ The language model the lab uses, set on the Settings page. API keys are never ke
 |---|---|---|
 | `provider` | `anthropic` | `anthropic`, `openai`, `gemini` or `local` (an OpenAI-compatible server). |
 | `model` | none | The model's name, as the provider gives it. |
+| `raw_data` | `values` | What the model that drafts a cleaning script is given of the raw file: `values` (each column's different values) or `rows` (its first 20 lines). |
 
 ## prepare and prepare_with
 

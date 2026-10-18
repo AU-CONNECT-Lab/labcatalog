@@ -11,7 +11,7 @@ from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MODELINE
-from labcatalog.config import CustomFieldDef, FreedParameter, ProjectConfig
+from labcatalog.config import CustomFieldDef, FreedParameter, PrepareStep, ProjectConfig
 from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.issues import Issue
 from labcatalog.metadata import records
@@ -105,6 +105,24 @@ def save_freed(root: Path, freed: list[FreedParameter]) -> None:
         stats["invariance_free"] = entries
     else:
         stats.pop("invariance_free", None)
+    save_data(root, opened, data)
+
+
+def save_step(root: Path, step: PrepareStep) -> None:
+    # Takes the place of a step with the same name, or runs last.
+    opened = open_file(root, defaults.CONFIG_FILENAME)
+    data = records.load(opened.text)
+    steps = data.setdefault("prepare", CommentedSeq())
+    entry = CommentedMap(step.model_dump())
+    entry.fa.set_flow_style()
+    for key in ("inputs", "outputs"):
+        entry[key] = CommentedSeq(entry[key])
+        entry[key].fa.set_flow_style()
+    at = next((n for n, s in enumerate(steps) if s.get("name") == step.name), None)
+    if at is None:
+        steps.append(entry)
+    else:
+        steps[at] = entry
     save_data(root, opened, data)
 
 

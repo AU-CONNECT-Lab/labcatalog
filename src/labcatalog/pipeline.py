@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.ai.cleaning import CleaningDraft, draft_script, fix_script
 from labcatalog.ai.instrument import InstrumentDraft, draft_instrument
 from labcatalog.ai.interpret import Interpretation, interpret
 from labcatalog.ai.measures import Draft, draft_description
@@ -162,6 +163,31 @@ def run_scoring_script(
 ) -> CallMetadata:
     client = make_llm_client(provider, model, url)
     return write_scoring_scripts(result.project, result.catalog, instrument_id, dataset, client)
+
+
+def run_cleaning_draft(
+    result: CatalogResult,
+    dataset: str,
+    raw: str,
+    language: str,
+    provider: str,
+    model: str,
+    url: str,
+) -> CleaningDraft:
+    client = make_llm_client(provider, model, url)
+    return draft_script(result.project, result.catalog, dataset, raw, language, client)
+
+
+def run_cleaning_fix(
+    result: CatalogResult,
+    issue: Issue,
+    rows: list[dict[str, str]],
+    provider: str,
+    model: str,
+    url: str,
+) -> CleaningDraft:
+    client = make_llm_client(provider, model, url)
+    return fix_script(result.project, result.catalog, issue, rows, client)
 
 
 def run_description_draft(

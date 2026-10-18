@@ -518,7 +518,7 @@ class Window:
         if self.root is None:
             common.empty("Open a project folder to run its prepare steps.", "folder_open")
         else:
-            prepare.render(self.root, self.preparing, lambda: self.load(self.root))
+            prepare.render(self.root, self.result, self.preparing, lambda: self.load(self.root))
 
     @ui.refreshable_method
     def edit_panel(self) -> None:

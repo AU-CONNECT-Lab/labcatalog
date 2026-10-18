@@ -4,6 +4,7 @@ from pathlib import Path
 
 from nicegui import run, ui
 
+from labcatalog.ai.cleaning import RAW_ROWS, ROWS, VALUES
 from labcatalog.charts import style
 from labcatalog.config import CORRELATIONS
 from labcatalog.exceptions import LabCatalogError
@@ -75,6 +76,11 @@ def project_section(
             estimator = select(ESTIMATORS, stats.cfa_estimator, "Factor models")
         with ui.row().classes("w-full items-start gap-2"):
             provider = select(PROVIDERS, config.llm.provider, "Language model provider")
+            raw_data = select(
+                {VALUES: "Each column's values", ROWS: f"The first {RAW_ROWS} rows"},
+                config.llm.raw_data,
+                "What a cleaning script's model sees of a raw file",
+            )
             model = (
                 ui.input("Model", value=config.llm.model or "")
                 .props("outlined dense")
@@ -92,7 +98,11 @@ def project_section(
                     "correlation": correlation.value,
                     "cfa_estimator": estimator.value,
                 },
-                "llm": {"provider": provider.value, "model": (model.value or "").strip() or None},
+                "llm": {
+                    "provider": provider.value,
+                    "model": (model.value or "").strip() or None,
+                    "raw_data": raw_data.value,
+                },
             }
             try:
                 await run.io_bound(save_settings, result.project.root, changes)

@@ -147,6 +147,8 @@ class LlmConfig(StrictModel):
     # The lab's provider and model; keys and a local server's address stay on each computer.
     provider: Literal["anthropic", "openai", "gemini", "local"] = defaults.LLM_PROVIDER
     model: str | None = None
+    # What a cleaning script's model sees of a raw file: each column's values or its first rows.
+    raw_data: Literal["values", "rows"] = "values"
 
 
 class PrepareStep(StrictModel):
