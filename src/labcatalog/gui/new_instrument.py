@@ -1,14 +1,13 @@
 import difflib
 from collections.abc import Awaitable, Callable
-from pathlib import Path
 
-import webview
-from nicegui import app, ui
+from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note
 from labcatalog.gui.edit import cell, grid_options
+from labcatalog.gui.files import PDF_FILES, choose_path
 from labcatalog.metadata import changes, new_instrument, records
 from labcatalog.metadata.completeness import DEMOGRAPHICS, QUESTIONNAIRE
 from labcatalog.paths import portable_path, posix_str
@@ -106,12 +105,10 @@ def open_wizard(
         draft.pdfs = {k: v for k, v in draft.pdfs.items() if k in draft.references and v}
 
     async def choose_pdf(key: str) -> None:
-        selection = await app.native.main_window.create_file_dialog(
-            webview.FileDialog.OPEN, file_types=("PDF files (*.pdf)",)
-        )
-        if selection:
-            root = references_root(project.config, project.root)
-            draft.pdfs[key] = posix_str(portable_path(Path(selection[0]), root))
+        root = references_root(project.config, project.root)
+        found = await choose_path(file_types=(PDF_FILES,), start=root)
+        if found:
+            draft.pdfs[key] = posix_str(portable_path(found, root))
             pdf_rows.refresh()
 
     def set_pdf(key: str, value: str) -> None:

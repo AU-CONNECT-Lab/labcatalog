@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-import webview
-from nicegui import app, ui
+from nicegui import ui
 
 from labcatalog.codebook.derivatives import Derived, Request, command_line, derive
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note, open_path, panel
+from labcatalog.gui.files import choose_path
 from labcatalog.paths import portable_path
 from labcatalog.project import Project
 
@@ -58,12 +58,10 @@ def render(project: Project, form: PipelineForm) -> None:
     form.study = form.study or next(iter(config.studies), None)
 
     async def choose() -> None:
-        selection = await app.native.main_window.create_file_dialog(
-            webview.FileDialog.OPEN, file_types=("Tables (*.tsv)",)
-        )
-        if selection:
-            form.table = selection[0]
-            chosen.set_text(portable_path(Path(form.table), project.root).as_posix())
+        found = await choose_path(file_types=("Tables (*.tsv)",), start=project.root)
+        if found:
+            form.table = str(found)
+            chosen.set_text(portable_path(found, project.root).as_posix())
 
     async def write() -> None:
         if absent := missing(form):

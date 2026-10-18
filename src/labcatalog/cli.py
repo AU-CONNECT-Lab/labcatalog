@@ -78,12 +78,22 @@ def gui(
         Path | None,
         typer.Option("--project", "-p", help="Project folder to open when the window starts."),
     ] = None,
+    browser: Annotated[
+        bool,
+        typer.Option(
+            help="Show the pages in a web browser instead of a window, for example on a server "
+            "reached through an SSH tunnel."
+        ),
+    ] = False,
+    port: Annotated[
+        int | None, typer.Option(help="Port to serve on; a free one when not given.")
+    ] = None,
 ) -> None:
     """Open the labcatalog window."""
     # Imported here so other commands do not pay for loading the GUI stack.
     from labcatalog.gui import launch
 
-    launch(project)
+    launch(project, browser, port)
 
 
 @app.command()

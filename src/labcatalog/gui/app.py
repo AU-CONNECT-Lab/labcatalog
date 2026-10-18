@@ -1,9 +1,10 @@
+import secrets
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 
-import webview
 from nicegui import app, background_tasks, ui
+from nicegui.native import find_open_port
 
 from labcatalog.charts import style, views
 from labcatalog.data.manifest import changed, file_times
@@ -20,6 +21,7 @@ from labcatalog.gui import (
     edit,
     example,
     fix,
+    gate,
     instruments,
     methods,
     new_dataset,
@@ -36,6 +38,8 @@ from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
 from labcatalog.gui.datalad import frozen_text, get_button, versions_tooltip
 from labcatalog.gui.edit import EditView
+from labcatalog.gui.files import FOLDER, choose_path
+from labcatalog.gui.gate import Gate
 from labcatalog.gui.instruments import (
     CFA_DONE,
     CFA_FAILED,
@@ -82,25 +86,36 @@ ALL_STUDIES = "*"
 DISK_SECONDS = 5
 
 
-def launch(project: Path | None = None) -> None:
+def launch(project: Path | None = None, browser: bool = False, port: int | None = None) -> None:
     theme.install()
     saved = preferences.load().get(preferences.PALETTE)
     # A palette saved by another version may no longer exist.
     style.use_palette(saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
     if datalad := preferences.load().get(preferences.DATALAD):
         use_folder(datalad)
+    app.on_shutdown(rbridge.stop_all)
+    port = port or find_open_port()
+    token = secrets.token_urlsafe(24)
+    app.add_middleware(Gate, token=token, port=port)
+    start = f"/?{gate.PARAMETER}={token}"
+    options = {
+        "root": lambda: main_page(project),
+        "title": f"labcatalog {__version__}",
+        "port": port,
+        "favicon": theme.ICON,
+        "reload": False,
+        "show_welcome_message": False,
+    }
+    if browser:
+        common.native = False
+        print(f"labcatalog is at http://127.0.0.1:{port}{start}")
+        print("Open that link in a browser; this stops when you press Ctrl+C.", flush=True)
+        ui.run(host="127.0.0.1", show=start, **options)
+        return
     # Saving a table or figure goes through the window's own save dialog.
     app.native.settings["ALLOW_DOWNLOADS"] = True
-    app.on_shutdown(rbridge.stop_all)
-    ui.run(
-        root=lambda: main_page(project),
-        title=f"labcatalog {__version__}",
-        native=True,
-        window_size=WINDOW_SIZE,
-        favicon=theme.ICON,
-        reload=False,
-        show_welcome_message=False,
-    )
+    app.native.window_args["url"] = f"http://127.0.0.1:{port}{start}"
+    ui.run(native=True, window_size=WINDOW_SIZE, **options)
 
 
 def main_page(project: Path | None) -> None:
@@ -268,11 +283,12 @@ class Window:
                 )
 
     async def choose_folder(self) -> None:
-        selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)
-        if selection:
+        start = self.root.parent if self.root is not None else None
+        folder = await choose_path(FOLDER, start=start)
+        if folder:
             self.home = None
             self.frozen_bar.visible = False
-            await self.open_project(Path(selection[0]))
+            await self.open_project(folder)
 
     async def open_project(self, root: Path) -> None:
         # Remembered for the next start; a freeze opened from it is not.

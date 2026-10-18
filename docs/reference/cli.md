@@ -5,10 +5,14 @@ Every command that works on a project takes `--project` (`-p`), the project fold
 ## gui
 
 ```bash
-labcatalog gui [-p PROJECT]
+labcatalog gui [-p PROJECT] [--browser] [--port PORT]
 ```
 
 Open the labcatalog window with the given project; without one, the project open when the window last closed, or the example the first time.
+
+With `--browser` the pages open in a web browser instead of a window, for a computer with no screen of its own, such as a compute node reached through an SSH tunnel. labcatalog prints a link and serves only this computer (`127.0.0.1`); `--port` picks the port, otherwise a free one is used. In the browser, choosing a file shows the folders of the computer that runs labcatalog, and opening a file downloads a copy.
+
+The link holds a key made new each time labcatalog starts, and a page opened without it is refused, because anyone signed in to the same computer can reach its local ports. Open the printed link once; the browser then remembers the key until labcatalog stops. The window of the desktop app passes the key by itself.
 
 ## init
 

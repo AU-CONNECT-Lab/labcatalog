@@ -18,6 +18,8 @@ from labcatalog.stats.summary import wave_order
 
 LINE_SUFFIX = re.compile(r":(\d+)$")
 ROW_KEY = "_row"
+# False when the pages are in a browser, set once at launch: one person runs each labcatalog.
+native = True
 
 
 def col(name: str, label: str, *, numeric: bool = False, sortable: bool = True) -> dict:
@@ -165,6 +167,15 @@ def without_line(location: str) -> str:
 
 
 def open_path(path: Path) -> None:
+    if not native:
+        # A browser cannot open what is on the computer that runs labcatalog: a file comes down
+        # as a copy, a folder's path is copied to find it there.
+        if path.is_dir():
+            ui.clipboard.write(str(path))
+            ui.notify(f"Copied the folder's path: {path}", multi_line=True)
+        else:
+            ui.download.file(path)
+        return
     if sys.platform == "win32":
         os.startfile(path)
     elif sys.platform == "darwin":

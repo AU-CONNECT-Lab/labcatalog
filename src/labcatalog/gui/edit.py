@@ -3,14 +3,14 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 
-import webview
-from nicegui import app, ui
+from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.charts import mindmap
 from labcatalog.exceptions import EditError, LabCatalogError
 from labcatalog.gui import common, edit_form, theme
 from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
+from labcatalog.gui.files import PDF_FILES, choose_path
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
 from labcatalog.pipeline import run_instrument_draft
@@ -253,12 +253,10 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             chosen: list[Path] = []
 
             async def pick() -> None:
-                selection = await app.native.main_window.create_file_dialog(
-                    webview.FileDialog.OPEN, file_types=("PDF files (*.pdf)",)
-                )
-                if selection:
-                    chosen[:] = [Path(selection[0])]
-                    picked.set_text(chosen[0].name)
+                found = await choose_path(file_types=(PDF_FILES,), start=root)
+                if found:
+                    chosen[:] = [found]
+                    picked.set_text(found.name)
 
             async def make() -> None:
                 if not chosen:

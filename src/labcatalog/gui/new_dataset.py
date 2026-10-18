@@ -3,13 +3,14 @@ from collections.abc import Awaitable, Callable
 from datetime import date
 from pathlib import Path
 
-import webview
-from nicegui import app, ui
+from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note, path_input, show_status
+from labcatalog.gui.files import FOLDER as PICK_FOLDER
+from labcatalog.gui.files import choose_path
 from labcatalog.metadata import changes, new_dataset
 from labcatalog.paths import expand_path, stored_path
 from labcatalog.pipeline import CatalogResult
@@ -179,17 +180,15 @@ def open_wizard(
         stepper.next()
 
     async def choose() -> None:
-        selection = await app.native.main_window.create_file_dialog(
-            webview.FileDialog.OPEN, file_types=(DATA_FILES,)
-        )
-        if selection:
-            state["source"] = Path(selection[0])
-            chosen.set_text(str(state["source"]))
+        found = await choose_path(file_types=(DATA_FILES,), start=project.root)
+        if found:
+            state["source"] = found
+            chosen.set_text(str(found))
 
     async def choose_folder() -> None:
-        selection = await app.native.main_window.create_file_dialog(webview.FileDialog.FOLDER)
-        if selection:
-            folder_path.set_value(selection[0])
+        found = await choose_path(PICK_FOLDER, start=typed_folder() or project.root)
+        if found:
+            folder_path.set_value(str(found))
             await scan_folder()
 
     def typed_folder() -> Path | None:

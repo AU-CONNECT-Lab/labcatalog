@@ -2,8 +2,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import webview
-from nicegui import app, run, ui
+from nicegui import run, ui
 
 from labcatalog import defaults
 from labcatalog.codebook import core as codebook
@@ -11,6 +10,7 @@ from labcatalog.codebook.core import ImportResult
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import pipeline_table, problems
 from labcatalog.gui.common import col, computed, empty, note, open_path, panel, table
+from labcatalog.gui.files import choose_path
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
 
@@ -55,11 +55,9 @@ def render(
         steps.refresh()
 
     async def create_from(file_type: str) -> None:
-        selection = await app.native.main_window.create_file_dialog(
-            webview.FileDialog.OPEN, file_types=(file_type,)
-        )
-        if selection:
-            await create(Path(selection[0]))
+        chosen = await choose_path(file_types=(file_type,), start=project.root)
+        if chosen:
+            await create(chosen)
 
     def copy_prompt() -> None:
         ui.clipboard.write(codebook.ai_prompt(project, view.dataset))

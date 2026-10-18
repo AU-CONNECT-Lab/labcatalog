@@ -2,8 +2,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import webview
-from nicegui import app, ui
+from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.ai.cleaning import cleaning_step, raw_of
@@ -13,6 +12,7 @@ from labcatalog.gui import common, preferences
 from labcatalog.gui.cleaning import LANGUAGE_NAMES, review, sent_text
 from labcatalog.gui.common import computed, empty, note, open_path, page_head, panel, path_input
 from labcatalog.gui.datalad import get_button
+from labcatalog.gui.files import choose_path
 from labcatalog.paths import portable_path, posix_str
 from labcatalog.pipeline import CatalogResult, run_cleaning_draft, run_get
 from labcatalog.project import load_project
@@ -315,13 +315,9 @@ def draft_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable[N
             raw = path_input("Raw export", raw_for(first), "In the project folder, such as raw/")
 
             async def choose() -> None:
-                selection = await app.native.main_window.create_file_dialog(
-                    webview.FileDialog.OPEN,
-                    directory=str(root),
-                    file_types=("CSV files (*.csv;*.tsv;*.txt)",),
-                )
-                if selection:
-                    raw.set_value(posix_str(portable_path(Path(selection[0]), root)))
+                found = await choose_path(file_types=("CSV files (*.csv;*.tsv;*.txt)",), start=root)
+                if found:
+                    raw.set_value(posix_str(portable_path(found, root)))
 
             ui.button("Choose", on_click=choose).props("flat no-caps")
             language = ui.toggle(LANGUAGE_NAMES, value="r").props("dense no-caps")
