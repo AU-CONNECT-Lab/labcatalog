@@ -14,6 +14,7 @@ When R is set up on the Settings page (see [Set Up R and Language Models](../how
 | Multilevel models | lme4, lmerTest, performance | statsmodels |
 | Mediation, with up to two moderators | lavaan; modsem for latent interactions | not available |
 | Multiple imputation, pooled correlations, regressions and group comparisons | mice, miceadds | not available |
+| Rater agreement: Cohen's κ, intraclass correlations | psych | statsmodels (κ only) |
 
 ## Settings that change the numbers
 

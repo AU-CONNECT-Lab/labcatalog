@@ -8,6 +8,7 @@ from labcatalog.charts import matrices, plot_code, views
 from labcatalog.config import CORRELATIONS, dataset_by_name
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import (
+    agreement,
     analysis_tables,
     charts,
     common,
@@ -38,6 +39,7 @@ PARTS = {
     "correlation": "Correlation table",
     "regression": "Regression",
     "groups": "Group comparison",
+    "agreement": "Rater agreement",
     "measurement": "Measurement model",
     "invariance": "Invariance",
     "mediation": "Mediation",
@@ -61,6 +63,7 @@ class AnalysisView:
     # None keeps the project's stats.cfa_estimator.
     invariance_estimator: str | None = None
     missing: list[str] = field(default_factory=list)
+    raters: list[str] = field(default_factory=list)
     # The imputation every section shares; None keeps the project's choice or every score.
     missing_method: str | None = None
     imputed: list[str] | None = None
@@ -122,6 +125,8 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
                 )
         elif view.part == "missing":
             missing.render(result, sample, view, choices)
+        elif view.part == "agreement":
+            agreement.render(result, sample, view, choices)
         elif view.part == "correlation":
             correlation_section(result, sample, view, choices)
         elif view.part == "regression":

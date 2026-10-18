@@ -1,3 +1,4 @@
+from labcatalog.stats.agreement import ICC, Agreement
 from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import (
     ANOVA,
@@ -118,6 +119,42 @@ def missing_text(missing: MissingData, labels: list[str]) -> str:
     return (
         f"{opening} Missing values ranged from {low[2]} ({percent(low[2], people)}) for "
         f"{low_label} to {high[2]} ({percent(high[2], people)}) for {high_label}."
+    )
+
+
+def agreement_text(agreement: Agreement, digits: int = 2) -> str:
+    k = agreement.raters
+    among = "between the two raters" if k == 2 else f"among the {k} raters"
+    if agreement.kind == ICC:
+        rows = {r.type: r for r in agreement.icc}
+        single, mean = rows["ICC2"], rows["ICC2k"]
+        whom = "both" if k == 2 else "all of them"
+        return (
+            f"Agreement {among}, on the {agreement.n} people {whom} rated, was "
+            f"{interval('ICC(2,1)', single.icc, single.low, single.high, digits, bounded)} "
+            "(two-way random effects, absolute agreement, single rater); for the mean of the "
+            f"raters, {interval('ICC(2,k)', mean.icc, mean.low, mean.high, digits, bounded)}."
+        )
+    pairs = agreement.kappas
+    if k == 2:
+        [pair] = pairs
+        if pair.kappa is None:
+            return ""
+        plain = interval("κ", pair.kappa, pair.kappa_low, pair.kappa_high, digits, bounded)
+        text = f"Agreement {among}, on the {pair.n} people both rated, was Cohen's {plain}"
+        if pair.weighted is None:
+            return f"{text}."
+        weighted = interval(
+            "κ", pair.weighted, pair.weighted_low, pair.weighted_high, digits, bounded
+        )
+        return f"{text}; with quadratic weights, {weighted}."
+    values = [p.kappa for p in pairs if p.kappa is not None]
+    if agreement.light is None:
+        return ""
+    return (
+        f"Cohen's κ averaged over the {len(pairs)} pairs of the {k} raters (Light's κ) was "
+        f"{bounded(agreement.light, digits)}, ranging from {bounded(min(values), digits)} to "
+        f"{bounded(max(values), digits)} across pairs."
     )
 
 
