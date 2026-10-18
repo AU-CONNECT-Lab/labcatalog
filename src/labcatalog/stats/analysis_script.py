@@ -667,41 +667,6 @@ def comparison_plan(
     return ComparisonPlan(kind, code, left)
 
 
-def page_script(
-    result: CatalogResult,
-    sample: analysis.Sample,
-    scores: list[str],
-    xs: list[str],
-    y: str | None,
-    group: str | None,
-    outcome: str | None,
-) -> tuple[str, str, pd.DataFrame] | None:
-    # Each part of the Analysis page that has enough chosen to run, in page order.
-    data = AnalysisData(result, sample)
-    codes = []
-    if len(scores) >= 2:
-        method = result.project.config.stats.correlation
-        codes.append(correlation_code([data.variable(k) for k in scores], method))
-    if y is not None:
-        target = data.variable(y)
-        variables = [data.variable(x) for x in xs if x != y]
-        frame = data.frame()
-        fitted = [v for v in variables if fittable(frame, v.column, target.column)]
-        if fitted:
-            codes.append(regression_code(fitted, target))
-    if group is not None and outcome is not None:
-        # The frame holds only the variables asked for so far, so ask first.
-        grouping, measured = data.item(group), data.variable(outcome)
-        t_test = result.project.config.stats.t_test
-        plan = comparison_plan(data.frame(), grouping, measured, t_test)
-        if plan is not None:
-            codes.append(plan.code)
-    if not codes:
-        return None
-    r_text, python_text = script(result, sample, codes)
-    return r_text, python_text, data.frame()
-
-
 def script(result: CatalogResult, sample: analysis.Sample, codes: list[Code]) -> tuple[str, str]:
     packages = tuple(dict.fromkeys(p for c in codes for p in c.packages))
     r_head, py_head = headers(result, sample, DATA_FILE, packages)

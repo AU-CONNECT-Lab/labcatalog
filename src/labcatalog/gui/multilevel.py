@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from nicegui import ui
 
-from labcatalog.charts import views
+from labcatalog.charts import plot_code, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import charts, common, paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
@@ -64,7 +64,7 @@ def render(result: CatalogResult, view) -> None:
 
             async def fill() -> Callable:
                 fitted, engine = await fit(result, model, long, label)
-                r_text, python_text = ml.scripts(result, model, long, label)
+                r_text, python_text = script_texts(result, model, long, label)
                 texts = {
                     ml.DATA_FILE: long.frame.to_csv(index=False),
                     R_FILE: r_text,
@@ -187,6 +187,19 @@ def render(result: CatalogResult, view) -> None:
                     on_change=lambda e: change(split=e.value),
                 )
         body()
+
+
+def script_texts(
+    result: CatalogResult, model: ml.Model, long: ml.Long, label: str
+) -> tuple[str, str]:
+    # The model's R and Python scripts, each followed by the trajectory figure.
+    r_text, python_text = ml.scripts(result, model, long, label)
+    by_wave = long.time_label == ml.TIME_LABEL
+    columns = {"person": ml.PERSON, "wave": ml.WAVE, "time": ml.TIME, "y": long.outcome}
+    r_plot, python_plot = plot_code.trajectories(
+        columns, label, "" if by_wave else long.time_label, by_wave
+    )
+    return f"{r_text}\n{r_plot}", f"{python_text}\n{python_plot}"
 
 
 def trajectory_note(long: ml.Long) -> str:

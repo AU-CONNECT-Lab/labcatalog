@@ -1,5 +1,7 @@
+import os
 import shutil
 import subprocess
+import sys
 from dataclasses import replace
 from glob import glob
 from types import SimpleNamespace
@@ -9,6 +11,7 @@ import pandas as pd
 import pytest
 
 from labcatalog.charts import views
+from labcatalog.gui import multilevel as multilevel_view
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import multilevel as ml
 from labcatalog.stats.rbridge import MULTILEVEL_PACKAGES, r_status
@@ -178,6 +181,27 @@ def test_saved_python_script_runs_on_its_data(result, tmp_path):
     )
     assert done.returncode == 0, done.stderr
     assert "Mixed Linear Model Regression Results" in done.stdout
+
+
+def run_with_figure(result, tmp_path, model, command: list[str], name: str) -> None:
+    long = ml.long_frame(result, model)
+    long.frame.to_csv(tmp_path / ml.DATA_FILE, index=False)
+    r_text, python_text = multilevel_view.script_texts(result, model, long, "EMS Total score")
+    text = r_text if name.endswith(".R") else python_text
+    (tmp_path / name).write_text(text, encoding="utf-8")
+    env = os.environ | {"MPLBACKEND": "Agg"}
+    done = subprocess.run([*command, name], cwd=tmp_path, capture_output=True, text=True, env=env)
+    assert done.returncode == 0, done.stderr
+    assert (tmp_path / "multilevel.png").stat().st_size > 0
+
+
+def test_saved_python_script_draws_the_trajectories(result, tmp_path):
+    run_with_figure(result, tmp_path, growth(), [sys.executable], "multilevel.py")
+
+
+@needs_r
+def test_saved_r_script_draws_the_trajectories_over_months(result, tmp_path):
+    run_with_figure(result, tmp_path, growth(time="month"), [rscript()], "multilevel.R")
 
 
 def test_groups_and_people_fit_in_python():

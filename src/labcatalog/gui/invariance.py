@@ -115,14 +115,35 @@ def test_block(
                 icon="rule",
                 on_click=lambda: score_dialog(result, instrument, test, steps, model, reload),
             ).props("flat dense no-caps")
+        described = f"{instrument.name}, {heading}"
         save_button(
             result,
             name,
             {"invariance": shown},
-            later_texts=lambda: mplus.invariance_files(
-                model(), test.estimator, f"{instrument.name}, {heading}"
+            later_texts=lambda: (
+                mplus.invariance_files(model(), test.estimator, described)
+                | invariance.script_files(model(), test.estimator, described)
             ),
         )
+    code_view(lambda: invariance.script_files(model(), test.estimator, described))
+
+
+def code_view(files: Callable[[], dict[str, str]]) -> None:
+    # The script is written on first opening, as building the model's data takes a moment.
+    def opened(e) -> None:
+        if not e.value or shown:
+            return
+        shown.append(True)
+        with holder:
+            note(
+                f"Runs in a folder that holds {invariance.SCRIPT_DATA}; Save to outputs writes "
+                "both, with the Mplus inputs."
+            )
+            ui.code(files()[invariance.SCRIPT_FILE], language="r").classes("w-full")
+
+    shown: list[bool] = []
+    with ui.expansion("Code", icon="code", on_value_change=opened).props("dense").classes("w-full"):
+        holder = ui.column().classes("w-full gap-2")
 
 
 def invariance_table(test: InvarianceTest) -> tuple[list[dict], list[dict]]:

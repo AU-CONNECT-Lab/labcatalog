@@ -4,7 +4,7 @@ from functools import partial
 
 from nicegui import ui
 
-from labcatalog.charts import matrices, views
+from labcatalog.charts import matrices, plot_code, views
 from labcatalog.config import dataset_by_name
 from labcatalog.gui import (
     analysis_tables,
@@ -31,7 +31,6 @@ PARTS = {
     "invariance": "Invariance",
     "mediation": "Mediation",
     "multilevel": "Multilevel model",
-    "script": "Script",
 }
 
 
@@ -114,8 +113,6 @@ def render(result: CatalogResult, view: AnalysisView) -> None:
             else:
                 totals = default_totals(result, view, choices)
                 mediation.render(result, sample, view.mediation, choices, totals)
-        else:
-            analysis_tables.script_section(result, sample, view, choices)
 
     def sample_changed() -> None:
         # The multilevel model picks its own waves and people, so the sample does not refit it.
@@ -258,7 +255,15 @@ def correlation_section(
                     " Spearman's p uses the t approximation here; in R, as in JASP, it is exact "
                     "when there are no ties."
                 )
-            texts = analysis_tables.section_files(result, sample, frame, code)
+            columns_labels = {v.column: choices[k] for k, v in zip(keys, variables, strict=True)}
+
+            def files() -> dict[str, str]:
+                dots = view.style == "dots"
+                figure = plot_code.correlation(columns_labels, stats.coefficient(), dots)
+                return analysis_tables.section_files(result, sample, frame, code, figure)
+
+            # Saving and the Code view read this one dict, so a new style updates both.
+            texts = files()
             described, matrix = analysis_script.read_correlations(
                 found, [v.column for v in variables]
             )
@@ -284,7 +289,13 @@ def correlation_section(
 
             def restyle(value: str) -> None:
                 view.style = value
+                texts.update(files())
                 chart.refresh()
+                code_part.refresh()
+
+            @ui.refreshable
+            def code_part() -> None:
+                analysis_tables.code_view(texts, figure=True)
 
             shown = PaperTable(
                 "Correlations Among Variables",
@@ -311,7 +322,7 @@ def correlation_section(
                 result_actions(
                     result, "correlations", {"correlations": shown}, drawn, texts, engine
                 )
-                analysis_tables.code_view(texts)
+                code_part()
 
             return content
 
@@ -400,7 +411,10 @@ def pair_section(
                 return lambda: note("Too few people have an X value and the Y value.")
             code = analysis_script.regression_code(list(usable.values()), y)
             found, engine = await analysis_tables.compute(result, sample, frame, code)
-            texts = analysis_tables.section_files(result, sample, frame, code)
+            figure = plot_code.regression(
+                {v.column: choices[x] for x, v in usable.items()}, choices[y_key]
+            )
+            texts = analysis_tables.section_files(result, sample, frame, code, figure)
             fits = analysis_script.read_regressions(found, {v.column: x for x, v in usable.items()})
             fig = views.pair_scatter(result, sample, list(fits), y_key)
             columns, rows = fit_table(fits, choices)
@@ -420,7 +434,7 @@ def pair_section(
                     [shown],
                 )
                 result_actions(result, "regression", {"regression": shown}, drawn, texts, engine)
-                analysis_tables.code_view(texts)
+                analysis_tables.code_view(texts, figure=True)
 
             return content
 

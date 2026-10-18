@@ -11,7 +11,7 @@ from labcatalog.data.scoring import scorable, score_items
 from labcatalog.project import Project
 from labcatalog.schema import Instrument, Score
 from labcatalog.sources import LoadedDataset
-from labcatalog.stats.cfa import FIT, MIN_ITEMS, ONE_FACTOR, SUBSCALES, WLSMV, is_total
+from labcatalog.stats.cfa import FIT, MIN_ITEMS, ML, MLR, ONE_FACTOR, SUBSCALES, WLSMV, is_total
 from labcatalog.stats.link import link
 from labcatalog.stats.rbridge import run_r
 from labcatalog.stats.summary import wave_order
@@ -359,6 +359,108 @@ def write_model(
     path = folder / "models.csv"
     pd.DataFrame([entry]).to_csv(path, mode="a", header=not path.exists(), index=False)
     return name, original
+
+
+SCRIPT_DATA = "invariance_data.csv"
+SCRIPT_FILE = "invariance.R"
+R_STEPS = {
+    WLSMV: (
+        'list(configural = "", thresholds = "thresholds",\n'
+        '              metric = c("thresholds", "loadings"),\n'
+        '              scalar = c("thresholds", "loadings", "intercepts"))',
+        '"chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.scaled", "tli.scaled", '
+        '"rmsea.scaled", "srmr"',
+        'ordered = items, estimator = "WLSMV", missing = "pairwise",\n'
+        '                   parameterization = "theta", ID.cat = "Wu.Estabrook.2016"',
+    ),
+    MLR: (
+        'list(configural = "", metric = "loadings", scalar = c("loadings", "intercepts"))',
+        '"chisq.scaled", "df.scaled", "pvalue.scaled", "cfi.robust", "tli.robust", '
+        '"rmsea.robust", "srmr"',
+        'estimator = "MLR", missing = "ml"',
+    ),
+    ML: (
+        'list(configural = "", metric = "loadings", scalar = c("loadings", "intercepts"))',
+        '"chisq", "df", "pvalue", "cfi", "tli", "rmsea", "srmr"',
+        'estimator = "ML", missing = "ml"',
+    ),
+}
+R_INVARIANCE = """\
+# Measurement invariance of {title}, written by labcatalog.
+# d is the data saved beside this script, the items reversed where the scale says so:
+{names}
+# Each step holds more parameters equal (semTools::measEq.syntax, factors identified by their
+# variances), and lavTestLRT compares each step with the one before it. {method}
+# Needs the R packages lavaan and semTools; install them once with:
+# install.packages(c("lavaan", "semTools"))
+d <- read.csv("{data}")
+syntax <- "{syntax}"
+items <- setdiff(names(d), "{group}")
+steps <- {steps}
+{across}fits <- list()
+for (step in names(steps)) {{
+  fits[[step]] <- semTools::measEq.syntax(
+    configural.model = syntax, data = d, ID.fac = "std.lv", return.fit = TRUE,
+    {options},
+    {equal}
+  )
+  cat("\\n", step, "\\n")
+  print(lavaan::fitMeasures(fits[[step]], c({measures})))
+}}
+print(do.call(lavaan::lavTestLRT, unname(fits)))
+"""
+R_LONG_NAMES = """\
+# The same item or factor on each occasion differs only in its _t<occasion> ending.
+stem <- function(names) sub("_t[0-9]+$", "", names)
+by_stem <- function(names) split(names, stem(names))
+"""
+METHODS = {
+    WLSMV: "The items are ordered categories (WLSMV, theta parameterization, Wu and Estabrook's "
+    "identification).",
+    MLR: "The items are continuous, with robust ML (MLR) and everyone's available answers.",
+    ML: "The items are continuous, with ML and everyone's available answers.",
+}
+
+
+def script_files(model: InvarianceModel, estimator: str, title: str) -> dict[str, str]:
+    # One model's data and an R script that fits its steps the way invariance.R does.
+    with tempfile.TemporaryDirectory() as temp:
+        folder = Path(temp)
+        name, original = write_model(folder, 1, model, estimator)
+        data = (folder / f"{name}.csv").read_text(encoding="utf-8")
+        entry = pd.read_csv(folder / "models.csv", keep_default_na=False).iloc[0]
+    steps, measures, options = R_STEPS[estimator]
+    freed = [f'"{p}"' for p in entry["partial"].split("; ") if p]
+    free = f"c({', '.join(freed)})" if freed else '""'
+    group = entry["group"]
+    if group:
+        across = ""
+        equal = f'group = "{group}", group.equal = steps[[step]], group.partial = {free}'
+    else:
+        across = R_LONG_NAMES
+        equal = (
+            'longFacNames = by_stem(lavaan::lavNames(syntax, "lv")),\n'
+            "    longIndNames = by_stem(items), long.equal = steps[[step]],\n"
+            f"    long.partial = {free}"
+        )
+    shorts = dict.fromkeys(m.group(0) for m in R_NAME.finditer(entry["syntax"]))
+    names = "\n".join(f"#   {short}: {original[short]}" for short in shorts if short in original)
+    if group:
+        names += f"\n#   {group}: the group"
+    script = R_INVARIANCE.format(
+        title=title,
+        names=names,
+        method=METHODS[estimator],
+        data=SCRIPT_DATA,
+        syntax=entry["syntax"],
+        group=group,
+        steps=steps,
+        across=across,
+        options=options,
+        equal=equal,
+        measures=measures,
+    )
+    return {SCRIPT_DATA: data, SCRIPT_FILE: script}
 
 
 def side_by_side(

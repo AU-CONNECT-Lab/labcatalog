@@ -3,7 +3,7 @@ from collections.abc import Callable
 import pandas as pd
 from nicegui import ui
 
-from labcatalog.charts import plots, style, views
+from labcatalog.charts import plot_code, plots, style, views
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import charts, common, paper, preferences
@@ -46,10 +46,16 @@ async def compute(
 
 
 def section_files(
-    result: CatalogResult, sample: analysis.Sample, frame: pd.DataFrame, code: Code
+    result: CatalogResult,
+    sample: analysis.Sample,
+    frame: pd.DataFrame,
+    code: Code,
+    figure: tuple[str, str] | None = None,
 ) -> dict[str, str]:
-    # The code for one section, runnable on its own beside the data it reads.
+    # The code for one section, runnable on its own beside the data it reads, then its figure.
     r_text, python_text = script.script(result, sample, [code])
+    if figure is not None:
+        r_text, python_text = f"{r_text}\n{figure[0]}", f"{python_text}\n{figure[1]}"
     return {
         script.DATA_FILE: frame.to_csv(index=False),
         "analysis.R": r_text,
@@ -57,9 +63,13 @@ def section_files(
     }
 
 
-def code_view(texts: dict[str, str]) -> None:
+def code_view(texts: dict[str, str], figure: bool = False) -> None:
     with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
-        note(f"Runs in a folder that holds {script.DATA_FILE}; Save to outputs writes both.")
+        drawn = " and saves the figure beside it" if figure else ""
+        note(
+            f"Runs in a folder that holds {script.DATA_FILE}{drawn}; Save to outputs writes "
+            "the data and both scripts."
+        )
         code_tabs({"r": texts["analysis.R"], "python": texts["analysis.py"]})
 
 
@@ -225,8 +235,9 @@ def group_section(
             if plan is None:
                 return lambda: note("Fewer than two groups have two or more people with a value.")
             found, engine = await compute(result, sample, frame, plan.code)
-            texts = section_files(result, sample, frame, plan.code)
             comparison = script.read_comparison(found, plan)
+            figure = plot_code.groups(group.label, outcome.label, len(comparison.groups))
+            texts = section_files(result, sample, frame, plan.code, figure)
             fig = group_figure(frame, group, outcome, comparison, script.link_name(result))
             left = ", ".join(f"{text} ({n})" for text, n in comparison.left_out)
             papers = {
@@ -251,7 +262,7 @@ def group_section(
                     list(papers.values()),
                 )
                 paper.result_actions(result, "groups", papers, drawn, texts, engine)
-                code_view(texts)
+                code_view(texts, figure=True)
 
             return content
 
@@ -363,47 +374,6 @@ def test_table(comparison: Comparison) -> tuple[list[dict], list[dict]]:
             f"[{decimal(comparison.low)}, {decimal(comparison.high)}]"
         )
     return columns, [row]
-
-
-def script_section(
-    result: CatalogResult, sample: analysis.Sample, view, scores: dict[str, str]
-) -> None:
-
-    def write() -> None:
-        found = script.page_script(
-            result,
-            sample,
-            scores=[k for k in view.scores if k in scores],
-            xs=[k for k in view.xs if k in scores],
-            y=view.y if view.y in scores else None,
-            group=view.group,
-            outcome=view.outcome if view.outcome in scores else None,
-        )
-        holder.clear()
-        with holder:
-            if found is None:
-                note("Nothing on the other tabs to write a script for yet.")
-                return
-            r_text, python_text, frame = found
-            texts = {
-                script.DATA_FILE: frame.to_csv(index=False),
-                "analysis.R": r_text,
-                "analysis.py": python_text,
-            }
-            paper.save_button(result, "script", texts=texts)
-            code_tabs({"r": r_text, "python": python_text})
-
-    with panel(
-        "Script",
-        "The tables on the other tabs as one R script and one Python script, for the choices made when "
-        f"you press the button. Saving puts the data beside them as {script.DATA_FILE}, "
-        "so either script runs in that folder.",
-    ) as tools:
-        holder = ui.column().classes("w-full gap-2")
-    with tools:
-        ui.button("Write script", icon="code", on_click=write).props("flat no-caps").classes(
-            "lc-quiet-btn"
-        )
 
 
 def decimal(value: float | None) -> str:

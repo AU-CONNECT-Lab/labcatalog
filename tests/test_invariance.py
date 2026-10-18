@@ -1,4 +1,5 @@
 import shutil
+import subprocess
 from glob import glob
 
 import pandas as pd
@@ -244,3 +245,48 @@ def test_a_multigroup_model_runs_every_step_and_frees_by_group(result):
     assert before.steps[1].fit["df"] - after.steps[1].fit["df"] == len(held.occasions) - 1
     scores = invariance.score_tests(held, "scalar", rscript(), "ml")
     assert {s.parameter for s in scores} == {"intercept"} and len(scores) == 9
+
+
+def run_saved_script(model, estimator: str, folder) -> pd.DataFrame:
+    files = invariance.script_files(model, estimator, "EMS")
+    for name, text in files.items():
+        (folder / name).write_text(text, encoding="utf-8")
+    measures = invariance.R_STEPS[estimator][1]
+    # Read the fit back the way the page reads its own run.
+    keep = f'write.csv(t(sapply(fits, lavaan::fitMeasures, c({measures}))), "fits.csv")\n'
+    with open(folder / invariance.SCRIPT_FILE, "a", encoding="utf-8") as f:
+        f.write(keep)
+    done = subprocess.run(
+        [rscript(), invariance.SCRIPT_FILE], cwd=folder, capture_output=True, text=True
+    )
+    assert done.returncode == 0, done.stderr
+    return pd.read_csv(folder / "fits.csv", index_col=0)
+
+
+@needs_r
+def test_the_saved_script_fits_the_waves_as_the_page_does(result, tmp_path):
+    mood = models_of(result)["example_mood"]
+    mood.occasions = {wave: mood.occasions[wave] for wave in ("1", "2")}
+    [test] = invariance.fit_models([mood], rscript())
+    fits = run_saved_script(mood, "wlsmv", tmp_path)
+    assert list(fits.index) == [s.step for s in test.steps]
+    for step in test.steps:
+        assert fits.loc[step.step].iloc[0] == pytest.approx(step.fit["chisq"], rel=1e-6)
+        assert fits.loc[step.step].iloc[1] == pytest.approx(step.fit["df"])
+
+
+@needs_r
+def test_the_saved_script_fits_the_groups_with_freed_items_as_the_page_does(result, tmp_path):
+    sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
+    [held] = group_invariance.group_models(result, sample, "example_mood@child_w1", GENDER)
+    result.project.config.stats.invariance_free = [
+        FreedParameter(
+            instrument="example_mood", item="ems_3", parameter="loading", across=held.across
+        )
+    ]
+    [freed] = group_invariance.group_models(result, sample, "example_mood@child_w1", GENDER)
+    [test] = invariance.fit_models([freed], rscript(), "mlr")
+    fits = run_saved_script(freed, "mlr", tmp_path)
+    for step in test.steps:
+        assert fits.loc[step.step].iloc[0] == pytest.approx(step.fit["chisq"], rel=1e-6)
+        assert fits.loc[step.step].iloc[1] == pytest.approx(step.fit["df"])

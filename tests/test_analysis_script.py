@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 from scipy import stats
 
-from labcatalog.charts import views
+from labcatalog.charts import plot_code, views
 from labcatalog.gui import analysis_tables
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import analysis
@@ -190,47 +190,77 @@ def test_r_and_python_give_the_same_numbers(result, sample):
             assert in_r.omega_low <= in_r.omega <= in_r.effect
 
 
-def page(result, sample):
-    return script.page_script(
-        result,
-        sample,
-        scores=[EMS, EPS],
-        xs=[EPS],
-        y=EMS,
-        group=GENDER,
-        outcome=EMS,
-    )
+FIGURES = {
+    "heatmap": "correlations.png",
+    "dots": "correlations.png",
+    "regression": "regression.png",
+    "groups": "group_comparison.png",
+}
 
 
-def test_the_page_script_runs_and_matches_the_page(result, sample, tmp_path, monkeypatch):
-    r_text, python_text, frame = page(result, sample)
-    for title in ("# Correlations", "# Regression", "# Group comparison"):
-        assert title in r_text and title in python_text
-    frame.to_csv(tmp_path / script.DATA_FILE, index=False)
-    monkeypatch.chdir(tmp_path)
-    names: dict = {}
-    exec(python_text, names)
+def section_scripts(result, sample) -> dict[str, dict[str, str]]:
+    # Each section's saved files as the Analysis page builds them, figure code included.
+    data = script.AnalysisData(result, sample)
+    ems, eps, gender = data.variable(EMS), data.variable(EPS), data.item(GENDER)
+    frame = data.frame()
+    labels = {ems.column: "EMS", eps.column: "EPS"}
+    plan = script.comparison_plan(frame, gender, ems)
+    sections = {
+        "heatmap": (script.correlation_code([ems, eps]), plot_code.correlation(labels, "r", False)),
+        "dots": (script.correlation_code([ems, eps]), plot_code.correlation(labels, "r", True)),
+        "regression": (
+            script.regression_code([eps], ems),
+            plot_code.regression({eps.column: "EPS"}, "EMS"),
+        ),
+        "groups": (plan.code, plot_code.groups("Gender", "EMS", 3)),
+    }
+    return {
+        name: analysis_tables.section_files(result, sample, frame, code, figure)
+        for name, (code, figure) in sections.items()
+    }
+
+
+def written(texts: dict[str, str], folder) -> None:
+    folder.mkdir()
+    for name, text in texts.items():
+        (folder / name).write_text(text, encoding="utf-8")
+
+
+def test_each_section_script_runs_and_draws_its_figure(result, sample, tmp_path, monkeypatch):
+    monkeypatch.setenv("MPLBACKEND", "Agg")
+    found = {}
+    for name, texts in section_scripts(result, sample).items():
+        written(texts, tmp_path / name)
+        monkeypatch.chdir(tmp_path / name)
+        names: dict = {}
+        exec(texts["analysis.py"], names)
+        names["plt"].close("all")
+        assert (tmp_path / name / FIGURES[name]).stat().st_size > 0
+        found[name] = names
     expected = analysis.correlate(
         analysis.values(result, sample, EMS), analysis.values(result, sample, EPS)
     )
-    found = names["correlations"].iloc[0]
-    assert (found["n"], found["r"]) == (expected.n, pytest.approx(expected.r))
+    correlation = found["heatmap"]["correlations"].iloc[0]
+    assert (correlation["n"], correlation["r"]) == (expected.n, pytest.approx(expected.r))
     fit = analysis.regress(
         analysis.values(result, sample, EPS), analysis.values(result, sample, EMS)
     )
-    assert names["regressions"].iloc[0]["slope"] == pytest.approx(fit.slope)
-    assert names["regressions"].iloc[0]["slope_se"] == pytest.approx(fit.slope_se)
-    assert list(names["groups"]["group"]) == ["Girl", "Boy", "Another gender"]
+    assert found["regression"]["regressions"].iloc[0]["slope"] == pytest.approx(fit.slope)
+    assert found["regression"]["regressions"].iloc[0]["slope_se"] == pytest.approx(fit.slope_se)
+    assert list(found["groups"]["groups"]["group"]) == ["Girl", "Boy", "Another gender"]
 
 
 @needs_r
-def test_the_page_script_runs_in_r(result, sample, tmp_path):
-    r_text, _, frame = page(result, sample)
-    frame.to_csv(tmp_path / script.DATA_FILE, index=False)
-    (tmp_path / "analysis.R").write_text(r_text, encoding="utf-8")
-    done = subprocess.run([rscript(), "analysis.R"], cwd=tmp_path, capture_output=True, text=True)
-    assert done.returncode == 0, done.stderr
-    assert "Eta2" in done.stdout
+def test_each_section_script_runs_and_draws_its_figure_in_r(result, sample, tmp_path):
+    for name, texts in section_scripts(result, sample).items():
+        written(texts, tmp_path / name)
+        done = subprocess.run(
+            [rscript(), "analysis.R"], cwd=tmp_path / name, capture_output=True, text=True
+        )
+        assert done.returncode == 0, done.stderr
+        assert (tmp_path / name / FIGURES[name]).stat().st_size > 0
+        if name == "groups":
+            assert "Eta2" in done.stdout
 
 
 def test_table_one_reads_like_a_paper_table(result, sample):
@@ -366,9 +396,11 @@ def test_number_items_analyse_beside_scores(result, tmp_path, monkeypatch):
     pd.testing.assert_series_equal(
         analysis.values(result, sample, FAA), expected, check_names=False
     )
-    r_text, python_text, frame = script.page_script(
-        result, sample, scores=[EMS, FAA], xs=[FAA], y=EMS, group=None, outcome=None
-    )
+    data = script.AnalysisData(result, sample)
+    ems, faa = data.variable(EMS), data.variable(FAA)
+    frame = data.frame()
+    codes = [script.correlation_code([ems, faa]), script.regression_code([faa], ems)]
+    _, python_text = script.script(result, sample, codes)
     assert "frontal_alpha_asymmetry_eeg_w1" in frame.columns
     frame.to_csv(tmp_path / script.DATA_FILE, index=False)
     monkeypatch.chdir(tmp_path)
