@@ -71,7 +71,7 @@ def render(
 
     def show(found: mm.Plan, fit: CfaFit, used: str) -> None:
         names = ", ".join(found.labels.values())
-        texts = mm.script_files(found.model, used, found.labels, names)
+        texts = mm.script_files(found.model, used, found.labels | found.covariates, names)
         texts |= mplus.cfa_files([found.model], used, names)
         if fit.problem:
             note(f"The model could not be used: {fit.problem}.")
@@ -80,6 +80,12 @@ def render(
                 f"lavaan, {estimator_text(used)}, the {fit.n} people of the sample who answered "
                 "every item; factors identified by their variances."
             )
+            if found.covariates:
+                method += (
+                    " Every factor is regressed on the study, so the loadings are of the pooled "
+                    "sample and the factor correlations are within studies; ω comes from the same "
+                    "factors fitted without the study, as semTools takes no covariates."
+                )
             papers = {
                 "measurement_fit": PaperTable(
                     "Fit of the Measurement Model", *fit_table(fit), method
@@ -156,6 +162,12 @@ def render(
             "freely: the measurement model to report before a structural model. Scores must not "
             "share items, so pick subscales or totals, not both."
         )
+        if analysis.pooling(result, sample.datasets):
+            note(
+                "The datasets come from several studies, so every factor is regressed on the "
+                "study: the factor correlations are within studies. This takes the items to work "
+                "alike in every study; Invariance tests that with Study as the groups."
+            )
         controls()
         body = ui.column().classes("w-full gap-2")
         with body:
@@ -294,7 +306,7 @@ def diagram(factors: dict[str, list[str]], labels: dict[str, str], fit: CfaFit |
             'fill="var(--lc-surface)" stroke="var(--lc-ink)" stroke-width="1"/>'
         )
         # The dataset a shared column name carries is the factor's own, so it is left off.
-        name = item.removesuffix("_" + k.rsplit("@", 1)[-1])
+        name = item.removesuffix("_" + analysis.parts(k)[0])
         short = name if len(name) <= 10 else name[:9] + "…"
         parts.append(
             f'<text x="{cx}" y="{item_y + 16}" text-anchor="middle" font-size="11" '

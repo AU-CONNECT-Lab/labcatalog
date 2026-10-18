@@ -67,6 +67,8 @@ class CfaModel:
     # Score id to the columns that load on it; for subscale scores, GENERAL to the score ids.
     factors: dict[str, list[str]]
     data: pd.DataFrame
+    # Columns of data, not items, that every factor is regressed on.
+    covariates: list[str] = field(default_factory=list)
 
     @property
     def ordered(self) -> bool:
@@ -90,6 +92,7 @@ class CfaFit:
     problem: str | None = None
     engine: str = R
     estimator: str = WLSMV
+    covariates: list[str] = field(default_factory=list)
 
 
 def estimator_text(estimator: str, indicators: str = "items") -> str:
@@ -170,7 +173,8 @@ def model_estimator(model: CfaModel, estimator: str) -> str:
 
 def lavaan_names(model: CfaModel) -> tuple[dict[str, str], dict[str, str]]:
     # R and lavaan never rename x1 or f1, so results map back to columns and scores safely.
-    items = {column: f"x{i}" for i, column in enumerate(model.data.columns, start=1)}
+    columns = [c for c in model.data.columns if c not in model.covariates]
+    items = {column: f"x{i}" for i, column in enumerate(columns, start=1)}
     factors = {score: f"f{i}" for i, score in enumerate(model.factors, start=1)}
     if model.kind == SECOND_ORDER:
         factors[GENERAL] = "g"
@@ -187,25 +191,42 @@ def model_syntax(model: CfaModel, items: dict[str, str], factors: dict[str, str]
     return lines
 
 
+def regression_syntax(model: CfaModel, factors: dict[str, str]) -> list[str]:
+    if not model.covariates:
+        return []
+    covariates = " + ".join(covariate_names(model).values())
+    return [f"{' + '.join(factors[s] for s in model.factors)} ~ {covariates}"]
+
+
+def covariate_names(model: CfaModel) -> dict[str, str]:
+    return {column: f"c{i}" for i, column in enumerate(model.covariates, start=1)}
+
+
 def write_model(
     folder: Path, n: int, model: CfaModel, estimator: str
 ) -> tuple[str, dict[str, str]]:
     items, factors = lavaan_names(model)
+    covariates = covariate_names(model)
     name = f"m{n}"
-    model.data.set_axis(list(items.values()), axis=1).to_csv(
+    model.data.rename(columns=items | covariates).to_csv(
         folder / f"{name}.csv", index=False, float_format="%g"
     )
     entry = {
         "model": name,
         "data": f"{name}.csv",
-        "syntax": "; ".join(model_syntax(model, items, factors)),
+        "syntax": "; ".join(
+            model_syntax(model, items, factors) + regression_syntax(model, factors)
+        ),
+        # semTools' ω takes no covariates, so it comes from the factors fitted without them.
+        "omega_syntax": "; ".join(model_syntax(model, items, factors)) if model.covariates else "",
         "estimator": model_estimator(model, estimator),
         # Hierarchical ω: the share of all items' sum that the general factor explains.
         "composite": f"g <~ {' + '.join(items.values())}" if model.kind == SECOND_ORDER else "",
     }
     path = folder / "models.csv"
     pd.DataFrame([entry]).to_csv(path, mode="a", header=not path.exists(), index=False)
-    return name, {**{v: k for k, v in items.items()}, **{v: k for k, v in factors.items()}}
+    names = items | factors | covariates
+    return name, {v: k for k, v in names.items()}
 
 
 def read_fit(
@@ -220,6 +241,7 @@ def read_fit(
         model.factors,
         len(model.data),
         estimator=estimator,
+        covariates=model.covariates,
     )
     problems = rows[rows["what"] == "problem"]
     if len(problems):

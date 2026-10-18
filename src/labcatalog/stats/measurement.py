@@ -1,9 +1,10 @@
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
 
+from labcatalog.data.resolve import ResolvedScore
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis
 from labcatalog.stats.analysis import CHOICE
@@ -15,7 +16,7 @@ MIN_FACTORS = 2
 DATA_FILE = "measurement_data.csv"
 SCRIPT_FILE = "measurement.R"
 R_FIT = {
-    WLSMV: 'ordered = names(d), estimator = "WLSMV"',
+    WLSMV: 'ordered = grep("^x", names(d), value = TRUE), estimator = "WLSMV"',
     MLR: 'estimator = "MLR"',
     ML: 'estimator = "ML"',
 }
@@ -33,7 +34,7 @@ R_SCRIPT = """\
 # says so, for the people of the sample who answered every one of them.
 {names}
 # Each score is a factor of its items, factors identified by their variances and free to
-# correlate (lavaan::cfa); ω of each factor from semTools::compRelSEM.
+# correlate (lavaan::cfa); ω of each factor from semTools::compRelSEM.{within}
 # Needs the R packages lavaan and semTools; install them once with:
 # install.packages(c("lavaan", "semTools"))
 d <- read.csv("{data}")
@@ -45,8 +46,7 @@ solution <- lavaan::standardizedSolution(fit)
 # Standardized loadings, then the factor correlations with their 95% CIs.
 print(solution[solution$op == "=~", ])
 print(solution[solution$op == "~~" & solution$lhs != solution$rhs, ])
-print(semTools::compRelSEM(fit))
-"""
+{omega}"""
 
 
 @dataclass
@@ -56,25 +56,33 @@ class Plan:
     # Whether every item has answer options, so WLSMV can treat them as ordered.
     ordinal: bool
     problem: str | None = None
+    # The study's 0/1 columns, by label, when the sample pools studies.
+    covariates: dict[str, str] = field(default_factory=dict)
+
+
+def part_scores(result: CatalogResult, key: str) -> list[ResolvedScore]:
+    # The score in each file of a pooled key, or in its one file.
+    by_key = {s.key: s for s in result.catalog.scores}
+    return [by_key[analysis.part_key(key, name)] for name in analysis.parts(key)]
 
 
 def offered(result: CatalogResult, choices: dict[str, str]) -> dict[str, str]:
     # Scores of two or more items, each a possible factor.
-    by_key = {s.key: s for s in result.catalog.scores}
+    keys = {s.key for s in result.catalog.scores}
     return {
         k: label
         for k, label in choices.items()
-        if k in by_key and len(by_key[k].columns) >= MIN_ITEMS
+        if analysis.first_key(k) in keys
+        and all(len(s.columns) >= MIN_ITEMS for s in part_scores(result, k))
     }
 
 
 def ordinal(result: CatalogResult, keys: list[str]) -> bool:
-    by_key = {s.key: s for s in result.catalog.scores}
     for key in keys:
-        score = by_key[key]
-        types = {v.column: v.type for v in result.catalog.variables_for(score.dataset)}
-        if any(types.get(c) != CHOICE for c in score.columns):
-            return False
+        for score in part_scores(result, key):
+            types = {v.column: v.type for v in result.catalog.variables_for(score.dataset)}
+            if any(types.get(c) != CHOICE for c in score.columns):
+                return False
     return True
 
 
@@ -97,11 +105,18 @@ def plan(result: CatalogResult, sample: analysis.Sample, keys: list[str]) -> Pla
                 )
                 return found
             owner[item] = key
-    columns = list(owner)
+    # Pooled studies predict every factor, so the factor correlations are within studies.
+    if analysis.pooling(result, sample.datasets):
+        found.covariates = {v.column: v.label for v in data.study_dummies()}
+    columns = list(owner) + list(found.covariates)
     items = data.frame()[columns].dropna()
-    datasets = ", ".join(dict.fromkeys(v.dataset for v in variables.values()))
+    datasets = ", ".join(
+        dict.fromkeys(d for v in variables.values() for d in v.dataset.split(analysis.POOL))
+    )
     factors = {k: v.items for k, v in variables.items()}
-    found.model = CfaModel("", datasets, MEASUREMENT, factors, items.reset_index(drop=True))
+    found.model = CfaModel(
+        "", datasets, MEASUREMENT, factors, items.reset_index(drop=True), list(found.covariates)
+    )
     return found
 
 
@@ -123,9 +138,26 @@ def script_files(
     names += "\n" + "\n".join(
         f"#   {short}: {original[short]}" for short in original if short.startswith("x")
     )
+    covariates = [short for short in original if short.startswith("c")]
+    names += "".join(f"\n#   {short}: {labels[original[short]]}" for short in covariates)
+    within = (
+        f"\n# Every factor is regressed on the study ({', '.join(covariates)}), so the "
+        "factor\n# correlations are within studies."
+        if covariates
+        else ""
+    )
+    omega = (
+        "# semTools' ω takes no covariates, so it comes from the factors fitted without the study.\n"
+        f'alone <- lavaan::cfa("{entry["omega_syntax"]}", data = d, {R_FIT[used]}, std.lv = TRUE)\n'
+        "print(semTools::compRelSEM(alone))\n"
+        if covariates
+        else "print(semTools::compRelSEM(fit))\n"
+    )
     script = R_SCRIPT.format(
         title=title,
         names=names,
+        within=within,
+        omega=omega,
         data=DATA_FILE,
         syntax=entry["syntax"],
         fit=R_FIT[used],

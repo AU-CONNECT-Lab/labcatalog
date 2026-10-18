@@ -15,19 +15,27 @@ add <- function(model, what, factor = "", item = "", value = NA, message = "") {
                                           item = item, value = value, message = message)
 }
 
-# wlsmv treats the items as ordered categories, ml and mlr (robust) as continuous; composite,
-# when given, is the one composite to take omega of, such as all items of a second-order model.
-fit_one <- function(model, syntax, data, estimator, composite) {
-  ordinal <- estimator == "wlsmv"
+# wlsmv treats the items as ordered categories, ml and mlr (robust) as continuous.
+fit_cfa <- function(syntax, data, estimator) {
+  # Items are x1, x2 and so on; covariates such as the study's 0/1 columns stay numbers.
+  items <- grep("^x", names(data), value = TRUE)
   # Small samples often leave empty response cells; lavaan warns but the fit stands.
-  fit <- withCallingHandlers(
-    if (ordinal) {
-      lavaan::cfa(syntax, data = data, ordered = names(data), estimator = "WLSMV", std.lv = TRUE)
+  withCallingHandlers(
+    if (estimator == "wlsmv") {
+      lavaan::cfa(syntax, data = data, ordered = items, estimator = "WLSMV", std.lv = TRUE)
     } else {
       lavaan::cfa(syntax, data = data, estimator = toupper(estimator), std.lv = TRUE)
     },
     warning = function(w) invokeRestart("muffleWarning")
   )
+}
+
+# composite, when given, is the one composite to take omega of, such as all items of a
+# second-order model; omega_syntax, when given, is the model without its covariates, which
+# semTools needs for omega.
+fit_one <- function(model, syntax, data, estimator, composite, omega_syntax) {
+  ordinal <- estimator == "wlsmv"
+  fit <- fit_cfa(syntax, data, estimator)
   if (!lavaan::lavInspect(fit, "converged")) {
     return(add(model, "problem", message = "the model did not converge"))
   }
@@ -58,8 +66,9 @@ fit_one <- function(model, syntax, data, estimator, composite) {
     add(model, "correlation_high", cors$lhs[i], cors$rhs[i], cors$ci.upper[i])
     add(model, "correlation_p", cors$lhs[i], cors$rhs[i], cors$pvalue[i])
   }
+  alone <- if (omega_syntax == "") fit else fit_cfa(omega_syntax, data, estimator)
   omega <- suppressWarnings(
-    if (composite == "") semTools::compRelSEM(fit) else semTools::compRelSEM(fit, W = composite)
+    if (composite == "") semTools::compRelSEM(alone) else semTools::compRelSEM(alone, W = composite)
   )
   for (name in names(omega)) add(model, "omega", name, value = omega[[name]])
 }
@@ -70,7 +79,8 @@ for (i in seq_len(nrow(models))) {
   model <- models$model[i]
   data <- read.csv(file.path(folder, models$data[i]))
   tryCatch(
-    fit_one(model, models$syntax[i], data, models$estimator[i], models$composite[i]),
+    fit_one(model, models$syntax[i], data, models$estimator[i], models$composite[i],
+            models$omega_syntax[i]),
     error = function(e) add(model, "problem", message = conditionMessage(e))
   )
 }

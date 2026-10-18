@@ -12,6 +12,7 @@ from labcatalog.stats.cfa import (
     SUBSCALE_SCORES,
     WLSMV,
     CfaModel,
+    covariate_names,
     lavaan_names,
     model_estimator,
 )
@@ -37,7 +38,8 @@ def cfa_files(models: list[CfaModel], estimator: str, title: str) -> dict[str, s
     for n, model in enumerate(models, start=1):
         name = f"mplus_cfa_{n}"
         files[f"{name}.inp"] = cfa_input(model, f"{name}.dat", estimator, title)
-        files[f"{name}.dat"] = data_text(model.data)
+        items, _ = lavaan_names(model)
+        files[f"{name}.dat"] = data_text(model.data[[*items, *model.covariates]])
     return files
 
 
@@ -48,6 +50,7 @@ def data_text(data: pd.DataFrame) -> str:
 
 def cfa_input(model: CfaModel, data_file: str, estimator: str, title: str) -> str:
     items, factors = lavaan_names(model)
+    covariates = covariate_names(model)
     names = f"x1-x{len(items)}"
     ordered = model_estimator(model, estimator) == WLSMV
     what = "Subscale scores" if model.kind == SUBSCALE_SCORES else ITEMS
@@ -55,10 +58,11 @@ def cfa_input(model: CfaModel, data_file: str, estimator: str, title: str) -> st
         *title_lines(f"{title}, {model.dataset}, {model.kind} model"),
         f"! {what}:",
         *(f"! {name} = {column}"[:WIDTH] for column, name in items.items()),
+        *(f"! {name} = {column}, a covariate"[:WIDTH] for column, name in covariates.items()),
         "DATA:",
         f'  FILE = "{data_file}";',
         "VARIABLE:",
-        f"  NAMES = {names};",
+        *statement(f"NAMES = {' '.join([names, *covariates.values()])}"),
         *([f"  CATEGORICAL = {names};"] if ordered else []),
         f"  MISSING = ALL ({MISSING});",
         "ANALYSIS:",
@@ -75,6 +79,10 @@ def cfa_input(model: CfaModel, data_file: str, estimator: str, title: str) -> st
         first, *rest = first_order
         lines += statement(f"g BY {' '.join([first + '*', *rest])}")
         lines += statement("g@1")
+    if covariates:
+        # Regressed factors' residual covariances, written out rather than left to defaults.
+        lines += statement(f"{' '.join(first_order)} ON {' '.join(covariates.values())}")
+        lines += [s for a, b in combinations(first_order, 2) for s in statement(f"{a} WITH {b}")]
     lines += ["OUTPUT:", "  STDYX;", ""]
     return "\n".join(lines)
 

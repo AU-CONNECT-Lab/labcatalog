@@ -329,6 +329,11 @@ def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
         sentences = [f"{opening} fits exactly with three {indicators}, so it has no fit indices."]
     else:
         sentences = [f"{opening} gave {fit_indices(fit.fit, digits)}."]
+    if fit.covariates:
+        sentences.append(
+            "Every factor was regressed on the study, so the factor correlations are within "
+            "studies."
+        )
     if fit.kind == SECOND_ORDER and len(fit.factors) == MIN_SUBSCALES:
         sentences.append("With three subscales, its fit equals that of the subscale model.")
     if fit.loadings:

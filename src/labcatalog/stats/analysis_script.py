@@ -24,6 +24,7 @@ from labcatalog.stats.analysis import (
     item_key,
     item_variable,
     number_items,
+    part_key,
     parts,
 )
 from labcatalog.stats.cfa import is_total
@@ -554,13 +555,19 @@ class AnalysisData:
         definition = next(s for s in instrument.scores if s.id == score.score_id)
         column = f"{score.score_id}_{'_'.join(parts(key))}"
         self.columns[column] = analysis.values(self.result, self.sample, key)
-        names = []
-        # A pooled score's items differ from file to file, so it has none.
-        if items and len(parts(key)) == 1:
-            found = score_items(self.result.datasets[score.dataset], score)
-            names = [self.column_name(score.dataset, c) for c in found.columns]
-            for name, source in zip(names, found.columns, strict=True):
-                self.columns[name] = self.align(score.dataset, found[source].to_numpy(dtype=float))
+        names: list[str] = []
+        if items:
+            for dataset in parts(key):
+                part = next(
+                    s for s in self.result.catalog.scores if s.key == part_key(key, dataset)
+                )
+                found = score_items(self.result.datasets[dataset], part)
+                # A pooled score's items take the first file's names; its studies' people differ.
+                names = names or [self.column_name(dataset, c) for c in found.columns]
+                for name, source in zip(names, found.columns, strict=True):
+                    values = self.align(dataset, found[source].to_numpy(dtype=float))
+                    held = self.columns.get(name)
+                    self.columns[name] = values if held is None else held.combine_first(values)
         return Variable(
             key=key,
             label=f"{abbreviation(instrument)} {definition.label}",

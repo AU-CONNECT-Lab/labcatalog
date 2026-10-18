@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import pandas as pd
@@ -6,8 +7,10 @@ from scipy import stats
 
 from labcatalog.charts import views
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats import analysis, group_invariance, invariance
+from labcatalog.reports import results
+from labcatalog.stats import analysis, cfa, group_invariance, invariance, mplus
 from labcatalog.stats import analysis_script as script
+from labcatalog.stats import measurement as mm
 from labcatalog.stats import mediation as med
 from labcatalog.stats.mediation_r import mediation_code
 from tests.test_analysis_script import needs_r, rscript
@@ -245,3 +248,62 @@ def test_the_example_pools_its_two_studies(example_project):
     # 1001P of each study is someone else, with a parent of their own family.
     people = analysis.build_sample(result, files, True).people
     assert {"mock_study/1001", "mock_study_2/1001"} <= set(people)
+
+
+WORRIES = "example_worries_temper.ewt_worries@child_w1+pilot_w1"
+TEMPER = "example_worries_temper.ewt_temper@child_w1+pilot_w1"
+
+
+def test_a_pooled_measurement_model_regresses_its_factors_on_the_study(result, sample):
+    keys = [SADNESS, WORRIES, TEMPER]
+    assert set(keys) <= set(mm.offered(result, {k: k for k in keys}))
+    found = mm.plan(result, sample, keys)
+    assert found.problem is None and found.covariates == {"study_2": "Study: pilot"}
+    model = found.model
+    assert model.covariates == ["study_2"] and model.dataset == "child_w1, pilot_w1"
+    # Each study's people bring their own file's items, here the same answers twice.
+    items = model.data.drop(columns="study_2")
+    mine, theirs = items[model.data["study_2"] == 0], items[model.data["study_2"] == 1]
+    assert len(mine) and mine.to_numpy().tolist() == theirs.to_numpy().tolist()
+    texts = mm.script_files(model, cfa.WLSMV, found.labels | found.covariates, "t")
+    assert "f1 + f2 + f3 ~ c1" in texts[mm.SCRIPT_FILE]
+    assert "#   c1: Study: pilot" in texts[mm.SCRIPT_FILE]
+    inp = mplus.cfa_input(model, "m.dat", cfa.WLSMV, "t")
+    assert "f1 f2 f3 ON c1;" in inp and "f1 WITH f2;" in inp and "CATEGORICAL = x1-x11;" in inp
+
+
+@needs_r
+def test_the_same_answers_in_two_studies_give_one_studys_measurement_model(
+    result, sample, tmp_path
+):
+    one = analysis.build_sample(result, ["child_w1"], True)
+    alone_keys = [k.replace("+pilot_w1", "") for k in (SADNESS, WORRIES, TEMPER)]
+    [alone] = cfa.fit_models([mm.plan(result, one, alone_keys).model], rscript(), cfa.ML)
+    pooled = mm.plan(result, sample, [SADNESS, WORRIES, TEMPER])
+    [fit] = cfa.fit_models([pooled.model], rscript(), cfa.ML)
+    assert fit.problem is None and fit.n == 2 * alone.n
+    first = {k: k.replace("+pilot_w1", "") for k in (SADNESS, WORRIES, TEMPER)}
+    for (a, b), found in fit.correlations.items():
+        same = alone.correlations.get((first[a], first[b]))
+        assert found["r"] == pytest.approx(same["r"], abs=1e-4)
+    assert list(fit.loadings.values()) == pytest.approx(list(alone.loadings.values()), abs=1e-4)
+    # WLSMV keeps the study's column a number, not an ordered category.
+    [ordinal] = cfa.fit_models([pooled.model], rscript(), cfa.WLSMV)
+    assert ordinal.problem is None and ordinal.covariates == ["study_2"]
+    assert "within studies" in results.cfa_text([ordinal], pooled.labels)
+    # The R script beside the data gives the same fit and ω.
+    texts = mm.script_files(pooled.model, cfa.WLSMV, pooled.labels | pooled.covariates, "t")
+    for name, body in texts.items():
+        (tmp_path / name).write_text(body, encoding="utf-8")
+    with open(tmp_path / mm.SCRIPT_FILE, "a", encoding="utf-8") as f:
+        f.write(
+            'write.csv(t(lavaan::fitMeasures(fit, "chisq.scaled")), "fit.csv")\n'
+            'write.csv(t(unlist(semTools::compRelSEM(alone))), "omega.csv")\n'
+        )
+    done = subprocess.run([rscript(), mm.SCRIPT_FILE], cwd=tmp_path, capture_output=True, text=True)
+    assert done.returncode == 0, done.stderr
+    assert pd.read_csv(tmp_path / "fit.csv").iloc[0]["chisq.scaled"] == pytest.approx(
+        ordinal.fit["chisq"], rel=1e-6
+    )
+    omega = pd.read_csv(tmp_path / "omega.csv").iloc[0]
+    assert [omega[f"f{i}"] for i in (1, 2, 3)] == pytest.approx(list(ordinal.omega.values()))
