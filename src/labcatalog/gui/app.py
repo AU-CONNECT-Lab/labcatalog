@@ -470,7 +470,12 @@ class Window:
                 lambda: self.open_instrument(None),
                 lambda: self.tabs.set_value("datasets"),
                 lambda: self.tabs.set_value("problems"),
+                self.open_map,
             )
+
+    def open_map(self) -> None:
+        self.view.layout = instruments.MAP
+        self.open_instrument(None)
 
     @ui.refreshable_method
     def instruments_panel(self) -> None:

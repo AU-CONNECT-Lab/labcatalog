@@ -13,6 +13,33 @@ const DIM = 0.12;
 const FIT_ZOOM = 2.6;
 // For this long after a new layout starts, the view follows it while it spreads out.
 const FOLLOW_MS = 1500;
+// The night look, as on the overview banner: glowing dots on a dark sky with stars.
+const NIGHT = { ink: "#f2f2f4", muted: "rgba(236, 236, 238, 0.75)", faint: "#ffffff", panel: "#111114" };
+const NIGHT_LINK_ALPHA = 0.22;
+const NIGHT_CROSS_ALPHA = 0.12;
+const NIGHT_STARS = 260;
+
+function lighter(hex, share) {
+  // Mixes a #rrggbb colour with white, so dots stay bright on the dark sky.
+  const n = parseInt(hex.slice(1), 16);
+  const mix = (c) => Math.round(c + (255 - c) * share);
+  return `rgb(${mix(n >> 16)}, ${mix((n >> 8) & 255)}, ${mix(n & 255)})`;
+}
+
+function starField(width, height) {
+  // A fixed scatter of faint stars, the same each time, as a CSS background.
+  let seed = 7;
+  const rand = () => ((seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296);
+  let stars = "";
+  for (let i = 0; i < NIGHT_STARS; i++) {
+    const big = rand() < 0.06;
+    const r = big ? 0.9 + rand() * 0.6 : 0.25 + rand() * 0.6;
+    const alpha = big ? 0.5 + rand() * 0.4 : 0.12 + rand() * 0.4;
+    stars += `<circle cx="${(rand() * width).toFixed(1)}" cy="${(rand() * height).toFixed(1)}" r="${r.toFixed(2)}" fill="#fff" opacity="${alpha.toFixed(2)}"/>`;
+  }
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">${stars}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
 
 function gravity(strength) {
   // Pulls every node towards the centre, so groups with no link between them stay in view.
@@ -29,7 +56,7 @@ function gravity(strength) {
 
 export default {
   template: `
-    <div class="lc-network">
+    <div class="lc-network" :class="{ 'lc-network-night': night }">
       <div ref="stage"></div>
       <div class="lc-network-legend">
         <span v-for="(g, i) in spec.groups" :key="g.name" class="lc-network-key"
@@ -41,6 +68,7 @@ export default {
   props: {
     spec: Object,
     height: Number,
+    night: Boolean,
   },
   data() {
     return { hidden: [] };
@@ -89,6 +117,7 @@ export default {
     for (const event of ["wheel", "pointerdown"]) {
       stage.addEventListener(event, () => (this.touched = true), { passive: true });
     }
+    if (this.night) stage.style.backgroundImage = starField(1400, this.height);
     this.resizeObserver = new ResizeObserver(() => this.graph.width(this.$el.clientWidth));
     this.resizeObserver.observe(this.$el);
     this.load(this.spec);
@@ -157,13 +186,15 @@ export default {
     },
     readTheme() {
       const style = getComputedStyle(this.$el);
-      this.colors = {
-        ink: style.getPropertyValue("--lc-ink").trim(),
-        muted: style.getPropertyValue("--lc-muted").trim(),
-        faint: style.getPropertyValue("--lc-faint").trim(),
-        panel: style.getPropertyValue("--lc-panel").trim(),
-        font: style.fontFamily,
-      };
+      this.colors = this.night
+        ? { ...NIGHT, font: style.fontFamily }
+        : {
+            ink: style.getPropertyValue("--lc-ink").trim(),
+            muted: style.getPropertyValue("--lc-muted").trim(),
+            faint: style.getPropertyValue("--lc-faint").trim(),
+            panel: style.getPropertyValue("--lc-panel").trim(),
+            font: style.fontFamily,
+          };
       const t = Math.min(1, (performance.now() - this.fade.start) / FADE_MS);
       const eased = t * (2 - t);
       this.level = this.fade.from + (this.fade.to - this.fade.from) * eased;
@@ -195,10 +226,26 @@ export default {
       const focused = this.focus && this.near.has(n.id);
       const alpha = this.focus && !focused ? 1 - (1 - DIM) * this.level : 1;
       ctx.globalAlpha = alpha;
+      const color = this.spec.groups[n.group]?.color || this.colors.muted;
       ctx.beginPath();
       ctx.arc(n.x, n.y, n.size, 0, 2 * Math.PI);
-      ctx.fillStyle = this.spec.groups[n.group]?.color || this.colors.muted;
-      ctx.fill();
+      if (this.night) {
+        ctx.save();
+        ctx.fillStyle = color.startsWith("#") ? lighter(color, 0.35) : color;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = n.named ? 14 : 7;
+        ctx.fill();
+        ctx.restore();
+        if (n.named) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.size * 0.45, 0, 2 * Math.PI);
+          ctx.fillStyle = "#ffffff";
+          ctx.fill();
+        }
+      } else {
+        ctx.fillStyle = color;
+        ctx.fill();
+      }
       if (this.focus && n.id === this.focus.id) {
         ctx.lineWidth = 2 / scale;
         ctx.strokeStyle = this.colors.ink;
@@ -250,12 +297,13 @@ export default {
         ctx.stroke();
       };
       const level = this.focus ? this.level : 0;
+      const rest = this.night ? (l.tip ? NIGHT_CROSS_ALPHA : NIGHT_LINK_ALPHA) : HAIRLINE_ALPHA;
       if (touching) {
         // The grey hairline turns into the link's sign colour and strength.
-        line(this.colors.faint, HAIRLINE_ALPHA * (1 - level), HAIRLINE_PX);
+        line(this.colors.faint, rest * (1 - level), HAIRLINE_PX);
         line(l.color, 0.9 * level, HAIRLINE_PX + (l.width + 0.5 - HAIRLINE_PX) * level);
       } else {
-        line(this.colors.faint, HAIRLINE_ALPHA * (1 - (1 - DIM) * level), HAIRLINE_PX);
+        line(this.colors.faint, rest * (1 - (1 - DIM) * level), HAIRLINE_PX);
       }
       ctx.globalAlpha = 1;
     },

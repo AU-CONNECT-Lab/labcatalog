@@ -93,7 +93,8 @@ from labcatalog.stats.invariance import (
 from labcatalog.stats.summary import VariableSummary
 
 PAGE_SIZE = 50
-LAYOUTS = {"list": "List", "map": "Map"}
+LIST, MAP = "list", "map"
+LAYOUTS = {LIST: "List", MAP: "Map"}
 # The instrument tab a click on the map opens, by the kind of dot: scores or items.
 MAP_PARTS = {"s": "scores", "t": "items"}
 CFA_UNSET = "unset"
@@ -113,7 +114,7 @@ class BrowseView:
     # Instruments ticked for export, kept across filters and refreshes.
     chosen: set[str] = field(default_factory=set)
     asked: Search | None = None
-    layout: str = "list"
+    layout: str = LIST
 
     @property
     def only(self) -> set[str] | None:
@@ -199,7 +200,7 @@ def browser(
                     on_click=lambda: new_instrument.open_wizard(result, wizard_done(view, cfa)),
                 ).props("flat dense no-caps").classes("lc-quiet-btn")
             active_filters(index, view, changed)
-            if view.layout == "map":
+            if view.layout == MAP:
                 catalog_map(result, list(found), view, on_open)
                 return
             shown = table(*list_table(result, found), pagination=PAGE_SIZE)
@@ -266,7 +267,7 @@ def catalog_map(
         f"different instruments means |r| ≥ {defaults.CHART_MIN_R:g} in some wave; hover over a "
         "dot to see its links, scroll to zoom, and click to open it."
     )
-    NetworkGraph(spec, network.MAP_HEIGHT, on_click=opened).classes("w-full")
+    NetworkGraph(spec, network.MAP_HEIGHT, on_click=opened, night=True).classes("w-full")
 
 
 def wizard_done(view: BrowseView, cfa: CfaView) -> Callable[[str], Awaitable[None]]:

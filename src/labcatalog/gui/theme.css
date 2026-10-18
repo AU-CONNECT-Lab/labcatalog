@@ -257,6 +257,26 @@ body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.0
   -webkit-mask-image: linear-gradient(to right, transparent 0%, #000 35%);
   mask-image: linear-gradient(to right, transparent 0%, #000 35%);
 }
+.lc-banner-art svg { display: block; height: 100%; width: auto; }
+.lc-banner-art .dots circle, .lc-banner-art .glow circle, .lc-banner-art .cores circle, .lc-banner-art .links line {
+  transition: opacity 0.2s, stroke-opacity 0.2s, transform 0.2s;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.lc-art-focus .dots circle, .lc-art-focus .glow circle, .lc-art-focus .cores circle { opacity: 0.22; }
+.lc-art-focus circle.lc-art-on { opacity: 1; }
+.lc-art-focus circle.lc-art-me { transform: scale(1.7); }
+.lc-art-focus .links line { stroke-opacity: 0.04; }
+.lc-art-focus .links line.lc-art-on { stroke-opacity: 0.75; }
+.q-btn.lc-banner-go {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  color: #ececee;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.q-btn.lc-banner-go:hover { background: rgba(255, 255, 255, 0.16); }
 .lc-banner-words {
   position: relative;
   width: 48%;
@@ -323,6 +343,12 @@ body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.0
 .lc-network-key:hover { color: var(--lc-ink); }
 .lc-network-off { opacity: 0.4; }
 .lc-network-swatch { width: 9px; height: 9px; border-radius: 50%; }
+.lc-network-night { border-radius: 16px; overflow: hidden; background:
+    radial-gradient(ellipse 55% 85% at 60% 42%, rgba(52, 70, 120, 0.2), transparent 70%),
+    radial-gradient(ellipse 40% 60% at 92% 95%, rgba(70, 50, 110, 0.1), transparent 70%),
+    linear-gradient(115deg, #111114 0%, #131317 55%, #16171d 100%); }
+.lc-network-night .lc-network-legend { color: #b4b4b9; padding: 8px 12px 10px; }
+.lc-network-night .lc-network-key:hover { color: #f2f2f4; }
 .lc-network .float-tooltip-kap {
   padding: 5px 9px;
   background: var(--lc-tooltip);

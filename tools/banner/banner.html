@@ -64,16 +64,18 @@ function svg({ nodes, links }) {
     const alpha = (big ? 0.5 + rand() * 0.4 : 0.12 + rand() * 0.4).toFixed(2);
     stars += `<circle cx="${x}" cy="${y}" r="${size}" fill="#fff" opacity="${alpha}"/>`;
   }
-  const lines = links.map((l) => `<line x1="${X(l.source)}" y1="${Y(l.source)}" x2="${X(l.target)}" y2="${Y(l.target)}" stroke="#fff" stroke-opacity="${l.cross ? LOOK.crossAlpha : LOOK.linkAlpha}"/>`).join("");
-  const dots = nodes.map((d) => `<circle cx="${X(d)}" cy="${Y(d)}" r="${r(d)}" fill="${fill(d)}"/>`).join("");
-  const cores = nodes.filter((d) => d.kind === "hub").map((d) => `<circle cx="${X(d)}" cy="${Y(d)}" r="${(LOOK.hub * 0.45).toFixed(1)}" fill="#fff" fill-opacity="0.9"/>`).join("");
+  // data-i numbers each node and data-a, data-b a link's ends, so the app can light up a node and its neighbours.
+  nodes.forEach((d, i) => (d.i = i));
+  const lines = links.map((l) => `<line data-a="${l.source.i}" data-b="${l.target.i}" x1="${X(l.source)}" y1="${Y(l.source)}" x2="${X(l.target)}" y2="${Y(l.target)}" stroke="#fff" stroke-opacity="${l.cross ? LOOK.crossAlpha : LOOK.linkAlpha}"/>`).join("");
+  const dots = nodes.map((d) => `<circle data-i="${d.i}" cx="${X(d)}" cy="${Y(d)}" r="${r(d)}" fill="${fill(d)}"/>`).join("");
+  const cores = nodes.filter((d) => d.kind === "hub").map((d) => `<circle data-i="${d.i}" cx="${X(d)}" cy="${Y(d)}" r="${(LOOK.hub * 0.45).toFixed(1)}" fill="#fff" fill-opacity="0.9"/>`).join("");
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
 <defs><filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${LOOK.glow}"/></filter></defs>
-<g>${stars}</g>
-<g stroke-width="0.6">${lines}</g>
-<g filter="url(#glow)" opacity="${LOOK.glowAlpha}">${dots}</g>
-<g>${dots}</g>
-<g>${cores}</g>
+<g class="stars">${stars}</g>
+<g class="links" stroke-width="0.6">${lines}</g>
+<g class="glow" filter="url(#glow)" opacity="${LOOK.glowAlpha}">${dots}</g>
+<g class="dots">${dots}</g>
+<g class="cores">${cores}</g>
 </svg>
 `;
 }

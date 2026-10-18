@@ -17,11 +17,18 @@ TODO_LOOK = {
 }
 
 
+class BannerArt(ui.element, component="banner_art.js"):
+    def __init__(self, src: str) -> None:
+        super().__init__()
+        self._props["src"] = src
+
+
 def render(
     result: CatalogResult,
     on_instruments: Callable[[], None],
     on_datasets: Callable[[], None],
     on_problems: Callable[[], None],
+    on_map: Callable[[], None],
 ) -> None:
     config = result.project.config
     issues = result.report.issues
@@ -30,7 +37,7 @@ def render(
     unfinished = sum(bool(gaps(i)) for i in result.project.instruments.values())
     waves = sorted_waves(d.wave for d in config.datasets)
     reporters = unique(d.reporter for d in config.datasets)
-    banner(result)
+    banner(result, on_map)
     with ui.grid(columns=4).classes("lc-lifted w-full gap-4"):
         tile(
             "Instruments",
@@ -81,10 +88,13 @@ def render(
     charts.overview_section(result)
 
 
-def banner(result: CatalogResult) -> None:
+def banner(result: CatalogResult, on_map: Callable[[], None]) -> None:
     found = views.banner(result)
     with ui.element("div").classes("lc-banner w-full"):
-        ui.element("img").props(f"src={theme.BANNER} alt=''").classes("lc-banner-art")
+        BannerArt(theme.BANNER)
+        ui.button("Explore the map", icon="hub", on_click=on_map).props("flat no-caps").classes(
+            "lc-banner-go"
+        )
         with ui.column().classes("lc-banner-words gap-2"):
             if found.kicker:
                 ui.label(found.kicker).classes("lc-banner-kicker")
