@@ -34,3 +34,13 @@ def test_preferences_keep_other_keys(monkeypatch, tmp_path):
     preferences.save({"palette": "lancet", "other": 1})
     preferences.save({"palette": "nature"})
     assert preferences.load() == {"palette": "nature", "other": 1}
+
+
+def test_groups_past_the_palette_come_lighter_then_darker():
+    groups = style.PALETTES[style.palette].groups
+    colors = [style.group_color(k) for k in range(3 * len(groups))]
+    assert colors[: len(groups)] == list(groups)
+    assert len(set(colors)) == len(colors)
+    first, again = (int(c[1:3], 16) for c in (colors[0], colors[len(groups)]))
+    assert again > first
+    assert int(colors[2 * len(groups)][1:3], 16) < first

@@ -910,8 +910,10 @@ def catalog_map(result: CatalogResult, instrument_ids: list[str]) -> dict | None
     found = instrument_modalities(result)
     vocab = result.project.config.vocab
     kinds = [vocab.modality_label(found[i]) for i in instrument_ids if i in found]
-    order = list(dict.fromkeys(kinds))
-    groups = [(name, group_color(k)) for k, name in enumerate(order)]
+    # Each modality keeps its colour, by its place in vocab, whatever the filters leave.
+    every = [vocab.modality_label(m) for m in dict.fromkeys([*vocab.modalities, *found.values()])]
+    order = [name for name in every if name in kinds]
+    groups = [(name, group_color(every.index(name))) for name in order]
     if len(kinds) < len(instrument_ids):
         groups.append((MAP_UNPLACED, network.UNSET_COLOR))
     nodes: list[dict] = []

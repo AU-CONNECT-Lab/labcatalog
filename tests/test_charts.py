@@ -293,3 +293,18 @@ def test_catalog_map_hangs_items_from_their_smallest_score_and_links_scores_acro
     assert all(link["value"] < 1 for link in correlated)
     assert sum(n.get("named", False) for n in spec["nodes"]) == len(instruments)
     assert views.catalog_map(result, []) is None
+
+
+def test_catalog_map_gives_each_modality_its_own_colour_whatever_the_filter(result):
+    every = views.catalog_map(result, list(result.project.instruments))["groups"]
+    colors = {g["name"]: g["color"] for g in every}
+    assert len(set(colors.values())) == len(colors) > 7
+    found = views.instrument_modalities(result)
+    last = next(i for i in reversed(list(result.project.instruments)) if i in found)
+    alone = views.catalog_map(result, [last])["groups"]
+    # Alone on the map it would have taken the first colour, had colours followed what is shown.
+    assert alone[0]["color"] != style.group_color(0)
+    assert [(g["name"], g["color"]) for g in alone][0] == (
+        alone[0]["name"],
+        colors[alone[0]["name"]],
+    )

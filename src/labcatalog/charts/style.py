@@ -40,6 +40,8 @@ PALETTES = {
     ),
 }
 DEFAULT_PALETTE = "default"
+# How much lighter each further round of a palette is drawn; negative is darker.
+SHADES = (0.0, 0.45, -0.35)
 palette = DEFAULT_PALETTE
 LOLLIPOP_COLORS = (
     "#A6CEE3",
@@ -90,7 +92,18 @@ def wave_color(index: int) -> str:
 
 def group_color(index: int) -> str:
     groups = PALETTES[palette].groups
-    return groups[index % len(groups)]
+    # Past the palette, each round repeats it lighter, then darker, so no two groups share a colour.
+    lighter = SHADES[index // len(groups) % len(SHADES)]
+    color = groups[index % len(groups)]
+    return shade(color, lighter) if lighter else color
+
+
+def shade(color: str, lighter: float) -> str:
+    # Towards white for a positive share, towards black for a negative one.
+    channels = [int(color[i : i + 2], 16) for i in (1, 3, 5)]
+    target = 255 if lighter > 0 else 0
+    mixed = [round(c + (target - c) * abs(lighter)) for c in channels]
+    return "#" + "".join(f"{c:02x}" for c in mixed)
 
 
 def pair_color(index: int) -> str:
