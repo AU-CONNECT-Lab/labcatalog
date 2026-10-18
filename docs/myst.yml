@@ -50,6 +50,7 @@ project:
         - file: how-to/database.md
         - file: how-to/write-methods.md
         - file: how-to/datalad.md
+        - file: how-to/work-as-a-team.md
         - file: how-to/r-and-models.md
     - file: statistics/index.md
     - title: Reference
