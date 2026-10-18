@@ -15,9 +15,17 @@ ids:
 
 `labcatalog check` then reports IDs that do not match (`id_pattern`), IDs with leading or trailing spaces (`id_whitespace`), rows without an ID (`id_missing`) and IDs that appear twice in one file (`id_duplicate`).
 
+A study whose IDs are written another way gives its own pattern, which its datasets and its roster are held to in place of `ids.pattern`:
+
+```yaml
+studies:
+  mock_study_2:
+    id_pattern: '^S2-\d{4}$'
+```
+
 ### Correcting IDs
 
-When a file writes IDs another way than the project, such as `sub-1001C`, `1001c` or `S12`, **Fix IDs** corrects them without touching the file. It opens from the **Fix** of an ID problem on the Problems page and from a dataset's page. Add rules, applied in order: remove a prefix or a suffix, find and replace (a regular expression), pad the number with zeros, remove spaces, or change the case. Type an ID in the **Corrected ID** column to set one by hand. The table shows, for every ID of the file, its corrected ID, whether that matches `ids.pattern` and whether the roster lists it, with the IDs still wrong and those that change first. Two IDs that would become the same are marked, and Save stays off until they differ. **Save** asks before it writes anything.
+When a file writes IDs another way than the project, such as `sub-1001C`, `1001c` or `S12`, **Fix IDs** corrects them without touching the file. It opens from the **Fix** of an ID problem on the Problems page and from a dataset's page. Add rules, applied in order: remove a prefix or a suffix, find and replace (a regular expression), pad the number with zeros, remove spaces, or change the case. Type an ID in the **Corrected ID** column to set one by hand. The table shows, for every ID of the file, its corrected ID, whether that matches the ID pattern of the file's study and whether the roster lists it, with the IDs still wrong and those that change first. Two IDs that would become the same are marked, and Save stays off until they differ. **Save** asks before it writes anything.
 
 The corrections go to `id_map.csv` in the project folder, one line per ID:
 

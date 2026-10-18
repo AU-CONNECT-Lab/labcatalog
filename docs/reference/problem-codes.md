@@ -51,7 +51,7 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 | `unexpected_value` | error | Values that are neither response options nor missing codes, or numbers outside `min` and `max`. |
 | `id_missing` | error | Rows without an ID. |
 | `id_whitespace` | error | IDs with leading or trailing spaces. |
-| `id_pattern` | error | IDs that do not match `ids.pattern`. |
+| `id_pattern` | error | IDs that do not match `ids.pattern`, or the study's own `id_pattern`. |
 | `id_duplicate` | error | IDs that appear more than once in one file. |
 | `group_missing` | warning | IDs from which no group can be read, or people the roster lists without a group. |
 | `id_not_in_roster` | warning | IDs in the data that their study's roster does not list. |

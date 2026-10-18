@@ -1,6 +1,8 @@
 import pandas as pd
 
-from labcatalog.pipeline import run_check
+from labcatalog.ai.cleaning import clean_file_lines
+from labcatalog.config import id_pattern
+from labcatalog.pipeline import run_catalog, run_check
 
 
 def edit(path, old, new):
@@ -113,3 +115,39 @@ def test_free_text_answers_are_searched_for_identifiers(mock_project):
     change_csv(mock_project / "data" / "parent_w1.csv", change)
     [message] = found(run_check(mock_project))["possible_identifier"]
     assert message.startswith("dem_comment_w1") and "phone numbers" in message
+
+
+def pattern_issues(root) -> dict[str, str]:
+    # By dataset, since the pilot reads child_w1's file; a roster by its path.
+    return {
+        i.details.get("dataset", i.location.split(":")[0]): i.message
+        for i in run_check(root).issues
+        if i.code == "id_pattern"
+    }
+
+
+def test_a_study_can_write_its_ids_its_own_way(pilot_project):
+    config = pilot_project / "labcatalog.yaml"
+    edit(config, "  pilot:\n", "  pilot:\n    id_pattern: '^P-\\d{4}$'\n")
+    found = pattern_issues(pilot_project)
+    # Only the pilot's files and roster are held to its own pattern.
+    assert all("studies.pilot.id_pattern" in m for m in found.values())
+    assert set(found) == {"pilot_w1", "data/pilot_roster.csv"}
+    edit(config, "pattern: '^\\d{4}[PC]$'", "pattern: '^X$'")
+    edit(config, "id_pattern: '^P-\\d{4}$'", "id_pattern: '^\\d{4}[PC]$'")
+    found = pattern_issues(pilot_project)
+    assert "pilot_w1" not in found and "data/pilot_roster.csv" not in found
+    assert "ids.pattern" in found["child_w1"]
+    result = run_catalog(pilot_project)
+    assert id_pattern(result.project.config, "pilot") == (
+        "^\\d{4}[PC]$",
+        "studies.pilot.id_pattern",
+    )
+    lines = clean_file_lines(result.project, result.catalog, "pilot_w1")
+    assert "IDs match the regular expression ^\\d{4}[PC]$" in lines
+
+
+def test_a_studys_pattern_must_be_a_regular_expression(pilot_project):
+    edit(pilot_project / "labcatalog.yaml", "  pilot:\n", "  pilot:\n    id_pattern: '^(\\d'\n")
+    messages = found(run_check(pilot_project))["invalid_value"]
+    assert any(m.startswith("studies.pilot.id_pattern: invalid pattern") for m in messages)

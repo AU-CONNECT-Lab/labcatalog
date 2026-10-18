@@ -535,17 +535,18 @@ def check_data_settings(project: Project) -> list[Issue]:
     issues = []
     group = config.ids.group
     for name, pattern in [
-        ("pattern", config.ids.pattern),
-        ("group.from_id", group.from_id if group else None),
+        ("ids.pattern", config.ids.pattern),
+        ("ids.group.from_id", group.from_id if group else None),
+        *((f"studies.{s}.id_pattern", study.id_pattern) for s, study in config.studies.items()),
     ]:
         if pattern is None:
             continue
         try:
             groups = re.compile(pattern).groups
         except re.error as err:
-            issues.append(problem("invalid_value", f"ids.{name}: invalid pattern: {err}", CONFIG))
+            issues.append(problem("invalid_value", f"{name}: invalid pattern: {err}", CONFIG))
             continue
-        if name == "group.from_id" and groups != 1:
+        if name == "ids.group.from_id" and groups != 1:
             message = "ids.group.from_id: needs exactly one (...) around the group part of the ID"
             issues.append(problem("invalid_value", message, CONFIG))
     for n, dataset in enumerate(config.datasets, start=1):

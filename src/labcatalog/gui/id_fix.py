@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from nicegui import ui
 
 from labcatalog import defaults
+from labcatalog.config import id_pattern
 from labcatalog.data import id_map
 from labcatalog.data.id_map import Row, Rule
 from labcatalog.gui.common import note
@@ -33,7 +34,6 @@ def open_dialog(
     names = [n for n, d in result.datasets.items() if d.original_ids is not None]
     state = State(dataset if dataset in names else names[0])
     state.manual = id_map.mapping(root, state.dataset)
-    pattern = result.project.config.ids.pattern
     rosters = {
         study: set(r.frame[r.id_column].str.strip())
         for study, r in load_rosters(result.project).items()
@@ -42,10 +42,14 @@ def open_dialog(
     def listed() -> set[str] | None:
         return rosters.get(result.datasets[state.dataset].config.study)
 
+    def pattern() -> tuple[str | None, str]:
+        # Each study can write its IDs its own way.
+        return id_pattern(result.project.config, result.datasets[state.dataset].config.study)
+
     def rows() -> list[Row]:
         ids = result.datasets[state.dataset].original_ids
         ids = [v for v in ids.astype(str) if v != ""]
-        return id_map.propose(ids, state.rules, state.manual, pattern, listed())
+        return id_map.propose(ids, state.rules, state.manual, pattern()[0], listed())
 
     def wrong(row: Row) -> bool:
         return row.clash or row.matches is False or row.listed is False
@@ -127,8 +131,8 @@ def open_dialog(
         changed = [r for r in found if r.new != r.old]
         clashes = [r for r in found if r.clash]
         parts = [f"{len(changed)} of {len(found)} IDs change"]
-        if pattern:
-            parts.append(f"{sum(r.matches is False for r in found)} do not match ids.pattern")
+        if pattern()[0]:
+            parts.append(f"{sum(r.matches is False for r in found)} do not match {pattern()[1]}")
         if listed() is not None:
             parts.append(f"{sum(r.listed is False for r in found)} are not in the roster")
         if clashes:
@@ -151,7 +155,7 @@ def open_dialog(
                         "flex": 1,
                         "cellClassRules": {"lc-bad-text": "data.clash"},
                     },
-                    {"field": "matches", "headerName": "Matches ids.pattern", "width": 150},
+                    {"field": "matches", "headerName": "Matches the ID pattern", "width": 170},
                     {"field": "listed", "headerName": "In the roster", "width": 120},
                     {"field": "note", "headerName": "Note", "flex": 1},
                 ],
@@ -216,8 +220,8 @@ def open_dialog(
                 label="Dataset",
                 on_change=lambda e: choose_dataset(e.value),
             ).classes("w-64")
-            if pattern:
-                note(f"ids.pattern: {pattern}")
+            if pattern()[0]:
+                note(f"{pattern()[1]}: {pattern()[0]}")
             ui.space()
             ui.toggle(SHOWN, value=state.shown, on_change=lambda e: show(e.value)).props(
                 "dense no-caps"

@@ -7,7 +7,13 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog import defaults
-from labcatalog.config import PrepareStep, dataset_by_name, id_column_for, missing_codes_for
+from labcatalog.config import (
+    PrepareStep,
+    dataset_by_name,
+    id_column_for,
+    id_pattern,
+    missing_codes_for,
+)
 from labcatalog.data.resolve import Catalog, ResolvedVariable, as_text_dict
 from labcatalog.exceptions import DataSourceError
 from labcatalog.issues import Issue
@@ -173,8 +179,9 @@ def clean_file_lines(project: Project, catalog: Catalog, dataset: str) -> list[s
     codes = missing_codes_for(config, found)
     listed = ", ".join(f"{c.code} = {c.label}" for c in codes) or "none"
     lines.append(f"Missing codes: {listed}")
-    if config.ids.pattern:
-        lines.append(f"IDs match the regular expression {config.ids.pattern}")
+    pattern, _ = id_pattern(config, found.study)
+    if pattern:
+        lines.append(f"IDs match the regular expression {pattern}")
     return lines
 
 

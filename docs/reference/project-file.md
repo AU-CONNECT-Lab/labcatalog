@@ -64,6 +64,7 @@ A mapping from each study's ID to:
 | `waves` | mapping | Each wave's key to its `start` and `end` dates (both optional). |
 | `milestones` | list | Dates to show on the Overview timeline, each with a `name` and a `date`. |
 | `roster` | mapping | The study's people, see below. |
+| `id_pattern` | text | A regular expression the study's IDs must match, in place of `ids.pattern`, for a study that writes its IDs another way. |
 | `exclusions` | text | A path to a CSV file with an `id` column listing people or groups of the study who must not be in the data. `labcatalog check` reports rows of the study's datasets that belong to them. |
 | `custom` | mapping | Values of custom fields that apply to studies. |
 

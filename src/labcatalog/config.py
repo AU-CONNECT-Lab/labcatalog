@@ -77,6 +77,8 @@ class StudyConfig(StrictModel):
     # IDs belong to their study, so each study lists its own people.
     roster: RosterConfig | None = None
     exclusions: str | None = None
+    # The study's own ID pattern, in place of ids.pattern, when its IDs are written another way.
+    id_pattern: str | None = None
     custom: dict[str, Any] = {}
 
 
@@ -236,6 +238,14 @@ class ProjectConfig(StrictModel):
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:
     return next(dataset for dataset in config.datasets if dataset.name == name)
+
+
+def id_pattern(config: ProjectConfig, study: str) -> tuple[str | None, str]:
+    # The pattern a study's IDs must match, and the setting it comes from.
+    own = config.studies[study].id_pattern
+    if own:
+        return own, f"studies.{study}.id_pattern"
+    return config.ids.pattern, "ids.pattern"
 
 
 def map_name_of(config: ProjectConfig, name: str) -> str:

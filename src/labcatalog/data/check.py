@@ -5,7 +5,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.config import missing_labels_for
+from labcatalog.config import id_pattern, missing_labels_for
 from labcatalog.data import id_map
 from labcatalog.data.ids import load_exclusions
 from labcatalog.data.prepare import step_states
@@ -171,7 +171,7 @@ def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issu
         where = location(project, loaded)
         ids = loaded.frame[loaded.id_column]
         dataset_name = loaded.config.name
-        clean, found = id_problems(project, ids, where, dataset=dataset_name)
+        clean, found = id_problems(project, ids, where, loaded.config.study, dataset=dataset_name)
         issues += found
         # With a roster, people missing from it are reported by check_roster instead.
         if loaded.group is not None and project.config.studies[loaded.config.study].roster is None:
@@ -193,9 +193,9 @@ def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issu
 
 
 def id_problems(
-    project: Project, ids: pd.Series, where: str, **details: Any
+    project: Project, ids: pd.Series, where: str, study: str, **details: Any
 ) -> tuple[pd.Series, list[Issue]]:
-    pattern = project.config.ids.pattern
+    pattern, setting = id_pattern(project.config, study)
     issues = []
     blank = ids.str.strip() == ""
     spaced = ~blank & (ids != ids.str.strip())
@@ -212,7 +212,7 @@ def id_problems(
         mismatched = clean & ~ids.str.fullmatch(pattern)
         if mismatched.any():
             message = (
-                f"{mismatched.sum()} ID(s) do not match ids.pattern: {examples(ids[mismatched])}"
+                f"{mismatched.sum()} ID(s) do not match {setting}: {examples(ids[mismatched])}"
             )
             issues.append(
                 problem("id_pattern", message, where, rows=rows_of(mismatched), **details)
@@ -238,17 +238,17 @@ def check_rosters(project: Project, datasets: dict[str, LoadedDataset]) -> list[
         issue
         for study, roster in load_rosters(project).items()
         for issue in check_roster(
-            project, roster, {n: d for n, d in datasets.items() if d.config.study == study}
+            project, roster, {n: d for n, d in datasets.items() if d.config.study == study}, study
         )
     ]
 
 
 def check_roster(
-    project: Project, roster: Roster, datasets: dict[str, LoadedDataset]
+    project: Project, roster: Roster, datasets: dict[str, LoadedDataset], study: str
 ) -> list[Issue]:
     where = portable_path(roster.path, project.root).as_posix()
     ids = roster.frame[roster.id_column]
-    clean, issues = id_problems(project, ids, where)
+    clean, issues = id_problems(project, ids, where, study)
     if roster.group_column:
         no_group = clean & (roster.frame[roster.group_column].str.strip() == "")
         if no_group.any():
