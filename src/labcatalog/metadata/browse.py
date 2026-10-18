@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, dataset_by_name
@@ -19,6 +19,8 @@ class Facet:
     label: str
     # Value key to display label, in display order; only values that occur are listed.
     values: dict[str, str]
+    # A vocabulary's terms, to the group they are listed under.
+    parents: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -78,7 +80,7 @@ def build_index(project: Project) -> BrowseIndex:
                     **administration.custom,
                 }
                 values = {n: as_set(known[n] if n in known else custom.get(n)) for n in names}
-                rows.append(Administered(instrument.id, name, values))
+                rows.append(Administered(instrument.id, name, widened(config, values)))
     administered = {row.instrument_id for row in rows}
     # Data column names find their instrument, as its ID does.
     columns: dict[str, set[str]] = {}
@@ -97,7 +99,7 @@ def build_index(project: Project) -> BrowseIndex:
                 "status": [*status[instrument_id], *unused],
             }
             values = {n: as_set(custom.get(n)) for n in names}
-            rows.append(Administered(instrument_id, None, values))
+            rows.append(Administered(instrument_id, None, widened(config, values)))
     return BrowseIndex(
         instruments=list(project.instruments),
         facets=[facet(config, name, rows) for name in names],
@@ -208,6 +210,16 @@ def part_values(instrument: Instrument) -> dict[str, list[str]]:
     return {name: sorted(values) for name, values in found.items()}
 
 
+def widened(config: ProjectConfig, values: dict[str, set[str]]) -> dict[str, set[str]]:
+    # A vocabulary's term also counts as its group, so choosing the group finds it.
+    for custom in config.custom_fields:
+        parents = custom.parents()
+        if custom.name in values and parents:
+            found = values[custom.name]
+            values[custom.name] = found | {parents[v] for v in found if v in parents}
+    return values
+
+
 def as_set(value: object) -> set[str]:
     if value is None:
         return set()
@@ -237,10 +249,13 @@ def facet(config: ProjectConfig, name: str, rows: list[Administered]) -> Facet:
     else:
         labels = {v: v for v in value_order(config, name)}
     labels.update({v: v for v in sorted(present - set(labels))})
+    custom = next((f for f in config.custom_fields if f.name == name), None)
+    parents = custom.parents() if custom is not None else {}
     return Facet(
         name=name,
         label=facet_label(config, name),
         values={value: label for value, label in labels.items() if value in present},
+        parents={v: p for v, p in parents.items() if v in present},
     )
 
 

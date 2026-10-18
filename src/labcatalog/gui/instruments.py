@@ -584,11 +584,13 @@ def facet_panel(index: BrowseIndex, view: BrowseView, changed: Callable[[], None
         for value, label in facet.values.items():
             n = found[facet.name][value]
             if n or value in chosen:
-                ui.checkbox(
+                box = ui.checkbox(
                     f"{label} ({n})",
                     value=value in chosen,
                     on_change=lambda e, c=chosen, v=value: toggle(c, v, e.value),
                 ).props("dense")
+                if value in facet.parents:
+                    box.classes("q-ml-md")
 
 
 MISSING_CELL = r"""

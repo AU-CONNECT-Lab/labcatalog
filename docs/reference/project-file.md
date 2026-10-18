@@ -112,6 +112,7 @@ A list of fields your lab adds to instruments, scores, administrations or datase
 | `applies_to` | `instrument`, `score`, `item`, `administration`, `dataset` or `study`. |
 | `type` | `text`, `number`, `date`, `choice` or `tags`. |
 | `choices` | The allowed values of a `choice` or `tags` field. |
+| `vocabulary` | A vocabulary that comes with labcatalog, in place of `choices`: `rdoc`, the RDoC domains and their constructs. In the filters each term sits under its group, and a term also counts as its group. |
 
 ## browse
 

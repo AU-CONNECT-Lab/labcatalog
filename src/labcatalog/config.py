@@ -1,10 +1,15 @@
 from datetime import date
+from functools import cache
+from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import Field
+import yaml
+from pydantic import Field, model_validator
 
 from labcatalog import defaults
 from labcatalog.schema import StrictModel
+
+VOCABULARIES_DIR = Path(__file__).parent / "vocabularies"
 
 
 class ProjectInfo(StrictModel):
@@ -43,13 +48,13 @@ class IdConfig(StrictModel):
 
 
 class RosterConfig(StrictModel):
-    # One row per person; where each person's group is read from when the ID holds none.
+    # One row per person of the study; where each person's group is read from when the ID holds none.
     path: str
     id_column: str | None = None
     group_column: str | None = None
     # Each person's role, one of vocab.reporters, held against the reporter of their datasets.
     role_column: str | None = None
-    # The demographics instrument that describes the other columns, mapped in maps/roster.csv.
+    # The demographics instrument that describes the other columns, mapped in maps/roster_<study>.csv.
     instrument: str | None = None
 
 
@@ -69,6 +74,9 @@ class StudyConfig(StrictModel):
     reference: str | None = None
     waves: dict[str, WaveConfig] = {}
     milestones: list[Milestone] = []
+    # IDs belong to their study, so each study lists its own people.
+    roster: RosterConfig | None = None
+    exclusions: str | None = None
     custom: dict[str, Any] = {}
 
 
@@ -112,6 +120,38 @@ class CustomFieldDef(StrictModel):
     applies_to: Literal["instrument", "score", "item", "administration", "dataset", "study"]
     type: Literal["text", "number", "date", "choice", "tags"]
     choices: list[str] | None = None
+    # A vocabulary that comes with labcatalog; it gives the choices, each group then its terms.
+    vocabulary: str | None = None
+
+    @model_validator(mode="after")
+    def from_vocabulary(self) -> "CustomFieldDef":
+        if self.vocabulary is None:
+            return self
+        if self.choices is not None:
+            raise ValueError("give choices or a vocabulary, not both")
+        if self.vocabulary not in vocabulary_names():
+            raise ValueError(
+                f"no vocabulary {self.vocabulary}; there is {', '.join(vocabulary_names())}"
+            )
+        self.choices = [
+            term for group, terms in vocabulary(self.vocabulary).items() for term in [group, *terms]
+        ]
+        return self
+
+    def parents(self) -> dict[str, str]:
+        # Each term of a vocabulary's group, to the group.
+        if self.vocabulary is None:
+            return {}
+        return {t: group for group, terms in vocabulary(self.vocabulary).items() for t in terms}
+
+
+def vocabulary_names() -> list[str]:
+    return sorted(path.stem for path in VOCABULARIES_DIR.glob("*.yaml"))
+
+
+@cache
+def vocabulary(name: str) -> dict[str, list[str]]:
+    return yaml.safe_load((VOCABULARIES_DIR / f"{name}.yaml").read_text(encoding="utf-8"))
 
 
 class BrowseConfig(StrictModel):
@@ -178,13 +218,11 @@ class ProjectConfig(StrictModel):
     missing_codes: list[MissingCode] = []
     defaults: Defaults = Field(default_factory=Defaults)
     ids: IdConfig = Field(default_factory=IdConfig)
-    roster: RosterConfig | None = None
     studies: dict[str, StudyConfig] = {}
     datasets: list[DatasetConfig] = []
     custom_fields: list[CustomFieldDef] = []
     browse: BrowseConfig = Field(default_factory=BrowseConfig)
     references: ReferencesConfig = Field(default_factory=ReferencesConfig)
-    exclusions: str | None = None
     stats: StatsConfig = Field(default_factory=StatsConfig)
     llm: LlmConfig = Field(default_factory=LlmConfig)
     prepare: list[PrepareStep] = []
@@ -201,7 +239,7 @@ def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:
 
 
 def map_name_of(config: ProjectConfig, name: str) -> str:
-    # The roster is no listed dataset and reads maps/roster.csv.
+    # A roster is no listed dataset and reads maps/roster_<study>.csv.
     found = next((dataset for dataset in config.datasets if dataset.name == name), None)
     return name if found is None else found.map_name()
 
@@ -227,13 +265,21 @@ def id_column_for(config: ProjectConfig, dataset: DatasetConfig) -> str:
     return dataset.id_column or config.defaults.id_column
 
 
-def roster_dataset(config: ProjectConfig) -> DatasetConfig:
-    # The roster read like a dataset, belonging to no study or wave.
-    roster = config.roster
+def roster_name(study: str) -> str:
+    return f"{defaults.ROSTER}_{study}"
+
+
+def rosters(config: ProjectConfig) -> dict[str, RosterConfig]:
+    return {name: study.roster for name, study in config.studies.items() if study.roster}
+
+
+def roster_dataset(config: ProjectConfig, study: str) -> DatasetConfig:
+    # A study's roster read like a dataset, belonging to no wave.
+    roster = config.studies[study].roster
     return DatasetConfig(
-        name=defaults.ROSTER,
+        name=roster_name(study),
         modality="",
-        study="",
+        study=study,
         wave="",
         reporter="",
         source="csv",

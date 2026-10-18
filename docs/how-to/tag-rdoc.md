@@ -1,64 +1,26 @@
 # Tag Scores with RDoC
 
-The Research Domain Criteria (RDoC; Insel et al., 2010) sort what a measure taps into domains, such as Negative Valence Systems, and constructs within them, such as Potential Threat ("Anxiety"). labcatalog has no RDoC list of its own: two [custom fields](../concepts/instruments.md) on scores carry the tags, and the filters on the Instruments page and **Color by** on the Overview network work with them like any other field. The same steps work for any other framework your lab tags with.
+The Research Domain Criteria (RDoC; Insel et al., 2010) sort what a measure taps into domains, such as Negative Valence Systems, and constructs within them, such as Potential Threat ("Anxiety"). labcatalog comes with the RDoC domains and constructs as a vocabulary that a [custom field](../concepts/instruments.md) on scores can use. The filters on the Instruments page then list each construct under its domain, and **Color by** on the Overview network works with the field like any other.
 
-## Add the fields
+## Add the field
 
-Paste this into `labcatalog.yaml`. The choices are the domains and constructs of the RDoC matrix as NIMH listed them in October 2026; check the matrix for changes, and add subconstructs to the choices if you tag at that level.
+Add one field to `labcatalog.yaml`, and its name to the filters:
 
 ```yaml
 custom_fields:
-  - name: rdoc_domain
-    label: RDoC domain
-    applies_to: score
-    type: tags
-    choices:
-      - Negative Valence Systems
-      - Positive Valence Systems
-      - Cognitive Systems
-      - Social Processes
-      - Arousal and Regulatory Systems
-      - Sensorimotor Systems
-  - name: rdoc_construct
-    label: RDoC construct
-    applies_to: score
-    type: tags
-    choices:
-      - Acute Threat ("Fear")
-      - Potential Threat ("Anxiety")
-      - Sustained Threat
-      - Loss
-      - Frustrative Nonreward
-      - Reward Responsiveness
-      - Reward Learning
-      - Reward Valuation
-      - Attention
-      - Perception
-      - Declarative Memory
-      - Language
-      - Cognitive Control
-      - Working Memory
-      - Affiliation and Attachment
-      - Social Communication
-      - Perception and Understanding of Self
-      - Perception and Understanding of Others
-      - Arousal
-      - Circadian Rhythms
-      - Sleep-Wakefulness
-      - Motor Actions
-      - Agency and Ownership
-      - Habit - Sensorimotor
-      - Innate Motor Patterns
+  - {name: rdoc, label: RDoC, applies_to: score, type: tags, vocabulary: rdoc}
 
 browse:
-  facets: [study, wave, coverage, reporter, rdoc_domain, rdoc_construct, status]
+  facets: [study, wave, coverage, reporter, rdoc, status]
 ```
 
-If `labcatalog.yaml` already has `custom_fields` or `browse`, add the two fields to the list and the two names to `facets` instead of pasting a second copy.
+The vocabulary gives the field its choices: the six domains and the constructs of each, as NIMH listed them in October 2026. A field takes its choices from a vocabulary or from `choices`, not both. To tag at the level of subconstructs, or with another framework, declare a field with your own `choices` instead, as for any custom field.
+
+If `labcatalog.yaml` already has `custom_fields` or `browse`, add the field to the list and its name to `facets` instead of pasting a second copy.
 
 ## Tag a score
 
-Under each score in an instrument file, list its domains and constructs under `custom`. Tags are lists, so a score can sit in more than one:
+Under each score in an instrument file, list its constructs under `custom`. Tags are lists, so a score can sit in more than one. A construct also counts as its domain, so choosing Arousal and Regulatory Systems in the filters finds the score below; tag a domain itself only when none of its constructs fits:
 
 ```yaml
 scores:
@@ -67,8 +29,7 @@ scores:
     method: sum
     items: [q3, q5, q8]
     custom:
-      rdoc_domain: [Negative Valence Systems, Arousal and Regulatory Systems]
-      rdoc_construct: [Potential Threat ("Anxiety"), Sleep-Wakefulness]
+      rdoc: [Potential Threat ("Anxiety"), Sleep-Wakefulness]
 ```
 
 Tag scores rather than whole instruments: the subscales of one questionnaire often tap different constructs. On the Instruments page, a filter on a score's tag shows the instrument that holds the score. A tag that is not among the choices is reported as an error, which catches misspellings.

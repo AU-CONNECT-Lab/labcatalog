@@ -232,3 +232,59 @@ def test_item_and_study_fields_are_held_to_their_declaration(mock_project):
     messages = [i.message for i in run_validate(mock_project)]
     assert any(m.startswith("studies.mock_study.custom.funder:") for m in messages)
     assert "items[1] (ems_1).custom.domain: declared for instrument, not item" in messages
+
+
+def add_rdoc(root):
+    edit(
+        root / "labcatalog.yaml",
+        "custom_fields:\n",
+        "custom_fields:\n"
+        "  - {name: rdoc, label: RDoC, applies_to: score, type: tags, vocabulary: rdoc}\n",
+    )
+    edit(
+        root / "labcatalog.yaml",
+        "facets: [study, wave, coverage, reporter, target, modality, domain, topics, status]",
+        "facets: [study, rdoc, status]",
+    )
+    edit(
+        root / "instruments" / "example_mood.yaml",
+        "custom: {topics: [negative affect]}}\n  - {id: ems_sadness",
+        "custom: {topics: [negative affect], rdoc: [Loss]}}\n  - {id: ems_sadness",
+    )
+    edit(
+        root / "instruments" / "example_child_sleep.yaml",
+        "custom: {topics: [sleep]}}",
+        "custom: {topics: [sleep], rdoc: [Sleep-Wakefulness, Social Processes]}}",
+    )
+
+
+def test_a_vocabulary_gives_the_choices_and_a_group_finds_its_terms(mock_project):
+    add_rdoc(mock_project)
+    index = index_for(mock_project)
+    rdoc = next(f for f in index.facets if f.name == "rdoc")
+    assert list(rdoc.values) == [
+        "Negative Valence Systems",
+        "Loss",
+        "Social Processes",
+        "Arousal and Regulatory Systems",
+        "Sleep-Wakefulness",
+    ]
+    assert rdoc.parents == {
+        "Loss": "Negative Valence Systems",
+        "Sleep-Wakefulness": "Arousal and Regulatory Systems",
+    }
+    assert list(matches(index, {"rdoc": {"Negative Valence Systems"}})) == ["example_mood"]
+    assert list(matches(index, {"rdoc": {"Social Processes"}})) == ["example_child_sleep"]
+    found = counts(index, {})["rdoc"]
+    assert found["Arousal and Regulatory Systems"] == found["Sleep-Wakefulness"] == 1
+
+
+def test_a_vocabulary_holds_its_tags_and_stands_alone(mock_project):
+    add_rdoc(mock_project)
+    edit(mock_project / "instruments" / "example_mood.yaml", "rdoc: [Loss]", "rdoc: [Grief]")
+    messages = [i.message for i in run_validate(mock_project)]
+    assert any("custom.rdoc" in m and "Grief" in m for m in messages)
+    edit(mock_project / "labcatalog.yaml", "vocabulary: rdoc}", "vocabulary: rdoc, choices: [a]}")
+    assert any("not both" in m for m in (i.message for i in run_validate(mock_project)))
+    edit(mock_project / "labcatalog.yaml", "vocabulary: rdoc, choices: [a]}", "vocabulary: dsm}")
+    assert any("no vocabulary dsm" in m for m in (i.message for i in run_validate(mock_project)))
