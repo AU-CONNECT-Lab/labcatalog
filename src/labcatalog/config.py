@@ -148,10 +148,6 @@ class StatsConfig(StrictModel):
     t_test: Literal["welch", "student"] = "welch"
     # Correlations between scores and variables; item-rest and regression stay Pearson.
     correlation: Literal["pearson", "spearman"] = "pearson"
-    # Missing values: each analysis on everyone with values, or multiple imputation in R (mice).
-    missing: Literal["available", "impute"] = "available"
-    imputations: int = Field(defaults.IMPUTATIONS, ge=2, le=500)
-    seed: int = defaults.SEED
     invariance_free: list[FreedParameter] = []
 
     def coefficient(self) -> str:
