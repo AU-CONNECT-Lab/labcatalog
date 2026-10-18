@@ -101,6 +101,31 @@ def test_timeline_draws_waves_up_to_today_and_the_milestones(result):
     ]
 
 
+def test_next_up_lists_errors_gaps_the_wave_collecting_and_warnings(result):
+    rows = views.next_up(result, date(2026, 10, 15))
+    assert [r.kind for r in rows] == [views.ERRORS, views.DETAILS, views.COLLECTING, views.WARNINGS]
+    errors = sum(i.level == "error" for i in result.report.issues)
+    assert rows[0].lead == f"{errors} errors"
+    wave = rows[2]
+    assert (wave.lead, wave.rest) == ("Wave 3", "is collecting, since 2026-03-01")
+    assert wave.note == "parent 160 of Wave 2's 170, child 174 of 182"
+    assert wave.progress == pytest.approx((160 + 174) / (170 + 182))
+
+
+def test_coming_up_counts_the_days_to_each_future_milestone(result):
+    found = views.coming_up(result, date(2026, 12, 15))
+    assert [(m.name, m.days) for m in found] == [("Interim report", 0), ("Wave 3 data freeze", 47)]
+    assert views.coming_up(result, date(2027, 2, 1)) == []
+
+
+def test_banner_names_the_study_and_counts_people_once(result):
+    found = views.banner(result)
+    assert found.title == result.project.config.project.name
+    assert found.kicker == "Mock Family Study"
+    people = {str(p) for d in result.datasets.values() for p in d.respondents().dropna()}
+    assert dict((noun, n) for n, noun in found.facts)["people"] == len(people)
+
+
 def test_overview_charts(result):
     everything = list(views.correlated_instruments(result))
     assert views.collection_pace(result) is not None

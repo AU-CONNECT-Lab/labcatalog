@@ -1,6 +1,7 @@
 import html
 from collections import Counter
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import date
 
 import numpy as np
@@ -15,6 +16,8 @@ from labcatalog.charts.style import group_color, natural_key, pair_color, wave_c
 from labcatalog.config import dataset_by_name, missing_labels_for
 from labcatalog.data.resolve import ResolvedScore, as_text_dict
 from labcatalog.metadata.browse import as_set, facet_label, facet_names, value_order
+from labcatalog.metadata.completeness import gaps
+from labcatalog.metadata.studies import wave_status
 from labcatalog.pipeline import CatalogResult
 from labcatalog.schema import Instrument, Score
 from labcatalog.stats import analysis, analysis_script
@@ -22,6 +25,11 @@ from labcatalog.stats import multilevel as ml
 from labcatalog.stats.summary import wave_order
 
 RADAR_AXES = 3
+# Kinds of the overview's to-do rows, in the order they show.
+ERRORS, DETAILS, COLLECTING, WARNINGS = "errors", "details", "collecting", "warnings"
+# How many names or codes a to-do row spells out before "and N more".
+TODO_NAMES = 4
+COMING_UP = 3
 # The catalog map's group for instruments that no dataset holds yet.
 MAP_UNPLACED = "Not in a dataset"
 
@@ -529,6 +537,156 @@ def default_score(result: CatalogResult, instrument_id: str) -> str:
 
 
 # ---- overview page ----
+
+
+# ---- overview ----
+
+
+@dataclass
+class Banner:
+    kicker: str
+    title: str
+    description: str
+    facts: list[tuple[int, str]]
+
+
+@dataclass
+class ToDo:
+    kind: str
+    lead: str
+    rest: str
+    note: str
+    progress: float | None = None
+
+
+@dataclass
+class Milestone:
+    name: str
+    date: date
+    days: int
+    study: str
+
+
+def banner(result: CatalogResult) -> Banner:
+    config = result.project.config
+    studies = config.studies
+    if len(studies) == 1:
+        study_id, study = next(iter(studies.items()))
+        kicker, description = study.label or study_id, study.description or ""
+    else:
+        kicker = f"{len(studies)} studies" if studies else ""
+        description = ", ".join(s.label or i for i, s in studies.items())
+    people = {
+        str(person)
+        for loaded in result.datasets.values()
+        for person in loaded.respondents().dropna()
+    }
+    waves = {(d.study, d.wave) for d in config.datasets}
+    facts = [
+        (len(result.project.instruments), "instruments"),
+        (len(config.datasets), "datasets"),
+        (len(waves), "waves"),
+        (len(people), "people"),
+    ]
+    return Banner(kicker, config.project.name, description, facts)
+
+
+def next_up(result: CatalogResult, today: date | None = None) -> list[ToDo]:
+    issues = result.report.issues
+    errors = [i for i in issues if i.level == "error"]
+    warnings = [i for i in issues if i.level == "warning"]
+    unfinished = [i for i in result.project.instruments.values() if gaps(i)]
+    found = []
+    if errors:
+        found.append(
+            ToDo(ERRORS, counted(len(errors), "error"), "to fix before analysis", codes(errors))
+        )
+    if unfinished:
+        found.append(
+            ToDo(
+                DETAILS,
+                counted(len(unfinished), "instrument"),
+                "are missing details" if len(unfinished) > 1 else "is missing details",
+                listed([i.abbreviation or i.id for i in unfinished]),
+            )
+        )
+    found += collecting(result, today or date.today())
+    if warnings:
+        found.append(
+            ToDo(WARNINGS, counted(len(warnings), "warning"), "worth a look", codes(warnings))
+        )
+    return found
+
+
+def collecting(result: CatalogResult, today: date) -> list[ToDo]:
+    # Each wave still collecting, with its counts against the wave before it.
+    counts: dict[tuple[str, str], dict[str, int]] = {}
+    for r in result.summary.retention:
+        counts.setdefault((r.study, r.wave), {})[r.reporter] = r.n
+    found = []
+    for study, study_config in result.project.config.studies.items():
+        waves = [
+            w for w in sorted(study_config.waves, key=wave_order) if study_config.waves[w].start
+        ]
+        for k, wave in enumerate(waves):
+            dates = study_config.waves[wave]
+            if wave_status(dates, today) != "Collecting":
+                continue
+            now = counts.get((study, wave), {})
+            earlier = waves[k - 1] if k else None
+            before = counts.get((study, earlier), {}) if earlier else {}
+            parts = []
+            for reporter, n in now.items():
+                if not before.get(reporter):
+                    parts.append(f"{reporter} {n}")
+                elif not parts:
+                    parts.append(
+                        f"{reporter} {n} of {wave_name(result, study, earlier)}'s {before[reporter]}"
+                    )
+                else:
+                    parts.append(f"{reporter} {n} of {before[reporter]}")
+            compared = [r for r in now if before.get(r)]
+            progress = (
+                min(1.0, sum(now[r] for r in compared) / sum(before[r] for r in compared))
+                if compared
+                else None
+            )
+            found.append(
+                ToDo(
+                    COLLECTING,
+                    wave_name(result, study, wave),
+                    f"is collecting, since {dates.start}",
+                    ", ".join(parts),
+                    progress,
+                )
+            )
+    return found
+
+
+def coming_up(result: CatalogResult, today: date | None = None) -> list[Milestone]:
+    today = today or date.today()
+    several = several_studies(result)
+    found = [
+        Milestone(m.name, m.date, (m.date - today).days, (s.label or study) if several else "")
+        for study, s in result.project.config.studies.items()
+        for m in s.milestones
+        if m.date >= today
+    ]
+    return sorted(found, key=lambda m: m.date)[:COMING_UP]
+
+
+def counted(n: int, noun: str) -> str:
+    return f"{n} {noun}" + ("" if n == 1 else "s")
+
+
+def listed(names: list[str]) -> str:
+    shown = ", ".join(names[:TODO_NAMES])
+    more = len(names) - TODO_NAMES
+    return f"{shown} and {more} more" if more > 0 else shown
+
+
+def codes(issues: list) -> str:
+    return listed([code for code, _ in Counter(i.code for i in issues).most_common()])
 
 
 def timeline(result: CatalogResult, today: date | None = None) -> go.Figure | None:

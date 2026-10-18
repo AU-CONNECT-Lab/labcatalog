@@ -236,6 +236,52 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 }
 .lc-tile-detail { margin-top: 4px; font-size: 0.82rem; color: var(--lc-muted); }
 
+/* ---- Overview: a night-sky banner with the catalog map, the tiles lapping over its lower edge ---- */
+.lc-banner {
+  position: relative;
+  min-height: 290px;
+  border-radius: 16px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse 55% 85% at 74% 42%, rgba(52, 70, 120, 0.2), transparent 70%),
+    radial-gradient(ellipse 40% 60% at 92% 95%, rgba(70, 50, 110, 0.1), transparent 70%),
+    linear-gradient(115deg, #111114 0%, #131317 55%, #16171d 100%);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06); }
+.lc-banner-map {
+  position: absolute;
+  inset: 0;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 40%, #000 60%);
+  mask-image: linear-gradient(to right, transparent 0%, transparent 40%, #000 60%);
+}
+.lc-banner-words {
+  position: relative;
+  width: 48%;
+  padding: 34px 0 84px 32px;
+  color: #b4b4b9;
+  pointer-events: none;
+}
+.lc-banner-kicker { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #8b8b90; }
+.lc-banner-title { font-size: 2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; color: #f2f2f4; }
+.lc-banner-text { font-size: 0.92rem; line-height: 1.5; }
+.lc-banner-facts { font-size: 0.85rem; margin-top: 4px; }
+.lc-banner-number { font-weight: 600; color: #f2f2f4; }
+.lc-banner-legend { position: absolute; top: 14px; right: 18px; font-size: 0.72rem; color: #8b8b90; }
+.lc-banner-swatch { width: 7px; height: 7px; border-radius: 50%; }
+.lc-lifted { position: relative; margin-top: -72px; padding: 0 20px; }
+/* Next up and Coming up stand side by side at the same height. */
+.lc-pair > * > .lc-panel { flex: 1 1 auto; }
+.lc-todo { padding: 11px 0; border-bottom: 1px solid var(--lc-rule); }
+.lc-todo:last-child { border-bottom: 0; }
+.lc-todo-go { cursor: pointer; }
+.lc-todo-go:hover .lc-tile-go { color: var(--lc-accent); }
+.lc-todo-bar { width: 220px; height: 6px; margin-top: 6px; border-radius: 999px; background: var(--lc-rule); overflow: hidden; }
+.lc-todo-bar > div { height: 100%; border-radius: 999px; background: var(--lc-accent); }
+.lc-countdown { padding: 10px 0; border-bottom: 1px solid var(--lc-rule); }
+.lc-countdown:last-child { border-bottom: 0; }
+.lc-countdown-number { font-size: 2.2rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; color: var(--lc-ink); }
+
 .lc-panel { overflow: hidden; }
 /* A panel inside a panel is outlined, so cards do not stack shadows. */
 .lc-panel .lc-panel { border: 1px solid var(--lc-rule); border-radius: 12px; box-shadow: none; }

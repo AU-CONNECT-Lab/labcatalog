@@ -18,3 +18,10 @@ class NetworkGraph(
     def show(self, spec: dict) -> None:
         self._props["spec"] = spec
         self.update()
+
+
+class StarMap(ui.element, component="star_map.js", dependencies=["vendor/force-graph.min.js"]):
+    def __init__(self, spec: dict, area: tuple[float, float, float, float]) -> None:
+        super().__init__()
+        self._props["spec"] = spec
+        self._props["area"] = list(area)

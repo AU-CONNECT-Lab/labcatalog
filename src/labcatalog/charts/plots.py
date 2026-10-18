@@ -31,8 +31,9 @@ DOT_BOTTOM = 16
 TITLE_ROOM = 28
 # Room on the calendar before the first date and after the last.
 TIMELINE_PAD = timedelta(days=30)
-# Bar thickness as a share of a lane.
-TIMELINE_BAR = 0.3
+# Bar thickness as a share of a lane, and a lane's height in pixels.
+TIMELINE_BAR = 0.36
+TIMELINE_LANE = 36
 # Room beside the first and last wave, in waves.
 TRAJECTORY_PAD = 0.12
 
@@ -123,7 +124,7 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
     )
     return base_layout(
         fig,
-        70 + 46 * len(lanes),
+        60 + TIMELINE_LANE * len(lanes),
         barmode="overlay",
         margin=dict(l=10, r=20, t=30, b=30),
     )

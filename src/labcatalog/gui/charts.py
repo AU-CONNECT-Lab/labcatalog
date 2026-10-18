@@ -291,7 +291,5 @@ def show_tree(instrument: Instrument) -> ui.echart:
 def timeline(result: CatalogResult) -> None:
     fig = views.timeline(result)
     if fig is not None:
-        with panel(
-            "Timeline", "Each wave's dates and counts, and the milestones in labcatalog.yaml"
-        ):
+        with panel("Timeline"):
             show(fig)
