@@ -742,29 +742,38 @@ def timeline(result: CatalogResult, today: date | None = None) -> go.Figure | No
     return plots.timeline(lanes, bars, marks, today) if bars or marks else None
 
 
-def collection_pace(result: CatalogResult) -> go.Figure | None:
+def collection_pace(result: CatalogResult, study: str) -> go.Figure | None:
+    # Each person counts once in a wave, on the first date any of their files gives.
     config = result.project.config
-    by_reporter: dict[str, dict[str, list[int]]] = {}
-    colors = {}
-    for summary in result.summary.datasets:
-        if not summary.collected_by_day:
+    first: dict[tuple[str, str], pd.Series] = {}
+    for d in config.datasets:
+        loaded = result.datasets.get(d.name)
+        if d.study != study or not d.date_column or loaded is None:
             continue
-        d = dataset_by_name(config, summary.dataset)
-        days = {pd.Timestamp(day): n for day, n in summary.collected_by_day.items()}
-        start = config.studies[d.study].waves[d.wave].start
-        start = pd.Timestamp(start) if start else min(days)
-        name = wave_name(result, d.study, d.wave)
-        colors[name] = wave_colors(result)[d.wave]
-        offsets = by_reporter.setdefault(d.reporter, {}).setdefault(name, [])
-        for day, n in days.items():
-            offsets += [(day - start).days] * n
-    if not by_reporter:
+        if d.date_column not in loaded.frame:
+            continue
+        dates = pd.to_datetime(
+            loaded.frame[d.date_column], format=config.defaults.date_format, errors="coerce"
+        )
+        found = dates.groupby(loaded.respondents()).min().dropna()
+        key = (d.reporter, d.wave)
+        first[key] = (
+            pd.concat([first[key], found]).groupby(level=0).min() if key in first else found
+        )
+    if not first:
         return None
+    waves = config.studies[study].waves
+    by_reporter: dict[str, dict[str, list[int]]] = {}
+    for (reporter, wave), dates in first.items():
+        start = pd.Timestamp(waves[wave].start) if waves[wave].start else dates.min()
+        name = wave_name(result, study, wave)
+        by_reporter.setdefault(reporter, {})[name] = [(day - start).days for day in dates]
+    order = sorted({wave for _, wave in first}, key=wave_order)
+    colors = {wave_name(result, study, w): wave_colors(result)[w] for w in order}
     facets = [
-        {"title": r.capitalize(), "unit": "rows", "days": days} for r, days in by_reporter.items()
+        {"title": r.capitalize(), "unit": "people", "days": days} for r, days in by_reporter.items()
     ]
-    waves = [w for w in all_wave_names(result) if w in colors]
-    return plots.collection_pace(facets, waves, colors)
+    return plots.collection_pace(facets, list(colors), colors)
 
 
 def instrument_names(result: CatalogResult) -> dict[str, str]:

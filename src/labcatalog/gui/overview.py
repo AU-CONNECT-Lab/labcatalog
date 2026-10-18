@@ -85,7 +85,7 @@ def render(
                 with panel("Coming up"):
                     for milestone in milestones:
                         countdown(milestone)
-    charts.overview_section(result)
+    charts.timeline(result)
 
 
 def banner(result: CatalogResult, on_map: Callable[[], None]) -> None:

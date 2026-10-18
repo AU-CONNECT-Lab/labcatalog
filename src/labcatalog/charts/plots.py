@@ -34,6 +34,8 @@ TIMELINE_PAD = timedelta(days=30)
 # Bar thickness as a share of a lane, and a lane's height in pixels.
 TIMELINE_BAR = 0.36
 TIMELINE_LANE = 36
+# The least distance between the counts at the ends of the pace lines, as a share of the top.
+PACE_LABEL_GAP = 0.07
 # Room beside the first and last wave, in waves.
 TRAJECTORY_PAD = 0.12
 
@@ -584,6 +586,7 @@ def collection_pace(
         horizontal_spacing=0.12,
     )
     top = 0
+    ends: list[tuple[int, float, int, str]] = []
     for c, facet in enumerate(facets, start=1):
         for wave in wave_labels:
             days = facet["days"].get(wave)
@@ -608,19 +611,34 @@ def collection_pace(
                 row=1,
                 col=c,
             )
+            ends.append((c, weeks[-1], int(counts[-1]), colors[wave]))
             fig.add_trace(
                 go.Scatter(
                     x=[weeks[-1]],
                     y=[counts[-1]],
-                    mode="markers+text",
-                    text=[str(counts[-1])],
-                    textposition="middle right",
-                    textfont=dict(color=colors[wave], size=11),
+                    mode="markers",
                     cliponaxis=False,
                     marker=dict(size=8, color=colors[wave], line=dict(color="white", width=1)),
                     showlegend=False,
                     hoverinfo="skip",
                 ),
+                row=1,
+                col=c,
+            )
+    # Each line ends in its count; close counts are nudged apart so the numbers do not overlap.
+    gap = PACE_LABEL_GAP * (top or 1)
+    for c in {end[0] for end in ends}:
+        shown = -gap
+        for _, x, n, color in sorted((e for e in ends if e[0] == c), key=lambda e: e[2]):
+            shown = max(n, shown + gap)
+            fig.add_annotation(
+                x=x,
+                y=shown,
+                text=str(n),
+                showarrow=False,
+                xanchor="left",
+                xshift=7,
+                font=dict(color=color, size=11),
                 row=1,
                 col=c,
             )

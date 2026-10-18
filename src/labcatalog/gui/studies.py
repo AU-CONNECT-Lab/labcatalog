@@ -7,7 +7,7 @@ from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import new_dataset
+from labcatalog.gui import charts, new_dataset
 from labcatalog.gui.common import cited, computed, note, panel, table
 from labcatalog.gui.datasets import dataset_table
 from labcatalog.issues import Issue
@@ -308,6 +308,7 @@ def detail(
             )
         waves = waves_panel(project, study, touched)
         milestones = milestones_panel(found, touched)
+        charts.collection_pace(result, study)
     with parts["text"]:
         boxes, template = text_panels(result, study, touched)
     with parts["datasets"]:

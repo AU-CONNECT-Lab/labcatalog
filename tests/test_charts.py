@@ -126,8 +126,15 @@ def test_banner_names_the_study_and_counts_people_once(result):
     assert dict((noun, n) for n, noun in found.facts)["people"] == len(people)
 
 
-def test_overview_charts(result):
-    assert views.collection_pace(result) is not None
+def test_collection_pace_counts_each_person_once_per_wave(result):
+    fig = views.collection_pace(result, "mock_study")
+    ends = {(t.xaxis, t.name): int(t.y[-1]) for t in fig.data if t.mode == "lines"}
+    facets = {"x": "parent", "x2": "child"}
+    retention = {(r.reporter, f"Wave {r.wave}"): r.n for r in result.summary.retention}
+    assert {(facets[axis], wave): n for (axis, wave), n in ends.items()} == retention
+    # Close counts at the line ends are nudged apart.
+    shown = sorted(a.y for a in fig.layout.annotations if a.text.isdigit() and a.xref == "x")
+    assert all(b - a >= 0.07 * max(ends.values()) - 1e-9 for a, b in zip(shown, shown[1:]))
 
 
 def test_item_heatmap_and_table_keep_the_item_order_below_the_diagonal(result):

@@ -181,12 +181,11 @@ def instrument_dataset_section(result: CatalogResult, instrument_id: str, datase
     standardized(1)
 
 
-def overview_section(result: CatalogResult) -> None:
-    timeline(result)
-    pace = views.collection_pace(result)
-    if pace is not None:
-        with panel("Collection pace", "Rows with a date, by week since each wave started"):
-            show(pace)
+def collection_pace(result: CatalogResult, study: str) -> None:
+    fig = views.collection_pace(result, study)
+    if fig is not None:
+        with panel("Collection pace", "Each person once, from the first date in their files"):
+            show(fig)
 
 
 def wave_picker(choices: dict[str, str], value: str, changed) -> None:

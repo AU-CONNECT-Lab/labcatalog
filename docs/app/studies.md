@@ -18,6 +18,8 @@ A study opens with its label and ID on top, the buttons **Rename**, **Delete**, 
 
 **Milestones**: dates shown on the [Overview](overview.md) timeline, such as an interim report or a data freeze, each with a **Name** and a **Date**. **Add milestone** and **Delete ticked** work as for waves.
 
+**Collection pace**: for each reporter, how many people had come in by each week since each wave started, one line per wave, so a wave still collecting can be set against the ones before it. Each person counts once in a wave, from the earliest date in any of their files. It needs a `date_column` on the datasets.
+
 ## Text
 
 **Methods**: one box per modality the study's datasets use, for how its data were collected and processed, and one for each dataset given its own text in the study file. The text is shown on the [Methods](methods.md) page under Procedure and with each dataset. Leave a blank line between paragraphs. It is written to `methods` in the study file.

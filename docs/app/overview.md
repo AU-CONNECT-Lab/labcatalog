@@ -22,8 +22,4 @@ The next milestones of each study, with the days left until each. It shows when 
 
 ## Timeline
 
-Each wave as a bar from its start to its end date, with the number of people per reporter. A wave without an end date is still collecting: its bar runs to today, the count is compared with the previous wave's, and a faint bar shows when it would end if it took as long as the previous wave. The `milestones` of each study are shown as diamonds, and a dashed line marks today.
-
-## Collection pace
-
-For each reporter, how many rows had come in by each week since each wave started, one line per wave. It needs a `date_column` on the datasets. Use it to see whether a wave is collecting faster or slower than the last.
+Each wave as a bar from its start to its end date, with the number of people per reporter. A wave without an end date is still collecting: its bar runs to today, the count is compared with the previous wave's, and a faint bar shows when it would end if it took as long as the previous wave. The `milestones` of each study are shown as diamonds, and a dashed line marks today. How fast each wave collected is on the [Studies](studies.md) page.
