@@ -219,14 +219,16 @@ def facts(
     ]
     if summary.n_groups is not None:
         rows.append((f"{result.summary.group_name.capitalize()} groups", summary.n_groups))
-    retention = next(
-        r
-        for r in result.summary.retention
-        if (r.study, r.reporter, r.wave) == (dataset.study, dataset.reporter, dataset.wave)
+    # Against the last wave with this modality, so a scan every other wave counts its own people.
+    counted = next(
+        m
+        for m in result.summary.modalities
+        if (m.study, m.reporter, m.wave, m.modality)
+        == (dataset.study, dataset.reporter, dataset.wave, dataset.modality)
     )
-    if retention.n_from_previous is not None:
-        rows.append(("Also in the previous wave", retention.n_from_previous))
-        rows.append(("New this wave", retention.n_new))
+    if counted.previous_wave is not None:
+        rows.append((f"Also at Wave {counted.previous_wave}", counted.n_from_previous))
+        rows.append((f"New since Wave {counted.previous_wave}", counted.n_new))
     if summary.first_date:
         rows.append(("Collected", f"{summary.first_date} to {summary.last_date}"))
     if summary.snapshot_date:

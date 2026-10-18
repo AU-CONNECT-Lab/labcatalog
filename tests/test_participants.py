@@ -24,8 +24,17 @@ def test_default_paragraph_gives_waves_counts_and_retention(mock_project):
     assert text.count("mean age was [ ] years (SD = [ ])") == 2
     assert text.endswith(
         "Data from salivary cortisol were available for 131 of 217 child respondents at Wave 1 "
-        "(60%) and 101 of 174 at Wave 3 (58%)."
+        "(60%) and 101 of 174 at Wave 3 (58%). Of these, 69 of the 131 from Wave 1 had them "
+        "again at Wave 3 (53%)."
     )
+    ids = {
+        d.config.wave: set(d.frame[d.id_column])
+        for d in result.datasets.values()
+        if d.config.modality == "saliva"
+    }
+    assert len(ids["1"] & ids["3"]) == 69
+    # EEG skipped Wave 2, so its returning count is against Wave 1.
+    assert "90 of the 141 from Wave 1 had them again at Wave 3" in text
 
 
 def test_modality_table_counts_each_modality_against_its_wave(mock_project):

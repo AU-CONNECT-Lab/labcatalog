@@ -10,7 +10,7 @@ At the top of the page, pick the study and, for a study with several waves, the 
 
 The Participants part has a paragraph and two tables:
 
-- The paragraph says how many people took part in each wave, how many returned, and, when the study has several modalities, how many have data from each.
+- The paragraph says how many people took part in each wave, how many returned, and, when the study has several modalities, how many have data from each and how many of those had them again at the next wave that collected that modality.
 - **Participants by Wave** counts people per reporter and wave, and how many returned from the previous wave. With a group, it also counts groups and the groups with data from every reporter.
 - **Participants by Modality** counts people per modality and wave.
 

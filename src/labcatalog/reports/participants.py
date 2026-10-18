@@ -93,6 +93,16 @@ def modalities(summary: Summary, study: str, vocab: Vocab, named: bool) -> str:
             )
         label = vocab.modality_label(modality)
         sentences.append(f"Data from {label} were available for {series(parts)}.")
+        before = {m.wave: m.n for m in counted}
+        again = [
+            f"{number(m.n_from_previous)} of the {number(before[m.previous_wave])} from Wave "
+            f"{m.previous_wave} had them again at Wave {m.wave}"
+            f"{share(m.n_from_previous, before[m.previous_wave])}"
+            for m in counted
+            if m.previous_wave is not None
+        ]
+        if again:
+            sentences.append(f"Of these, {series(again)}.")
     return " ".join(sentences)
 
 

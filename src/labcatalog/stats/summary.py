@@ -91,7 +91,10 @@ class ModalityCount(BaseModel):
     wave: str
     modality: str
     n: int
+    # The last wave that collected this modality, which need not be the wave before.
+    previous_wave: str | None = None
     n_from_previous: int | None = None
+    n_new: int | None = None
 
 
 class WaveGroups(BaseModel):
@@ -455,6 +458,7 @@ def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
     for (study, reporter, modality), waves in found.items():
         # Returning counts against the last wave that collected this modality.
         previous: set | None = None
+        previous_wave = None
         for wave in sorted(waves, key=wave_order):
             ids = waves[wave]
             rows.append(
@@ -464,10 +468,12 @@ def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
                     wave=wave,
                     modality=modality,
                     n=len(ids),
+                    previous_wave=previous_wave,
                     n_from_previous=None if previous is None else len(ids & previous),
+                    n_new=None if previous is None else len(ids - previous),
                 )
             )
-            previous = ids
+            previous, previous_wave = ids, wave
     return rows
 
 
