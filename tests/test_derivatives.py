@@ -152,7 +152,7 @@ def test_command_prints_what_to_add(demo_project, monkeypatch, capsys):
         main()
     out = capsys.readouterr().out
     assert caught.value.code == 0
-    assert "Not numbers, so left out: device" in out and "add under datasets:" in out
+    assert "Neither numbers nor given Levels, so left out: device" in out and "add under datasets:" in out
 
 
 def test_command_line_repeats_the_run_for_a_prepare_step(demo_project):
