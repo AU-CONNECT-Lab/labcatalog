@@ -11,6 +11,8 @@ MPLUS = "mplus"
 BOOTSTRAP_WORKERS = "bootstrap_workers"
 DATALAD = "datalad"
 LAST_PROJECT = "last_project"
+# The study each project was last narrowed to, by its folder.
+STUDY_SCOPE = "study_scope"
 LLM_URL = "llm_url"
 TABLE_FORMAT = "table_format"
 RICH = "rich"

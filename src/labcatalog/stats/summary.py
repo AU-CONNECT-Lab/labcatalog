@@ -137,7 +137,7 @@ class RetainedScore(BaseModel):
 
 class Summary(BaseModel):
     variables: list[VariableSummary]
-    # The roster's own described columns, under the dataset name roster.
+    # Each roster's own described columns, under the roster's name.
     roster: list[VariableSummary] = []
     scores: list[ScoreSummary]
     datasets: list[DatasetSummary]

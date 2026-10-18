@@ -24,6 +24,7 @@ from labcatalog.stats.summary import DatasetSummary
 
 def render(
     result: CatalogResult,
+    study: str | None,
     selected: str | None,
     on_select: Callable[[str | None], None],
     on_instrument: Callable[[str], None],
@@ -32,7 +33,8 @@ def render(
     on_edit: Callable[[str, int | None], None],
     on_added: Callable[[str], Awaitable[None]],
 ) -> None:
-    summaries = {d.dataset: d for d in result.summary.datasets}
+    shown = {d.name for d in result.project.config.datasets if study in (None, d.study)}
+    summaries = {d.dataset: d for d in result.summary.datasets if d.dataset in shown}
     if selected not in summaries:
         with page_head("Datasets", list_summary(result, summaries)):
             if result.project.config.studies:
@@ -45,7 +47,11 @@ def render(
                 database_button(result)
                 datalad.freeze_button(result, on_frozen)
         if not summaries:
-            empty("No datasets yet; press Add a dataset, after adding a study on the Studies page.")
+            empty(
+                "No datasets in this study yet; press Add a dataset."
+                if study
+                else "No datasets yet; press Add a dataset, after adding a study on the Studies page."
+            )
             return
         studies(result, summaries, on_select)
         datalad.freezes_table(result.project.root, on_open_freeze)

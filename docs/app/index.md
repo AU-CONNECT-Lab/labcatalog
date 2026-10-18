@@ -6,6 +6,10 @@ Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to o
 
 The window opens the project that was open when it last closed, or the example project the first time. **Open** in the header has two choices: **Open project** chooses a project folder, the one with `labcatalog.yaml` in it, and **Open example** opens the example. The header then shows the project's name (hover over it for the folder) and the date the data are as of, from the datasets' `snapshot_date`.
 
+## One study or all
+
+When a project has more than one study, a picker at the top right chooses the study the pages show. **All studies** shows every study. With one study chosen, the Overview shows its datasets, waves, people, instruments and milestones; the Instruments page starts with that study's filter set; the Datasets page lists its datasets; the Analysis page offers its datasets; and the Studies and Methods pages open it. Set up, Problems and Settings always cover the whole project. The window remembers the choice for each project.
+
 ## Refreshing after a change
 
 labcatalog reads the project when it opens it. After you change a file, in the window or in an editor, press **Refresh** to read it again. Your filters and choices stay as they were.

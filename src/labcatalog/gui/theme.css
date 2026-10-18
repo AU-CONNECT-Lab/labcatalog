@@ -114,6 +114,7 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 }
 .lc-project { font-size: 1.25rem; font-weight: 600; line-height: 1.2; color: var(--lc-ink); }
 .lc-as-of { font-size: 0.85rem; color: var(--lc-faint); }
+.lc-scope { min-width: 12rem; }
 
 /* ---- Page links under the title ---- */
 .lc-nav { margin-bottom: -1px; }

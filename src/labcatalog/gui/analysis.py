@@ -94,8 +94,9 @@ def default_totals(result: CatalogResult, view: AnalysisView, choices: dict[str,
     return [k for k in views.total_choices(result, view.datasets) if k in choices]
 
 
-def render(result: CatalogResult, view: AnalysisView) -> None:
-    names = views.dataset_order(result, [d.name for d in result.project.config.datasets])
+def render(result: CatalogResult, view: AnalysisView, study: str | None = None) -> None:
+    datasets = result.project.config.datasets
+    names = views.dataset_order(result, [d.name for d in datasets if study in (None, d.study)])
     if not names:
         empty("No datasets yet.")
         return

@@ -25,15 +25,17 @@ class MethodsView:
     attrition: list[str] = field(default_factory=list)
 
 
-def render(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
+def render(
+    result: CatalogResult, view: MethodsView, cfa: CfaView, scope: str | None = None
+) -> None:
     config = result.project.config
     studies = {
         name: study.label or name
         for name, study in config.studies.items()
-        if any(d.study == name for d in config.datasets)
+        if scope in (None, name) and any(d.study == name for d in config.datasets)
     }
     if not studies:
-        empty("No study has datasets yet.")
+        empty("This study has no datasets yet." if scope else "No study has datasets yet.")
         return
     if view.study not in studies:
         view.study = next(iter(studies))

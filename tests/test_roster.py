@@ -276,3 +276,23 @@ def people_of(result, study: str) -> set[str]:
         if loaded.config.study == study
         for p in loaded.respondents().dropna()
     }
+
+
+def test_the_overview_of_one_study_shows_only_its_own(pilot_project):
+    result = run_catalog(pilot_project)
+    assert views.for_study(result, None) is result
+    pilot = views.for_study(result, "pilot")
+    assert list(pilot.project.config.studies) == ["pilot"]
+    assert list(pilot.datasets) == ["pilot_w1"]
+    assert set(pilot.project.instruments) == {
+        "example_mood",
+        "example_worries_temper",
+        PARTICIPANTS,
+    }
+    assert {r.study for r in pilot.summary.retention} == {"pilot"}
+    banner = views.banner(pilot)
+    assert banner.kicker == "pilot"
+    facts = {label: n for n, label in banner.facts}
+    assert facts["people"] == len(people_of(result, "pilot"))
+    # The whole project is left as it was.
+    assert len(result.project.config.studies) == 2

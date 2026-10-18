@@ -1,7 +1,7 @@
 import html
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date
 
 import numpy as np
@@ -35,6 +35,40 @@ MAP_UNPLACED = "Not in a dataset"
 
 def several_studies(result: CatalogResult) -> bool:
     return len(result.project.config.studies) > 1
+
+
+def for_study(result: CatalogResult, study: str | None) -> CatalogResult:
+    # The catalog as one study sees it, for pages that only show it; None keeps every study.
+    if study is None:
+        return result
+    project, config, summary = result.project, result.project.config, result.summary
+    names = {d.name for d in config.datasets if d.study == study}
+    given = {
+        v.instrument_id
+        for v in [*result.catalog.variables, *result.catalog.roster_variables]
+        if v.study == study
+    }
+    scoped = config.model_copy(
+        update={
+            "studies": {study: config.studies[study]},
+            "datasets": [d for d in config.datasets if d.name in names],
+        }
+    )
+    return replace(
+        result,
+        project=replace(
+            project,
+            config=scoped,
+            instruments={i: s for i, s in project.instruments.items() if i in given},
+        ),
+        datasets={n: d for n, d in result.datasets.items() if n in names},
+        summary=summary.model_copy(
+            update={
+                "retention": [r for r in summary.retention if r.study == study],
+                "datasets": [d for d in summary.datasets if d.dataset in names],
+            }
+        ),
+    )
 
 
 def wave_name(result: CatalogResult, study: str, wave: str) -> str:

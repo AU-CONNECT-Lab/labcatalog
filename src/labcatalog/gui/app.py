@@ -5,7 +5,7 @@ from pathlib import Path
 import webview
 from nicegui import app, background_tasks, ui
 
-from labcatalog.charts import style
+from labcatalog.charts import style, views
 from labcatalog.datalad.annex import dataset_root
 from labcatalog.datalad.bridge import use_folder
 from labcatalog.datalad.freeze import list_freezes
@@ -73,6 +73,8 @@ PAGES = (
     (("problems", "Problems"),),
 )
 SETTINGS = "settings"
+# The study picker's choice that narrows nothing; a study ID never has this character.
+ALL_STUDIES = "*"
 
 
 def launch(project: Path | None = None) -> None:
@@ -131,6 +133,8 @@ class Window:
             retest=self.test_invariance,
         )
         self.dataset: str | None = None
+        # The study the pages are narrowed to, None for every study.
+        self.scope: str | None = None
         self.error: str | None = None
         # The project a frozen copy was opened from, while the copy is shown.
         self.home: Path | None = None
@@ -156,6 +160,13 @@ class Window:
                     ).classes("lc-quiet-btn")
                 self.frozen_bar.visible = False
                 ui.space()
+                self.scope_select = (
+                    ui.select({}, on_change=lambda e: self.set_scope(e.value))
+                    .props("dense outlined options-dense")
+                    .classes("lc-scope")
+                    .tooltip("The study the pages show")
+                )
+                self.scope_select.visible = False
                 self.spinner = ui.spinner(size="sm")
                 self.spinner.visible = False
                 self.refresh_button = (
@@ -281,6 +292,8 @@ class Window:
                 self.setting_up = SetupView()
                 self.cfa.estimator = self.cfa.invariance_estimator = None
                 self.root = root
+                self.scope = preferences.load().get(preferences.STUDY_SCOPE, {}).get(str(root))
+                self.follow_scope()
             self.set_busy(False)
         self.result = result
         self.show_result()
@@ -407,6 +420,7 @@ class Window:
         self.badge.visible = bool(issues)
         if result is not None and project is None:
             self.tabs.set_value("problems")
+        self.show_scope()
         for panel in (
             self.overview_panel,
             self.instruments_panel,
@@ -422,6 +436,41 @@ class Window:
         ):
             panel.refresh()
         self.project_settings()
+
+    def show_scope(self) -> None:
+        studies = self.result.project.config.studies if self.result and self.result.project else {}
+        if self.scope not in studies:
+            self.scope = None
+        options = {ALL_STUDIES: "All studies"} | {s: c.label or s for s, c in studies.items()}
+        self.scope_select.set_options(options, value=self.scope or ALL_STUDIES)
+        self.scope_select.visible = len(studies) > 1
+
+    def set_scope(self, value: str) -> None:
+        scope = None if value == ALL_STUDIES else value
+        if scope == self.scope:
+            return
+        self.scope = scope
+        saved = preferences.load().get(preferences.STUDY_SCOPE, {})
+        preferences.save({preferences.STUDY_SCOPE: {**saved, str(self.root): scope}})
+        self.follow_scope()
+        for panel in (
+            self.overview_panel,
+            self.instruments_panel,
+            self.studies_panel,
+            self.datasets_panel,
+            self.analysis_panel,
+            self.methods_panel,
+        ):
+            panel.refresh()
+
+    def follow_scope(self) -> None:
+        # The pages that keep their own choice of study start from the one picked at the top.
+        if self.scope is None:
+            self.view.selected.pop("study", None)
+            return
+        self.view.selected["study"] = {self.scope}
+        self.studying.study = self.scope
+        self.methods.study = self.scope
 
     def open_instrument(self, instrument_id: str | None) -> None:
         self.view.instrument = instrument_id
@@ -464,7 +513,7 @@ class Window:
     def overview_panel(self) -> None:
         if self.has_catalog():
             overview.render(
-                self.result,
+                views.for_study(self.result, self.scope),
                 lambda: self.open_instrument(None),
                 lambda: self.tabs.set_value("datasets"),
                 lambda: self.tabs.set_value("problems"),
@@ -496,6 +545,7 @@ class Window:
         if self.has_catalog():
             datasets.render(
                 self.result,
+                self.scope,
                 self.dataset,
                 self.show_dataset,
                 self.open_instrument,
@@ -508,12 +558,12 @@ class Window:
     @ui.refreshable_method
     def analysis_panel(self) -> None:
         if self.has_catalog():
-            analysis.render(self.result, self.analysis)
+            analysis.render(self.result, self.analysis, self.scope)
 
     @ui.refreshable_method
     def methods_panel(self) -> None:
         if self.has_catalog():
-            methods.render(self.result, self.methods, self.cfa)
+            methods.render(self.result, self.methods, self.cfa, self.scope)
 
     @ui.refreshable_method
     def prepare_panel(self) -> None:
