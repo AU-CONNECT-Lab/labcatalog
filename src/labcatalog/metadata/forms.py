@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path, PurePosixPath
 
 from ruamel.yaml.comments import CommentedMap
@@ -33,6 +33,12 @@ ABOUT = Table(
 )
 REFERENCES = Table("References", (Column("key", "Reference"), Column("pdf", "PDF")))
 NUMBERED = re.compile(r"(.*?)(\d+)")
+# Columns that name a response set, by section.
+SET_REFERENCES = {
+    "response_sets": ("id",),
+    "about": ("default_response_set",),
+    "items": ("response_set",),
+}
 
 
 @dataclass(frozen=True)
@@ -158,6 +164,28 @@ def config_sections(config: ProjectConfig | None, tables: dict[str, Table]) -> l
             carried=("study", "wave", "modality", "source"),
             noun="dataset",
         )
+    ]
+
+
+def rename_set(
+    sections: list[Section], rows: dict[str, list[dict]], old: str, new: str
+) -> list[Section]:
+    for key, columns in SET_REFERENCES.items():
+        for row in rows.get(key, ()):
+            for column in columns:
+                if row.get(column) == old:
+                    row[column] = new
+    return [
+        replace(
+            section,
+            options={
+                key: tuple(new if o == old else o for o in options)
+                if key in SET_REFERENCES.get(section.key, ())
+                else options
+                for key, options in section.options.items()
+            },
+        )
+        for section in sections
     ]
 
 

@@ -46,6 +46,21 @@ def test_form_changes_reach_the_file_and_pass_the_checks(mock_project):
     assert editing.check_text(MOOD, written) == []
 
 
+def test_renaming_a_response_set_renames_what_names_it(mock_project):
+    text = opened(mock_project, MOOD)
+    form = edit_form.open_form(mock_project, MOOD, text)
+    form.rows["items"][0]["response_set"] = "frequency"
+    form.sections = forms.rename_set(form.sections, form.rows, "frequency", "how_often")
+    assert {row["id"] for row in form.rows["response_sets"]} == {"how_often"}
+    assert form.rows["about"][0]["default_response_set"] == "how_often"
+    assert form.rows["items"][0]["response_set"] == "how_often"
+    items = next(s for s in form.sections if s.key == "items")
+    assert items.options["response_set"] == ("how_often",)
+    written = form.text(text)
+    assert "frequency" not in written
+    assert editing.check_text(MOOD, written) == []
+
+
 def test_new_ids_continue_a_numbered_run():
     assert forms.next_id(["ems_1", "ems_2"], "item") == "ems_3"
     assert forms.next_id(["total"], "score") == "score_1"

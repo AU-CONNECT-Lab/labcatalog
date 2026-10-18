@@ -48,16 +48,20 @@ def render(form: Form) -> None:
     def touch() -> None:
         form.edited = True
 
-    for section in form.sections:
-        if section.key in form.broken:
-            with panel(section.table.label):
-                note(f"{form.broken[section.key]} (Advanced, then Text).")
-        elif section.table.single:
-            fields_section(form.rows[section.key][0], section, touch)
-        elif section.table.inner and not section.table.parent:
-            groups_section(form.rows[section.key], section, touch)
-        else:
-            list_section(form.rows[section.key], section, touch)
+    @ui.refreshable
+    def everything() -> None:
+        for section in form.sections:
+            if section.key in form.broken:
+                with panel(section.table.label):
+                    note(f"{form.broken[section.key]} (Advanced, then Text).")
+            elif section.table.single:
+                fields_section(form.rows[section.key][0], section, touch)
+            elif section.table.inner and not section.table.parent:
+                groups_section(form, section, touch, everything.refresh)
+            else:
+                list_section(form.rows[section.key], section, touch)
+
+    everything()
 
 
 def fields_section(row: dict, section: forms.Section, touch: Callable[[], None]) -> None:
@@ -130,8 +134,11 @@ def list_section(rows: list[dict], section: forms.Section, touch: Callable[[], N
         body()
 
 
-def groups_section(rows: list[dict], section: forms.Section, touch: Callable[[], None]) -> None:
-    # Rows sharing the first column make one entry, such as the options of one response set.
+def groups_section(
+    form: Form, section: forms.Section, touch: Callable[[], None], redraw: Callable[[], None]
+) -> None:
+    # Rows sharing the first column make one entry: the options of one response set.
+    rows = form.rows[section.key]
     group, *columns = section.table.columns
 
     def changed() -> None:
@@ -153,11 +160,24 @@ def groups_section(rows: list[dict], section: forms.Section, touch: Callable[[],
         rows.insert(last + 1, blank(name, str(int(value) + 1) if value.isdigit() else ""))
         changed()
 
-    def rename(name: str, value: str) -> None:
-        for r in rows:
-            if r[group.key] == name:
-                r[group.key] = value
+    def rename(box: ui.input, old: str) -> None:
+        new = str(box.value).strip()
+        names = {r[group.key] for r in rows}
+        # Enter then blur sends a second rename after the first already went through.
+        if new == old or old not in names:
+            return
+        if not new or new in names:
+            ui.notify(
+                f"Another {section.noun} is already called {new}."
+                if new
+                else f"A {section.noun} needs an ID.",
+                type="warning",
+            )
+            box.value = old
+            return
+        form.sections = forms.rename_set(form.sections, form.rows, old, new)
         touch()
+        redraw()
 
     def remove(members: list[dict]) -> None:
         rows[:] = [r for r in rows if not any(r is m for m in members)]
@@ -171,11 +191,10 @@ def groups_section(rows: list[dict], section: forms.Section, touch: Callable[[],
             members = [r for r in rows if r[group.key] == name]
             with ui.column().classes("lc-form-entry w-full gap-1"):
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
-                    ui.input(
-                        group.label,
-                        value=name,
-                        on_change=lambda e, n=name: rename(n, e.value),
-                    ).props("dense outlined").classes("w-48")
+                    # Renamed when the box is left, so typing does not rename at each key.
+                    box = ui.input(group.label, value=name).props("dense outlined").classes("w-48")
+                    for event in ("blur", "keydown.enter"):
+                        box.on(event, lambda b=box, n=name: rename(b, n))
                     ui.space()
                     icon_button(
                         "delete_outline", f"Delete this {section.noun}", partial(remove, members)
