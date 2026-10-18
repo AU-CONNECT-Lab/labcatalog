@@ -22,15 +22,20 @@ from labcatalog.exceptions import DataladError, DataSourceError, FreezeError, Me
 from labcatalog.metadata.history import file_history
 from labcatalog.pipeline import (
     run_catalog,
+    run_clone,
     run_data_push,
     run_data_save,
     run_data_status,
     run_data_update,
+    run_drop_dataset,
     run_freeze,
     run_get,
+    run_get_dataset,
     run_get_missing,
+    run_history,
     run_open_freeze,
     run_push_freeze,
+    run_rerun,
 )
 from labcatalog.project import init_project, load_project
 from labcatalog.sources import load_datasets
@@ -588,4 +593,53 @@ def test_save_push_and_update_keep_two_clones_in_step(mock_project, datalad, tmp
     assert mine.read_text(encoding="utf-8") == path.read_text(encoding="utf-8")
     done = CliRunner().invoke(app, ["datalad", "status", "-p", str(mock_project)])
     assert done.exit_code == 0, done.output
-    assert "the project folder: saved, and the same as store" in done.output
+    assert "the project folder: saved, and the same as store;" in done.output
+
+
+COUNT = """import time
+
+with open("rows.txt", "w") as handle:
+    handle.write(str(time.time_ns()))
+"""
+
+
+@needs_datalad
+def test_a_clone_shows_its_history_reruns_a_step_and_frees_its_space(
+    mock_project, datalad, tmp_path
+):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    (mock_project / "count.py").write_text(COUNT, encoding="utf-8")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    command = f'"{sys.executable}" count.py'
+    datalad(mock_project, "run", "-m", "Count the rows", "--explicit", "-o", "rows.txt", command)
+    subprocess.run(["git", "init", "-q", "--bare", str(tmp_path / "store.git")], check=True)
+    store = (tmp_path / "store.git").as_posix()
+    datalad(mock_project, "siblings", "add", "-s", "store", "--url", store)
+    exe = datalad_exe()
+    # The first push to a sibling new to git-annex sends the content too.
+    run_data_push(mock_project, exe)
+
+    (tmp_path / "elsewhere").mkdir()
+    root = run_clone(store, tmp_path / "elsewhere", exe)
+    assert root == tmp_path / "elsewhere" / "store"
+    assert not is_placeholder(root / "data" / "child_w1.csv")
+    [ran, added, *_] = run_history(root)
+    assert (ran.ran, ran.title, added.title) == (True, "Count the rows", "Add the catalog")
+    assert ran.files == ["rows.txt"] and ran.author == added.author
+
+    before = (root / "rows.txt").read_text(encoding="utf-8")
+    run_rerun(root, root, ran.commit, exe)
+    assert (root / "rows.txt").read_text(encoding="utf-8") != before
+    assert run_history(root)[0].ran and not (root / "prepare_running.json").exists()
+
+    [state] = run_data_status(root)
+    assert 0 < state.present <= state.total
+    run_get_dataset(root, exe)
+    assert run_data_status(root)[0].present == state.total
+    run_drop_dataset(root, exe)
+    assert run_data_status(root)[0].present == 0
+    assert is_placeholder(root / "data" / "child_w1.csv")
+    run_get_dataset(root, exe)
+    assert run_data_status(root)[0].present == state.total

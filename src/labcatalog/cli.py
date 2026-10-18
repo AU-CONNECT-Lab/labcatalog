@@ -22,6 +22,7 @@ from labcatalog.issues import Issue, has_errors, summarize_issues
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     run_check,
+    run_clone,
     run_codebook_answer,
     run_codebook_create,
     run_codebook_import,
@@ -30,12 +31,15 @@ from labcatalog.pipeline import (
     run_data_save,
     run_data_status,
     run_data_update,
+    run_drop_dataset,
     run_freeze,
     run_get,
     run_get_missing,
+    run_history,
     run_open_freeze,
     run_prepare,
     run_push_freeze,
+    run_rerun,
     run_schema,
     run_validate,
 )
@@ -278,6 +282,55 @@ def datalad_push(project: ProjectOption = Path(".")) -> None:
     """Push the saved versions and their data to each dataset's sibling."""
     pushed = run_data_push(project, datalad_on_path())
     typer.echo(f"Pushed {len(pushed)} dataset(s).")
+
+
+@datalad_app.command("history")
+def datalad_history(
+    dataset: Annotated[
+        Path | None,
+        typer.Argument(help="Dataset folder; the one holding the project when left out."),
+    ] = None,
+    project: ProjectOption = Path("."),
+) -> None:
+    """The versions saved in a dataset, newest first; RERUN marks those datalad run made."""
+    for saved in run_history((dataset or project).resolve()):
+        mark = "RERUN " if saved.ran else ""
+        typer.echo(f"{saved.commit[:8]} {saved.when[:16]} {saved.author}: {mark}{saved.title}")
+
+
+@datalad_app.command("rerun")
+def datalad_rerun(
+    commit: Annotated[str, typer.Argument(help="Version that datalad run saved, from history.")],
+    dataset: Annotated[
+        Path | None,
+        typer.Option(help="Dataset folder; the one holding the project when left out."),
+    ] = None,
+    project: ProjectOption = Path("."),
+) -> None:
+    """Run the command a datalad run version recorded again, and save what it writes."""
+    run_rerun(project, (dataset or project).resolve(), commit, datalad_on_path())
+    typer.echo("Ran it again.")
+
+
+@datalad_app.command("drop")
+def datalad_drop(
+    dataset: Annotated[Path, typer.Argument(help="Dataset folder to free the space of.")],
+) -> None:
+    """Remove the dataset's file content from this computer, where a copy is kept elsewhere."""
+    run_drop_dataset(dataset.resolve(), datalad_on_path())
+    typer.echo("Dropped the content; get it again when you need it.")
+
+
+@datalad_app.command("clone")
+def datalad_clone(
+    url: Annotated[
+        str, typer.Argument(help="Where the project's dataset is, as datalad clone takes it.")
+    ],
+    folder: Annotated[Path, typer.Argument(help="Folder to put the project in.")] = Path("."),
+) -> None:
+    """Clone a project kept in DataLad and get the files it reads."""
+    root = run_clone(url, folder, datalad_on_path())
+    typer.echo(f"Cloned the project into {root}")
 
 
 codebook_app = typer.Typer(

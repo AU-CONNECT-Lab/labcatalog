@@ -1,3 +1,5 @@
+import json
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -6,7 +8,7 @@ from labcatalog.config import ProjectConfig
 from labcatalog.data.manifest import used_paths
 from labcatalog.datalad.annex import group_by_dataset
 from labcatalog.datalad.bridge import run_datalad
-from labcatalog.datalad.freeze import push_targets
+from labcatalog.datalad.freeze import push_targets, push_to
 from labcatalog.datalad.versions import ADJUSTED, run_git
 
 
@@ -20,6 +22,9 @@ class DatasetState:
     ahead: int | None
     # Versions on the sibling not merged here, as of the last update.
     behind: int | None
+    # Bytes of the dataset's annexed files here, and in all; None without git-annex.
+    present: int | None = None
+    total: int | None = None
 
 
 def project_datasets(config: ProjectConfig, root: Path) -> list[Path]:
@@ -53,7 +58,32 @@ def dataset_state(root: Path) -> DatasetState:
         if has_ref(root, remote):
             counts = run_git(root, "rev-list", "--left-right", "--count", f"{branch}...{remote}")
             ahead, behind = (int(n) for n in counts.split())
-    return DatasetState(root, changed_paths(root), sibling, ahead, behind)
+    present, total = space(root) or (None, None)
+    return DatasetState(root, changed_paths(root), sibling, ahead, behind, present, total)
+
+
+def space(root: Path) -> tuple[int, int] | None:
+    try:
+        found = json.loads(run_git(root, "annex", "info", "--fast", "--bytes", "--json", "."))
+    except subprocess.CalledProcessError:
+        return None
+    return int(found["local annex size"]), int(found["size of annexed files in working tree"])
+
+
+def get_all(root: Path, datalad: str) -> None:
+    run_datalad(datalad, ["get", "."], cwd=root)
+
+
+def drop_all(root: Path, datalad: str) -> None:
+    # DataLad refuses to drop a file it cannot find a copy of elsewhere.
+    run_datalad(datalad, ["drop", "."], cwd=root)
+
+
+def clone(url: str, folder: Path, datalad: str) -> Path:
+    name = re.split(r"[/\\:]", url.rstrip("/\\"))[-1].removesuffix(".git")
+    target = folder / name
+    run_datalad(datalad, ["clone", url, str(target)])
+    return target
 
 
 def has_ref(root: Path, ref: str) -> bool:
@@ -97,7 +127,7 @@ def push_datasets(roots: list[Path], datalad: str) -> list[Path]:
     pushed = []
     for root, sibling in push_targets(deepest_first(roots)).items():
         if sibling is not None:
-            run_datalad(datalad, ["push", "--to", sibling], cwd=root)
+            push_to(root, sibling, datalad)
             pushed.append(root)
     return pushed
 
@@ -113,7 +143,18 @@ def state_text(state: DatasetState) -> str:
             parts.append(f"{state.ahead} saved version(s) not pushed to {state.sibling}")
         if state.behind:
             parts.append(f"{state.behind} new version(s) on {state.sibling}")
-    return "; ".join(parts) or f"saved, and the same as {state.sibling}"
+    text = "; ".join(parts) or f"saved, and the same as {state.sibling}"
+    if state.total:
+        text += f"; {size_text(state.present)} of {size_text(state.total)} here"
+    return text
+
+
+def size_text(count: float) -> str:
+    for unit in ("bytes", "KB", "MB", "GB"):
+        if count < 1000 or unit == "GB":
+            break
+        count /= 1000
+    return f"{count:.0f} {unit}" if unit == "bytes" else f"{count:.1f} {unit}"
 
 
 def summary(states: list[DatasetState]) -> tuple[str, str]:

@@ -1,7 +1,8 @@
 import json
 import os
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -115,39 +116,45 @@ def run_steps(
             "The prepare steps run with DataLad (prepare_with: datalad); "
             "set the path to datalad on the Settings page"
         )
-    lock = project.root / defaults.PREPARE_LOCK_FILENAME
-    # Two people running the steps at once would write the same files.
-    if not anyway and (other := running(project.root)):
-        raise PrepareBusyError(other.by, other.since, lock)
-    lock.write_text(
-        json.dumps(
-            {"by": who(project.root), "since": datetime.now().isoformat(timespec="seconds")}
-        ),
-        encoding="utf-8",
-    )
     session.stopping = False
     done = []
     try:
-        for step in project.config.prepare:
-            if session.stopping:
-                break
-            # Checked step by step, so a rerun step makes the steps after it outdated too.
-            if step.name not in names or (
-                outdated_only and step_state(project, step).status == "up to date"
-            ):
-                continue
-            run = StepRun(step.name, step.run)
-            session.runs[step.name] = run
-            done.append(run)
-            if echo:
-                echo(f"== {step.name}: {step.run}")
-            execute(step, project.root, run, session, echo, rscript, datalad)
-            if run.exit_code != 0:
-                break
+        with prepare_lock(project.root, anyway):
+            for step in project.config.prepare:
+                if session.stopping:
+                    break
+                # Checked step by step, so a rerun step makes the steps after it outdated too.
+                if step.name not in names or (
+                    outdated_only and step_state(project, step).status == "up to date"
+                ):
+                    continue
+                run = StepRun(step.name, step.run)
+                session.runs[step.name] = run
+                done.append(run)
+                if echo:
+                    echo(f"== {step.name}: {step.run}")
+                execute(step, project.root, run, session, echo, rscript, datalad)
+                if run.exit_code != 0:
+                    break
     finally:
-        lock.unlink(missing_ok=True)
         session.current = None
     return done
+
+
+@contextmanager
+def prepare_lock(root: Path, anyway: bool = False) -> Iterator[None]:
+    lock = root / defaults.PREPARE_LOCK_FILENAME
+    # Two people running the steps at once would write the same files.
+    if not anyway and (other := running(root)):
+        raise PrepareBusyError(other.by, other.since, lock)
+    lock.write_text(
+        json.dumps({"by": who(root), "since": datetime.now().isoformat(timespec="seconds")}),
+        encoding="utf-8",
+    )
+    try:
+        yield
+    finally:
+        lock.unlink(missing_ok=True)
 
 
 def running(root: Path) -> Runner | None:

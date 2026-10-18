@@ -83,9 +83,13 @@ labcatalog datalad status [-p PROJECT]
 labcatalog datalad save MESSAGE [-p PROJECT]
 labcatalog datalad update [-p PROJECT]
 labcatalog datalad push [-p PROJECT]
+labcatalog datalad history [DATASET] [-p PROJECT]
+labcatalog datalad rerun COMMIT [--dataset DATASET] [-p PROJECT]
+labcatalog datalad drop DATASET
+labcatalog datalad clone URL [FOLDER]
 ```
 
-Keep the DataLad datasets the project reads saved and in step with their sibling (the only one, or `origin`), as the **Data versions** panel of the Datasets page does. `status` lists each dataset's unsaved changes and the saved versions it has not pushed, and the new versions on the sibling as of the last update. `save` saves every change in those datasets as a new version, deepest first, with `MESSAGE` saying what changed. `update` merges the new versions on each sibling and then downloads the files the project reads. `push` sends the saved versions and their data to each sibling. `save`, `update` and `push` use the `datalad` on PATH.
+Keep the DataLad datasets the project reads saved and in step with their sibling (the only one, or `origin`), as the **Data versions** panel of the Datasets page does. `status` lists each dataset's unsaved changes and the saved versions it has not pushed, and the new versions on the sibling as of the last update. `save` saves every change in those datasets as a new version, deepest first, with `MESSAGE` saying what changed. `update` merges the new versions on each sibling and then downloads the files the project reads. `push` sends the saved versions and their data to each sibling. `history` lists a dataset's last 50 saved versions, newest first, with RERUN before those `datalad run` saved; `rerun` runs such a version's command again and saves what it writes, waiting while someone runs the prepare steps; both take the dataset holding the project unless given another. `drop` removes a dataset's file content from this computer where a copy is kept elsewhere. `clone` clones a project into `FOLDER` (the current folder unless given), downloads the files it reads and says where it is. All of them use the `datalad` on PATH.
 
 ## derivatives
 

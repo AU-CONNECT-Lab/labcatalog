@@ -41,7 +41,7 @@ from labcatalog.gui import (
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
-from labcatalog.gui.datalad import frozen_text, get_button, versions_tooltip
+from labcatalog.gui.datalad import clone_dialog, frozen_text, get_button, versions_tooltip
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.files import FOLDER, choose_path
 from labcatalog.gui.gate import Gate
@@ -261,6 +261,7 @@ class Window:
                 ):
                     with ui.menu().props("anchor='bottom right' self='top right'"):
                         ui.menu_item("Open project", on_click=self.choose_folder)
+                        ui.menu_item("Clone a project", on_click=self.clone_project)
                         if not common.serving:
                             ui.menu_item("Open example", on_click=self.open_example)
                 if common.serving:
@@ -357,6 +358,13 @@ class Window:
             self.home = None
             self.frozen_bar.visible = False
             await self.open_project(folder)
+
+    async def clone_project(self) -> None:
+        root = await clone_dialog(self.root.parent if self.root is not None else None)
+        if root:
+            self.home = None
+            self.frozen_bar.visible = False
+            await self.open_project(root)
 
     async def open_project(self, root: Path) -> None:
         # Remembered for the next start; a freeze opened from it is not.

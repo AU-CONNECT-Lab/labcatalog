@@ -52,7 +52,7 @@ Below that:
 
 ## Data versions
 
-When the data are in DataLad, the **Data versions** panel lists each dataset the project reads with its unsaved changes and the versions not yet pushed to its sibling or merged from it. **Save** keeps the changes as a new version on this computer, **Push** sends saved versions to the sibling, and **Update** merges what others pushed and downloads the files the project reads. The header shows a short note such as **2 unsaved**; click it to come here. See [Using labcatalog with DataLad](../how-to/datalad.md#saving-pushing-and-updating).
+When the data are in DataLad, the **Data versions** panel lists each dataset the project reads with its unsaved changes and the versions not yet pushed to its sibling or merged from it. **Save** keeps the changes as a new version on this computer, **Push** sends saved versions to the sibling, and **Update** merges what others pushed and downloads the files the project reads. Under the table, **History** lists a dataset's saved versions, with **Rerun** on those `datalad run` saved, **Get everything** downloads its file content and **Free space** removes it from this computer where a copy is kept elsewhere. The header shows a short note such as **2 unsaved**; click it to come here. See [Using labcatalog with DataLad](../how-to/datalad.md#saving-pushing-and-updating).
 
 ## Freezes
 

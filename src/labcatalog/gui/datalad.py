@@ -16,9 +16,15 @@ from labcatalog.datalad.freeze import (
     list_freezes,
     push_targets,
 )
-from labcatalog.datalad.sync import DatasetState, dataset_states, project_datasets, state_text
+from labcatalog.datalad.sync import (
+    DatasetState,
+    dataset_states,
+    project_datasets,
+    size_text,
+    state_text,
+)
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import preferences
+from labcatalog.gui import common, preferences
 from labcatalog.gui.common import (
     col,
     command,
@@ -29,15 +35,21 @@ from labcatalog.gui.common import (
     show_status,
     table,
 )
+from labcatalog.gui.files import FOLDER, allowed, choose_path
 from labcatalog.gui.look import look
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import (
     CatalogResult,
+    run_clone,
     run_data_push,
     run_data_save,
     run_data_update,
+    run_drop_dataset,
     run_freeze,
+    run_get_dataset,
+    run_history,
     run_push_freeze,
+    run_rerun,
 )
 
 
@@ -263,6 +275,7 @@ def versions_panel(result: CatalogResult, on_changed: Callable[[], Awaitable[Non
         holder.clear()
         with holder:
             versions_table(found, root)
+            dataset_tools(found, root, datalad, fill, on_changed)
 
     async def act(button: ui.button, function: Callable, *args) -> list[Path] | None:
         button.props("loading")
@@ -344,6 +357,7 @@ def versions_table(states: list[DatasetState], root: Path) -> None:
         col("sibling", "Sibling"),
         col("ahead", "Not pushed", numeric=True),
         col("behind", "New on the sibling", numeric=True),
+        col("here", "Here", numeric=True),
     ]
     rows = [
         {
@@ -352,6 +366,7 @@ def versions_table(states: list[DatasetState], root: Path) -> None:
             "sibling": s.sibling or "none, or several",
             "ahead": "never pushed" if s.sibling and s.ahead is None else (s.ahead or ""),
             "behind": s.behind or "",
+            "here": f"{size_text(s.present)} of {size_text(s.total)}" if s.total else "",
         }
         for s in states
     ]
@@ -359,9 +374,156 @@ def versions_table(states: list[DatasetState], root: Path) -> None:
     note(
         "Save keeps the changes as a new version on this computer, Push sends saved versions and "
         "their data to the sibling, and Update merges what others pushed and gets the files the "
-        "project reads. New on the sibling counts what the last Update saw."
+        "project reads. New on the sibling counts what the last Update saw. Here is how much of "
+        "the dataset's file content is on this computer."
     )
+
+
+def dataset_tools(
+    states: list[DatasetState],
+    root: Path,
+    datalad: str,
+    refill: Callable[[], Awaitable[None]],
+    on_changed: Callable[[], Awaitable[None]],
+) -> None:
+    labels = {s.root: dataset_label(s.root, root) for s in states}
+    with ui.row().classes("w-full items-center gap-2"):
+        chosen = ui.select(labels, value=states[0].root, label="Dataset").classes("w-72")
+        chosen.visible = len(states) > 1
+        ui.button("History", icon="history", on_click=lambda: open_history(chosen.value)).props(
+            "flat no-caps"
+        )
+        get = ui.button("Get everything", icon="download").props("flat no-caps")
+        drop = ui.button("Free space", icon="cleaning_services").props("flat no-caps")
+
+    async def act(button: ui.button, function: Callable, done: str) -> None:
+        button.props("loading")
+        try:
+            await computed(function, chosen.value, datalad)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative", multi_line=True)
+            return
+        finally:
+            button.props(remove="loading")
+        ui.notify(done)
+        await refill()
+
+    def confirm_drop() -> None:
+        with ui.dialog() as dialog, ui.card().classes("w-[32rem] max-w-full"):
+            ui.label("Free the space").classes("text-lg font-medium")
+            note(
+                f"This removes the file content of {labels[chosen.value]} from this computer; "
+                "the files stay listed, and Get everything brings them back. DataLad leaves any "
+                "file it cannot find a copy of elsewhere, such as on the sibling."
+            )
+
+            async def go() -> None:
+                dialog.close()
+                await act(drop, run_drop_dataset, "Freed the space")
+
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+                ui.button("Free space", on_click=go)
+        dialog.open()
+
+    async def open_history(dataset: Path) -> None:
+        found = await computed(run_history, dataset)
+        with ui.dialog() as dialog, ui.card().classes("w-[48rem] max-w-full"):
+            ui.label(f"History of {labels[dataset]}").classes("text-lg font-medium")
+            note(
+                f"The last {len(found)} saved versions, newest first. A version that datalad run "
+                "saved, such as a prepare step's, can run again: its command writes its outputs "
+                "anew and they are saved as a new version."
+            )
+            with ui.scroll_area().classes("h-96 w-full"):
+                for saved in found:
+                    with ui.row().classes("w-full items-center no-wrap gap-3 py-1"):
+                        ui.label(saved.when[:16].replace("T", " ")).classes("lc-note shrink-0")
+                        ui.label(saved.author).classes("lc-note shrink-0")
+                        with ui.label(saved.title).classes("grow min-w-0"):
+                            if saved.files:
+                                ui.tooltip("\n".join(saved.files[:20])).classes(
+                                    "whitespace-pre-line"
+                                )
+                        ui.label(f"{len(saved.files)} file(s)").classes("lc-note shrink-0")
+                        if saved.ran:
+                            ui.button(
+                                "Rerun",
+                                icon="replay",
+                                on_click=lambda c=saved.commit: rerun_version(dialog, dataset, c),
+                            ).props("flat dense no-caps")
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Close", on_click=dialog.close).props("flat no-caps")
+        dialog.open()
+
+    async def rerun_version(dialog: ui.dialog, dataset: Path, commit: str) -> None:
+        dialog.close()
+        ui.notify("Running it again")
+        try:
+            await computed(run_rerun, root, dataset, commit, datalad)
+        except LabCatalogError as err:
+            ui.notify(str(err), type="negative", multi_line=True)
+            return
+        ui.notify("Ran it again and saved what it wrote")
+        await on_changed()
+
+    get.on_click(lambda: act(get, run_get_dataset, "Got the content"))
+    drop.on_click(confirm_drop)
 
 
 def versions_tooltip(states: list[DatasetState], root: Path) -> str:
     return "; ".join(f"{dataset_label(s.root, root)}: {state_text(s)}" for s in states)
+
+
+async def clone_dialog(start: Path | None) -> Path | None:
+    # Returns the cloned project's folder, with the files it reads already here.
+    datalad = preferences.load().get(preferences.DATALAD)
+    if not datalad:
+        ui.notify("Set the path to datalad on the Settings page first", type="warning")
+        return None
+    with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
+        ui.label("Clone a project").classes("text-lg font-medium")
+        note(
+            "A project kept in DataLad, such as one a labmate pushed to GIN, a server or a shared "
+            "drive. labcatalog clones it into the folder, gets the files it reads and opens it."
+        )
+        url = ui.input("Where it is", placeholder="https://gin.g-node.org/lab/project").classes(
+            "w-full"
+        )
+        with ui.row().classes("w-full items-center no-wrap gap-2"):
+            folder = ui.input("Into the folder", value=str(start or common.serving or "")).classes(
+                "grow"
+            )
+
+            async def pick() -> None:
+                found = await choose_path(
+                    FOLDER, start=Path(folder.value) if folder.value else None
+                )
+                if found:
+                    folder.value = str(found)
+
+            ui.button("Choose", on_click=pick).props("flat no-caps")
+
+        async def go() -> None:
+            if not (url.value or "").strip() or not folder.value:
+                ui.notify("Give where the project is and a folder to put it in", type="warning")
+                return
+            where = Path(folder.value)
+            if not allowed(where):
+                ui.notify(f"Choose a folder inside {common.serving}", type="warning")
+                return
+            clone.props("loading")
+            try:
+                dialog.submit(await computed(run_clone, url.value.strip(), where, datalad))
+            except LabCatalogError as err:
+                ui.notify(str(err), type="negative", multi_line=True)
+            finally:
+                clone.props(remove="loading")
+
+        with ui.row().classes("w-full justify-end"):
+            ui.button("Cancel", on_click=lambda: dialog.submit(None)).props("flat no-caps")
+            clone = ui.button("Clone", on_click=go)
+    try:
+        return await dialog
+    finally:
+        dialog.delete()

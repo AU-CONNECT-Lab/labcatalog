@@ -50,6 +50,8 @@ datalad get -n data
 
 `datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The **Prepare data** step of the Set up page also has a Get button next to each file that is not downloaded. On the command line, `labcatalog get` does the same as Get missing content.
 
+In the window, **Open > Clone a project** does all of this at once: give where the project's dataset is (a URL, an SSH address or a folder, as `datalad clone` takes it) and the folder to put it in, and labcatalog clones it, downloads the files the project reads and opens it. `labcatalog datalad clone URL FOLDER` does the same on the command line.
+
 ## Saving, pushing and updating
 
 The **Data versions** panel of the Datasets page keeps the datasets the project reads in step with their sibling, without a terminal. Its table lists each dataset (the one holding the project folder, and any subdataset or dataset elsewhere that holds data the project reads) with its unsaved changes, its sibling, the saved versions not pushed yet and the new versions on the sibling as of the last update. The header shows the same in a few words, such as **2 unsaved** or **1 to push**; click it to go to the panel.
@@ -59,6 +61,14 @@ The **Data versions** panel of the Datasets page keeps the datasets the project 
 - **Update** runs `datalad update --how merge` from each sibling, the outermost dataset first, and then downloads the files the project reads, as **Get missing content** does.
 
 A dataset is pushed to and updated from its only sibling, or `origin` when it has several; a dataset with several siblings and no `origin` is left for you to push from a terminal. The panel needs the path to datalad on the Settings page. On the command line, `labcatalog datalad status`, `save`, `update` and `push` do the same.
+
+The table's **Here** column shows how much of each dataset's file content is on this computer. Below the table, pick a dataset (when there are several) and:
+
+- **History** lists its last 50 saved versions, newest first, with when, who and what changed. A version that `datalad run` saved, such as a prepare step's, has **Rerun**, which runs its command again with `datalad rerun` and saves what it writes as a new version; like the prepare steps, it waits while someone else runs them.
+- **Get everything** downloads all the dataset's file content.
+- **Free space** removes the dataset's file content from this computer with `datalad drop`; the files stay listed and Get everything brings them back. DataLad leaves any file it cannot find a copy of elsewhere, so push first.
+
+On the command line, `labcatalog datalad history`, `rerun` and `drop` do the same.
 
 ## Prepare steps through datalad run
 

@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
@@ -88,6 +89,21 @@ def push_targets(roots: list[Path]) -> dict[Path, str | None]:
     return found
 
 
+def push_to(root: Path, sibling: str, datalad: str, *options: str) -> None:
+    # A sibling that has not met git-annex gets the history on a first push, the content on a second.
+    new = not annex_known(root, sibling)
+    run_datalad(datalad, ["push", "--to", sibling, *options], cwd=root)
+    if new:
+        run_datalad(datalad, ["push", "--to", sibling, *options], cwd=root)
+
+
+def annex_known(root: Path, sibling: str) -> bool:
+    try:
+        return bool(run_git(root, "config", f"remote.{sibling}.annex-uuid"))
+    except subprocess.CalledProcessError:
+        return False
+
+
 def freeze_roots(project: Project) -> list[Path]:
     # The datasets a freeze tags: those holding the data and the one holding the records.
     folder = project.root / defaults.FREEZES_DIR
@@ -100,7 +116,7 @@ def push_freeze(roots: list[Path], name: str, datalad: str) -> list[Path]:
     for root, sibling in push_targets(roots).items():
         if sibling is None:
             continue
-        run_datalad(datalad, ["push", "--to", sibling, "--data", "anything"], cwd=root)
+        push_to(root, sibling, datalad, "--data", "anything")
         run_git(root, "push", sibling, name)
         pushed.append(root)
     return pushed

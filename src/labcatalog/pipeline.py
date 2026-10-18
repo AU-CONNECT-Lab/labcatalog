@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
+from labcatalog import defaults
 from labcatalog.ai.cleaning import CleaningDraft, draft_script, fix_script
 from labcatalog.ai.instrument import InstrumentDraft, draft_instrument
 from labcatalog.ai.interpret import Interpretation, interpret
@@ -15,7 +16,7 @@ from labcatalog.codebook import core as codebook
 from labcatalog.codebook.core import ImportResult
 from labcatalog.data.check import CheckReport, check_project
 from labcatalog.data.manifest import Manifest, build_manifest, metadata_paths, used_paths
-from labcatalog.data.prepare import Session, StepRun, run_steps
+from labcatalog.data.prepare import Session, StepRun, prepare_lock, run_steps
 from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.data.scoring import compute_scores
 from labcatalog.datalad.bridge import get_content
@@ -27,15 +28,20 @@ from labcatalog.datalad.freeze import (
     open_freeze,
     push_freeze,
 )
+from labcatalog.datalad.history import Saved, history, rerun
 from labcatalog.datalad.sync import (
     DatasetState,
+    branch_name,
+    clone,
     dataset_states,
+    drop_all,
+    get_all,
     project_datasets,
     push_datasets,
     save_datasets,
     update_datasets,
 )
-from labcatalog.exceptions import CodebookError, FreezeError, MetadataError
+from labcatalog.exceptions import CodebookError, FreezeError, MetadataError, ProjectNotFoundError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.metadata import accepted
@@ -298,6 +304,35 @@ def run_data_update(root: Path, datalad: str) -> list[Path]:
 
 def run_data_push(root: Path, datalad: str) -> list[Path]:
     return push_datasets(data_datasets(root), datalad)
+
+
+def run_history(dataset: Path) -> list[Saved]:
+    return history(dataset, branch_name(dataset))
+
+
+def run_rerun(root: Path, dataset: Path, commit: str, datalad: str) -> None:
+    # A rerun writes what the prepare steps write, so it waits for anyone running them.
+    with prepare_lock(root):
+        rerun(dataset, commit, datalad)
+
+
+def run_get_dataset(dataset: Path, datalad: str) -> None:
+    get_all(dataset, datalad)
+
+
+def run_drop_dataset(dataset: Path, datalad: str) -> None:
+    drop_all(dataset, datalad)
+
+
+def run_clone(url: str, folder: Path, datalad: str) -> Path:
+    root = clone(url, folder, datalad)
+    if not (root / defaults.CONFIG_FILENAME).is_file():
+        raise ProjectNotFoundError(
+            f"Cloned into {root}, but it has no {defaults.CONFIG_FILENAME}, so it is not a "
+            "labcatalog project"
+        )
+    run_get_missing(root, datalad)
+    return root
 
 
 def run_open_freeze(root: Path, name: str, datalad: str, folder: Path | None = None) -> Path:
