@@ -23,6 +23,7 @@ The analyses allow for the study, so that a difference between the studies' mean
 - The correlation table gives each pair's correlation within studies: the correlation of what is left of the two variables once each study's mean is taken out, with the *p* value of the variable's coefficient in a linear model with the study. For Spearman's ρ, the same on the ranks of each pair.
 - Each regression includes the study as a fixed effect, a dummy for each study but the first. The slope is the slope within studies, the intercept is the first study's, and *r* is the correlation within studies, so the table gives no interval for it.
 - Missing data and the group comparison work as for one study.
+- Invariance offers each instrument that every chosen study has in one chosen dataset, and **Study** as the groups: a multigroup model with one group per study, which tests whether the instrument measures the same thing in each study before their scores are put together.
 
 The other tabs and multiple imputation do not take several studies yet: they say so, and the Missing values switch is not shown.
 
@@ -70,7 +71,7 @@ Choose two or more **Factors**, scores of two or more items each, from any of th
 
 ## Measurement invariance across groups
 
-Choose an **Instrument** in one of the chosen datasets and the **Groups**, an answer-option item of a demographics instrument, then press **Test**. labcatalog fits a multigroup factor model in R with one group per answer and tests configural, threshold (for ordered items), metric and scalar invariance, the same steps as across waves on the instrument page. The grouping item may be in another dataset, such as the child's gender reported by the parent; people are matched as in the Sample. A group needs more people than the model has items, and smaller groups are left out and named. **Which items differ** and **Save and rerun** work as on the instrument page, with the freed items stored for this grouping item. **Code** holds an R script that fits the same steps with lavaan and semTools; **Save to outputs** writes it with its data (`invariance_data.csv`) and the Mplus inputs.
+Choose an **Instrument** in one of the chosen datasets and the **Groups**, an answer-option item of a demographics instrument, then press **Test**. labcatalog fits a multigroup factor model in R with one group per answer and tests configural, threshold (for ordered items), metric and scalar invariance, the same steps as across waves on the instrument page. The grouping item may be in another dataset, such as the child's gender reported by the parent; people are matched as in the Sample. With datasets of several studies, **Study** is the first choice of groups (see [Several studies](#several-studies)). A group needs more people than the model has items, and smaller groups are left out and named. **Which items differ** and **Save and rerun** work as on the instrument page, with the freed items stored for this grouping item. **Code** holds an R script that fits the same steps with lavaan and semTools; **Save to outputs** writes it with its data (`invariance_data.csv`) and the Mplus inputs.
 
 ## Mediation
 

@@ -6,7 +6,7 @@ from scipy import stats
 
 from labcatalog.charts import views
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats import analysis
+from labcatalog.stats import analysis, group_invariance, invariance
 from labcatalog.stats import analysis_script as script
 from tests.test_analysis_script import needs_r, rscript
 
@@ -137,6 +137,37 @@ def test_r_and_python_agree_within_studies(result, sample):
     assert (fits[0].slope, fits[0].slope_se, fits[0].correlation.p) == pytest.approx(
         (fits[1].slope, fits[1].slope_se, fits[1].correlation.p)
     )
+
+
+MOOD = "example_mood@child_w1+pilot_w1"
+
+
+def test_an_instrument_is_tested_across_studies(result, sample):
+    choices = group_invariance.measure_choices(
+        result, FILES, ["example_mood"], {n: n for n in FILES}
+    )
+    assert MOOD in choices and "(" not in choices[MOOD]
+    [model] = group_invariance.group_models(result, sample, MOOD, analysis.STUDY_KEY)
+    assert model.across == analysis.STUDY_KEY
+    assert list(model.occasions) == ["Mock Family Study", "pilot"]
+    mine, theirs = model.occasions.values()
+    # Each study's group holds its own people's answers, the same answers in both.
+    assert all(p.startswith("mock_study/") for p in mine.index)
+    assert mine.to_numpy().tolist() == theirs.to_numpy().tolist()
+
+
+@needs_r
+def test_the_same_answers_in_two_studies_hold_every_step(result, sample):
+    [model] = group_invariance.group_models(result, sample, MOOD, analysis.STUDY_KEY)
+    [test] = invariance.fit_models([model], rscript(), "ml")
+    assert test.problem is None and [s.step for s in test.steps] == [
+        "configural",
+        "metric",
+        "scalar",
+    ]
+    chisq = [s.fit["chisq"] for s in test.steps]
+    assert chisq == pytest.approx([chisq[0]] * 3, abs=1e-4)
+    assert test.steps[2].fit["df"] > test.steps[1].fit["df"] > test.steps[0].fit["df"]
 
 
 def test_the_example_pools_its_two_studies(example_project):

@@ -8,6 +8,7 @@ from labcatalog.gui.common import computed, estimator_toggle, note, panel
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
+from labcatalog.stats.analysis import STUDY_KEY
 from labcatalog.stats.group_invariance import MEASURE_SEPARATOR, group_models, measure_choices
 from labcatalog.stats.invariance import fit_models
 
@@ -22,8 +23,8 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
     ):
         if not groups or not measures:
             note(
-                "Needs a demographics item with answer options and an instrument with three or more "
-                "items per score in the chosen datasets."
+                "Needs a demographics item with answer options, or datasets of several studies, and "
+                "an instrument with three or more items per score in the chosen datasets."
             )
             return
         if view.invariance_group not in groups:
@@ -62,7 +63,13 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
                 note("Fewer than two groups have two or more people who answered every item.")
                 return
             instrument = result.project.instruments[measure.split(MEASURE_SEPARATOR)[0]]
-            method = invariance_view.method_text(result, "groups", groups[group], estimator)
+            by_study = group == STUDY_KEY
+            by = "studies" if by_study else groups[group]
+            across = by if by_study else f"the groups of {by}"
+            title = "Studies" if by_study else by
+            method = invariance_view.method_text(
+                result, STUDY_KEY if by_study else "groups", by, estimator
+            )
             note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
             for i, (model, found) in enumerate(zip(models, tests, strict=True), start=1):
                 counts = ", ".join(f"{label} {n}" for label, n in found.n.items())
@@ -73,13 +80,13 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
                     result,
                     instrument,
                     found,
-                    f"Invariance of {instrument.name} Across {groups[group]}",
+                    f"Invariance of {instrument.name} Across {title}",
                     f"{method} n per group: {counts}.",
                     f"{measures[measure]}; answered every item: {counts}.",
                     f"invariance_groups_{instrument.id}_{i}",
                     lambda model=model: model,
                     test,
-                    f"the groups of {groups[group]}",
+                    across,
                 )
 
         def choose(key: str, value: str) -> None:

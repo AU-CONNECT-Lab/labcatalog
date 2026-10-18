@@ -13,6 +13,7 @@ from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
 from labcatalog.schema import Instrument
 from labcatalog.stats import invariance, mplus
+from labcatalog.stats.analysis import STUDY_KEY
 from labcatalog.stats.cfa import MLR, SUBSCALES, WLSMV, estimator_text
 from labcatalog.stats.invariance import (
     REPORTERS,
@@ -58,6 +59,8 @@ def method_text(result: CatalogResult, across: str, by: str, estimator: str) -> 
             f"{config.stats.correlate_by} are linked, and each item's residuals correlate across "
             "reporters"
         )
+    elif across == STUDY_KEY:
+        model = "a multigroup model with one group per study"
     else:
         model = f"a multigroup model with one group per answer to {by}"
     return f"lavaan and semTools: {model}; {how} against the step before."
