@@ -5,6 +5,7 @@ from glob import glob
 import pandas as pd
 import pytest
 
+from labcatalog.gui import measurement as measurement_view
 from labcatalog.pipeline import run_catalog
 from labcatalog.reports import results
 from labcatalog.stats import analysis, cfa, mplus
@@ -90,3 +91,17 @@ def test_the_factors_of_several_instruments_correlate_and_the_script_fits_the_sa
     assert saved["df.scaled"] == pytest.approx(fit.fit["df"])
     inputs = mplus.cfa_files([found.model], cfa.WLSMV, "test")
     assert any(name.endswith(".inp") for name in inputs)
+
+
+def test_the_diagram_draws_each_factor_its_items_loadings_and_correlations():
+    factors = {"a.t@d1": ["a_1_d1", "a_2_d1"], "b.t@d1": ["b_1", "b_2"]}
+    labels = {"a.t@d1": "Anxiety", "b.t@d1": "Burnout"}
+    fit = cfa.CfaFit("", "d1", cfa.MEASUREMENT, factors, 50)
+    fit.loadings = {("a.t@d1", "a_1_d1"): 0.71, ("b.t@d1", "b_2"): 0.64}
+    fit.correlations = {("a.t@d1", "b.t@d1"): {"r": 0.38, "low": 0.1, "high": 0.6, "p": 0.01}}
+    drawn = measurement_view.diagram(factors, labels, fit)
+    assert "Anxiety" in drawn and "Burnout" in drawn
+    assert ">a_1<title>a_1_d1</title>" in drawn
+    assert all(v in drawn for v in ("0.71", "0.64", "0.38"))
+    plain = measurement_view.diagram(factors, labels, None)
+    assert "0.38" not in plain and plain.count("<rect") == 4

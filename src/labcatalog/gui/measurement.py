@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from html import escape
 
 from nicegui import ui
 
@@ -94,6 +95,9 @@ def render(
                     "Standardized correlations between the factors, with 95% confidence intervals.",
                 ),
             }
+            ui.html(diagram(found.model.factors, found.labels, fit), sanitize=False).classes(
+                "w-full"
+            )
             for shown in papers.values():
                 paper_table(shown)
             results_text(
@@ -111,6 +115,16 @@ def render(
         setattr(chosen, name, value)
         controls.refresh()
         body.clear()
+        with body:
+            preview()
+
+    def preview() -> None:
+        # The model's shape before it is fitted, or why it cannot be.
+        found = mm.plan(result, sample, chosen.keys)
+        if found.problem:
+            note(found.problem)
+            return
+        ui.html(diagram(found.model.factors, found.labels, None), sanitize=False).classes("w-full")
 
     @ui.refreshable
     def controls() -> None:
@@ -144,6 +158,8 @@ def render(
         )
         controls()
         body = ui.column().classes("w-full gap-2")
+        with body:
+            preview()
 
 
 def first_dataset(keys: list[str]) -> list[str]:
@@ -221,3 +237,96 @@ def correlation_table(fit: CfaFit, labels: dict[str, str]) -> tuple[list[dict], 
             )
         rows.append(row)
     return columns, rows
+
+
+FACTOR_RX = 74
+FACTOR_RY = 22
+ITEM_W = 62
+ITEM_H = 24
+ITEM_GAP = 6
+GROUP_GAP = 28
+FACTOR_Y_GAP = 150
+ARC_STEP = 22
+MARGIN = 24
+LABEL_CHARS = 22
+# The diagram shrinks to the panel down to this share of its size, then scrolls.
+MIN_SCALE = 0.75
+
+
+def diagram(factors: dict[str, list[str]], labels: dict[str, str], fit: CfaFit | None) -> str:
+    # Factors in a row with their items below them, and the factor correlations as arcs above.
+    keys = list(factors)
+    x, spots, items = MARGIN, {}, []
+    for k in keys:
+        width = len(factors[k]) * (ITEM_W + ITEM_GAP) - ITEM_GAP
+        width = max(width, 2 * FACTOR_RX)
+        start = x + (width - (len(factors[k]) * (ITEM_W + ITEM_GAP) - ITEM_GAP)) / 2
+        for i, item in enumerate(factors[k]):
+            items.append((k, item, start + i * (ITEM_W + ITEM_GAP) + ITEM_W / 2))
+        spots[k] = x + width / 2
+        x += width + GROUP_GAP
+    width = x - GROUP_GAP + MARGIN
+    arc_top = ARC_STEP * (len(keys) - 1) + 30 if len(keys) > 1 else 0
+    factor_y = MARGIN + arc_top + FACTOR_RY
+    item_y = factor_y + FACTOR_Y_GAP
+    height = item_y + ITEM_H + MARGIN
+    parts = []
+    for i, a in enumerate(keys):
+        for j in range(i + 1, len(keys)):
+            b = keys[j]
+            x1, x2 = spots[a], spots[b]
+            top = factor_y - FACTOR_RY - ARC_STEP * (j - i) - 8
+            parts.append(
+                f'<path d="M{x1},{factor_y - FACTOR_RY} Q{(x1 + x2) / 2},{2 * top - factor_y + FACTOR_RY} '
+                f'{x2},{factor_y - FACTOR_RY}" fill="none" stroke="var(--lc-muted)" '
+                'stroke-width="1" marker-start="url(#lc-mm-head)" marker-end="url(#lc-mm-head)"/>'
+            )
+            found = (fit.correlations.get((a, b)) or fit.correlations.get((b, a))) if fit else None
+            if found:
+                parts.append(label_at((x1 + x2) / 2, top + 4, fmt(found["r"])))
+    for k, item, cx in items:
+        parts.append(
+            f'<line x1="{spots[k]}" y1="{factor_y + FACTOR_RY}" x2="{cx}" y2="{item_y}" '
+            'stroke="var(--lc-muted)" stroke-width="1" marker-end="url(#lc-mm-head)"/>'
+        )
+        parts.append(
+            f'<rect x="{cx - ITEM_W / 2}" y="{item_y}" width="{ITEM_W}" height="{ITEM_H}" rx="4" '
+            'fill="var(--lc-surface)" stroke="var(--lc-ink)" stroke-width="1"/>'
+        )
+        # The dataset a shared column name carries is the factor's own, so it is left off.
+        name = item.removesuffix("_" + k.rsplit("@", 1)[-1])
+        short = name if len(name) <= 10 else name[:9] + "…"
+        parts.append(
+            f'<text x="{cx}" y="{item_y + 16}" text-anchor="middle" font-size="11" '
+            f'fill="var(--lc-ink)">{escape(short)}<title>{escape(item)}</title></text>'
+        )
+        if fit and (k, item) in fit.loadings:
+            parts.append(label_at(cx, item_y - 6, fmt(fit.loadings[(k, item)])))
+    for k in keys:
+        text = labels[k]
+        short = text if len(text) <= LABEL_CHARS else text[: LABEL_CHARS - 1] + "…"
+        parts.append(
+            f'<ellipse cx="{spots[k]}" cy="{factor_y}" rx="{FACTOR_RX}" ry="{FACTOR_RY}" '
+            'fill="var(--lc-panel)" stroke="var(--lc-ink)" stroke-width="1.2"/>'
+            f'<text x="{spots[k]}" y="{factor_y + 4}" text-anchor="middle" font-size="12" '
+            f'font-weight="600" fill="var(--lc-ink)">{escape(short)}<title>{escape(text)}'
+            "</title></text>"
+        )
+    # Fitted to the panel, but scrolled rather than shrunk far, so labels stay legible.
+    return (
+        f'<div style="overflow-x: auto"><svg style="width: 100%; min-width: '
+        f'{MIN_SCALE * width:.0f}px; max-width: {width}px" '
+        f'viewBox="0 0 {width} {height}" role="img" aria-label="Path diagram of the measurement '
+        'model"><defs><marker id="lc-mm-head" viewBox="0 0 10 10" refX="10" refY="5" '
+        'markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 '
+        'L0,10 z" fill="var(--lc-muted)"/></marker></defs>' + "".join(parts) + "</svg></div>"
+    )
+
+
+def label_at(x: float, y: float, text: str) -> str:
+    # A number on a line, on the panel's colour so the line does not run through it.
+    return (
+        f'<text x="{x}" y="{y}" text-anchor="middle" font-size="11" fill="var(--lc-muted)" '
+        'paint-order="stroke" stroke="var(--lc-panel)" stroke-width="4">'
+        f"{escape(text)}</text>"
+    )
