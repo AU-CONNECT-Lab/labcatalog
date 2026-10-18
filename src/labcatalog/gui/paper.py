@@ -135,6 +135,7 @@ def save_button(
     chart: Chart | None = None,
     texts: dict[str, str] | None = None,
     later_texts: Callable[[], dict[str, str]] | None = None,
+    blobs: dict[str, bytes] | None = None,
 ) -> None:
     # later_texts builds files only when saving, such as Mplus inputs with their data.
     async def save() -> None:
@@ -146,6 +147,7 @@ def save_button(
         else:
             texts_now = texts or {}
         files |= {n: text.encode("utf-8") for n, text in texts_now.items()}
+        files |= blobs or {}
         if chart is not None and chart.plot is not None:
             for kind in IMAGE_KINDS:
                 files[f"{name}.{kind}"] = await image(chart, kind)

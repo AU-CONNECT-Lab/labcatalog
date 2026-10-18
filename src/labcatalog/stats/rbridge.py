@@ -1,7 +1,10 @@
 import json
 import subprocess
 import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
+from pathlib import Path
 
 from labcatalog.exceptions import RError
 from labcatalog.processes import NEW_GROUP, end_tree
@@ -19,7 +22,7 @@ ALL_PACKAGES = (
     + IMPUTATION_PACKAGES
 )
 MISSING_PACKAGES = 3
-# The R processes running now, so that closing the window can end them.
+# The analysis processes running now, so that closing the window can end them.
 RUNNING: set[subprocess.Popen] = set()
 # How many R processes run at once; the rest wait their turn, so many windows cannot fill memory.
 DEFAULT_AT_ONCE = 2
@@ -64,40 +67,58 @@ def allow_at_once(count: int) -> None:
 
 
 def run_r(rscript: str, args: list[str]) -> str:
+    with r_turn():
+        return run_now(rscript, args)
+
+
+@contextmanager
+def r_turn() -> Iterator[None]:
     # Held from this object, so a change to the limit meanwhile releases the one taken.
     gate = turns
     with gate:
-        return run_now(rscript, args)
+        yield
 
 
 def run_now(rscript: str, args: list[str]) -> str:
     try:
-        process = subprocess.Popen(
-            [rscript, *args],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            **NEW_GROUP,
-        )
+        process = run_process([rscript, *args])
     except OSError:
         raise RError(
             f"Rscript not found at {rscript}; check the path on the Settings page"
         ) from None
-    RUNNING.add(process)
-    try:
-        stdout, stderr = process.communicate()
-    finally:
-        RUNNING.discard(process)
     if process.returncode == MISSING_PACKAGES:
-        missing = stdout.split()
+        missing = process.stdout.split()
         raise RError(
             f"R is missing {', '.join(missing)}; install them in R with: {install_command(missing)}"
         )
     if process.returncode != 0:
-        raise RError(f"R stopped with an error: {stderr.strip()[-500:]}")
-    return stdout
+        raise RError(f"R stopped with an error: {process.stderr.strip()[-500:]}")
+    return process.stdout
+
+
+def run_process(
+    command: list[str],
+    folder: Path | None = None,
+    started: Callable[[subprocess.Popen], None] | None = None,
+) -> subprocess.CompletedProcess:
+    process = subprocess.Popen(
+        command,
+        cwd=folder,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        **NEW_GROUP,
+    )
+    RUNNING.add(process)
+    if started is not None:
+        started(process)
+    try:
+        stdout, stderr = process.communicate()
+    finally:
+        RUNNING.discard(process)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 def stop_all() -> None:

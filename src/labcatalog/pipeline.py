@@ -7,6 +7,7 @@ import pandas as pd
 
 from labcatalog import defaults
 from labcatalog.ai.cleaning import CleaningDraft, draft_script, fix_script
+from labcatalog.ai.custom import AnalysisDraft, draft_analysis, fix_analysis
 from labcatalog.ai.instrument import InstrumentDraft, draft_instrument
 from labcatalog.ai.interpret import Interpretation, interpret
 from labcatalog.ai.measures import Draft, draft_description
@@ -201,6 +202,28 @@ def run_cleaning_fix(
 ) -> CleaningDraft:
     client = make_llm_client(provider, model, url)
     return fix_script(result.project, result.catalog, issue, rows, client)
+
+
+def run_analysis_draft(
+    columns: str, wanted: str, language: str, data_file: str, provider: str, model: str, url: str
+) -> AnalysisDraft:
+    client = make_llm_client(provider, model, url)
+    return draft_analysis(columns, wanted, language, data_file, client)
+
+
+def run_analysis_fix(
+    columns: str,
+    wanted: str,
+    language: str,
+    data_file: str,
+    script: str,
+    ran: str,
+    provider: str,
+    model: str,
+    url: str,
+) -> AnalysisDraft:
+    client = make_llm_client(provider, model, url)
+    return fix_analysis(columns, wanted, language, data_file, script, ran, client)
 
 
 def run_description_draft(

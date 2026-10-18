@@ -12,6 +12,7 @@ from labcatalog.gui import (
     analysis_tables,
     charts,
     common,
+    custom,
     group_invariance,
     measurement,
     mediation,
@@ -46,6 +47,7 @@ PARTS = {
     "mediation": "Mediation",
     "multilevel": "Multilevel model",
     "panel": "Cross-lagged panel",
+    "custom": "Custom",
 }
 
 
@@ -81,6 +83,7 @@ class AnalysisView:
     t_test: str | None = None
     measurement: measurement.Choices = field(default_factory=measurement.Choices)
     mediation: mediation.Choices = field(default_factory=mediation.Choices)
+    custom: custom.Choices = field(default_factory=custom.Choices)
     # The instruments whose variables the page offers; None until first shown, then all.
     instruments: list[str] | None = None
     part: str = "correlation"
@@ -137,6 +140,8 @@ def render(result: CatalogResult, view: AnalysisView, study: str | None = None) 
             missing.render(result, sample, view, choices)
         elif view.part == "agreement":
             agreement.render(result, sample, view, choices)
+        elif view.part == "custom":
+            custom.render(result, sample, view, choices)
         elif view.part == "correlation":
             correlation_section(result, sample, view, choices)
         elif view.part == "regression":
