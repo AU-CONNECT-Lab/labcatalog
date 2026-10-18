@@ -42,6 +42,13 @@ class IdConfig(StrictModel):
     group: GroupConfig | None = None
 
 
+class RosterConfig(StrictModel):
+    # One row per person; where each person's group is read from when the ID holds none.
+    path: str
+    id_column: str | None = None
+    group_column: str | None = None
+
+
 class WaveConfig(StrictModel):
     start: date | None = None
     end: date | None = None
@@ -73,7 +80,6 @@ class DatasetConfig(StrictModel):
     url: str | None = None
     table: str | None = None
     id_column: str | None = None
-    group_column: str | None = None
     date_column: str | None = None
     # In a file holding several waves, the column that names each row's wave.
     wave_column: str | None = None
@@ -137,6 +143,7 @@ class ProjectConfig(StrictModel):
     missing_codes: list[MissingCode] = []
     defaults: Defaults = Field(default_factory=Defaults)
     ids: IdConfig = Field(default_factory=IdConfig)
+    roster: RosterConfig | None = None
     studies: dict[str, StudyConfig] = {}
     datasets: list[DatasetConfig] = []
     custom_fields: list[CustomFieldDef] = []

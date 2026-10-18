@@ -53,7 +53,9 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 | `id_whitespace` | error | IDs with leading or trailing spaces. |
 | `id_pattern` | error | IDs that do not match `ids.pattern`. |
 | `id_duplicate` | error | IDs that appear more than once in one file. |
-| `group_missing` | warning | IDs from which no group can be read. |
+| `group_missing` | warning | IDs from which no group can be read, or people the roster lists without a group. |
+| `id_not_in_roster` | warning | IDs in the data that the roster does not list. |
+| `roster_unused` | info | People in the roster who are in no dataset. |
 | `excluded_present` | error | Rows of people or groups on the exclusion list. |
 | `possible_identifier` | warning | A column whose name or values suggest names, emails, phone numbers, addresses or birth dates. |
 | `date_unparseable` | warning | Dates in the `date_column` that do not match `defaults.date_format`. |

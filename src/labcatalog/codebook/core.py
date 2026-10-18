@@ -179,7 +179,7 @@ def template_items(
     fields: dict[str, redcap.Field] | None = None,
 ) -> list[dict[str, str]]:
     config = project.config
-    skipped = {id_column_for(config, dataset), dataset.group_column, dataset.date_column}
+    skipped = {id_column_for(config, dataset), dataset.date_column}
     mapped = {
         entry.column: (entry.instrument, entry.item)
         for entries in project.maps.values()

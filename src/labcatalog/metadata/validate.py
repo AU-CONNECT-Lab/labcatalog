@@ -514,12 +514,16 @@ def check_data_settings(project: Project) -> list[Issue]:
         if dataset.source != "folder" and dataset.files is not None:
             message = f"{where}.files: only folder datasets take files"
             issues.append(problem("invalid_value", message, CONFIG))
-        if dataset.group_column and group is None:
-            message = f"{where}.group_column: declare ids.group (its name) first"
-            issues.append(problem("invalid_value", message, CONFIG))
-        if group and not group.from_id and not dataset.group_column:
-            message = f"{where}: needs group_column, or ids.group.from_id for every dataset"
-            issues.append(problem("invalid_value", message, CONFIG))
+    group_column = config.roster.group_column if config.roster else None
+    if group_column and group is None:
+        message = "roster.group_column: declare ids.group (its name) first"
+        issues.append(problem("invalid_value", message, CONFIG))
+    if group and not group.from_id and not group_column:
+        message = "ids.group: needs from_id, or a roster with a group_column"
+        issues.append(problem("invalid_value", message, CONFIG))
+    if group and group.from_id and group_column:
+        message = "ids.group.from_id and roster.group_column: read the group in one way only"
+        issues.append(problem("invalid_value", message, CONFIG))
     allowed = {"id", "none"} | ({group.name} if group else set())
     if config.stats.correlate_by not in allowed:
         message = f"stats.correlate_by: '{config.stats.correlate_by}' is not one of {', '.join(sorted(allowed))}"

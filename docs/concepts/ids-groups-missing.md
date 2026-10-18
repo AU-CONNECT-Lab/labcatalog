@@ -17,7 +17,7 @@ ids:
 
 ## Groups
 
-Some people belong together: a parent and their child, siblings, pupils in a class. A group links them. Declare it under `ids`, with a name and how to read the group from each ID:
+Some people belong together: a parent and their child, siblings, pupils in a class. A group links them. Declare it under `ids` with a name of your choosing. When the ID holds the group, say how to read it:
 
 ```yaml
 ids:
@@ -27,7 +27,24 @@ ids:
     from_id: '^(\d{4})'
 ```
 
-Here `1001P` and `1001C` are the parent and child of family `1001`. `from_id` is a regular expression whose first group is the group's ID. If the group cannot be read from the ID, leave out `from_id` and give each dataset a `group_column` instead.
+Here `1001P` and `1001C` are the parent and child of family `1001`. `from_id` is a regular expression whose first group is the group's ID.
+
+When every person has an ID of their own that says nothing of their group, list everyone once in a roster instead and give the group only its name:
+
+```yaml
+ids:
+  group:
+    name: family
+
+roster:
+  path: data/participants.csv
+  id_column: pid
+  group_column: family_id
+```
+
+The roster is a CSV file with one row per person: their ID, their group in a column you name, and any other columns you keep there, such as their role or birth year. Every dataset takes its people's groups from it, so a file that holds only a child's ID, such as an EEG file, still knows the child's family. Most labs already keep such a list, from recruitment or a demographics form; it can be made by one of your [prepare steps](../how-to/prepare-steps.md) like any other file. `from_id` and a roster's `group_column` are two ways of giving the same thing, so a project uses one of them.
+
+With a roster, `labcatalog check` also reports IDs in the data that the roster does not list (`id_not_in_roster`), people the roster lists twice (`id_duplicate`) or without a group (`group_missing`), and, for information, people in the roster who are in no dataset yet (`roster_unused`).
 
 Groups are used in three places:
 

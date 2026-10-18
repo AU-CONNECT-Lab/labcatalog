@@ -9,7 +9,7 @@ from labcatalog.data.ids import group_ids
 from labcatalog.exceptions import DataSourceError
 from labcatalog.paths import expand_path
 from labcatalog.project import Project
-from labcatalog.sources.csv_source import CsvSource
+from labcatalog.sources.csv_source import CsvSource, read_csv
 from labcatalog.sources.folder_source import FolderSource
 
 
@@ -51,7 +51,36 @@ def get_source(name: str) -> DataSource:
     return SOURCES[name]
 
 
-def load_dataset(project: Project, dataset: DatasetConfig) -> LoadedDataset:
+@dataclass
+class Roster:
+    frame: pd.DataFrame
+    id_column: str
+    group_column: str | None
+    path: Path
+
+    def groups(self) -> pd.Series:
+        # A person listed twice has no known group; the checks report them.
+        ids = self.frame[self.id_column]
+        listed = self.frame[(ids != "") & ~ids.duplicated(keep=False)]
+        return listed.set_index(self.id_column)[self.group_column].replace("", pd.NA)
+
+
+def load_roster(project: Project) -> Roster | None:
+    roster = project.config.roster
+    if roster is None:
+        return None
+    path = expand_path(roster.path, project.root)
+    frame = read_csv(path, "roster")
+    id_column = roster.id_column or project.config.defaults.id_column
+    for column in (id_column, roster.group_column):
+        if column and column not in frame:
+            raise DataSourceError(f"roster: no column '{column}' in {path}")
+    return Roster(frame, id_column, roster.group_column, path)
+
+
+def load_dataset(
+    project: Project, dataset: DatasetConfig, groups: pd.Series | None = None
+) -> LoadedDataset:
     config = project.config
     id_column = id_column_for(config, dataset)
     frame = get_source(dataset.source).read(dataset, project.root, id_column)
@@ -67,10 +96,8 @@ def load_dataset(project: Project, dataset: DatasetConfig) -> LoadedDataset:
     ids = frame[id_column]
 
     group = None
-    if dataset.group_column:
-        if dataset.group_column not in frame:
-            raise DataSourceError(f"{dataset.name}: no group column '{dataset.group_column}'")
-        group = frame[dataset.group_column]
+    if groups is not None:
+        group = ids.map(groups)
     elif config.ids.group and config.ids.group.from_id:
         group = group_ids(ids, config.ids.group.from_id)
 
@@ -85,4 +112,8 @@ def load_dataset(project: Project, dataset: DatasetConfig) -> LoadedDataset:
 
 
 def load_datasets(project: Project) -> dict[str, LoadedDataset]:
-    return {dataset.name: load_dataset(project, dataset) for dataset in project.config.datasets}
+    roster = load_roster(project)
+    groups = roster.groups() if roster and roster.group_column else None
+    return {
+        dataset.name: load_dataset(project, dataset, groups) for dataset in project.config.datasets
+    }

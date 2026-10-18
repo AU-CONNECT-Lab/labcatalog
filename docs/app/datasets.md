@@ -23,7 +23,7 @@ Click a row to open the dataset.
 **Add a dataset**, above the tables, adds one CSV file to the project. It takes four steps:
 
 1. **Start from**: choose **Repeat a dataset** or **A new kind of file**.
-    - **Repeat a dataset** is for a file like one the project already has, usually the same questionnaire in the next wave. Pick it under **Same as**. The new one takes that dataset's modality, study, reporter, ID, group and date columns. The window suggests the next wave and a name with the wave number changed (`parent_w1` becomes `parent_w2`). A folder of files takes the same folder and its files rule with the wave number changed (`ses-1` becomes `ses-2`); check the match on the next step. A dataset read from a file that holds every wave (one with a `wave_column`) reads the same file again for the new wave.
+    - **Repeat a dataset** is for a file like one the project already has, usually the same questionnaire in the next wave. Pick it under **Same as**. The new one takes that dataset's modality, study, reporter, ID and date columns. The window suggests the next wave and a name with the wave number changed (`parent_w1` becomes `parent_w2`). A folder of files takes the same folder and its files rule with the wave number changed (`ses-1` becomes `ses-2`); check the match on the next step. A dataset read from a file that holds every wave (one with a `wave_column`) reads the same file again for the new wave.
     - **A new kind of file** is for the first dataset of a study, or a reporter or modality the project has not had before. Choose **A table** or **A folder of files** (such as scans or recordings), its **Study**, **Modality** and **Reporter**, and type its **Name** and **Wave**.
 
     Change the suggestions if needed, and set **Data as of**.

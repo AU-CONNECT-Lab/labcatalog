@@ -101,7 +101,12 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     "id_whitespace": ("IDs with a space before or after them.", SCRIPTS),
     "id_pattern": ("IDs that do not look like the project's IDs.", SCRIPTS),
     "id_duplicate": ("The same ID appears more than once in one file.", SCRIPTS),
-    "group_missing": ("IDs from which the group ID cannot be read.", SCRIPTS),
+    "group_missing": ("IDs with no group ID, read from the ID or from the roster.", SCRIPTS),
+    "id_not_in_roster": (
+        "IDs in the data that the roster does not list: a typo, or a person not yet added to "
+        "the roster.",
+        SCRIPTS,
+    ),
     "excluded_present": ("Rows of people on the exclusion list are still in the data.", SCRIPTS),
     "possible_identifier": (
         "A column that may hold names, emails, phone numbers, addresses or birth dates. It "

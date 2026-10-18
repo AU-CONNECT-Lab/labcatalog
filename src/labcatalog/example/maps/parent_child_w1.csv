@@ -1,0 +1,11 @@
+column,instrument,item
+pid,,
+visit_date,,
+ewt_1_w1,example_worries_temper,ewt_1
+ewt_2_w1,example_worries_temper,ewt_2
+ewt_3_w1,example_worries_temper,ewt_3
+ewt_4_w1,example_worries_temper,ewt_4
+ewt_5_w1,example_worries_temper,ewt_5
+ewt_6_w1,example_worries_temper,ewt_6
+ewt_7_w1,example_worries_temper,ewt_7
+ewt_8_w1,example_worries_temper,ewt_8

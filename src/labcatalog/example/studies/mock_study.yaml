@@ -3,7 +3,7 @@ study: mock_study
 # How each modality's data were collected and processed in this study; one paragraph per line, a blank line between paragraphs.
 methods:
   questionnaire: |
-    Parents filled in their questionnaires online in the week after each visit. Children answered theirs on a tablet during the visit, and a research assistant read the items aloud to children who asked.
+    Parents filled in their questionnaires online in the week after each visit, and one short checklist for each of their children taking part. Children answered theirs on a tablet during the visit, and a research assistant read the items aloud to children who asked.
 
     Each wave was exported from the survey platform and cleaned with scripts/clean_export.py, which drops preview responses and unfinished attempts and takes the visit date from the start time.
   eeg: |
@@ -25,6 +25,8 @@ administrations:
   - {instrument: example_child_sleep, datasets: [parent_w1, parent_w2, parent_w3], target: child}
   - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self}
   - {instrument: example_screen_time, datasets: [child_w2, child_w3], target: self}
+  - {instrument: example_worries_temper, datasets: [parent_child_w1, parent_child_w2, parent_child_w3], target: child}
+  - {instrument: example_worries_temper, datasets: [child_w1, child_w2, child_w3], target: self}
   - {instrument: example_demographics, datasets: [parent_w1, parent_w2, parent_w3]}
   - {instrument: eeg_resting, datasets: [eeg_w1, eeg_w3], target: self}
   - {instrument: fmri_resting, datasets: [fmri_w1, fmri_w3], target: self}

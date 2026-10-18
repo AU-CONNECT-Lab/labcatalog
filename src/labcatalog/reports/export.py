@@ -213,7 +213,7 @@ def exported_scores(
 def data_frame(result: CatalogResult, dataset: str, instrument_ids: list[str]) -> pd.DataFrame:
     loaded = result.datasets[dataset]
     config = loaded.config
-    keys = [id_column_for(result.project.config, config), config.group_column, config.date_column]
+    keys = [id_column_for(result.project.config, config), config.date_column]
     # Open answers are never shown or exported, since they can identify people.
     items = [
         v.column
@@ -221,6 +221,10 @@ def data_frame(result: CatalogResult, dataset: str, instrument_ids: list[str]) -
         if v.instrument_id in instrument_ids and v.type != "text"
     ]
     frame = loaded.frame[[c for c in dict.fromkeys(keys) if c] + items].copy()
+    group = result.project.config.ids.group
+    # A group read from the roster is not in the data, so it goes next to the ID.
+    if result.project.config.roster and group and loaded.group is not None:
+        frame.insert(1, group.name, loaded.group)
     for score in exported_scores(result, dataset, instrument_ids):
         frame[output_name(score)] = result.scores[dataset][score.key]
     return frame
@@ -303,6 +307,8 @@ def wide_frame(
         frame = data_frame(result, dataset, instrument_ids)
         if layout == BY_ID:
             frame = frame.drop(columns=loaded.id_column)
+        elif key_name(result, layout) in frame:
+            frame = frame.drop(columns=key_name(result, layout))
         frame = frame.add_prefix(f"{dataset}_")[keep]
         parts.append(frame.set_axis(keys[keep].to_numpy()))
     wide = pd.concat(parts, axis=1).sort_index()

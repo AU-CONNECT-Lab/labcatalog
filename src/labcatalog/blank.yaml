@@ -16,6 +16,13 @@ vocab:
 # Codes in the data that mean "no answer"; they are counted, never scored. Blank cells always count as missing.
 missing_codes: []
 
+# Optional: the ID format to check, and the group each person belongs to (a family, a classroom; you choose the name). The group can be read from part of the ID:
+#   ids:
+#     pattern: '^\d{4}[PC]$'
+#     group: {name: family, from_id: '^(\d{4})'}
+# Or list everyone once in a roster, one row per person, with the group in a column you name; every dataset then takes its people's groups from it, and ids.group needs only its name:
+#   roster: {path: data/participants.csv, id_column: pid, group_column: family_id}
+
 # Optional: how the statistics run, shown here with their defaults. Everyone opening the project gets the same numbers.
 #   stats:
 #     correlate_by: id          # how people in different files are matched: id, a group name under ids, or none

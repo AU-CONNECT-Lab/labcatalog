@@ -40,7 +40,6 @@ datasets:
 | `source` | `csv` for a table, `folder` for a folder of files. |
 | `path` | The file, or for a folder dataset the folder. |
 | `id_column` | The column with participant IDs, when it is not `defaults.id_column`. |
-| `group_column` | A column with each person's group, when the group is not read from the ID. |
 | `date_column` | A column with the date each row was collected, for the "collected by month" chart. |
 | `wave_column` | In a file that holds several waves, the column naming each row's wave. |
 | `snapshot_date` | The date the file was exported, shown as "data as of". |

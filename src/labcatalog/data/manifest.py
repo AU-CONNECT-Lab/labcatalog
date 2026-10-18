@@ -17,7 +17,7 @@ from labcatalog.datalad.versions import (
 )
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project, bib_path, references_root
-from labcatalog.sources import LoadedDataset
+from labcatalog.sources import LoadedDataset, load_roster
 from labcatalog.version import __version__
 
 CHUNK = 1 << 20
@@ -88,6 +88,8 @@ def used_paths(config: ProjectConfig, root: Path) -> list[Path]:
         metadata.append(references_root(config, root))
     if config.exclusions:
         metadata.append(expand_path(config.exclusions, root))
+    if config.roster:
+        metadata.append(expand_path(config.roster.path, root))
     sources = [expand_path(d.path, root) for d in config.datasets if d.path]
     inputs = [expand_path(path, root) for step in config.prepare for path in step.inputs]
     return present(list(dict.fromkeys([*metadata, *sources, *inputs])))
@@ -95,6 +97,18 @@ def used_paths(config: ProjectConfig, root: Path) -> list[Path]:
 
 def present(paths: list[Path]) -> list[Path]:
     return [p for p in paths if p.exists() or is_placeholder(p)]
+
+
+def roster_records(project: Project) -> list[FileRecord]:
+    roster = load_roster(project)
+    if roster is None:
+        return []
+    path = portable_path(roster.path, project.root).as_posix()
+    return [
+        FileRecord(
+            dataset="roster", path=path, sha256=file_sha256(roster.path), rows=len(roster.frame)
+        )
+    ]
 
 
 def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Manifest:
@@ -115,7 +129,8 @@ def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Mani
             )
             for name, loaded in datasets.items()
             if loaded.source_path is not None
-        ],
+        ]
+        + roster_records(project),
         inputs=[
             InputRecord(step=state.step.name, path=f.path, sha256=file_sha256(f.resolved))
             for state in states

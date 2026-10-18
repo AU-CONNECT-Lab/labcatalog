@@ -48,9 +48,19 @@ missing_codes:
 |---|---|
 | `pattern` | A regular expression every participant ID must match. |
 | `group.name` | The name of the group, such as `family`. |
-| `group.from_id` | A regular expression whose first group reads the group from an ID. Without it, every dataset needs a `group_column`. |
+| `group.from_id` | A regular expression whose first group reads the group from an ID. Without it, the `roster` gives each person's group. |
 
 See [IDs, Groups and Missing Codes](../concepts/ids-groups-missing.md).
+
+## roster
+
+A CSV file listing everyone once, one row per person. Optional.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `path` | | The file, relative to the project folder. |
+| `id_column` | `defaults.id_column` | The column with each person's ID. |
+| `group_column` | none | The column with each person's group, named by `ids.group.name`. Every dataset takes its groups from here; a project gives `ids.group.from_id` or this, not both. |
 
 ## studies
 
@@ -79,7 +89,6 @@ A list with one entry per data file.
 | `path` | path | The file, or the folder. |
 | `files` | text | For a folder dataset: the files to count, with `{id}` where the path holds the ID. |
 | `id_column` | text | The ID column, when it is not `defaults.id_column`. |
-| `group_column` | text | A column with each row's group, when the group is not read from the ID. |
 | `date_column` | text | A column with the date each row was collected. |
 | `wave_column` | text | In a file that holds several waves, the column naming each row's wave; the dataset reads only the rows of its own `wave`. |
 | `snapshot_date` | date | The date the file was exported. |

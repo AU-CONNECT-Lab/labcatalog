@@ -72,7 +72,7 @@ def test_variable_list_has_items_then_scores(result):
 def test_data_keep_raw_values_add_scores_and_leave_out_open_answers(result):
     frame = data_frame(result, "parent_w1", ["example_demographics", "example_parent_stress"])
     raw = result.datasets["parent_w1"].frame
-    assert list(frame.columns[:3]) == ["pid", "visit_date", "eps_1_w1"]
+    assert list(frame.columns[:4]) == ["pid", "family", "visit_date", "eps_1_w1"]
     assert frame["eps_1_w1"].equals(raw["eps_1_w1"])
     assert "dem_comment_w1" not in frame and "dem_age_w1" in frame
     score = "example_parent_stress.eps_mean@parent_w1"

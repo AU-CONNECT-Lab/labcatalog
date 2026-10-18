@@ -15,7 +15,7 @@ from labcatalog.datalad.check import check_git_annex
 from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
-from labcatalog.sources import LoadedDataset
+from labcatalog.sources import LoadedDataset, load_roster
 
 EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
 PHONE = re.compile(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
@@ -42,6 +42,7 @@ def check_project(
             *check_waves(project, datasets),
             *check_values(project, catalog, datasets),
             *check_ids(project, datasets),
+            *check_roster(project, datasets),
             *check_exclusions(project, datasets),
             *check_identifier_columns(project, datasets),
             *check_dates(project, datasets),
@@ -162,46 +163,15 @@ def check_values(
 
 
 def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
-    pattern = project.config.ids.pattern
     issues = []
     for loaded in datasets.values():
         where = location(project, loaded)
         ids = loaded.frame[loaded.id_column]
-        blank = ids.str.strip() == ""
-        spaced = ~blank & (ids != ids.str.strip())
-        # Rows already reported for spaces are not reported again below.
-        clean = ~blank & ~spaced
         dataset_name = loaded.config.name
-        if blank.any():
-            message = f"{blank.sum()} row(s) have no ID"
-            issues.append(
-                problem("id_missing", message, where, dataset=dataset_name, rows=rows_of(blank))
-            )
-        if spaced.any():
-            shown = examples([repr(value) for value in ids[spaced]])
-            message = f"{spaced.sum()} ID(s) have leading or trailing spaces: {shown}"
-            issues.append(
-                problem("id_whitespace", message, where, dataset=dataset_name, rows=rows_of(spaced))
-            )
-        if pattern:
-            mismatched = clean & ~ids.str.fullmatch(pattern)
-            if mismatched.any():
-                message = f"{mismatched.sum()} ID(s) do not match ids.pattern: {examples(ids[mismatched])}"
-                issues.append(
-                    problem(
-                        "id_pattern", message, where, dataset=dataset_name, rows=rows_of(mismatched)
-                    )
-                )
-        duplicated = clean & ids.duplicated(keep=False)
-        if duplicated.any():
-            repeated = ids[duplicated].unique()
-            message = f"{len(repeated)} ID(s) appear more than once: {examples(repeated)}"
-            issues.append(
-                problem(
-                    "id_duplicate", message, where, dataset=dataset_name, rows=rows_of(duplicated)
-                )
-            )
-        if loaded.group is not None:
+        clean, found = id_problems(project, ids, where, dataset=dataset_name)
+        issues += found
+        # With a roster, people missing from it are reported by check_roster instead.
+        if loaded.group is not None and project.config.roster is None:
             no_group = clean & loaded.group.isna()
             if no_group.any():
                 name = project.config.ids.group.name if project.config.ids.group else "group"
@@ -216,6 +186,80 @@ def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issu
                         rows=rows_of(no_group),
                     )
                 )
+    return issues
+
+
+def id_problems(
+    project: Project, ids: pd.Series, where: str, **details: Any
+) -> tuple[pd.Series, list[Issue]]:
+    pattern = project.config.ids.pattern
+    issues = []
+    blank = ids.str.strip() == ""
+    spaced = ~blank & (ids != ids.str.strip())
+    # Rows already reported for spaces are not reported again below.
+    clean = ~blank & ~spaced
+    if blank.any():
+        message = f"{blank.sum()} row(s) have no ID"
+        issues.append(problem("id_missing", message, where, rows=rows_of(blank), **details))
+    if spaced.any():
+        shown = examples([repr(value) for value in ids[spaced]])
+        message = f"{spaced.sum()} ID(s) have leading or trailing spaces: {shown}"
+        issues.append(problem("id_whitespace", message, where, rows=rows_of(spaced), **details))
+    if pattern:
+        mismatched = clean & ~ids.str.fullmatch(pattern)
+        if mismatched.any():
+            message = (
+                f"{mismatched.sum()} ID(s) do not match ids.pattern: {examples(ids[mismatched])}"
+            )
+            issues.append(
+                problem("id_pattern", message, where, rows=rows_of(mismatched), **details)
+            )
+    duplicated = clean & ids.duplicated(keep=False)
+    if duplicated.any():
+        repeated = ids[duplicated].unique()
+        message = f"{len(repeated)} ID(s) appear more than once: {examples(repeated)}"
+        issues.append(problem("id_duplicate", message, where, rows=rows_of(duplicated), **details))
+    return clean, issues
+
+
+def check_roster(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
+    roster = load_roster(project)
+    if roster is None:
+        return []
+    where = portable_path(roster.path, project.root).as_posix()
+    ids = roster.frame[roster.id_column]
+    clean, issues = id_problems(project, ids, where)
+    if roster.group_column:
+        no_group = clean & (roster.frame[roster.group_column].str.strip() == "")
+        if no_group.any():
+            name = project.config.ids.group.name if project.config.ids.group else "group"
+            message = f"{no_group.sum()} person(s) have no {name} ID: {examples(ids[no_group])}"
+            issues.append(
+                problem("group_missing", message, where, "warning", rows=rows_of(no_group))
+            )
+    listed = set(ids[clean])
+    seen = set()
+    for loaded in datasets.values():
+        found = loaded.frame[loaded.id_column]
+        seen.update(found.str.strip())
+        # Blank and spaced IDs are reported by check_ids already.
+        unlisted = (found.str.strip() == found) & (found != "") & ~found.isin(listed)
+        if unlisted.any():
+            message = f"{unlisted.sum()} ID(s) are not in the roster: {examples(found[unlisted])}"
+            issues.append(
+                problem(
+                    "id_not_in_roster",
+                    message,
+                    location(project, loaded),
+                    "warning",
+                    dataset=loaded.config.name,
+                    rows=rows_of(unlisted),
+                )
+            )
+    unused = sorted(listed - seen)
+    if unused:
+        message = f"{len(unused)} person(s) in the roster are in no dataset: {examples(unused)}"
+        issues.append(problem("roster_unused", message, where, "info"))
     return issues
 
 

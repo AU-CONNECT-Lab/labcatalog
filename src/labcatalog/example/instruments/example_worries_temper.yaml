@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: example_worries_temper
+name: Example Worries and Temper Checklist
+abbreviation: EWT
+construct_name: Worries and temper
+instructions: How true has each of these been over the last six months? Parents answer once for each child; children answer about themselves.
+response_sets:
+  - id: true_of
+    options:
+      - {value: 0, label: Not true}
+      - {value: 1, label: Somewhat true}
+      - {value: 2, label: Certainly true}
+default_response_set: true_of
+items:
+  - {id: ewt_1, text: Often worried.}
+  - {id: ewt_2, text: Quick to lose temper.}
+  - {id: ewt_3, text: Afraid of making mistakes.}
+  - {id: ewt_4, text: Often argues with adults.}
+  - {id: ewt_5, text: Nervous in new situations.}
+  - {id: ewt_6, text: Finds it hard to wait for a turn.}
+  - {id: ewt_7, text: Upset when plans change.}
+  - {id: ewt_8, text: Breaks rules at home or at school.}
+scores:
+  - {id: ewt_total, label: Total score, method: sum, items: [ewt_1, ewt_2, ewt_3, ewt_4, ewt_5, ewt_6, ewt_7, ewt_8], custom: {topics: [negative affect]}}
+  - {id: ewt_worries, label: Worries, method: sum, items: [ewt_1, ewt_3, ewt_5, ewt_7], custom: {topics: [negative affect]}}
+  - {id: ewt_temper, label: Temper, method: sum, items: [ewt_2, ewt_4, ewt_6, ewt_8], custom: {topics: [negative affect]}}
+references:
+  - {key: trial2020}
+license: Free for research use (fictional)
+custom:
+  domain: emotion
