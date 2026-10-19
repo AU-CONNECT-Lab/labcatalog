@@ -345,7 +345,12 @@ def group_section(
                 {k: TESTS[k] for k in ("welch", "student")},
                 view.t_test or result.project.config.stats.t_test,
                 choose_test,
-                "With two groups; three or more take a one-way ANOVA",
+                "With two groups; three or more take a one-way ANOVA"
+                + (
+                    "; multiple imputation always pools Student's t"
+                    if missing.imputing(result, view)
+                    else ""
+                ),
             )
         body()
 
