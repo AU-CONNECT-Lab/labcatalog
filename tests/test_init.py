@@ -1,9 +1,8 @@
 import json
-import sys
 
 import pytest
 
-from labcatalog.cli import main
+from labcatalog.exceptions import ProjectExistsError
 from labcatalog.pipeline import run_catalog, run_check, run_schema, run_validate
 from labcatalog.project import init_project
 
@@ -29,13 +28,10 @@ def test_blank_project_is_valid_and_empty(tmp_path):
     assert (root / "schemas" / "labcatalog.schema.json").is_file()
 
 
-def test_init_refuses_a_folder_that_has_files(tmp_path, monkeypatch, capsys):
+def test_init_refuses_a_folder_that_has_files(tmp_path):
     (tmp_path / "notes.txt").write_text("keep me", encoding="utf-8")
-    monkeypatch.setattr(sys, "argv", ["labcatalog", "init", str(tmp_path)])
-    with pytest.raises(SystemExit) as caught:
-        main()
-    assert caught.value.code == 3
-    assert "is not empty" in capsys.readouterr().err
+    with pytest.raises(ProjectExistsError, match="is not empty"):
+        init_project(tmp_path)
     assert [p.name for p in tmp_path.iterdir()] == ["notes.txt"]
 
 

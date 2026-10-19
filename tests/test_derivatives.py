@@ -1,13 +1,10 @@
 import json
-import os
-import sys
 from pathlib import Path
 
 import pytest
 import yaml
 
-from labcatalog.cli import main
-from labcatalog.codebook.derivatives import Request, command_line, run_derivatives
+from labcatalog.codebook.derivatives import Request, run_derivatives
 from labcatalog.data.check import check_values
 from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.exceptions import CodebookError
@@ -132,36 +129,6 @@ def test_a_table_without_sessions_needs_a_wave(demo_project):
     assert yaml.safe_load((demo_project / "instruments" / "qc.yaml").read_text())["items"] == [
         {"id": "age", "text": "age", "type": "number"}
     ]
-
-
-def test_command_prints_what_to_add(demo_project, monkeypatch, capsys):
-    table = pipeline_table(demo_project)
-    argv = ["labcatalog", "derivatives", str(table), "--name", "qc", "--study", "demo_study"]
-    argv += [
-        "--modality",
-        "fnirs",
-        "--reporter",
-        "child",
-        "--split",
-        "task",
-        "-p",
-        str(demo_project),
-    ]
-    monkeypatch.setattr(sys, "argv", argv)
-    with pytest.raises(SystemExit) as caught:
-        main()
-    out = capsys.readouterr().out
-    assert caught.value.code == 0
-    assert "Neither numbers nor given Levels, so left out: device" in out and "add under datasets:" in out
-
-
-def test_command_line_repeats_the_run_for_a_prepare_step(demo_project):
-    table = pipeline_table(demo_project)
-    line = command_line(request(table, split=["task"], label="Pipe quality"), demo_project)
-    assert line.startswith("labcatalog derivatives derivatives/pipe/desc-qc.tsv --name qc ")
-    assert line.endswith(
-        "--split task --label " + ('"Pipe quality"' if os.name == "nt" else "'Pipe quality'")
-    )
 
 
 def test_the_import_page_form_asks_for_what_is_missing_and_splits_lists():

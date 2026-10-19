@@ -1,9 +1,7 @@
-import sys
-
 import pandas as pd
 import pytest
 
-from labcatalog.cli import main
+from labcatalog.exceptions import ExportError
 from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import run_catalog
 from labcatalog.reports.export import (
@@ -17,6 +15,7 @@ from labcatalog.reports.export import (
     data_frame,
     export_plan,
     layouts,
+    named_plan,
     variable_rows,
     write_export,
 )
@@ -132,38 +131,23 @@ def test_wide_table_by_group_puts_parent_and_child_side_by_side(result):
     assert (row["parent_w1_pid"], row["child_w1_pid"]) == ("1001P", "1001C")
 
 
-def run_cli(monkeypatch, capsys, *args: str) -> tuple[int, str, str]:
-    monkeypatch.setattr(sys, "argv", ["labcatalog", "export", *args])
-    with pytest.raises(SystemExit) as caught:
-        main()
-    out = capsys.readouterr()
-    return caught.value.code, out.out, out.err
-
-
-def test_cli_exports_named_instruments(mock_project, monkeypatch, capsys):
-    p = ["-p", str(mock_project)]
-    code, out, _ = run_cli(monkeypatch, capsys, "example_mood", "-d", "child_w3", *p)
-    assert code == 0
-    folder = next((mock_project / "outputs").iterdir())
-    assert out.strip() == f"Wrote {folder.resolve()}"
-    assert sorted(f.name for f in folder.iterdir()) == [
+def test_named_instruments_are_exported_from_the_datasets_that_give_them(result):
+    done = write_export(result, named_plan(result, ["example_mood"], ["child_w3"]), BY_DATASET)
+    assert sorted(f.name for f in done.folder.iterdir()) == [
         "child_w3.csv",
         ITEM_STATISTICS,
         "manifest.json",
         SCORE_STATISTICS,
         VARIABLES,
     ]
-    code, out, _ = run_cli(monkeypatch, capsys, "example_parent_stress", "--by", "id", *p)
-    assert code == 0 and "Left out 2 rows of parent_w3: their id repeats in that file" in out
-    code, _, err = run_cli(monkeypatch, capsys, "example_mood", "--by", "row", *p)
-    assert (code, err.strip()) == (
-        1,
-        "Error: Cannot export by row; these datasets allow dataset, id, group",
-    )
-    code, _, err = run_cli(monkeypatch, capsys, "example_mood", "nope", *p)
-    assert (code, err.strip()) == (1, "Error: Not an instrument or dataset in this project: nope")
-    code, _, err = run_cli(monkeypatch, capsys, "example_mood", "-d", "parent_w1", *p)
-    assert (code, err.strip()) == (1, "Error: None of these instruments is in these datasets")
+    wide = write_export(result, named_plan(result, ["example_parent_stress"], []), BY_ID)
+    assert wide.left_out == {"parent_w3": 2}
+    with pytest.raises(ExportError, match="Cannot export by row; these datasets allow dataset"):
+        write_export(result, named_plan(result, ["example_mood"], []), "row")
+    with pytest.raises(ExportError, match="Not an instrument or dataset in this project: nope"):
+        named_plan(result, ["example_mood", "nope"], [])
+    with pytest.raises(ExportError, match="None of these instruments is in these datasets"):
+        named_plan(result, ["example_mood"], ["parent_w1"])
 
 
 def test_statistics_match_the_summary_and_leave_out_open_answers(result):

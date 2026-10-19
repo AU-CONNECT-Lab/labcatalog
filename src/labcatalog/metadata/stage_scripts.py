@@ -83,6 +83,57 @@ if __name__ == "__main__":
     for recording in sorted(source.iterdir()):
         process(recording, target)
 """,
+    ("database", "python"): '''\
+import csv
+import sqlite3
+import sys
+from pathlib import Path
+
+QUERY = """
+SELECT * FROM visits
+"""
+
+
+def connect(path: str):
+    # Read only: a SQLite file starts with this header; any other file is read as DuckDB.
+    with open(path, "rb") as file:
+        if file.read(16) == b"SQLite format 3\\x00":
+            return sqlite3.connect(f"file:{Path(path).resolve().as_posix()}?mode=ro", uri=True)
+    import duckdb
+
+    return duckdb.connect(path, read_only=True)
+
+
+if __name__ == "__main__":
+    connection = connect(sys.argv[1])
+    rows = connection.execute(QUERY)
+    with open(sys.argv[2], "w", encoding="utf-8", newline="") as file:
+        writer = csv.writer(file, lineterminator="\\n")
+        writer.writerow([d[0] for d in rows.description])
+        writer.writerows(["" if v is None else v for v in row] for row in rows.fetchall())
+    connection.close()
+''',
+    ("database", "r"): """\
+library(DBI)
+
+QUERY <- "
+SELECT * FROM visits
+"
+
+args <- commandArgs(trailingOnly = TRUE)
+# Read only: a SQLite file starts with this header; any other file is read as DuckDB.
+sqlite <- identical(readBin(args[1], "raw", 15), charToRaw("SQLite format 3"))
+connection <- if (sqlite) {
+  dbConnect(RSQLite::SQLite(), args[1], flags = RSQLite::SQLITE_RO)
+} else {
+  dbConnect(duckdb::duckdb(), args[1], read_only = TRUE)
+}
+rows <- dbGetQuery(connection, QUERY)
+dbDisconnect(connection)
+out <- file(args[2], "wb")
+write.csv(rows, out, row.names = FALSE, na = "")
+close(out)
+""",
     ("process", "r"): """\
 process <- function(recording, out_dir) {
   # One person's raw recording: run the pipeline on it and write its output in out_dir.
@@ -111,14 +162,14 @@ def stage_script(
     dataset: str | None = None,
     name: str = "",
 ) -> NewScript:
-    # A clean or extract script writes a dataset's file; a process script writes a folder.
+    # A clean, extract or database script writes a dataset's file; a process script writes a folder.
     if not source:
         raise EditError("Choose what the script reads")
     if dataset is not None:
         found = dataset_by_name(project.config, dataset)
         if not found.path:
             raise EditError(f"{dataset} reads a folder of files, so no script writes it")
-        target, name = found.path, f"{stage}_{dataset}"
+        target, name = found.path, f"{NAME_STARTS.get(stage, stage)}_{dataset}"
     if not target or not name:
         raise EditError("Give the script a name and the folder it writes")
     path = f"{defaults.SCRIPTS_DIR}/{name}{LANGUAGES[language].suffix}"
@@ -131,21 +182,31 @@ def stage_script(
         lines += dataset_lines(project, dataset)
     else:
         lines.append(f"It reads each recording in {source} and writes its output to {target}.")
-    lines.append(f"Fill in {FUNCTIONS[stage]}; the lines below it apply it to the files.")
+    lines.append(FUNCTIONS[stage])
     header = "\n".join(
         f"# {part}" for line in lines for part in textwrap.wrap(line, 96, subsequent_indent="  ")
     )
     id_column = id_column_for(project.config, found) if dataset else ""
     body = BODIES[(stage, language)].replace("ID_COLUMN", id_column)
-    step = PrepareStep(name=name, run=run, inputs=inputs, outputs=[target], stage=stage)
+    step = PrepareStep(
+        name=name, run=run, inputs=inputs, outputs=[target], stage=STEP_STAGES.get(stage, stage)
+    )
     return NewScript(path, f"{header}\n\n{body}", step)
 
 
 FUNCTIONS = {
-    "clean": "clean(), which gets the raw export as a table and returns the clean table",
-    "extract": "features(), which gets one person's output and returns their row",
-    "process": "process(), which gets one person's recording and the folder to write to",
+    "clean": "Fill in clean(), which gets the raw export as a table and returns the clean table; "
+    "the lines below it apply it to the files.",
+    "extract": "Fill in features(), which gets one person's output and returns their row; "
+    "the lines below it apply it to the files.",
+    "process": "Fill in process(), which gets one person's recording and the folder to write to; "
+    "the lines below it apply it to the files.",
+    "database": "Write QUERY, whose rows become the file, one per person; the lines below it run "
+    "it on the database, opened read only.",
 }
+# A query's step cleans: it turns the database into a dataset's file.
+STEP_STAGES = {"database": "clean"}
+NAME_STARTS = {"database": "query"}
 
 
 def dataset_lines(project: Project, dataset: str) -> list[str]:

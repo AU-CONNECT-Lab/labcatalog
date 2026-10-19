@@ -1,12 +1,9 @@
 import csv
-import io
-import sys
 from pathlib import Path
 
 import pandas as pd
 import pytest
 
-from labcatalog.cli import main
 from labcatalog.codebook import redcap, spss
 from labcatalog.codebook.core import (
     INSTRUMENTS,
@@ -369,65 +366,6 @@ def test_the_redcap_api_dictionary_reads_the_same(tmp_path):
     (tmp_path / "other.csv").write_text("column,label\nx,y\n", encoding="utf-8")
     with pytest.raises(CodebookError, match="not a REDCap data dictionary"):
         redcap.read_dictionary(tmp_path / "other.csv")
-
-
-def run_cli(monkeypatch, capsys, *args: str) -> tuple[int, str, str]:
-    monkeypatch.setattr(sys, "argv", ["labcatalog", "codebook", *args])
-    with pytest.raises(SystemExit) as caught:
-        main()
-    out = capsys.readouterr()
-    return caught.value.code, out.out, out.err
-
-
-def test_cli_creates_prompts_and_imports(pilot, tmp_path, monkeypatch, capsys):
-    (pilot / "data" / "pilot_w1.csv").write_text(REDCAP_DATA, encoding="utf-8")
-    dictionary = write_dictionary(tmp_path / "dictionary.csv", REDCAP_HEADER)
-    p = ["-p", str(pilot)]
-    code, _, err = run_cli(monkeypatch, capsys, "prompt", "pilot_w1", *p)
-    assert (code, err.strip()) == (
-        1,
-        "Error: Create the codebook files first: labcatalog codebook create pilot_w1",
-    )
-    code, out, _ = run_cli(
-        monkeypatch, capsys, "create", "pilot_w1", "--redcap", str(dictionary), *p
-    )
-    assert code == 0
-    assert out.splitlines()[-1] == "Fill them in, then run: labcatalog codebook import pilot_w1"
-    code, out, _ = run_cli(monkeypatch, capsys, "prompt", "pilot_w1", *p)
-    assert code == 0 and "mood_1_w1,mood_scale,mood_1" in out
-    code, out, _ = run_cli(monkeypatch, capsys, "import", "pilot_w1", *p)
-    assert code == 0
-    lines = out.splitlines()
-    assert lines[0] == "No problems found."
-    assert [line.endswith("pilot_w1.csv") for line in lines if line.startswith("Wrote ")] == [
-        False,
-        False,
-        True,
-    ]
-    assert "Create studies/pilot.yaml with:" in lines
-    code, _, err = run_cli(monkeypatch, capsys, "import", "pilot_w1", *p)
-    assert (code, err.strip()) == (1, "Error: pilot_w1 already has a column map in maps/")
-    code, _, err = run_cli(monkeypatch, capsys, "create", "nope", *p)
-    assert (code, err.strip()) == (1, "Error: No dataset named nope in labcatalog.yaml")
-
-
-def test_cli_writes_the_ai_answer_from_a_file_or_standard_input(
-    pilot, tmp_path, monkeypatch, capsys
-):
-    write_templates(load_project(pilot), "pilot_w1")
-    answer = "".join(f"```csv\n{FILLED[name]}```\n" for name in (ITEMS, SCORES, INSTRUMENTS))
-    saved = tmp_path / "answer.md"
-    saved.write_text(answer, encoding="utf-8")
-    code, out, _ = run_cli(monkeypatch, capsys, "answer", "pilot_w1", str(saved), "-p", str(pilot))
-    assert code == 0 and out.count("Wrote ") == 3
-    for name, written in codebook_paths(load_project(pilot), "pilot_w1").items():
-        assert written.read_text(encoding="utf-8-sig") == FILLED[name]
-    monkeypatch.setattr(sys, "stdin", io.StringIO(answer.replace("```csv", "```")))
-    code, out, _ = run_cli(monkeypatch, capsys, "answer", "pilot_w1", "-p", str(pilot))
-    assert code == 0 and out.splitlines()[-1].endswith("labcatalog codebook import pilot_w1")
-    monkeypatch.setattr(sys, "stdin", io.StringIO("No code here."))
-    code, _, err = run_cli(monkeypatch, capsys, "answer", "pilot_w1", "-p", str(pilot))
-    assert code == 1 and "no code block for" in err
 
 
 def test_existing_instruments_are_reused_and_the_map_matches(mock_project):

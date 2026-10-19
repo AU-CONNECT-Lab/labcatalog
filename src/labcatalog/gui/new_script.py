@@ -12,6 +12,7 @@ from labcatalog.paths import portable_path, posix_str
 from labcatalog.pipeline import CatalogResult
 
 OTHER = "other"
+DATABASE = "database"
 
 
 def open_dialog(result: CatalogResult, on_made: Callable[[str], Awaitable[None]]) -> None:
@@ -21,6 +22,11 @@ def open_dialog(result: CatalogResult, on_made: Callable[[str], Awaitable[None]]
     files = [d.name for d in project.config.datasets if d.path]
     given = sorted({(v.instrument_id, v.dataset) for v in result.catalog.variables})
     choices = {k: f"{STAGES[k]}: {v}" for k, v in STAGE_HELP.items()}
+    choices = {
+        "clean": choices.pop("clean"),
+        DATABASE: "From a database: a query whose rows become a dataset's file",
+        **choices,
+    }
     choices[OTHER] = "Other: a script with only the lines that read and write its files"
     fields: dict[str, ui.element] = {}
 
@@ -40,7 +46,7 @@ def open_dialog(result: CatalogResult, on_made: Callable[[str], Awaitable[None]]
     def details() -> None:
         fields.clear()
         stage = stage_select.value
-        if stage in ("clean", "extract"):
+        if stage in ("clean", "extract", DATABASE):
             fields["dataset"] = (
                 ui.select(files, label="Dataset it writes", with_input=True)
                 .props("outlined dense")
@@ -48,6 +54,10 @@ def open_dialog(result: CatalogResult, on_made: Callable[[str], Awaitable[None]]
             )
             if stage == "clean":
                 fields["source"] = picker("Raw export", "A file in the project, such as raw/", FILE)
+            elif stage == DATABASE:
+                fields["source"] = picker(
+                    "Database", "A SQLite or DuckDB file in the project", FILE
+                )
             else:
                 fields["source"] = picker(
                     "Pipeline output", "The folder with one file per person", FOLDER
@@ -77,7 +87,8 @@ def open_dialog(result: CatalogResult, on_made: Callable[[str], Awaitable[None]]
         elif stage != OTHER:
             note(
                 "The script tells what it reads and writes, with the dataset's ID column, columns and "
-                "missing codes, and leaves one function to fill in. Its step is added too."
+                "missing codes, and leaves one function, or a database's query, to fill in. Its step "
+                "is added too."
             )
 
     async def create() -> None:

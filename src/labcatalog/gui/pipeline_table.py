@@ -3,7 +3,7 @@ from pathlib import Path
 
 from nicegui import ui
 
-from labcatalog.codebook.derivatives import Derived, Request, command_line, derive
+from labcatalog.codebook.derivatives import Derived, Request, derive
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note, open_path, panel
 from labcatalog.gui.files import choose_path
@@ -73,7 +73,7 @@ def render(project: Project, form: PipelineForm) -> None:
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
             return
-        written_dialog(project.root, done, command_line(request, project.root))
+        written_dialog(project.root, done)
 
     with panel(
         "From a pipeline's table",
@@ -112,7 +112,7 @@ def field(element: ui.input | ui.select, form: PipelineForm, name: str) -> ui.el
     return element.bind_value(form, name).props("dense outlined stack-label")
 
 
-def written_dialog(root: Path, done: Derived, command: str) -> None:
+def written_dialog(root: Path, done: Derived) -> None:
     with ui.dialog() as dialog, ui.card().classes("w-[48rem] max-w-full"):
         ui.label("Written").classes("text-xl font-medium")
         with ui.column().classes("gap-1"):
@@ -132,8 +132,10 @@ def written_dialog(root: Path, done: Derived, command: str) -> None:
                 ui.code(lines, language="yaml").classes("w-full")
         else:
             ui.label("Press Refresh to read the new files.")
-        ui.label("To run it again whenever the pipeline does, add it as a prepare step:")
-        ui.code(command, language="bash").classes("w-full")
+        note(
+            "When the pipeline writes the table again, choose it here again: the data files are "
+            "rewritten and your changes to the instruments stay."
+        )
         with ui.row().classes("w-full justify-end"):
             ui.button("Close", on_click=dialog.close)
     dialog.open()

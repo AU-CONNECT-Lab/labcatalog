@@ -5,6 +5,7 @@ from pathlib import Path
 
 from nicegui import run, ui
 
+from labcatalog import defaults
 from labcatalog.ai.cleaning import RAW_ROWS, ROWS, VALUES
 from labcatalog.charts import style
 from labcatalog.config import CORRELATIONS
@@ -15,6 +16,7 @@ from labcatalog.gui.look import look
 from labcatalog.llm import KEY_ENV, PROVIDERS
 from labcatalog.metadata.editing import save_settings
 from labcatalog.pipeline import CatalogResult
+from labcatalog.project import write_schemas
 from labcatalog.stats import attrition, imputation, rbridge
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.custom import PYTHON_PACKAGES, python_status
@@ -143,6 +145,19 @@ def project_section(
                 show_status(status, str(err), "bad")
                 return
             await on_saved()
+
+    root = result.project.root
+    with panel(
+        "Schemas for editors",
+        help_text=f"The files in {defaults.SCHEMAS_DIR}/ let an editor such as VS Code complete "
+        "and check the YAML files; write them again after updating labcatalog.",
+    ):
+
+        def write() -> None:
+            written = write_schemas(root / defaults.SCHEMAS_DIR)
+            ui.notify(f"Wrote {len(written)} schemas in {defaults.SCHEMAS_DIR}/")
+
+        ui.button("Write the schemas", on_click=write).props("flat no-caps")
 
 
 def select(options: dict, value, label: str) -> ui.select:

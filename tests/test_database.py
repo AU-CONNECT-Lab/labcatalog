@@ -1,8 +1,6 @@
 import duckdb
 import pandas as pd
-from typer.testing import CliRunner
 
-from labcatalog.cli import app
 from labcatalog.pipeline import run_catalog, run_freeze
 from labcatalog.reports.database import run_database
 from labcatalog.reports.export import variable_rows
@@ -47,11 +45,6 @@ def test_the_database_holds_the_data_and_what_they_mean(mock_project):
     run_database(mock_project)
     with duckdb.connect(str(path), read_only=True) as con:
         assert con.execute('SELECT count(*) FROM data."child_w1"').fetchone()[0] == len(child)
-
-
-def test_the_command_builds_the_database(mock_project):
-    done = CliRunner().invoke(app, ["database", "-p", str(mock_project)])
-    assert done.exit_code == 0 and "labcatalog.duckdb" in done.output
 
 
 def test_a_freeze_keeps_its_own_copy_of_the_database(mock_project):

@@ -7,9 +7,9 @@ import pandas as pd
 from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.data.resolve import ResolvedScore
 from labcatalog.data.scoring import scorable
-from labcatalog.exceptions import ExportError, MetadataError
+from labcatalog.exceptions import ExportError
 from labcatalog.metadata.browse import build_index, matches
-from labcatalog.pipeline import CatalogResult, run_catalog
+from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.codegen import output_name
 from labcatalog.reports.outputs import write_output
 from labcatalog.stats.analysis import linkable
@@ -235,13 +235,6 @@ def data_frame(result: CatalogResult, dataset: str, instrument_ids: list[str]) -
     for score in exported_scores(result, dataset, instrument_ids):
         frame[output_name(score)] = result.scores[dataset][score.key]
     return frame
-
-
-def run_export(root: Path, instrument_ids: list[str], datasets: list[str], layout: str) -> Export:
-    result = run_catalog(root)
-    if result.project is None:
-        raise MetadataError(result.report.issues)
-    return write_export(result, named_plan(result, instrument_ids, datasets), layout)
 
 
 def named_plan(

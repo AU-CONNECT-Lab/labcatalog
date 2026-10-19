@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=schemas/labcatalog.schema.json
 # Settings for one labcatalog project. Instruments go in instruments/, studies in studies/, each dataset's column map in maps/.
-# For a filled-in example, run: labcatalog init <new folder>
+# For a filled-in example, choose Open example in the window's Open menu.
 
 project:
   name: PROJECT_NAME
@@ -44,7 +44,7 @@ studies: {}
 # Datasets are matched on their ID column, so the part of the path at {id} must be written as the IDs in your other datasets.
 datasets: []
 
-# Optional: your own cleaning scripts, run in order from the Prepare page or with "labcatalog prepare", for example:
+# Optional: your own cleaning scripts, run in order from the Scripts page or the Add data step, for example:
 #   prepare:
 #     - {name: clean_parent_w1, run: Rscript scripts/clean_parent.R, inputs: [raw/parent_w1_export.csv, scripts/clean_parent.R], outputs: [data/parent_w1.csv]}
 # A step is outdated when one of its inputs is newer than its outputs, so list the script among the inputs.

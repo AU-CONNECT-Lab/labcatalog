@@ -1,5 +1,4 @@
 import tempfile
-from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -13,11 +12,9 @@ from labcatalog.ai.interpret import Interpretation, interpret
 from labcatalog.ai.measures import Draft, draft_description
 from labcatalog.ai.scoring import write_scoring_scripts
 from labcatalog.ai.search import Search, search_catalog
-from labcatalog.codebook import core as codebook
-from labcatalog.codebook.core import ImportResult
 from labcatalog.data.check import CheckReport, check_project
 from labcatalog.data.manifest import Manifest, build_manifest, metadata_paths, used_paths
-from labcatalog.data.prepare import Session, StepRun, prepare_lock, run_steps
+from labcatalog.data.prepare import prepare_lock
 from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.data.scoring import compute_scores
 from labcatalog.datalad.bridge import get_content
@@ -42,7 +39,7 @@ from labcatalog.datalad.sync import (
     save_datasets,
     update_datasets,
 )
-from labcatalog.exceptions import CodebookError, FreezeError, MetadataError, ProjectNotFoundError
+from labcatalog.exceptions import FreezeError, MetadataError, ProjectNotFoundError
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.metadata import accepted
@@ -142,34 +139,6 @@ def run_cfa(result: CatalogResult, rscript: str | None, estimator: str) -> list[
 def run_invariance(result: CatalogResult, rscript: str, estimator: str) -> list[InvarianceTest]:
     models = invariance.build_models(result.project, result.catalog, result.datasets)
     return invariance.fit_models(models, rscript, estimator)
-
-
-def run_codebook_create(root: Path, dataset: str, dictionary: Path | None) -> list[Path]:
-    project = load_project(root)
-    codebook.require_unmapped(project, dataset)
-    return codebook.write_templates(project, dataset, dictionary)
-
-
-def run_codebook_prompt(root: Path, dataset: str) -> str:
-    project = load_project(root)
-    codebook.require_unmapped(project, dataset)
-    if not codebook.codebook_paths(project, dataset)[codebook.ITEMS].is_file():
-        raise CodebookError(
-            f"Create the codebook files first: labcatalog codebook create {dataset}"
-        )
-    return codebook.ai_prompt(project, dataset)
-
-
-def run_codebook_answer(root: Path, dataset: str, answer: str) -> list[Path]:
-    project = load_project(root)
-    codebook.require_unmapped(project, dataset)
-    return codebook.split_ai_answer(project, dataset, answer)
-
-
-def run_codebook_import(root: Path, dataset: str) -> ImportResult:
-    project = load_project(root)
-    codebook.require_unmapped(project, dataset)
-    return codebook.import_codebook(project, dataset)
 
 
 def run_scoring_script(
@@ -286,12 +255,6 @@ def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze
 
 def run_push_freeze(root: Path, name: str, datalad: str) -> list[Path]:
     return push_freeze(freeze_roots(load_project(root)), name, datalad)
-
-
-def run_prepare(root: Path, echo: Callable[[str], None], datalad: str | None) -> list[StepRun]:
-    project = load_project(root)
-    names = [step.name for step in project.config.prepare]
-    return run_steps(project, names, Session(), echo=echo, datalad=datalad)
 
 
 def run_get(paths: list[Path], datalad: str) -> None:

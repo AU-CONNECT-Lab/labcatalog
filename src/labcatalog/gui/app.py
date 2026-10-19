@@ -62,6 +62,7 @@ from labcatalog.gui.instruments import (
 )
 from labcatalog.gui.look import Look, register, within
 from labcatalog.gui.methods import MethodsView
+from labcatalog.gui.new_project import new_project_dialog
 from labcatalog.gui.prepare import PrepareView
 from labcatalog.gui.scripts import ScriptsView
 from labcatalog.gui.setup import SetupView
@@ -296,6 +297,7 @@ class Window:
                 ):
                     with ui.menu().props("anchor='bottom right' self='top right'"):
                         ui.menu_item("Open project", on_click=self.choose_folder)
+                        ui.menu_item("New project", on_click=self.new_project)
                         ui.menu_item("Clone a project", on_click=self.clone_project)
                         if not common.serving:
                             ui.menu_item("Open example", on_click=self.open_example)
@@ -400,6 +402,13 @@ class Window:
             self.home = None
             self.frozen_bar.visible = False
             await self.open_project(folder)
+
+    async def new_project(self) -> None:
+        root = await new_project_dialog(self.root.parent if self.root is not None else None)
+        if root:
+            self.home = None
+            self.frozen_bar.visible = False
+            await self.open_project(root)
 
     async def clone_project(self) -> None:
         root = await clone_dialog(self.root.parent if self.root is not None else None)

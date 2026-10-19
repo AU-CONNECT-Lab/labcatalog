@@ -124,7 +124,7 @@ browse:
 references:
   root: references
 
-# Your own cleaning scripts, run in order from the Prepare page or with "labcatalog prepare". Here one script turns each survey-platform export in raw/ into the clean file the catalog reads, and one script per modality turns the per-child results its pipeline left in derivatives/ into one row per child; listing the script among the inputs marks the step outdated when the script changes.
+# Your own cleaning scripts, run in order from the Scripts page or the Add data step. Here one script turns each survey-platform export in raw/ into the clean file the catalog reads, and one script per modality turns the per-child results its pipeline left in derivatives/ into one row per child; listing the script among the inputs marks the step outdated when the script changes.
 prepare:
   - {name: clean_parent_w1, run: Rscript scripts/clean_export.R raw/parent_w1_export.csv data/parent_w1.csv, inputs: [raw/parent_w1_export.csv, scripts/clean_export.R], outputs: [data/parent_w1.csv], stage: clean}
   - {name: clean_parent_w2, run: Rscript scripts/clean_export.R raw/parent_w2_export.csv data/parent_w2.csv, inputs: [raw/parent_w2_export.csv, scripts/clean_export.R], outputs: [data/parent_w2.csv], stage: clean}

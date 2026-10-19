@@ -10,7 +10,6 @@ from pathlib import Path
 
 import pytest
 
-from labcatalog.cli import main
 from labcatalog.data.prepare import Session, run_steps, running, step_states, stop
 from labcatalog.exceptions import PrepareBusyError
 from labcatalog.metadata.accepted import who
@@ -228,20 +227,16 @@ def test_example_steps_rebuild_the_example_data(mock_project, tmp_path):
         ), step.name
 
 
-def test_cli_runs_every_step_and_reports_a_failure(project_root, monkeypatch, capsys):
-    monkeypatch.setattr(sys, "argv", ["labcatalog", "prepare", "-p", str(project_root)])
-    with pytest.raises(SystemExit) as caught:
-        main()
-    assert caught.value.code == 0
-    out = capsys.readouterr().out.splitlines()
-    assert out[0].startswith("== clean: ")
-    assert out[1] == "cleaned 2 rows"
-    assert out[-1] == "2 step(s) succeeded."
+def test_every_step_runs_in_order_and_a_failure_stops_the_rest(project_root):
+    project = load_project(project_root)
+    names = [step.name for step in project.config.prepare]
+    out: list[str] = []
+    runs = run_steps(project, names, Session(), echo=out.append)
+    assert [r.exit_code for r in runs] == [0, 0]
+    assert out[0].startswith("== clean: ") and out[1] == "cleaned 2 rows"
 
     (project_root / "scripts" / "summarize.py").write_text(
         "raise SystemExit(2)\n", encoding="utf-8"
     )
-    with pytest.raises(SystemExit) as caught:
-        main()
-    assert caught.value.code == 1
-    assert capsys.readouterr().err.strip() == "Step summarize failed (exit code 2)."
+    runs = run_steps(project, names, Session(), echo=out.append)
+    assert runs[-1].name == "summarize" and runs[-1].outcome == "failed (exit code 2)"

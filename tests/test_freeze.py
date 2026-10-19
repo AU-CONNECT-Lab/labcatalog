@@ -3,8 +3,7 @@ from datetime import date
 import pytest
 from typer.testing import CliRunner
 
-from labcatalog.cli import app
-from labcatalog.datalad.freeze import RECORD_ONLY, list_freezes
+from labcatalog.datalad.freeze import list_freezes
 from labcatalog.exceptions import FreezeError
 from labcatalog.pipeline import run_freeze
 
@@ -29,9 +28,3 @@ def test_freeze_names_are_checked(mock_project):
     with pytest.raises(FreezeError, match="already a freeze named pilot"):
         run_freeze(mock_project, "pilot", None)
 
-
-def test_the_freeze_command_says_what_it_did(mock_project):
-    result = runner.invoke(app, ["freeze", "pilot", "-p", str(mock_project)])
-    assert result.exit_code == 0
-    assert f"{date.today()}_pilot.json" in result.output
-    assert RECORD_ONLY in result.output
