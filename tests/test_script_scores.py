@@ -1,10 +1,9 @@
-import shutil
 import subprocess
 import sys
-from glob import glob
 
 import pandas as pd
 import pytest
+from conftest import rscript
 
 from labcatalog.config import dataset_by_name
 from labcatalog.metadata import scoring_steps
@@ -15,12 +14,6 @@ from labcatalog.project import load_project
 INSTRUMENT = "instruments/example_parent_stress.yaml"
 SCRIPTED = "  - {id: eps_t, label: T score, method: script}\n"
 KEY = "example_parent_stress.eps_t@parent_w1"
-
-
-def rscript() -> str | None:
-    return shutil.which("Rscript") or next(
-        iter(glob("C:/Program Files/R/R-*/bin/Rscript.exe")), None
-    )
 
 
 def score_by_script(root, scores_file: str | None = "data/parent_w1_scores.csv") -> None:

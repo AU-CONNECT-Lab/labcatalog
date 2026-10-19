@@ -1,9 +1,8 @@
-import shutil
 import sys
-from glob import glob
 
 import pandas as pd
 import pytest
+from conftest import rscript
 
 from labcatalog.ai import custom as ai
 from labcatalog.config import SavedAnalysis
@@ -19,12 +18,6 @@ from labcatalog.stats import analysis_script as script
 
 CHILD = "child_w1"
 TOTAL = f"example_worries_temper.ewt_total@{CHILD}"
-
-
-def rscript() -> str | None:
-    return shutil.which("Rscript") or next(
-        iter(glob("C:/Program Files/R/R-*/bin/Rscript.exe")), None
-    )
 
 
 class FakeClient(LLMClient):

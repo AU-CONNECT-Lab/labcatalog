@@ -1,23 +1,16 @@
-import shutil
 import sqlite3
 import subprocess
 import sys
-from glob import glob
 
 import duckdb
 import pytest
+from conftest import rscript
 
 from labcatalog.metadata.stage_scripts import stage_script
 from labcatalog.project import load_project
 
 QUERY = "SELECT pid, visit, score FROM visits WHERE visit = 1 ORDER BY pid"
 EXPECTED = ["pid,visit,score", "1001C,1,2.5", "1002C,1,"]
-
-
-def rscript() -> str | None:
-    return shutil.which("Rscript") or next(
-        iter(glob("C:/Program Files/R/R-*/bin/Rscript.exe")), None
-    )
 
 
 def r_has(*packages: str) -> bool:

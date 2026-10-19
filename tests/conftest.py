@@ -1,4 +1,5 @@
 import shutil
+from glob import glob
 from pathlib import Path
 
 import pytest
@@ -7,6 +8,12 @@ from labcatalog.metadata import changes, studies
 from labcatalog.project import EXAMPLE_DIR, load_project
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples"
+
+
+def rscript() -> str | None:
+    return shutil.which("Rscript") or next(
+        iter(glob("C:/Program Files/R/R-*/bin/Rscript.exe")), None
+    )
 
 
 @pytest.fixture

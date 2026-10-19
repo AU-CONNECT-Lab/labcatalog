@@ -1,14 +1,13 @@
 import json
 import os
-import shutil
 import subprocess
 import sys
 import threading
 import time
-from glob import glob
 from pathlib import Path
 
 import pytest
+from conftest import rscript
 
 from labcatalog.data.prepare import Session, run_steps, running, step_states, stop
 from labcatalog.exceptions import PrepareBusyError
@@ -201,12 +200,6 @@ def test_a_step_cannot_overwrite_what_it_reads_or_what_another_step_writes(proje
         "file it reads; write the cleaned data to a new file"
     )
     assert messages[1] == "prepare: clean, summarize all write raw/A.csv; give each its own file"
-
-
-def rscript() -> str | None:
-    return shutil.which("Rscript") or next(
-        iter(glob("C:/Program Files/R/R-*/bin/Rscript.exe")), None
-    )
 
 
 @pytest.mark.skipif(rscript() is None, reason="R is not installed")
