@@ -47,7 +47,7 @@ Below that:
 - **Instruments**: each instrument in the file, with how many people answered all, some or none of its items. Open answers do not count. Click a row to open the instrument.
 - **Missing values**: how many cells are blank, how many hold each missing code, and how many hold a value that is neither an answer nor a missing code.
 - **Collected by month**: rows per month, when the dataset has a `date_column`.
-- **Problems**: the problems found in this file and its column map. The file links open the **Edit files** step of the Set up page at the line.
+- **Problems**: the problems found in this file and its column map. The file links open the editor in the **Codebook** step of the Set up page at the line.
 - **Label code**: R code (with haven) and Python code (for pyreadstat) that puts the item wording, response labels and missing codes on the data, for example to save it as an SPSS file.
 
 ## Data versions

@@ -80,7 +80,9 @@ def open_wizard(
             else new_instrument.Draft("")
         )
     except LabCatalogError as err:
-        ui.notify(f"{err}. Use Edit files on the Set up page for this instrument.", type="negative")
+        ui.notify(
+            f"{err}. Use the Codebook step of the Set up page for this instrument.", type="negative"
+        )
         return
     first = new_instrument.first_gap(project, instrument_id) if completing else "about"
     tables = records.INSTRUMENT_TABLES

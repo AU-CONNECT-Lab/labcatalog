@@ -35,11 +35,11 @@ LEVEL_CELL = r"""
   </span>
 </q-td>
 """
-# The click is emitted back to Python, which opens the file in Edit files or in its own app.
+# The click is emitted back to Python, which opens the file in the editor or in its own app.
 LOCATION_CELL = r"""
 <q-td :props="props" class="whitespace-nowrap">
   <a v-if="props.value" class="text-primary cursor-pointer"
-     :title="props.row.in_editor ? 'Open in Edit files' : 'Open in its own app'"
+     :title="props.row.in_editor ? 'Open in the editor' : 'Open in its own app'"
      @click="$parent.$emit('open_location', props.row)">
     <q-icon :name="props.row.in_editor ? 'edit_note' : 'open_in_new'" size="xs" class="q-mr-xs" />
     {{ props.value }}
@@ -75,7 +75,7 @@ def render(
     with tools:
         help_button(
             "Fix opens a panel that says what the problem means and who usually fixes it. "
-            "Project files open in Edit files on the Set up page at the line named; data files open in their "
+            "Project files open in the editor of the Codebook step on the Set up page at the line named; data files open in their "
             "own app."
         )
         level = ui.toggle(LEVEL_FILTERS, value="all").props("dense no-caps")

@@ -2,9 +2,9 @@
 
 **Codebook**, the first step of the Set up page, describes the instruments before there is any data: their items, answer options and scores. The next step, [Add data](add-data.md), then links a data file's columns to their items.
 
-## Instruments
+## Instruments and the editor
 
-The instruments already in the project, with their numbers of items and scores. Drafts in `drafts/` waiting to be checked are named under the table, and the step bar says how many there are. **New instrument** and **Draft from a PDF** open the dialogs of the [Edit files](edit.md) step: an empty instrument file to fill in, or a draft a language model writes from the instrument's PDF (see [Add an Instrument](../how-to/add-instrument.md)).
+The step holds **From a codebook** (below), folded until a codebook is under way, and under it [the editor](edit.md) lists and edits every project file, the instruments and drafts first; its **New instrument** and **New instrument from a PDF** make an empty instrument file to fill in, or a draft a language model writes from the instrument's PDF (see [Add an Instrument](../how-to/add-instrument.md)). Drafts in `drafts/` waiting to be checked are counted on the step bar.
 
 ## From a codebook
 

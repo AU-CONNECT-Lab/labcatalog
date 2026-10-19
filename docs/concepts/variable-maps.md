@@ -19,7 +19,7 @@ Each row names a column of the data file and the instrument and item it holds. C
 
 A column that holds a score your lab already computed is mapped to `score:` and the score's ID, for example `score:ems_total`; labcatalog then compares it with its own computation.
 
-You rarely write a column map by hand. A codebook import writes it (see [Add an Instrument](../how-to/add-instrument.md)), and the **Edit files** step of the Set up page can change it. Excel can open and save it; choose "CSV UTF-8" when saving.
+You rarely write a column map by hand. A codebook import writes it (see [Add an Instrument](../how-to/add-instrument.md)), and the editor in the **Codebook** step of the Set up page can change it. Excel can open and save it; choose "CSV UTF-8" when saving.
 
 ### One map for several datasets
 

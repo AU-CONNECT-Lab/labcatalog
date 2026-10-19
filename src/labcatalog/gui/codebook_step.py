@@ -36,11 +36,8 @@ def render(
     project: Project,
     view: CodebookView,
     on_edit: Callable[[str, int | None], None],
-    on_new: Callable[[], None],
-    on_draft: Callable[[], None],
     reload: Callable[[], Awaitable[None]],
 ) -> None:
-    # on_new and on_draft open the Edit files step's dialogs for a new instrument.
     root = project.root
     paths = codebook.codebook_paths(project, codebook.NEW)
 
@@ -87,20 +84,6 @@ def render(
     async def refreshed() -> None:
         steps.refresh()
 
-    with panel("Instruments", "The questionnaires and measures the data will be described by"):
-        instruments_table(project)
-        waiting = drafts(root)
-        if waiting:
-            note(
-                f"{len(waiting)} draft(s) in {defaults.DRAFTS_DIR}/ wait to be checked and moved "
-                "to instruments/ in Edit files: " + ", ".join(Path(p).stem for p in waiting)
-            )
-        with ui.row().classes("items-center gap-2"):
-            ui.button("New instrument", icon="add", on_click=on_new).props("flat no-caps")
-            ui.button("Draft from a PDF", icon="picture_as_pdf", on_click=on_draft).props(
-                "flat no-caps"
-            )
-
     @ui.refreshable
     def steps() -> None:
         with ui.row().classes("w-full items-center gap-2"):
@@ -111,8 +94,8 @@ def render(
             note(
                 "Start from the data dictionary of a REDCap project, a Qualtrics survey file or "
                 "an SPSS file, which give each item's wording, options and type, or from empty "
-                "files to fill in from any codebook. No data file is needed yet; the next step "
-                "links a data file's columns to these instruments."
+                "files to fill in from any codebook. No data file is needed yet; Add data links a "
+                "data file's columns to these instruments."
             )
             with ui.row().classes("items-center gap-2 mt-1"):
                 ui.button("Create empty files", icon="note_add", on_click=lambda: create())
@@ -165,32 +148,11 @@ def render(
         if view.issues:
             problems.issue_table(view.issues, root, on_edit)
 
+    # Folded unless a codebook is under way, so the editor below is what the step opens on.
+    begun = any(path.exists() for path in paths.values()) or bool(view.issues)
     with panel("From a codebook", "New instruments from a data dictionary or any codebook"):
-        steps()
-
-
-def instruments_table(project: Project) -> None:
-    if not project.instruments:
-        note("No instruments yet.")
-        return
-    rows = [
-        {
-            "id": i.id,
-            "name": f"{i.name} ({i.abbreviation})" if i.abbreviation else i.name,
-            "items": len(i.items),
-            "scores": len(i.scores),
-        }
-        for i in project.instruments.values()
-    ]
-    table(
-        [
-            col("name", "Instrument"),
-            col("id", "ID"),
-            col("items", "Items", numeric=True),
-            col("scores", "Scores", numeric=True),
-        ],
-        rows,
-    )
+        with ui.expansion("Make instruments from a codebook", value=begun).classes("w-full"):
+            steps()
 
 
 def imported_dialog(root: Path, outcome: ImportResult) -> None:
@@ -200,7 +162,7 @@ def imported_dialog(root: Path, outcome: ImportResult) -> None:
             for path in outcome.written:
                 codebook_import.file_link(root, path)
         note(
-            "Check each instrument in Edit files. Then Add data links a data file's columns to "
+            "Check each instrument in the editor below. Then Add data links a data file's columns to "
             "their items."
         )
         with ui.row().classes("w-full justify-end"):

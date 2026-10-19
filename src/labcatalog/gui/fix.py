@@ -20,7 +20,7 @@ from labcatalog.project import Project, load_project
 
 YOU = "You can fix this yourself."
 SETTINGS = (
-    "Whoever knows what the value should be; once you know, fix it in Edit files on the Set up page at the "
+    "Whoever knows what the value should be; once you know, fix it in the Codebook step of the Set up page at the "
     "line named."
 )
 SCRIPTS = (

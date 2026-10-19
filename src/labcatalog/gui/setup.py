@@ -8,12 +8,11 @@ from labcatalog.data.prepare import step_states
 from labcatalog.gui import codebook_step, id_check
 from labcatalog.pipeline import CatalogResult
 
-CODEBOOK, DATA, IDS, EDIT, REVIEW = "codebook", "data", "ids", "edit", "review"
+CODEBOOK, DATA, IDS, REVIEW = "codebook", "data", "ids", "review"
 STEPS = {
     CODEBOOK: "Codebook",
     DATA: "Add data",
     IDS: "Check IDs",
-    EDIT: "Edit files",
     REVIEW: "Review",
 }
 # Where the last step's Next button leads.

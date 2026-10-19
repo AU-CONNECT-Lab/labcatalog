@@ -8,7 +8,7 @@ There are five ways to add an instrument. Which one fits depends on what you sta
 | A new data file and its codebook | A codebook import for that file, which also writes the column map |
 | Only a PDF of the instrument | A draft from a language model |
 | The items and a data file that has their columns | **Add an instrument** on the Instruments page |
-| Nothing but the items | Edit files on the Set up page, or write the file by hand |
+| Nothing but the items | The editor in the Codebook step of the Set up page, or write the file by hand |
 
 ## Add it step by step
 
@@ -46,17 +46,17 @@ If the codebook is a PDF or a document, a language model can fill in the three f
 
 ## Draft an instrument from its PDF
 
-With a language model set up on the Settings page (see [Set Up R and Language Models](r-and-models.md)), the **Edit files** step of the Set up page can draft a whole instrument file, scores included, from the instrument's PDF:
+With a language model set up on the Settings page (see [Set Up R and Language Models](r-and-models.md)), the editor in the **Codebook** step of the Set up page can draft a whole instrument file, scores included, from the instrument's PDF:
 
-1. In the **Edit files** step of the Set up page, press **New instrument from a PDF**, give the instrument an ID, choose the PDF and press **Draft**. When the PDF holds several instruments or versions, say which one to draft (for example "the short form"); otherwise the model drafts the one the PDF presents as the main one and names the others in its notes. The PDF's text, including the item wording, is sent to the model's provider.
-2. The draft is written to `drafts/<id>.yaml`, outside the catalog. Open it in Edit files and check every item, option and score against the PDF.
+1. In the editor in the **Codebook** step of the Set up page, press **New instrument from a PDF**, give the instrument an ID, choose the PDF and press **Draft**. When the PDF holds several instruments or versions, say which one to draft (for example "the short form"); otherwise the model drafts the one the PDF presents as the main one and names the others in its notes. The PDF's text, including the item wording, is sent to the model's provider.
+2. The draft is written to `drafts/<id>.yaml`, outside the catalog. Open it in the editor and check every item, option and score against the PDF.
 3. Press **Move to instruments**. The instrument is now in the catalog.
 
 You still map its columns and add its administration, as for any instrument. The references, the license and custom fields are always yours to fill in.
 
 ## Use Edit Files or write the file by hand
 
-In the **Edit files** step of the Set up page, **New instrument** creates `instruments/<id>.yaml` with the required keys. Switch to the table view to fill in items, response sets and scores as tables, or edit the YAML as text. [Instruments](../concepts/instruments.md) describes every key.
+In the editor in the **Codebook** step of the Set up page, **New instrument** creates `instruments/<id>.yaml` with the required keys. Switch to the table view to fill in items, response sets and scores as tables, or edit the YAML as text. [Instruments](../concepts/instruments.md) describes every key.
 
 An editor works just as well. Start the file with this line, so that an editor with YAML support checks it and completes the keys as you type:
 

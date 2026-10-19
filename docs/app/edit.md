@@ -1,8 +1,8 @@
-# Edit Files
+# The Editor
 
-**Edit files**, the fourth step of the Set up page, edits the project's files: `labcatalog.yaml`, the instrument files, the drafts, the study files and the column maps. The files are listed on the left; click one to open it.
+The editor, below **From a codebook** in the [Codebook](codebook.md) step of the Set up page, edits the project's files: `labcatalog.yaml`, the instrument files, the drafts, the study files and the column maps. The files are listed on the left; click one to open it.
 
-![The Edit files step with labcatalog.yaml open](../images/app/edit.png)
+![The editor with labcatalog.yaml open](../images/app/edit.png)
 
 ## Form
 

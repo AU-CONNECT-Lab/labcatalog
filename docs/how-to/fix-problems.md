@@ -15,7 +15,7 @@ maps/child_w2.csv:14: error [map_row] instrument and item must be filled togethe
 - An **error** means labcatalog cannot trust the result: a value that is not allowed, an ID used twice, a key it does not know. Fix errors first.
 - A **warning** points to something worth a look that may be fine: people who gave the same answer to every item, a column the map does not describe.
 
-The location names the file, and where it can, the line or the entry: `datasets[3] (child_w1).reporter` is the `reporter` of the third dataset in `labcatalog.yaml`. On the Problems page, the location is a link that opens the file in the **Edit files** step of the Set up page at that line.
+The location names the file, and where it can, the line or the entry: `datasets[3] (child_w1).reporter` is the `reporter` of the third dataset in `labcatalog.yaml`. On the Problems page, the location is a link that opens the file in the editor in the **Codebook** step of the Set up page at that line.
 
 The command line exits with status 1 when there are errors, so `labcatalog check` can stop a script or a CI job.
 

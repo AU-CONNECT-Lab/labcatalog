@@ -20,12 +20,12 @@ The factor models take longer than the rest, so they run in the background after
 
 The **Problems** tab shows how many problems the project has, in red when any is an error.
 
-- If the metadata have errors, the window opens the Problems page, and the catalog pages say "The project files have errors. Fix them, then press Refresh." Fix the files in the **Edit files** step of the Set up page or in an editor.
+- If the metadata have errors, the window opens the Problems page, and the catalog pages say "The project files have errors. Fix them, then press Refresh." Fix the files in the editor in the **Codebook** step of the Set up page or in an editor of your own.
 - If the data cannot be read, for example because a data file does not exist yet, the catalog pages show the error. The Set up page still works, so you can run the prepare steps that make the data.
 
 ## The Set up page
 
-Set up holds the work of building a project, in the order it is usually done. A row of numbered steps runs across the top: **Codebook**, **Add data**, **Check IDs**, **Edit files** and **Review**. Click a step to open it; a step with something left to do says so next to its name, such as "2 drafts" for instrument drafts to check, "3 to run" for prepare steps that are not up to date, "1 to link" for a data file with no column map, or "2 to check" for data files with ID problems. **Next** at the bottom of each step opens the one after it, and from the last step the Problems page. Switching steps keeps unsaved changes in Edit files.
+Set up holds the work of building a project, in the order it is usually done. A row of numbered steps runs across the top: **Codebook**, **Add data**, **Check IDs** and **Review**. Click a step to open it; a step with something left to do says so next to its name, such as "2 drafts" for instrument drafts to check, "3 to run" for prepare steps that are not up to date, "1 to link" for a data file with no column map, or "2 to check" for data files with ID problems. **Next** at the bottom of each step opens the one after it, and from the last step the Problems page. Switching steps keeps unsaved changes in the editor.
 
 ## The pages
 
@@ -37,6 +37,6 @@ Set up holds the work of building a project, in the order it is usually done. A 
 | [Datasets](datasets.md) | Each data file: who is in it, completeness, missing values; freezes. |
 | [Analysis](analysis.md) | Correlations, regression, group comparisons and multilevel models. |
 | [Methods](methods.md) | Draft text and tables for a methods section. |
-| Set up | Steps in order: [Codebook](codebook.md) describes the instruments before there is data, [Add data](add-data.md) adds data files, their [prepare steps](prepare.md) and their column maps, [Check IDs](ids.md) checks and corrects each file's IDs, [Edit files](edit.md) edits the project's files, [Review](review.md) looks over each data file and its scores. |
+| Set up | Steps in order: [Codebook](codebook.md) describes the instruments before there is data and holds [the editor](edit.md) of the project's files, [Add data](add-data.md) adds data files, their [prepare steps](prepare.md) and their column maps, [Check IDs](ids.md) checks and corrects each file's IDs, [Review](review.md) looks over each data file and its scores. |
 | [Problems](problems.md) | Every mismatch between metadata and data. |
 | [Settings](settings.md) | R, DataLad, the language model, charts and tables. |

@@ -8,7 +8,7 @@ At the top are the number of errors and warnings, a toggle to show **All**, **Er
 
 ## The table
 
-The table shows each problem's level, the file and line it is in, the problem and its code. A project file (`labcatalog.yaml`, an instrument, draft or study file, or a column map) opens in the **Edit files** step of the Set up page at that line. A data file opens in its own application.
+The table shows each problem's level, the file and line it is in, the problem and its code. A project file (`labcatalog.yaml`, an instrument, draft or study file, or a column map) opens in the editor in the **Codebook** step of the Set up page at that line. A data file opens in its own application.
 
 ## The Fix panel
 

@@ -329,10 +329,9 @@ class Window:
                 self.setup_bar()
                 # Every step stays built, so an unsaved edit survives a look at another step.
                 for name, parts in (
-                    (setup.CODEBOOK, (self.codebook_panel,)),
+                    (setup.CODEBOOK, (self.codebook_panel, self.edit_panel)),
                     (setup.DATA, (self.add_data_panel, self.prepare_panel, self.import_panel)),
                     (setup.IDS, (self.ids_panel,)),
-                    (setup.EDIT, (self.edit_panel,)),
                     (setup.REVIEW, (self.review_panel,)),
                 ):
                     with ui.column().classes("lc-step w-full") as self.steps[name]:
@@ -684,7 +683,7 @@ class Window:
 
     def edit_location(self, path: str, line: int | None) -> None:
         self.tabs.set_value("setup")
-        self.pick_step(setup.EDIT)
+        self.pick_step(setup.CODEBOOK)
         self.editing.open(path, line)
 
     def pick_step(self, name: str) -> None:
@@ -779,16 +778,8 @@ class Window:
             self.result.project,
             self.codebook,
             self.edit_location,
-            lambda: self.in_editor(self.editing.create),
-            lambda: self.in_editor(self.editing.draft),
             self.reload,
         )
-
-    def in_editor(self, dialog: Callable[[], None] | None) -> None:
-        # Opens the Edit files step, then one of its dialogs, so its unsaved edits are asked about.
-        self.pick_step(setup.EDIT)
-        if dialog is not None:
-            dialog()
 
     @ui.refreshable_method
     def add_data_panel(self) -> None:
