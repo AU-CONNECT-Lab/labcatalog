@@ -8,7 +8,7 @@ EXTRA = (
 
 
 def test_the_steps_count_drafts_steps_to_run_and_files_to_link(mock_project):
-    assert list(setup.STEPS) == [setup.CODEBOOK, setup.DATA, setup.IDS, setup.REVIEW]
+    assert list(setup.STEPS) == [setup.CODEBOOK, setup.DATA, setup.IDS]
     counts = setup.to_do(run_catalog(mock_project))
     assert counts[setup.CODEBOOK] == ""
     (mock_project / "drafts").mkdir(exist_ok=True)

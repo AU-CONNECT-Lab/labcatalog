@@ -1,11 +1,12 @@
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass, field
 
 from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, map_name_of
-from labcatalog.gui import codebook_import, datalad, id_fix, new_dataset, problems
+from labcatalog.gui import codebook_import, datalad, id_fix, new_dataset, problems, review
 from labcatalog.gui.common import (
     code_tabs,
     col,
@@ -24,10 +25,19 @@ from labcatalog.metadata.browse import build_dataset_index, dataset_counts, data
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats.summary import DatasetSummary
 
+LIST, REVIEW = "list", "review"
+LAYOUTS = {LIST: "List", REVIEW: "Review"}
+
+
+@dataclass
+class DatasetsView:
+    filters: Filters = field(default_factory=Filters)
+    layout: str = LIST
+
 
 def render(
     result: CatalogResult,
-    filters: Filters,
+    view: DatasetsView,
     selected: str | None,
     on_select: Callable[[str | None], None],
     on_instrument: Callable[[str], None],
@@ -36,9 +46,18 @@ def render(
     on_edit: Callable[[str, int | None], None],
     on_added: Callable[[str], Awaitable[None]],
 ) -> None:
+    filters = view.filters
     summaries = {d.dataset: d for d in result.summary.datasets}
+
+    def set_layout(layout: str) -> None:
+        view.layout = layout
+        listing.refresh()
+
     if selected not in summaries:
         with page_head("Datasets", list_summary(result, summaries)):
+            ui.toggle(LAYOUTS, value=view.layout, on_change=lambda e: set_layout(e.value)).props(
+                "dense no-caps"
+            )
             if result.project.config.studies:
                 ui.button(
                     "Add a dataset",
@@ -62,7 +81,10 @@ def render(
                 return
             if filters.any():
                 note(f"{len(found)} of {len(summaries)} datasets")
-            studies(result, found, on_select)
+            if view.layout == REVIEW:
+                review.render(result, list(found), on_select)
+            else:
+                studies(result, found, on_select)
 
         filter_bar(
             index.facets,

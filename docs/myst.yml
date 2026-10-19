@@ -30,6 +30,7 @@ project:
         - file: app/instruments.md
         - file: app/studies.md
         - file: app/datasets.md
+        - file: app/review.md
         - file: app/analysis.md
         - file: app/methods.md
         - file: app/codebook.md
@@ -38,7 +39,6 @@ project:
         - file: app/import.md
         - file: app/ids.md
         - file: app/edit.md
-        - file: app/review.md
         - file: app/problems.md
         - file: app/settings.md
     - title: How-To Guides

@@ -8,15 +8,15 @@ from labcatalog.data.prepare import step_states
 from labcatalog.gui import codebook_step, id_check
 from labcatalog.pipeline import CatalogResult
 
-CODEBOOK, DATA, IDS, REVIEW = "codebook", "data", "ids", "review"
+CODEBOOK, DATA, IDS = "codebook", "data", "ids"
 STEPS = {
     CODEBOOK: "Codebook",
     DATA: "Add data",
     IDS: "Check IDs",
-    REVIEW: "Review",
 }
-# Where the last step's Next button leads.
-AFTER = ("problems", "Problems")
+# Where the last step's Next button leads: the Datasets page's Review.
+REVIEW = "review"
+AFTER = (REVIEW, "Review the data")
 
 
 @dataclass

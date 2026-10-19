@@ -6,7 +6,7 @@ from nicegui import ui
 
 from labcatalog.charts import style, views
 from labcatalog.config import dataset_by_name
-from labcatalog.gui.common import apa, col, empty, fmt, note, panel, table
+from labcatalog.gui.common import apa, col, fmt, panel, table
 from labcatalog.pipeline import CatalogResult
 
 PLOT_WIDTH = 120
@@ -57,11 +57,12 @@ class ReviewGroup:
     scores: list[ScoreLine]
 
 
-def review_groups(result: CatalogResult) -> list[ReviewGroup]:
+def review_groups(result: CatalogResult, names: set[str] | None = None) -> list[ReviewGroup]:
+    # names: the files to show, all of them when None.
     config = result.project.config
     summary = result.summary
     by_key = {s.key: s for s in result.catalog.scores}
-    summaries = {d.dataset: d for d in summary.datasets}
+    summaries = {d.dataset: d for d in summary.datasets if names is None or d.dataset in names}
     # Files of one study, reporter and modality that share an instrument are one series.
     given: dict[str, set[str]] = {}
     for v in result.catalog.variables:
@@ -192,25 +193,17 @@ def lines(values: list[tuple[str, str | None]]) -> str:
     )
 
 
-def render(result: CatalogResult, open_dataset: Callable[[str], None]) -> None:
-    groups = review_groups(result)
-    with panel("Review", help_text="Each data file as the catalog reads it, before the analyses"):
-        note(
-            "The waves of one study's files from one reporter side by side: how many of the "
-            "answers each file should hold it has, how many are missing codes and how many are "
-            "values the items do not allow, the problems found in it, and each score's missing "
-            "values and spread. Open a file for its charts and its problems."
-        )
-        if not groups:
-            empty("No data files read yet.")
-            return
-        for group in groups:
-            with ui.column().classes("w-full gap-1"):
-                ui.label(group.title).classes("font-medium")
-                for wave in group.waves:
-                    wave_row(wave, open_dataset)
-                if group.scores:
-                    score_table(group)
+def render(result: CatalogResult, names: list[str], open_dataset: Callable[[str], None]) -> None:
+    for group in review_groups(result, set(names)):
+        with panel(
+            group.title,
+            help_text="Each file of this series by wave: how much it answers, its missing codes, "
+            "values not allowed and problems, and each score's spread.",
+        ):
+            for wave in group.waves:
+                wave_row(wave, open_dataset)
+            if group.scores:
+                score_table(group)
 
 
 def wave_row(wave: WaveFacts, open_dataset: Callable[[str], None]) -> None:
@@ -229,7 +222,6 @@ def wave_row(wave: WaveFacts, open_dataset: Callable[[str], None]) -> None:
             ui.label(f"{wave.errors} errors").classes("lc-pill lc-bad")
         if wave.warnings:
             ui.label(f"{wave.warnings} warnings").classes("lc-pill lc-warn")
-        ui.space()
         ui.button(
             "Open", icon="open_in_new", on_click=lambda d=wave.dataset: open_dataset(d)
         ).props("flat dense no-caps")

@@ -34,7 +34,6 @@ from labcatalog.gui import (
     preferences,
     prepare,
     problems,
-    review,
     serving,
     settings,
     setup,
@@ -46,9 +45,9 @@ from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
 from labcatalog.gui.codebook_step import CodebookView
 from labcatalog.gui.datalad import clone_dialog, frozen_text, get_button, versions_tooltip
+from labcatalog.gui.datasets import DatasetsView
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.files import FOLDER, choose_path
-from labcatalog.gui.filter_bar import Filters
 from labcatalog.gui.gate import Gate
 from labcatalog.gui.instruments import (
     CFA_DONE,
@@ -185,7 +184,7 @@ class Window:
         self.index: BrowseIndex | None = None
         self.view = BrowseView()
         self.studying = StudiesView()
-        self.dataset_filters = Filters()
+        self.datasets_view = DatasetsView()
         self.analysis = AnalysisView()
         self.methods = MethodsView()
         self.importing = ImportView()
@@ -344,7 +343,6 @@ class Window:
                     (setup.CODEBOOK, (self.codebook_panel, self.edit_panel)),
                     (setup.DATA, (self.add_data_panel, self.prepare_panel, self.import_panel)),
                     (setup.IDS, (self.ids_panel,)),
-                    (setup.REVIEW, (self.review_panel,)),
                 ):
                     with ui.column().classes("lc-step w-full") as self.steps[name]:
                         for part in parts:
@@ -429,7 +427,7 @@ class Window:
             if root != self.root:
                 self.view = BrowseView()
                 self.studying = StudiesView()
-                self.dataset_filters = Filters()
+                self.datasets_view = DatasetsView()
                 self.analysis = AnalysisView()
                 self.methods = MethodsView()
                 self.importing = ImportView()
@@ -586,7 +584,6 @@ class Window:
             self.ids_panel,
             self.import_panel,
             self.edit_panel,
-            self.review_panel,
             self.problems_panel,
         ):
             panel.refresh()
@@ -698,10 +695,10 @@ class Window:
         # The pages that keep their own choice of study start from the one picked at the top.
         if self.scope is None:
             self.view.selected.pop("study", None)
-            self.dataset_filters.selected.pop("study", None)
+            self.datasets_view.filters.selected.pop("study", None)
             return
         self.view.selected["study"] = {self.scope}
-        self.dataset_filters.selected["study"] = {self.scope}
+        self.datasets_view.filters.selected["study"] = {self.scope}
         self.studying.study = self.scope
         self.methods.study = self.scope
 
@@ -715,6 +712,10 @@ class Window:
         self.editing.open(path, line)
 
     def pick_step(self, name: str) -> None:
+        if name == setup.REVIEW:
+            self.datasets_view.layout = datasets.REVIEW
+            self.show_dataset(None)
+            name = "datasets"
         self.tabs.set_value(name)
 
     def show_page(self, gear: ui.button, page: str) -> None:
@@ -794,7 +795,7 @@ class Window:
         if self.has_catalog():
             datasets.render(
                 self.result,
-                self.dataset_filters,
+                self.datasets_view,
                 self.dataset,
                 self.show_dataset,
                 self.open_instrument,
@@ -858,11 +859,6 @@ class Window:
             common.empty("Open a project folder to edit its files.", "folder_open")
         else:
             edit.render(self.root, self.editing, lambda: self.load(self.root))
-
-    @ui.refreshable_method
-    def review_panel(self) -> None:
-        if self.has_catalog():
-            review.render(self.result, self.open_dataset)
 
     @ui.refreshable_method
     def ids_panel(self) -> None:
