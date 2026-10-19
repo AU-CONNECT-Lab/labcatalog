@@ -15,6 +15,7 @@ from labcatalog.metadata.scripts import (
     script_of,
     step_change,
 )
+from labcatalog.metadata.stage_scripts import stage_script
 from labcatalog.project import load_project
 
 
@@ -89,3 +90,27 @@ def test_scripts_are_filtered_by_what_their_steps_write(mock_project):
         for project_dataset in project.config.datasets
         if project_dataset.name in clean.datasets
     } == {"mock_study"}
+
+
+def test_a_stage_script_says_what_it_reads_and_writes_and_comes_with_its_step(mock_project):
+    project = load_project(mock_project)
+    changes.write(project, [remove_step_change(project, "clean_parent_w1")])
+    project = load_project(mock_project)
+    made = stage_script(project, "clean", "python", "raw/parent_w1_export.csv", dataset="parent_w1")
+    assert made.path == "scripts/clean_parent_w1.py"
+    assert made.step.run == (
+        "python scripts/clean_parent_w1.py raw/parent_w1_export.csv data/parent_w1.csv"
+    )
+    assert made.step.stage == "clean" and made.step.outputs == ["data/parent_w1.csv"]
+    assert "with the ID in pid" in made.text and "eps_1_w1" in made.text
+    assert "def clean(raw: pd.DataFrame)" in made.text
+    change = step_change(project, None, made.step)
+    assert changes.check(project, [change]) == []
+    extract = stage_script(project, "extract", "r", "derivatives/eeg/ses-1", dataset="eeg_w1")
+    assert "data.frame(pid = " in extract.text and extract.step.stage == "extract"
+    process = stage_script(
+        project, "process", "python", "raw/eeg", "derivatives/eeg", name="process_eeg"
+    )
+    assert process.step.outputs == ["derivatives/eeg"] and "def process(" in process.text
+    with pytest.raises(EditError, match="Choose what"):
+        stage_script(project, "clean", "r", "", dataset="parent_w1")

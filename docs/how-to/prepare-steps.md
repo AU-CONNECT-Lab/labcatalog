@@ -18,6 +18,7 @@ prepare:
     run: Rscript scripts/extract_eeg.R derivatives/eeg/ses-1 data/eeg_w1.csv
     inputs: [derivatives/eeg/ses-1/qc.csv, scripts/extract_eeg.R]
     outputs: [data/eeg_w1.csv]
+    stage: extract
 ```
 
 | Key | Meaning |
@@ -26,6 +27,7 @@ prepare:
 | `run` | The command. It runs in the project folder, so paths are relative to it. |
 | `inputs` | The files the step reads. |
 | `outputs` | The files the step writes: new files, never one of its inputs, and never a file another step writes. `labcatalog validate` reports a step that would overwrite what it reads, so the raw files stay as exported. |
+| `stage` | Optional: `clean`, `process`, `extract` or `score`, what the step does. The Scripts page groups and filters by it. |
 
 A step is **outdated** when one of its inputs is newer than one of its outputs. List the script itself among the inputs, so that changing the script also marks the step outdated. A step is **missing output** when an output does not exist yet, and **missing input** when an input does not.
 

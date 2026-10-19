@@ -7,6 +7,7 @@ from nicegui import ui
 from labcatalog.config import PrepareStep, dataset_by_name
 from labcatalog.data.prepare import step_state, step_states
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui import new_script as script_dialog
 from labcatalog.gui import prepare
 from labcatalog.gui.common import computed, empty, folding_panel, note, page_head, panel
 from labcatalog.gui.filter_bar import Filters, filter_bar
@@ -16,7 +17,6 @@ from labcatalog.metadata import changes, editing
 from labcatalog.metadata.browse import row_counts, row_matches
 from labcatalog.metadata.scripts import (
     ANALYSIS,
-    LANGUAGES,
     NO_STAGE,
     PREPARE,
     STAGE_HELP,
@@ -27,13 +27,13 @@ from labcatalog.metadata.scripts import (
     command,
     entries,
     language_of,
-    new_script,
     project_scripts,
     remove_step_change,
     script_index,
     step_change,
     written,
 )
+from labcatalog.metadata.stage_scripts import dataset_lines
 from labcatalog.pipeline import CatalogResult
 from labcatalog.project import Project
 
@@ -75,30 +75,15 @@ def render(
         view.key, view.edited = key, False
         page.refresh()
 
-    async def made(language: str, name: str, dialog: ui.dialog) -> None:
-        try:
-            path = new_script(project.root, name.strip(), language)
-        except LabCatalogError as err:
-            ui.notify(str(err), type="negative")
-            return
-        dialog.close()
+    async def made(path: str) -> None:
         view.key, view.edited = path, False
         filters.selected.clear()
         filters.query = ""
         await on_saved()
 
     def new_dialog() -> None:
-        with frame, ui.dialog() as dialog, ui.card().classes("w-[32rem] max-w-full"):
-            ui.label("New script").classes("text-lg font-medium")
-            name = ui.input("Name", placeholder="clean_parent").classes("w-full")
-            language = ui.toggle({k: v.name for k, v in LANGUAGES.items()}, value="r").props(
-                "dense no-caps"
-            )
-            note("Written to scripts/ with lines that read its input and write its output.")
-            with ui.row().classes("w-full justify-end"):
-                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
-                ui.button("Create", on_click=lambda: made(language.value, name.value or "", dialog))
-        dialog.open()
+        with frame:
+            script_dialog.open_dialog(result, made)
 
     def line(entry: Entry, steps: list[PrepareStep]) -> None:
         title = entry.script.path.split("/")[-1] if entry.script else entry.step.name
@@ -220,14 +205,46 @@ def script_part(
         view.edited = False
         redraw()
 
-    with panel(
-        script.path, help_text="The script's code; saving it puts its steps out of date"
-    ) as tools:
-        script_editor(root, script.path, tools, on_edit=edited, on_saved=saved)
+    with ui.row().classes("w-full no-wrap items-start gap-4"):
+        with (
+            ui.column().classes("grow min-w-0 gap-4"),
+            panel(
+                script.path, help_text="The script's code; saving it puts its steps out of date"
+            ) as tools,
+        ):
+            script_editor(root, script.path, tools, on_edit=edited, on_saved=saved)
+        with (
+            ui.column().classes("w-80 shrink-0 lc-sticky"),
+            panel(
+                "What it gets and gives",
+                help_text="What the steps that run it give it and want back",
+            ),
+        ):
+            contract(result, script)
     if script.analysis:
         analysis_part(result, script, on_saved)
     else:
         steps_part(result, script, script.steps, running, redraw, on_saved)
+
+
+def contract(result: CatalogResult, script: Script) -> None:
+    project = result.project
+    if script.analysis:
+        ui.label(f"Reads the datasets {', '.join(script.analysis.datasets)}.").classes("lc-note")
+        if script.analysis.variables:
+            ui.label(f"Variables: {', '.join(script.analysis.variables)}.").classes("lc-note")
+        return
+    if not script.steps:
+        note("No step runs it yet; Add a step below names what it reads and writes.")
+        return
+    for step in script.steps:
+        ui.label(step.name).classes("font-medium")
+        ui.label(step.run).classes("lc-step-run")
+        ui.label(f"Reads {', '.join(step.inputs) or 'nothing it names'}.").classes("lc-note")
+        ui.label(f"Writes {', '.join(step.outputs)}.").classes("lc-note")
+    for dataset in dict.fromkeys(written(project, script.steps)):
+        for line in dataset_lines(project, dataset):
+            ui.label(line).classes("lc-note")
 
 
 def steps_part(
