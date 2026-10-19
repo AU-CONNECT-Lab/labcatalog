@@ -21,7 +21,9 @@ NOTE = (
 
 
 def render(result: CatalogResult, view, study: str, wave: str) -> None:
-    with panel("Attrition", "Those who returned at the next wave against those who did not"):
+    with panel(
+        "Attrition", help_text="Those who returned at the next wave against those who did not"
+    ):
         second = attrition.next_wave(result, study, wave)
         if second is None:
             note("Pick an earlier wave above to compare those who returned with those who did not.")

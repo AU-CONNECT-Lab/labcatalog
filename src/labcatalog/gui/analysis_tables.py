@@ -155,7 +155,7 @@ def table_one_section(result: CatalogResult, sample: analysis.Sample, view) -> N
         view.measures = value or []
         body.refresh()
 
-    with panel("Table 1", "Descriptive statistics of the sample"):
+    with panel("Table 1", help_text="Descriptive statistics of the sample"):
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             chosen = (
                 ui.select(
@@ -318,7 +318,7 @@ def group_section(
         view.t_test = value
         body.refresh()
 
-    with panel("Group comparison", "An outcome across the groups of a demographics item"):
+    with panel("Group comparison", help_text="An outcome across the groups of a demographics item"):
         with ui.row().classes("w-full items-center gap-4"):
             ui.select(
                 groups,

@@ -158,7 +158,7 @@ def render(
         if view.issues:
             problems.issue_table(view.issues, project.root, on_edit)
 
-    with panel("Files without a column map", INTRO) as tools:
+    with panel("Files without a column map", help_text=INTRO) as tools:
         steps()
     with tools:
         ui.select(

@@ -43,7 +43,7 @@ def render(
     async def use(script: str) -> None:
         await registered(result, instrument, dataset, script, reload)
 
-    with panel("Scoring step", f"The script that computes scores in {dataset}"):
+    with panel("Scoring step", help_text=f"The script that computes scores in {dataset}"):
         if step is not None:
             note(
                 f"The Add data step of the Set up page runs {step.run}, which writes "

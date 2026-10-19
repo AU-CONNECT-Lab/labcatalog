@@ -78,7 +78,7 @@ def server_section() -> None:
     saved = preferences.load()
     with panel(
         "Set where labcatalog runs",
-        "This labcatalog serves several people, so the programs it runs are set by whoever "
+        help_text="This labcatalog serves several people, so the programs it runs are set by whoever "
         f"runs it, in {preferences.folder() / preferences.FILENAME}.",
     ):
         rows = [

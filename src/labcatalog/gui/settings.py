@@ -76,8 +76,7 @@ def project_section(
     result = current()
     with panel(
         "Shared with the lab",
-        "Saved in labcatalog.yaml, so everyone who opens the project starts from the same "
-        "choices. Each section of the Analysis page can still try another for itself.",
+        help_text="Saved in labcatalog.yaml, so the whole lab starts from the same choices.",
     ):
         if result is None or result.project is None:
             note("Open a project that reads without errors to set its choices.")
@@ -151,7 +150,7 @@ def select(options: dict, value, label: str) -> ui.select:
 
 
 def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
-    with panel("R", "Factor models, ω and the Analysis page"):
+    with panel("R", help_text="Factor models, ω and the Analysis page"):
         note(
             "Factor models (CFA) and ω run in R with lavaan and semTools, and the Analysis page "
             "uses R first, with psych and effectsize, and lme4, lmerTest and performance for "
@@ -227,7 +226,7 @@ def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
 
 
 def mplus_section() -> None:
-    with panel("Mplus", "Factor models as Mplus inputs"):
+    with panel("Mplus", help_text="Factor models as Mplus inputs"):
         note(
             "Save to outputs under a factor model's tables also writes each model as an Mplus "
             "input (.inp) with its data (.dat). With the path to Mplus set here, a Run in Mplus "
@@ -260,7 +259,7 @@ def mplus_section() -> None:
 
 
 def python_section() -> None:
-    with panel("Python", "For custom analyses written in Python"):
+    with panel("Python", help_text="For custom analyses written in Python"):
         note(
             "The Custom tab of the Analysis page runs Python scripts with this Python, which "
             f"needs {', '.join(PYTHON_PACKAGES)}, and so do prepare steps that call python. Left "
@@ -321,9 +320,7 @@ def looks_section(
 def tables_section() -> None:
     with panel(
         "Tables",
-        "The Copy button under each table on the Analysis page copies it as a three-line "
-        "table, as rich text for Word or Google Docs or as LaTeX (booktabs). Saving to outputs "
-        "always writes each table as .csv, .docx and .tex.",
+        help_text="How Copy under each table on the Analysis page copies it.",
     ):
         ui.toggle(
             {preferences.RICH: "Word or Google Docs", preferences.LATEX: "LaTeX"},
@@ -349,9 +346,7 @@ def confirm_reset(on_reset_example: Callable[[], Awaitable[None]]) -> None:
 def example_section(on_reset_example: Callable[[], Awaitable[None]]) -> None:
     with panel(
         "Example project",
-        "The window opens the project that was open when it last closed, or the example the "
-        f"first time. The example is a copy in {example.example_folder()}, so changes made "
-        "while trying it out stay there; Reset puts it back as installed.",
+        help_text=f"A copy in {example.example_folder()}; Reset puts it back as installed.",
     ):
         ui.button(
             "Reset the example",
@@ -362,7 +357,9 @@ def example_section(on_reset_example: Callable[[], Awaitable[None]]) -> None:
 
 def models_section(on_model: Callable[[], None]) -> None:
     provider = common.llm().provider
-    with panel("Language model", "Scoring scripts and descriptions drafted from reference PDFs"):
+    with panel(
+        "Language model", help_text="Scoring scripts and descriptions drafted from reference PDFs"
+    ):
         note(
             "On an instrument's page, a language model can write the scoring scripts and draft "
             "the description for the Measures paragraph from the instrument's reference PDF. The "

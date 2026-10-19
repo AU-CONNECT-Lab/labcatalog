@@ -709,7 +709,7 @@ def definition(result: CatalogResult, instrument: Instrument) -> None:
     reverse = sum(item.reverse for item in instrument.items)
     counted = f"{len(instrument.items)} items" + (f", {reverse} reverse-keyed" if reverse else "")
     if instrument.items:
-        with panel("Structure", "Scores and their items; hover for the wording"):
+        with panel("Structure", help_text="Scores and their items; hover for the wording"):
             charts.show_tree(instrument)
     with ui.row().classes("w-full gap-4 items-start"):
         with ui.column().classes("min-w-0").style("flex: 1 1 480px"), panel("Items", counted):
@@ -728,8 +728,7 @@ def definition(result: CatalogResult, instrument: Instrument) -> None:
 def scores_part(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> None:
     with panel(
         "Score statistics",
-        "α uses pairwise complete cases, as JASP's reliability analysis does; ω comes from the "
-        "factor model on people who answered every item.",
+        help_text="α uses pairwise complete cases, as JASP does; ω comes from the factor model.",
     ):
         score_statistics(result, instrument, cfa)
     charts.score_charts(result, instrument.id)
@@ -737,8 +736,8 @@ def scores_part(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> 
     if stable is not None:
         with panel(
             "Stability across waves",
-            f"{result.project.config.stats.coefficient()} between the same people's scores one "
-            "wave apart (n people).",
+            help_text=f"{result.project.config.stats.coefficient()} between the same people's scores "
+            "one wave apart.",
         ):
             table(*stable)
     invariance_section(result, instrument, cfa, stable is not None)
@@ -801,8 +800,7 @@ def item_totals(result: CatalogResult, instrument: Instrument) -> None:
 
     with panel(
         "Item-total correlations",
-        "r of each item with the sum of the other items answered; α without the item in "
-        "brackets. Both use pairwise complete cases, as JASP's reliability analysis does.",
+        help_text="Each item against the sum of the others; α without the item in brackets.",
     ) as tools:
         if len(choices) > 1:
             with tools:
@@ -814,7 +812,9 @@ def item_totals(result: CatalogResult, instrument: Instrument) -> None:
 
 def history(project: Project, instrument_id: str, changes: list[Change]) -> None:
     path = project.instrument_files[instrument_id]
-    with panel("History", f"Changes to {path} recorded in git; open one to see what changed."):
+    with panel(
+        "History", help_text=f"Changes to {path} recorded in git; open one to see what changed."
+    ):
         if not changes:
             note(f"No commits include {path} yet.")
         for change in changes:
@@ -1008,7 +1008,8 @@ def scoring_code(
     snippets = result.snippets.get((instrument.id, dataset))
     if snippets is not None:
         with panel(
-            "Scoring code", f"R and Python that compute this instrument's scores in {dataset}"
+            "Scoring code",
+            help_text=f"R and Python that compute this instrument's scores in {dataset}",
         ):
             code_tabs(snippets)
     scoring_step.render(result, instrument, dataset, reload)
@@ -1269,7 +1270,7 @@ def measures_section(
     )
     with panel(
         "Measures paragraph",
-        f"A draft for the paper's Measures section, with α and ω from {dataset}",
+        help_text=f"A draft for the paper's Measures section, with α and ω from {dataset}",
     ) as tools:
         with tools:
             copy_text(text)
@@ -1313,7 +1314,9 @@ def description_draft(result: CatalogResult, instrument: Instrument) -> None:
         finally:
             button.enable()
 
-    with panel("Description from the reference PDF", "For description: in the instrument's YAML"):
+    with panel(
+        "Description from the reference PDF", help_text="For description: in the instrument's YAML"
+    ):
         if not common.model_set():
             note("Set a language model on the Settings page to draft the description from the PDF.")
             return

@@ -77,10 +77,8 @@ def render(project: Project, form: PipelineForm) -> None:
 
     with panel(
         "From a pipeline's table",
-        "A pipeline's table of measures, a .tsv with a bids_name or participant_id column and "
-        "a .json sidecar of the same name, becomes one instrument per value of Split by, and a "
-        "data file and a column map for each wave. Running it again keeps your edits to the "
-        "instruments.",
+        help_text="A pipeline's .tsv table and its .json sidecar become instruments, data files "
+        "and column maps; running it again keeps your edits.",
     ):
         with ui.row().classes("items-center gap-3"):
             ui.button("Choose table", icon="table_view", on_click=choose).props(

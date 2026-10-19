@@ -458,8 +458,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 ui.column().classes("grow min-w-0"),
                 panel(
                     opened.path,
-                    "Saving checks the file the way loading the project does and keeps it as it "
-                    "was if something is wrong; then the catalog reloads.",
+                    help_text="Saving checks the file first and leaves it as it was if something is wrong.",
                 ) as tools,
             ):
                 with tools:

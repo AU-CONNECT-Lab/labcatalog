@@ -62,11 +62,11 @@ def panel(title: str, subtitle: str = "", help_text: str = "") -> Iterator[ui.ro
 
 
 @contextmanager
-def folding_panel(title: str, subtitle: str = "", opened: bool = False) -> Iterator[None]:
+def folding_panel(title: str, help_text: str = "", opened: bool = False) -> Iterator[None]:
     # A panel whose title bar opens and closes it.
     with ui.expansion(value=opened).classes("lc-panel lc-fold w-full") as fold:
         with fold.add_slot("header"):
-            panel_title(title, subtitle)
+            panel_title(title, "", help_text)
         with ui.column().classes("w-full gap-2"):
             yield
 
@@ -95,9 +95,8 @@ def page_head(title: str, summary: str = "", help_text: str = "") -> ui.row:
 
 
 def help_button(text: str) -> None:
-    with ui.button(icon="help_outline").props("flat round dense size=sm").classes("lc-help-btn"):
-        with ui.menu().props("anchor='bottom left' self='top left'"):
-            ui.label(text).classes("lc-help")
+    with ui.icon("help_outline").classes("lc-help-btn"):
+        ui.tooltip(text).classes("lc-help")
 
 
 def empty(text: str, icon: str = "inbox") -> None:

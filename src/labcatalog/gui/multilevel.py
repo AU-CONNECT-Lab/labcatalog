@@ -33,7 +33,9 @@ SINGULAR = (
 
 
 def render(result: CatalogResult, view) -> None:
-    with panel("Multilevel model", "Change across waves, with people and groups as levels"):
+    with panel(
+        "Multilevel model", help_text="Change across waves, with people and groups as levels"
+    ):
         outcomes = analysis.of_instruments(ml.outcome_choices(result), view.instruments)
         if not outcomes:
             note("Needs a score or number of the chosen measures in at least one dataset.")

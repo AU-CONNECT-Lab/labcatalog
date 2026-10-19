@@ -19,7 +19,7 @@ def render(result: CatalogResult, sample: analysis.Sample, view) -> None:
     measures = measure_choices(result, sample.datasets, view.instruments or [], labels)
     with panel(
         "Measurement invariance across groups",
-        "Whether an instrument measures the same thing in each group",
+        help_text="Whether an instrument measures the same thing in each group",
     ):
         if not groups or not measures:
             note(

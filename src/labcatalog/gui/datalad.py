@@ -81,7 +81,7 @@ def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
     example = (
         Path.home() / ".local" / "bin" / ("datalad.exe" if sys.platform == "win32" else "datalad")
     )
-    with panel("DataLad", "Versions of the data, freezes and datalad run"):
+    with panel("DataLad", help_text="Versions of the data, freezes and datalad run"):
         note(
             "When the data are in DataLad datasets, labcatalog records which version it read, "
             "freezes tag that version, and prepare steps can run through datalad run. Install "
@@ -226,7 +226,7 @@ def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) 
         }
         for f in found
     ]
-    with panel("Freezes", "Records of the data a result used"):
+    with panel("Freezes", help_text="Records of the data a result used"):
         shown = table(columns, rows)
     if on_open:
         shown.add_slot("body-cell-open", OPEN_CELL)
@@ -253,7 +253,9 @@ def versions_panel(result: CatalogResult, on_changed: Callable[[], Awaitable[Non
     if not roots:
         return
     datalad = preferences.load().get(preferences.DATALAD)
-    with panel("Data versions", "Saved on this computer, pushed and updated with DataLad") as head:
+    with panel(
+        "Data versions", help_text="Saved on this computer, pushed and updated with DataLad"
+    ) as head:
         if not datalad:
             note("Set the path to datalad on the Settings page to save, push and update the data.")
             return

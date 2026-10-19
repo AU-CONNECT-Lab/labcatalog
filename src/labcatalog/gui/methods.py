@@ -56,8 +56,7 @@ def render(
             view.wave = waves[0]
         with page_head(
             "Methods",
-            "Text and tables for a paper's Methods section; Table 1, Procedure and Measures "
-            "describe the chosen wave.",
+            help_text="Text and tables for a paper's Methods section, for the chosen wave.",
         ):
             if len(studies) > 1:
                 ui.toggle(
@@ -89,8 +88,7 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
     text = participants.paragraph(result.project, result.summary, study)
     with panel(
         "Participants",
-        "Change the wording with participants: in labcatalog.yaml or in the study's file in "
-        "studies/.",
+        help_text="Change the wording with participants: in labcatalog.yaml or the study file.",
     ) as tools:
         ui.label(text).classes("lc-prose")
     with tools:
@@ -115,7 +113,7 @@ def participants_part(result: CatalogResult, view: MethodsView) -> None:
             "share of that wave's n for the same reporter; returning are those also in the "
             "last wave with this modality, with their share of it.",
         )
-    with panel("Participants by wave", "Who took part at each wave and who came back"):
+    with panel("Participants by wave", help_text="Who took part at each wave and who came back"):
         for table in shown.values():
             paper_table(table)
         with ui.row().classes("lc-actions w-full"):
@@ -204,7 +202,7 @@ def retention_table(result: CatalogResult, study: str) -> tuple[list[dict], list
 def procedure(result: CatalogResult, study: str, wave: str) -> None:
     found = wave_methods(result.project, study, wave)
     labels = result.project.config.vocab.modality_labels
-    with panel("Procedure", "How each modality's data were collected"):
+    with panel("Procedure", help_text="How each modality's data were collected"):
         if not found:
             note(
                 "Write how each modality's data were collected under methods: in the study's "
@@ -236,8 +234,7 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
     used.sort(key=lambda pair: (order.index(pair[0]), datasets.index(pair[1])))
     with panel(
         "Measures",
-        "Each instrument's paragraph with α and ω from that dataset; change the wording with "
-        "measures: and description: as the instrument's page says.",
+        help_text="Each instrument's paragraph; change its wording on the instrument's page.",
     ) as tools:
         if not used:
             note("No instruments in this wave.")

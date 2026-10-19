@@ -310,7 +310,7 @@ def render(
     def set_script(value: str) -> None:
         chosen.script = value
 
-    with panel("Custom analysis", "Any analysis, in a script you can read and change"):
+    with panel("Custom analysis", help_text="Any analysis, in a script you can read and change"):
         if saved_list := result.project.config.analyses:
             with ui.row().classes("w-full items-center gap-2"):
                 caption("Saved")

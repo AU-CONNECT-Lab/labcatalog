@@ -66,7 +66,7 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
         view.missing = value or []
         body.refresh()
 
-    with panel("Missing data", "Who has a value on each chosen variable"):
+    with panel("Missing data", help_text="Who has a value on each chosen variable"):
         note(
             "The correlation table, regression and group comparison use everyone with values on "
             "what each needs; each table's note gives its n."
@@ -140,7 +140,9 @@ def imputation_panel(
             )
             analysis_tables.code_view(texts)
 
-    with panel("Multiple imputation", "One imputation model for every section that uses it"):
+    with panel(
+        "Multiple imputation", help_text="One imputation model for every section that uses it"
+    ):
         default = imputation.METHODS[stats.missing]
         note(
             "With Multiple imputation chosen under Missing values beside the Sample (the project "

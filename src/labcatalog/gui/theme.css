@@ -157,9 +157,9 @@ code, pre, .font-mono { font-family: var(--lc-mono); }
 .lc-page-head { padding: 0 2px 2px; }
 .lc-page-title { font-size: 1.35rem; font-weight: 700; line-height: 1.3; letter-spacing: -0.01em; color: var(--lc-ink); }
 .lc-page-summary { font-size: 0.85rem; color: var(--lc-muted); }
-.q-btn.lc-help-btn { color: var(--lc-faint); }
-.q-btn.lc-help-btn:hover { color: var(--lc-accent); }
-.lc-help { width: 28rem; max-width: 90vw; padding: 12px 14px; color: var(--lc-ink); font-size: 0.85rem; line-height: 1.55; white-space: pre-line; }
+.lc-help-btn { color: var(--lc-faint); font-size: 1.05rem; cursor: help; }
+.lc-help-btn:hover { color: var(--lc-accent); }
+.q-tooltip.lc-help { max-width: 22rem; line-height: 1.45; white-space: pre-line; }
 
 .lc-empty { padding: 3rem 1rem; text-align: center; }
 .lc-empty-icon { font-size: 2.4rem; color: var(--lc-faint); }

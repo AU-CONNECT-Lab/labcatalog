@@ -155,7 +155,7 @@ def render(
 
     with panel(
         "Measurement model",
-        "Several scores, each a factor of its items, fitted together on the Sample",
+        help_text="Several scores, each a factor of its items, fitted together on the Sample",
     ):
         note(
             "Each chosen score becomes a factor of its own items, and the factors correlate "

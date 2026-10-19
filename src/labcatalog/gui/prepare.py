@@ -130,12 +130,10 @@ def render(
         steps.refresh()
 
     help_text = (
-        "Runs your own cleaning scripts, one command per step, in the project folder. A step "
-        "is outdated when one of its inputs is newer than its outputs. A step can call "
-        "Rscript by name once its path is set on the Settings page."
+        "Runs your own cleaning scripts in the project folder; a step is outdated when an "
+        "input is newer than its outputs."
         + (
-            " Each step runs through datalad run, which gets missing inputs first and records "
-            "the run in the dataset's history."
+            " Each step runs through datalad run."
             if project.config.prepare_with == "datalad"
             else ""
         )
@@ -160,7 +158,8 @@ def render(
                 not view.running
             )
         with panel(
-            "Prepare steps", "Scripts that clean the data or compute scores, in the order they run"
+            "Prepare steps",
+            help_text="Scripts that clean the data or compute scores, in the order they run",
         ):
             for state in states:
                 step_row(state, view, start, show_log, on_success)
@@ -280,7 +279,7 @@ def log_panel(view: PrepareView) -> None:
 def draft_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable[None]]) -> None:
     with panel(
         "Draft a cleaning step",
-        "A language model writes a script that turns a raw export into a dataset's file",
+        help_text="A language model writes a script that turns a raw export into a dataset's file",
     ):
         if result is None or result.project is None:
             note("Open a project that reads without errors to draft a step.")

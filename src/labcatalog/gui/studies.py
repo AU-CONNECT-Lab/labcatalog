@@ -351,7 +351,7 @@ def waves_panel(project, study: str, touched: Callable[[], None]) -> ui.aggrid:
         }
         for row in studies.wave_rows(found)
     ]
-    with panel("Waves", "A wave with no end date is still collecting.") as tools:
+    with panel("Waves", help_text="A wave with no end date is still collecting.") as tools:
         waves = grid(
             [
                 column("wave", "Wave"),
@@ -373,7 +373,7 @@ def waves_panel(project, study: str, touched: Callable[[], None]) -> ui.aggrid:
 
 
 def milestones_panel(found, touched: Callable[[], None]) -> ui.aggrid:
-    with panel("Milestones", "Dates shown on the Overview timeline.") as tools:
+    with panel("Milestones", help_text="Dates shown on the Overview timeline.") as tools:
         milestones = grid(
             [column("name", "Name", flex=3), column("date", "Date")],
             studies.milestone_rows(found),
@@ -400,7 +400,8 @@ def text_panels(
     modalities = [m for m in vocab.modalities if m in used] + sorted(used - set(vocab.modalities))
     boxes = {}
     with panel(
-        "Methods", "How each modality's data were collected and processed, for the Methods page."
+        "Methods",
+        help_text="How each modality's data were collected and processed, for the Methods page.",
     ):
         if not modalities:
             note("The study has no datasets yet; each modality it uses gets a box here.")
@@ -424,7 +425,9 @@ def text_panels(
         problem = placeholder_problem(text, participants.PLACEHOLDERS)
         shown.set_text(problem or participants.paragraph(project, result.summary, study, text))
 
-    with panel("Participants", "The template of the Participants paragraph on the Methods page."):
+    with panel(
+        "Participants", help_text="The template of the Participants paragraph on the Methods page."
+    ):
         own = (content.participants or "").strip() if content else ""
         template = (
             ui.textarea("Template", value=own, on_change=touched)
@@ -447,7 +450,7 @@ def datasets_panel(
     config = result.project.config
     mine = {d.name for d in config.datasets if d.study == study}
     summaries = [s for s in result.summary.datasets if s.dataset in mine]
-    with panel("Datasets", "Click a row to open the dataset.") as tools:
+    with panel("Datasets", help_text="Click a row to open the dataset.") as tools:
         with tools:
             ui.button(
                 "Add a dataset" if summaries else "Add the first dataset",

@@ -833,11 +833,8 @@ class Window:
         with ui.row().classes("lc-panel lc-bar w-full items-center no-wrap gap-4"):
             common.panel_title(
                 "Add a data file",
-                "A data file, its cleaning and its columns",
-                "Choose a file as it came from the survey platform or the lab's pipeline; "
-                "labcatalog copies it into the project and links each column to an item of the "
-                "instruments in the codebook. A file that needs cleaning first, such as an "
-                "export with extra header rows, gets a cleaning step below.",
+                "",
+                "Copies a file into the project and links its columns to the instruments' items.",
             )
             if self.result.project.config.studies:
                 ui.button(

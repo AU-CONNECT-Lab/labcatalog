@@ -194,7 +194,7 @@ def lines(values: list[tuple[str, str | None]]) -> str:
 
 def render(result: CatalogResult, open_dataset: Callable[[str], None]) -> None:
     groups = review_groups(result)
-    with panel("Review", "Each data file as the catalog reads it, before the analyses"):
+    with panel("Review", help_text="Each data file as the catalog reads it, before the analyses"):
         note(
             "The waves of one study's files from one reporter side by side: how many of the "
             "answers each file should hold it has, how many are missing codes and how many are "

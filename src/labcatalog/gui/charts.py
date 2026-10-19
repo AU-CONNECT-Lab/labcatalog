@@ -41,7 +41,7 @@ def score_charts(result: CatalogResult, instrument_id: str) -> None:
     boxes = views.score_boxes(result, instrument_id)
     spread = views.score_distribution(result, instrument_id)
     if boxes is not None or spread is not None:
-        with panel("Distributions", "Each score by wave, and the total score's density"):
+        with panel("Distributions", help_text="Each score by wave, and the total score's density"):
             side_by_side(("", boxes), ("", spread))
     means = views.score_means(result, instrument_id)
     if means is not None:
@@ -184,7 +184,9 @@ def instrument_dataset_section(result: CatalogResult, instrument_id: str, datase
 def collection_pace(result: CatalogResult, study: str) -> None:
     fig = views.collection_pace(result, study)
     if fig is not None:
-        with panel("Collection pace", "Each person once, from the first date in their files"):
+        with panel(
+            "Collection pace", help_text="Each person once, from the first date in their files"
+        ):
             show(fig)
 
 

@@ -8,7 +8,6 @@ from labcatalog.data.check import CheckReport
 from labcatalog.gui.common import (
     col,
     empty,
-    help_button,
     keyed,
     note,
     open_path,
@@ -66,18 +65,13 @@ def render(
 ) -> None:
     issues = report.issues
     with panel(
-        summarize_issues(issues), "Fix says what a problem means and who usually fixes it"
+        summarize_issues(issues), help_text="Fix says what a problem means and who usually fixes it"
     ) as tools:
         if not issues:
             empty("No problems found.", "check_circle")
         shown = issue_table(issues, root, edit, fix)
         shown.visible = bool(issues)
     with tools:
-        help_button(
-            "Fix opens a panel that says what the problem means and who usually fixes it. "
-            "Project files open in the editor of the Codebook step on the Set up page at the line named; data files open in their "
-            "own app."
-        )
         level = ui.toggle(LEVEL_FILTERS, value="all").props("dense no-caps")
         search = ui.input(placeholder="Search").props("outlined dense clearable").classes("w-64")
         with search.add_slot("prepend"):

@@ -267,7 +267,7 @@ def render(
             )
 
     settle()
-    with panel("Mediation", "X on Y through a mediator M, with an optional moderator W"):
+    with panel("Mediation", help_text="X on Y through a mediator M, with an optional moderator W"):
         controls()
         body = ui.column().classes("w-full gap-2")
         with body:

@@ -24,7 +24,10 @@ ROWS = {
 
 
 def render(result: CatalogResult, view) -> None:
-    with panel("Cross-lagged panel", "X and Y over three or more waves, within and between people"):
+    with panel(
+        "Cross-lagged panel",
+        help_text="X and Y over three or more waves, within and between people",
+    ):
         choices = analysis.of_instruments(pm.choices(result), view.instruments)
         if len(choices) < 2:
             note(

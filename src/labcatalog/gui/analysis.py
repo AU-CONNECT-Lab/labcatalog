@@ -462,7 +462,7 @@ def correlation_section(
         view.correlation = value
         body.refresh()
 
-    with panel("Correlation table", "Every pair of the chosen variables"):
+    with panel("Correlation table", help_text="Every pair of the chosen variables"):
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             scores = (
                 ui.select(
@@ -640,7 +640,7 @@ def pair_section(
         view.y = value
         body.refresh()
 
-    with panel("Regression", "The outcome Y on each predictor X, one at a time"):
+    with panel("Regression", help_text="The outcome Y on each predictor X, one at a time"):
         with ui.row().classes("w-full items-center gap-4"):
             xs = (
                 ui.select(

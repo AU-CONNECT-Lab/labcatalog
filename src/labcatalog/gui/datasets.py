@@ -183,13 +183,15 @@ def detail(
     facts(result, summary, on_changed)
     with ui.row().classes("w-full no-wrap items-start gap-4"):
         with ui.column().classes("grow min-w-0 gap-4"):
-            with panel("Instruments", "People who answered all, some or none of the items"):
+            with panel(
+                "Instruments", help_text="People who answered all, some or none of the items"
+            ):
                 shown = table(*completeness_table(result, summary))
                 shown.classes("cursor-pointer")
                 shown.on("rowClick", lambda e: on_instrument(e.args[1]["id"]))
             main_panels(result, summary, on_edit)
         with ui.column().classes("w-80 shrink-0 gap-4"):
-            with panel("Missing values", "Cells of each kind"):
+            with panel("Missing values", help_text="Cells of each kind"):
                 table(*missing_table(summary))
             if summary.collected_by_month:
                 with panel("Collected by month"):
@@ -211,7 +213,7 @@ def main_panels(
             paragraphs(methods)
 
     issues = dataset_issues(result, summary.dataset)
-    with panel("Problems", "In this dataset's file and column map"):
+    with panel("Problems", help_text="In this dataset's file and column map"):
         if issues:
             problems.issue_table(issues, result.project.root, on_edit)
         else:
@@ -223,8 +225,7 @@ def main_panels(
 def label_code(snippets: dict[str, str]) -> None:
     with panel(
         "Label code",
-        "Puts the item wording, response labels and missing codes on the data: R with the "
-        "haven package, Python as the dictionaries pyreadstat takes to save a .sav file.",
+        help_text="Puts item wording, response labels and missing codes on the data, in R or Python.",
     ):
         code_tabs(snippets)
 
