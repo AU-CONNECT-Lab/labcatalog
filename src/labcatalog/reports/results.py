@@ -226,87 +226,91 @@ def pooled_agreement_text(agreement: Agreement, digits: int, wording: Wording) -
     )
 
 
-def panel_text(model: PanelModel, fit: PanelFit, digits: int = 2) -> str:
+def panel_text(
+    model: PanelModel, fit: PanelFit, digits: int = 2, wording: Wording = BUILT_IN
+) -> str:
     x, y, t = model.x_label, model.y_label, len(model.waves)
     values = {**fit.fits[RICLPM]}
     values["p"] = values["pvalue"]
     sentences = [
-        f"A random intercept cross-lagged panel model (RI-CLPM) of {x} and {y} over {t} waves "
-        f"(N = {fit.n}) gave {fit_indices(values, digits)}."
+        wording.say("panel", "fit", x=x, y=y, waves=t, n=fit.n, fit=fit_indices(values, digits))
     ]
-    chisq, df, p = fit.tests["equal"]
-    change = f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}"
-    if fit.equal_holds:
-        sentences.append(
-            f"Holding the lagged paths equal across waves did not worsen fit, {change}, so the "
-            "lagged paths are reported from that model."
-        )
-    else:
-        sentences.append(
-            f"Holding the lagged paths equal across waves worsened fit, {change}, so the lagged "
-            "paths are reported as estimated at each wave."
-        )
-    chisq, df, p = fit.tests["intercepts"]
-    verb = "improved" if p < SIGNIFICANT else "did not improve"
-    sentences.append(
-        f"The random intercepts {verb} fit over the cross-lagged panel model without them, "
-        f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}."
-    )
+    slot = "equal" if fit.equal_holds else "equal_worse"
+    sentences.append(wording.say("panel", slot, change=chi_change(fit.tests["equal"], digits)))
+    test = fit.tests["intercepts"]
+    slot = "intercepts" if test[2] < SIGNIFICANT else "intercepts_ns"
+    sentences.append(wording.say("panel", slot, change=chi_change(test, digits)))
     if model.grouped:
-        chisq, df, p = fit.tests["equal_studies" if fit.equal_holds else "studies"]
-        change = f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}"
+        test = fit.tests["equal_studies" if fit.equal_holds else "studies"]
+        slot = "studies" if fit.studies_hold else "studies_worse"
         sentences.append(
-            f"With the {len(model.studies)} studies as groups, holding the lagged paths equal "
-            f"across them {'did not worsen' if fit.studies_hold else 'worsened'} fit, {change}, "
-            + (
-                "so they are reported from that model, with β for each study."
-                if fit.studies_hold
-                else "so they are reported for each study."
+            wording.say(
+                "panel", slot, n_studies=len(model.studies), change=chi_change(test, digits)
             )
         )
     for group, study in enumerate(model.studies or [""], start=1):
-        sentences += panel_paths_text(model, fit, digits, group, study)
+        sentences += panel_paths_text(model, fit, digits, group, study, wording)
     return " ".join(sentences)
 
 
+def chi_change(test: tuple[float, float, float], digits: int) -> str:
+    chisq, df, p = test
+    return f"Δχ²({df:g}) = {number(chisq, digits)}, {p_text(p)}"
+
+
 def panel_paths_text(
-    model: PanelModel, fit: PanelFit, digits: int, group: int, study: str
+    model: PanelModel, fit: PanelFit, digits: int, group: int, study: str, wording: Wording
 ) -> list[str]:
     x, y = model.x_label, model.y_label
+    # In a study of several, each sentence names the study.
+    own = "_study" if study else ""
     sentences = []
-    where = f"In {study}, the" if study else "The"
     between = fit.correlation(RICLPM, "RIx", "RIy", group)
     if between is not None and between.standardized is not None:
+        r = f"r = {bounded(between.standardized, digits)}"
         sentences.append(
-            f"{where} random intercepts, the stable differences between people, correlated "
-            f"r = {bounded(between.standardized, digits)}, {p_text(between.p)}."
+            wording.say("panel", f"between{own}", study=study, r=r, p=p_text(between.p))
         )
     chosen = fit.chosen
-    within = f"In {study}, within people" if study else "Within people"
-    for kind, phrase in (("x_to_y", f"{x} predicted {y}"), ("y_to_x", f"{y} predicted {x}")):
+    for kind, predictor, outcome in (("x_to_y", x, y), ("y_to_x", y, x)):
         paths = fit.lagged(chosen, kind, group)
         if not paths:
             continue
+        named = {"study": study, "predictor": predictor, "outcome": outcome}
         if chosen in (EQUAL, EQUAL_STUDIES):
             path = paths[0]
             ordered = sorted(q.standardized for q in paths if q.standardized is not None)
             betas = list(dict.fromkeys(bounded(b, digits) for b in ordered))
             if len(betas) > 1:
-                spread = f" (β from {betas[0]} to {betas[-1]})"
+                spread = f"(β from {betas[0]} to {betas[-1]})"
             else:
-                spread = f" (β = {betas[0]})" if betas else ""
+                spread = f"(β = {betas[0]})" if betas else ""
             sentences.append(
-                f"{within}, {phrase} at the next wave, b = {number(path.estimate, digits)}"
-                f"{spread}, {p_text(path.p)}."
+                wording.say(
+                    "panel",
+                    f"lagged{own}",
+                    b=f"b = {number(path.estimate, digits)}",
+                    betas=spread,
+                    p=p_text(path.p),
+                    **named,
+                )
             )
         else:
             steps = [
-                f"from wave {model.waves[q.wave - 2]} to {model.waves[q.wave - 1]}, β = "
-                f"{bounded(q.standardized, digits)}, {p_text(q.p)}"
+                wording.say(
+                    "panel",
+                    "step",
+                    from_wave=model.waves[q.wave - 2],
+                    to_wave=model.waves[q.wave - 1],
+                    beta=f"β = {bounded(q.standardized, digits)}",
+                    p=p_text(q.p),
+                )
                 for q in paths
                 if q.standardized is not None
             ]
-            sentences.append(f"{within}, {phrase} at the next wave {series(steps)}.")
+            sentences.append(
+                wording.say("panel", f"lagged_steps{own}", steps=series(steps), **named)
+            )
     return sentences
 
 

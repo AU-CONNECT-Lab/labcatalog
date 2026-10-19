@@ -1,8 +1,10 @@
+import re
 import string
 from dataclasses import dataclass, field
 
 from labcatalog.config import ProjectConfig
 
+BEFORE_PUNCTUATION = re.compile(r" (?=[,;)])")
 METHODS = "Methods"
 RESULTS = "Results"
 # The file kinds that can hold their own wording of a template.
@@ -128,6 +130,19 @@ FITTED_EXAMPLE = {
 STEP_FIT_EXAMPLE = "χ²(38) = 52.40, CFI = .981, RMSEA = .042, SRMR = .051"
 DESIGN = ("outcome", "package", "observations", "people")
 DESIGN_EXAMPLE = {"outcome": "Mood", "package": "lme4", "observations": "512", "people": "180"}
+LAGGED = ("predictor", "outcome", "b", "betas", "p")
+LAGGED_EXAMPLE = {
+    "predictor": "Sleep problems",
+    "outcome": "Mood",
+    "b": "b = 0.14",
+    "betas": "(β from .12 to .15)",
+    "p": "p = .006",
+}
+STEPS_EXAMPLE = {
+    "predictor": "Sleep problems",
+    "outcome": "Mood",
+    "steps": "from wave 1 to 2, β = .18, p = .012 and from wave 2 to 3, β = .04, p = .561",
+}
 TEMPLATES: dict[str, Template] = {
     t.key: t
     for t in (
@@ -770,6 +785,132 @@ TEMPLATES: dict[str, Template] = {
             ),
             "The Results paragraph of the Multilevel model tab.",
         ),
+        Template(
+            "panel",
+            "Cross-lagged panel",
+            RESULTS,
+            (
+                Slot(
+                    "fit",
+                    "The model and its fit",
+                    "A random intercept cross-lagged panel model (RI-CLPM) of {x} and {y} over "
+                    "{waves} waves (N = {n}) gave {fit}.",
+                    ("x", "y", "waves", "n", "fit"),
+                    {
+                        "x": "Sleep problems",
+                        "y": "Mood",
+                        "waves": "3",
+                        "n": "180",
+                        "fit": "χ²(1) = 0.80, p = .371, CFI = 1.00, TLI = 1.00, RMSEA = .00, "
+                        "SRMR = .01",
+                    },
+                ),
+                Slot(
+                    "equal",
+                    "When equal lagged paths do not worsen fit",
+                    "Holding the lagged paths equal across waves did not worsen fit, {change}, so "
+                    "the lagged paths are reported from that model.",
+                    ("change",),
+                    {"change": "Δχ²(2) = 1.90, p = .387"},
+                ),
+                Slot(
+                    "equal_worse",
+                    "When equal lagged paths worsen fit",
+                    "Holding the lagged paths equal across waves worsened fit, {change}, so the "
+                    "lagged paths are reported as estimated at each wave.",
+                    ("change",),
+                    {"change": "Δχ²(2) = 9.40, p = .009"},
+                ),
+                Slot(
+                    "intercepts",
+                    "When the random intercepts improve fit",
+                    "The random intercepts improved fit over the cross-lagged panel model without "
+                    "them, {change}.",
+                    ("change",),
+                    {"change": "Δχ²(3) = 48.20, p < .001"},
+                ),
+                Slot(
+                    "intercepts_ns",
+                    "When the random intercepts do not improve fit",
+                    "The random intercepts did not improve fit over the cross-lagged panel model "
+                    "without them, {change}.",
+                    ("change",),
+                    {"change": "Δχ²(3) = 2.10, p = .552"},
+                ),
+                Slot(
+                    "studies",
+                    "With several studies, when equal paths across them do not worsen fit",
+                    "With the {n_studies} studies as groups, holding the lagged paths equal "
+                    "across them did not worsen fit, {change}, so they are reported from that "
+                    "model, with β for each study.",
+                    ("n_studies", "change"),
+                    {"n_studies": "2", "change": "Δχ²(2) = 1.30, p = .522"},
+                ),
+                Slot(
+                    "studies_worse",
+                    "With several studies, when equal paths across them worsen fit",
+                    "With the {n_studies} studies as groups, holding the lagged paths equal "
+                    "across them worsened fit, {change}, so they are reported for each study.",
+                    ("n_studies", "change"),
+                    {"n_studies": "2", "change": "Δχ²(2) = 8.80, p = .012"},
+                ),
+                Slot(
+                    "between",
+                    "The correlation of the random intercepts",
+                    "The random intercepts, the stable differences between people, correlated "
+                    "{r}, {p}.",
+                    ("r", "p"),
+                    {"r": "r = .52", "p": "p < .001"},
+                ),
+                Slot(
+                    "between_study",
+                    "The same, for each of several studies",
+                    "In {study}, the random intercepts, the stable differences between people, "
+                    "correlated {r}, {p}.",
+                    ("study", "r", "p"),
+                    {"study": "Study A", "r": "r = .52", "p": "p < .001"},
+                ),
+                Slot(
+                    "lagged",
+                    "A lagged path held equal across waves",
+                    "Within people, {predictor} predicted {outcome} at the next wave, {b} "
+                    "{betas}, {p}.",
+                    LAGGED,
+                    LAGGED_EXAMPLE,
+                ),
+                Slot(
+                    "lagged_study",
+                    "The same, for each of several studies",
+                    "In {study}, within people, {predictor} predicted {outcome} at the next wave, "
+                    "{b} {betas}, {p}.",
+                    ("study", *LAGGED),
+                    LAGGED_EXAMPLE | {"study": "Study A"},
+                ),
+                Slot(
+                    "lagged_steps",
+                    "A lagged path estimated at each wave",
+                    "Within people, {predictor} predicted {outcome} at the next wave {steps}.",
+                    ("predictor", "outcome", "steps"),
+                    STEPS_EXAMPLE,
+                ),
+                Slot(
+                    "lagged_steps_study",
+                    "The same, for each of several studies",
+                    "In {study}, within people, {predictor} predicted {outcome} at the next wave "
+                    "{steps}.",
+                    ("study", "predictor", "outcome", "steps"),
+                    STEPS_EXAMPLE | {"study": "Study A"},
+                ),
+                Slot(
+                    "step",
+                    "Each wave in that list",
+                    "from wave {from_wave} to {to_wave}, {beta}, {p}",
+                    ("from_wave", "to_wave", "beta", "p"),
+                    {"from_wave": "1", "to_wave": "2", "beta": "β = .18", "p": "p = .012"},
+                ),
+            ),
+            "The Results paragraph of the Cross-lagged panel tab.",
+        ),
     )
 }
 
@@ -785,7 +926,9 @@ class Wording:
         return (own or TEMPLATES[key].slot(slot).default).strip()
 
     def say(self, key: str, slot: str, **values: object) -> str:
-        return " ".join(self.text(key, slot).format_map(values).split())
+        text = " ".join(self.text(key, slot).format_map(values).split())
+        # A placeholder that is empty, such as a β with no standardized value, leaves no gap.
+        return BEFORE_PUNCTUATION.sub("", text)
 
 
 def project_text(config: ProjectConfig, key: str, slot: str = PARAGRAPH) -> str:

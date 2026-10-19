@@ -10,6 +10,7 @@ from labcatalog.gui.paper import paper_table, result_actions, results_text
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import panel as pm
@@ -180,7 +181,13 @@ def render(result: CatalogResult, view) -> None:
             }
             for shown in papers.values():
                 paper_table(shown)
-            results_text(results.panel_text(model, found, common.decimals()), list(papers.values()))
+            results_text(
+                results.panel_text(
+                    model, found, common.decimals(), Wording(result.project.config.templates)
+                ),
+                list(papers.values()),
+                "panel",
+            )
             result_actions(result, "panel", papers, texts=texts, engine="Computed in R.")
             with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
                 note(
