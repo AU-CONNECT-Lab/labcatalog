@@ -22,7 +22,7 @@ from labcatalog.schema import Instrument
 STEPS = ("about", "options", "items", "scores", "given", "check")
 # The step where each gap of the completeness check is filled in.
 GAP_STEPS = {"items": "items", "scores": "scores"}
-ABOUT = ("name", "abbreviation", "kind", "construct_name", "description", "license")
+ABOUT = ("name", "abbreviation", "modality", "construct_name", "description", "license")
 # The instrument file's keys in the order labcatalog writes them.
 ORDER = tuple(Instrument.model_fields)
 # Questionnaires often mark reversed items this way, so a pasted line keeps that.
@@ -32,7 +32,8 @@ REVERSED = re.compile(r"\s*\(R\)\s*$", re.IGNORECASE)
 @dataclass
 class Draft:
     id: str
-    about: dict[str, str] = field(default_factory=lambda: {"kind": QUESTIONNAIRE})
+    about: dict[str, str] = field(default_factory=lambda: {"modality": QUESTIONNAIRE})
+    demographics: bool = False
     # Rows as the Edit files tables hold them, so the same writer puts them in the file.
     options: list[dict[str, Any]] = field(default_factory=list)
     items: list[dict[str, Any]] = field(default_factory=list)
@@ -55,6 +56,7 @@ def existing(project: Project, instrument_id: str) -> Draft:
     return Draft(
         id=instrument_id,
         about={k: str(data[k]) for k in ABOUT if data.get(k) is not None},
+        demographics=bool(data.get("demographics")),
         options=records.read_rows(text, "response_sets", tables["response_sets"]),
         items=records.read_rows(text, "items", tables["items"]),
         scores=records.read_rows(text, "scores", tables["scores"]),
@@ -172,10 +174,11 @@ def instrument_change(project: Project, draft: Draft) -> Change:
     data = records.load(text)
     for key in ABOUT:
         value = draft.about.get(key, "").strip() or None
-        # The default kind is written only where the file already had it.
-        if key == "kind" and value == QUESTIONNAIRE and key not in data:
+        # The default modality is written only where the file already had it.
+        if key == "modality" and value == QUESTIONNAIRE and key not in data:
             value = None
         put(data, key, value)
+    put(data, "demographics", True if draft.demographics else None)
     put(data, "default_response_set", draft.default_set or None)
     put(data, "references", references(data, draft.references, draft.pdfs))
     relative = draft.path or f"{defaults.INSTRUMENTS_DIR}/{draft.id}.yaml"

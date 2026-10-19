@@ -51,7 +51,7 @@ def test_a_new_instrument_is_written_mapped_and_given(mock_project):
     changes.write(project, found)
 
     text = (mock_project / "instruments" / "sleep_habits.yaml").read_text(encoding="utf-8")
-    assert "kind" not in text
+    assert "modality" not in text and "demographics" not in text
     assert "  - {id: shq_2, text: I use a screen in bed., reverse: true}" in text
     assert "default_response_set: frequency" in text
     assert text.index("name:") < text.index("response_sets:") < text.index("items:")

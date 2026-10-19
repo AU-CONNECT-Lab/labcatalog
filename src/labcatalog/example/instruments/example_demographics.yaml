@@ -2,7 +2,7 @@
 id: example_demographics
 name: Example Family Background
 abbreviation: EFB
-kind: demographics
+demographics: true
 construct_name: Demographics
 instructions: Please tell us about your child and your household.
 response_sets:

@@ -138,8 +138,8 @@ def test_a_survey_file_fills_in_items_and_imports(tmp_path, survey):
     # Two questions share Q9, so a person decides which one the column holds.
     assert rows[-2:] == ["Q9,,,,,,,,", "Q9_DO_1,,,,,,,,"]
     assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == [
-        "child_mood,Child Mood,,,",
-        "background,Background,,,",
+        "child_mood,Child Mood,,,,",
+        "background,Background,,,,",
     ]
     assert import_codebook(project, "pilot_w1").issues == []
     mood = (root / "instruments" / "child_mood.yaml").read_text(encoding="utf-8")

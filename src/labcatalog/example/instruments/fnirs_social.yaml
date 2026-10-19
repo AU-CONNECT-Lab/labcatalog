@@ -2,7 +2,7 @@
 id: fnirs_social
 name: fNIRS social attention task
 abbreviation: fNIRS
-kind: fnirs
+modality: fnirs
 construct_name: Prefrontal response to social scenes
 description: Prefrontal oxygenated haemoglobin while watching social and non-social scenes, from a 16-channel cap; the pipeline leaves a channels-by-condition table of GLM betas for each child, with rejected channels left empty.
 items:

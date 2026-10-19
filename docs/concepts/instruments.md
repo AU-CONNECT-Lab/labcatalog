@@ -29,7 +29,7 @@ references:
 license: Free for research use (fictional)
 ```
 
-`kind` says what sort of instrument it is: `questionnaire` (the default), `demographics`, or a modality such as `eeg`. `construct_name` and `description` feed the Measures paragraph on the Methods page. A description is one or two sentences that a person has written or checked.
+`modality` says how it was collected: `questionnaire` (the default) or another modality, such as `eeg`. `demographics: true` marks a form about the people, such as age and gender, rather than a scale. `construct_name` and `description` feed the Measures paragraph on the Methods page. A description is one or two sentences that a person has written or checked.
 
 ## Items
 

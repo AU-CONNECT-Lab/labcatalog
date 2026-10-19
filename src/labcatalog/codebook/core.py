@@ -58,7 +58,8 @@ COLUMNS: dict[str, dict[str, str]] = {
         "instrument": "the instrument ID used in items.csv",
         "name": "the instrument's full name",
         "abbreviation": "its usual abbreviation",
-        "kind": "questionnaire (the default) or demographics",
+        "modality": "questionnaire (the default) or another modality",
+        "demographics": "yes for a form about the people rather than a scale",
         "construct": "what it measures",
     },
     SCORES: {
@@ -156,6 +157,7 @@ class Draft:
     items: dict[str, DraftItem] = field(default_factory=dict)
     fields: dict[str, str] = field(default_factory=dict)
     scores: list[dict[str, Any]] = field(default_factory=list)
+    demographics: bool = False
 
 
 def codebook_paths(project: Project, dataset: str) -> dict[str, Path]:
@@ -642,7 +644,7 @@ class Importer:
             messages.append("a choice item needs choices (or type number or text)")
         if item_type in ITEM_TYPES and item_type != "choice" and row["choices"]:
             messages.append(f"a {item_type} item has no choices")
-        reverse = parse_flag(row["reverse"], messages)
+        reverse = parse_flag(row["reverse"], "reverse", messages)
         low, high = (parse_number(row[name], name, messages) for name in ("min", "max"))
         if item_type != "number" and (low is not None or high is not None):
             messages.append("min and max apply to number items only")
@@ -678,6 +680,10 @@ class Importer:
                 continue
             if not row["name"]:
                 self.report(INSTRUMENTS, line, "name is empty")
+            messages: list[str] = []
+            draft.demographics = parse_flag(row["demographics"], "demographics", messages)
+            for message in messages:
+                self.report(INSTRUMENTS, line, message)
             draft.fields = row
         for draft in self.drafts.values():
             if draft.id not in seen:
@@ -808,11 +814,11 @@ def parse_choices(text: str, messages: list[str]) -> Options:
     return tuple(options)
 
 
-def parse_flag(value: str, messages: list[str]) -> bool:
+def parse_flag(value: str, name: str, messages: list[str]) -> bool:
     if value.lower() in YES:
         return True
     if value.lower() not in NO:
-        messages.append(f"reverse must be yes or no, not {value}")
+        messages.append(f"{name} must be yes or no, not {value}")
     return False
 
 
@@ -869,13 +875,14 @@ def instrument_yaml(draft: Draft) -> str:
     default = max(sets, key=lambda options: sets[options]) if sets else None
     fields = draft.fields
     document: dict[str, Any] = {"id": draft.id, "name": fields["name"]}
-    for key, column in (
-        ("abbreviation", "abbreviation"),
-        ("kind", "kind"),
-        ("construct_name", "construct"),
+    for key, value in (
+        ("abbreviation", fields["abbreviation"]),
+        ("modality", fields["modality"]),
+        ("demographics", draft.demographics),
+        ("construct_name", fields["construct"]),
     ):
-        if fields[column]:
-            document[key] = fields[column]
+        if value:
+            document[key] = value
     if sets:
         document["response_sets"] = [
             {

@@ -2,7 +2,7 @@
 id: video_play
 name: Coded parent-child play
 abbreviation: Play
-kind: video
+modality: video
 construct_name: Parent-child interaction
 description: Ten minutes of free play, filmed and coded by trained observers; the coding software leaves a behaviours-by-count-and-seconds table for each family.
 items:

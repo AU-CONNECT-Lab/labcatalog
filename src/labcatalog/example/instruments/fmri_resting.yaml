@@ -2,7 +2,7 @@
 id: fmri_resting
 name: Resting-state fMRI networks
 abbreviation: rsfMRI
-kind: fmri
+modality: fmri
 construct_name: Functional connectivity
 description: Connectivity between seven large-scale networks from an eight-minute resting scan; the pipeline leaves a networks-by-networks matrix of Fisher z for each child, and scripts/extract_fmri.py takes four of its cells.
 items:

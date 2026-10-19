@@ -140,7 +140,7 @@ def test_score_fields_belong_on_scores(mock_project):
 
 def test_demographics_are_never_imputed(mock_project):
     path = mock_project / "instruments" / "example_mood.yaml"
-    edit(path, "construct_name:", "kind: demographics\nconstruct_name:")
+    edit(path, "construct_name:", "demographics: true\nconstruct_name:")
     [issue] = run_validate(mock_project)
     assert issue.code == "invalid_value"
     assert "never imputed" in issue.message

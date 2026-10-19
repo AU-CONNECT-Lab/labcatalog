@@ -2,7 +2,7 @@
 id: saliva_cortisol
 name: Salivary cortisol, one day
 abbreviation: Cortisol
-kind: saliva
+modality: saliva
 construct_name: Diurnal cortisol
 description: Saliva at waking, 30 minutes later and at bedtime on one school day, assayed in duplicate; the lab returns one report for the whole wave.
 items:

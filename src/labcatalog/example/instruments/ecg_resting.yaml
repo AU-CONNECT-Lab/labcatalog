@@ -2,7 +2,7 @@
 id: ecg_resting
 name: Resting heart rate variability
 abbreviation: HRV
-kind: ecg
+modality: ecg
 construct_name: Autonomic regulation
 description: Five minutes of seated rest with a three-lead ECG; the beat detector leaves each child's R-R intervals with an artefact flag per beat.
 items:

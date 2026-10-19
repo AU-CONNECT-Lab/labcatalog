@@ -13,7 +13,7 @@ def test_an_instrument_form_offers_the_files_own_ids(mock_project):
     assert list(found)[:5] == ["about", "response_sets", "items", "scores", "references"]
     assert "ems_1" in found["scores"].options["items"]
     assert found["items"].options["response_set"]
-    assert "questionnaire" in found["about"].options["kind"]
+    assert "questionnaire" in found["about"].options["modality"]
 
 
 def test_settings_and_study_forms_offer_the_projects_lists(mock_project):

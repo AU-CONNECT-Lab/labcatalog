@@ -2,7 +2,7 @@
 id: sleep_watch
 name: Sleep watch week
 abbreviation: Watch
-kind: actigraphy
+modality: actigraphy
 construct_name: Sleep
 description: Children wore a wrist sleep watch for a week; the device software scores each night, and the nightly values are averaged over the nights worn.
 items:

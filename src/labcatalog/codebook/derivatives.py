@@ -273,7 +273,7 @@ def instrument_text(
         document = {
             "id": instrument_id,
             "name": f"{name}: {', '.join(group)}" if group else name,
-            "kind": request.modality,
+            "modality": request.modality,
             "description": f"Measures from {source or request.table.name}"
             + (f" for {', '.join(group)}." if group else "."),
             **({"response_sets": sets} if sets else {}),

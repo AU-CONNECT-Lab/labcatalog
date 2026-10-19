@@ -2,7 +2,7 @@
 id: eeg_resting
 name: Resting-state EEG
 abbreviation: EEG
-kind: eeg
+modality: eeg
 construct_name: Resting brain activity
 description: Band power from five minutes of eyes-closed rest, recorded with a 32-channel cap; the pipeline leaves a channels-by-bands table of log10 power for each child, and scripts/extract_eeg.py turns it into these measures.
 items:

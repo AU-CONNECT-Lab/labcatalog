@@ -2,7 +2,7 @@
 id: eyetracking_faces
 name: Eye tracking faces task
 abbreviation: ET
-kind: eyetracking
+modality: eyetracking
 construct_name: Attention to faces
 description: Looking at a face, an object and the background over twelve short trials; the tracker's software leaves a trials-by-areas table of fixation time for each child.
 items:

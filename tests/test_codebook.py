@@ -55,9 +55,9 @@ age,background,age,How old are you?,number,,,18,99
 remarks,background,remarks,Anything else?,text,,,,
 """,
     INSTRUMENTS: """\
-instrument,name,abbreviation,kind,construct
-anx,Pilot Anxiety Scale,PAS,,Anxiety
-background,Background,,demographics,
+instrument,name,abbreviation,modality,demographics,construct
+anx,Pilot Anxiety Scale,PAS,,,Anxiety
+background,Background,,,yes,
 """,
     SCORES: """\
 instrument,score,label,method,items,missing_rule,min_valid
@@ -102,7 +102,7 @@ def test_templates_guess_instruments_from_column_prefixes(pilot):
         "age,,,,,,,,",
         "remarks,,,,text,,,,",
     ]
-    assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == ["anx,,,,"]
+    assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == ["anx,,,,,"]
     assert paths[SCORES].read_text(encoding="utf-8-sig").splitlines()[1:] == []
     with pytest.raises(CodebookError, match="already has codebook files"):
         write_templates(project, "pilot_w1")
@@ -155,7 +155,7 @@ def test_import_writes_instruments_and_map_that_score_like_the_data(pilot):
     assert run_check(pilot).issues == []
     catalog = run_catalog(pilot)
     assert catalog.scores["pilot_w1"]["anx.anx_total@pilot_w1"].tolist() == [1.0, 4.5]
-    assert catalog.project.instruments["background"].kind == "demographics"
+    assert catalog.project.instruments["background"].demographics
 
 
 def test_import_reports_each_problem_by_file_and_line(pilot):
@@ -288,8 +288,8 @@ def test_a_redcap_dictionary_fills_in_items_and_imports(pilot, tmp_path):
         "redcap_event_name,,,,text,,,,",
     ]
     assert paths[INSTRUMENTS].read_text(encoding="utf-8-sig").splitlines()[1:] == [
-        "mood_scale,Mood scale,,,",
-        "background,Background,,,",
+        "mood_scale,Mood scale,,,,",
+        "background,Background,,,,",
     ]
     result = import_codebook(project, "pilot_w1")
     assert result.issues == []

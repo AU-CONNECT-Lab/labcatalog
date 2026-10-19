@@ -2,7 +2,7 @@
 id: example_participants
 name: Example Participant Roster
 abbreviation: Roster
-kind: demographics
+demographics: true
 construct_name: Demographics
 description: What the study keeps once for every person in the roster, whether parent or child.
 response_sets:

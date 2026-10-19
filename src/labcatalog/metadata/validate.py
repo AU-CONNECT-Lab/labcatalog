@@ -297,7 +297,7 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
         if score.min_valid is not None and score.missing_rule == "complete":
             message = f"{where}.min_valid: has no effect while missing_rule is complete"
             issues.append(problem("invalid_value", message, location, level="warning"))
-        if instrument.kind == "demographics" and score.missing_rule != "complete":
+        if instrument.demographics and score.missing_rule != "complete":
             message = f"{where}.missing_rule: demographic answers are never imputed; use complete"
             issues.append(problem("invalid_value", message, location))
     return issues

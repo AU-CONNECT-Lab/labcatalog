@@ -62,7 +62,9 @@ class Instrument(StrictModel):
     id: str
     name: str
     abbreviation: str | None = None
-    kind: str = "questionnaire"
+    modality: str = "questionnaire"
+    # A form about the people, not a scale: not scored, charted or checked for references.
+    demographics: bool = False
     construct_name: str | None = None
     # A sentence or two for the Measures paragraph, written or checked by a person.
     description: str | None = None

@@ -651,16 +651,14 @@ def demographic_items(result: CatalogResult, datasets: list[str]) -> list[Resolv
         v
         for name in datasets
         for v in analysis.items_for(result, name)
-        if instruments[v.instrument_id].kind == "demographics" and v.type in (CHOICE, NUMBER)
+        if instruments[v.instrument_id].demographics and v.type in (CHOICE, NUMBER)
     ]
 
 
 def other_numbers(result: CatalogResult, datasets: list[str]) -> list[ResolvedVariable]:
     instruments = result.project.instruments
     return [
-        v
-        for v in number_items(result, datasets)
-        if instruments[v.instrument_id].kind != "demographics"
+        v for v in number_items(result, datasets) if not instruments[v.instrument_id].demographics
     ]
 
 
@@ -691,7 +689,7 @@ def default_measures(result: CatalogResult, datasets: list[str]) -> list[str]:
     def shown(key: str) -> bool:
         instrument = instruments[instrument_of(key)]
         if key.startswith(ITEM_PREFIX):
-            return instrument.kind == "demographics"
+            return instrument.demographics
         return is_total(instrument, key.split(".", 1)[1])
 
     return [key for key in measures(result, datasets) if shown(key)]

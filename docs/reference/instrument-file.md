@@ -15,7 +15,8 @@ name: Example Mood Scale
 | `id` | text | | The instrument's ID. Required. |
 | `name` | text | | Its full name. Required. |
 | `abbreviation` | text | | Its usual abbreviation. |
-| `kind` | text | `questionnaire` | `questionnaire`, `demographics`, or a modality such as `eeg`. |
+| `modality` | text | `questionnaire` | How it was collected: `questionnaire` or another modality, such as `eeg`. |
+| `demographics` | true/false | `false` | A form about the people rather than a scale: not scored or charted, offered for Table 1 and groups. |
 | `construct_name` | text | | What it measures. |
 | `description` | text | | A sentence or two for the Measures paragraph. |
 | `measures` | text | | This instrument's own Measures template. |

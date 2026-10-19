@@ -744,7 +744,7 @@ def scores_part(result: CatalogResult, instrument: Instrument, cfa: CfaView) -> 
 
 
 def items_part(result: CatalogResult, instrument: Instrument) -> None:
-    if instrument.kind == "demographics":
+    if instrument.demographics:
         with panel("Sample by wave"):
             table(*sample_table(result, instrument))
     charts.item_charts(result, instrument.id)

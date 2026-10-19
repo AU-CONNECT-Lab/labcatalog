@@ -31,6 +31,6 @@ def test_a_full_questionnaire_lacks_nothing():
 
 
 def test_demographics_and_other_modalities_need_less():
-    assert gaps(Instrument(id="d", name="D", kind="demographics")) == ["items"]
-    measure = Instrument(id="e", name="E", kind="eeg", items=[Item(id="alpha", text="Alpha")])
+    assert gaps(Instrument(id="d", name="D", demographics=True)) == ["items"]
+    measure = Instrument(id="e", name="E", modality="eeg", items=[Item(id="alpha", text="Alpha")])
     assert gaps(measure) == ["construct", "description"]

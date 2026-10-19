@@ -20,7 +20,7 @@ The **Codebook** step of the Set up page makes new instruments from a codebook w
 
 ## Import a codebook for a data file
 
-A codebook import describes every column of one data file in three CSV files: `items.csv` (each column's instrument, item, wording, type and options), `instruments.csv` (each instrument's name, abbreviation and construct) and `scores.csv` (each score and its items). labcatalog checks them, then writes the instrument files and the dataset's column map. It works for a dataset that has no column map yet; add the dataset to `labcatalog.yaml` first (see [Add a Wave or Dataset](add-dataset.md)).
+A codebook import describes every column of one data file in three CSV files: `items.csv` (each column's instrument, item, wording, type and options), `instruments.csv` (each instrument's name, abbreviation, modality, whether it is a demographics form, and construct) and `scores.csv` (each score and its items). labcatalog checks them, then writes the instrument files and the dataset's column map. It works for a dataset that has no column map yet; add the dataset to `labcatalog.yaml` first (see [Add a Wave or Dataset](add-dataset.md)).
 
 In the window:
 

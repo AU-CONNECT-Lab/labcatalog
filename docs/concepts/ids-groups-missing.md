@@ -68,7 +68,7 @@ studies:
 
 The roster is a CSV file with one row per person of the study: their ID, their group in a column you name, and any other columns you keep there, such as their role or birth year. Every dataset of the study takes its people's groups from it, so a file that holds only a child's ID, such as an EEG file, still knows the child's family. Most labs already keep such a list, from recruitment or a demographics form; it can be made by one of your [prepare steps](../how-to/prepare-steps.md) like any other file. `from_id` and a roster's `group_column` are two ways of giving the same thing, so a project uses one of them. A study whose roster gives no group, or that has no roster, links its files by ID.
 
-The roster's other columns can be described like any data: name a `kind: demographics` instrument as the roster's `instrument` and map the columns to its items in `maps/roster_<study>.csv`, listing the ID and group columns with no instrument, as in a dataset's map:
+The roster's other columns can be described like any data: name a `demographics: true` instrument as the roster's `instrument` and map the columns to its items in `maps/roster_<study>.csv`, listing the ID and group columns with no instrument, as in a dataset's map:
 
 ```yaml
 studies:

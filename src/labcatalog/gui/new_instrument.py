@@ -9,7 +9,7 @@ from labcatalog.gui.common import computed, note
 from labcatalog.gui.edit import cell, grid_options
 from labcatalog.gui.files import PDF_FILES, choose_path
 from labcatalog.metadata import changes, new_instrument, records
-from labcatalog.metadata.completeness import DEMOGRAPHICS, QUESTIONNAIRE
+from labcatalog.metadata.completeness import QUESTIONNAIRE
 from labcatalog.paths import portable_path, posix_str
 from labcatalog.pipeline import CatalogResult
 from labcatalog.project import references_root
@@ -87,7 +87,12 @@ def open_wizard(
     first = new_instrument.first_gap(project, instrument_id) if completing else "about"
     tables = records.INSTRUMENT_TABLES
     state: dict = {"changes": [], "step": TITLES[first]}
-    kinds = sorted({QUESTIONNAIRE, DEMOGRAPHICS, *(i.kind for i in project.instruments.values())})
+    modalities = list(
+        dict.fromkeys(
+            [QUESTIONNAIRE, *project.config.vocab.modalities]
+            + [i.modality for i in project.instruments.values()]
+        )
+    )
     with_sets = {
         i: s.abbreviation or s.name for i, s in project.instruments.items() if s.response_sets
     }
@@ -98,11 +103,12 @@ def open_wizard(
         draft.about = {
             "name": name.value or "",
             "abbreviation": abbreviation.value or "",
-            "kind": kind.value or QUESTIONNAIRE,
+            "modality": modality.value or QUESTIONNAIRE,
             "construct_name": construct.value or "",
             "description": description.value or "",
             "license": license_input.value or "",
         }
+        draft.demographics = demographics.value
         draft.references = list(reference.value or [])
         draft.pdfs = {k: v for k, v in draft.pdfs.items() if k in draft.references and v}
 
@@ -289,13 +295,14 @@ def open_wizard(
                     abbreviation = ui.input(
                         "Abbreviation", value=draft.about.get("abbreviation", "")
                     ).classes("w-32")
-                with ui.row().classes("gap-3"):
-                    kind = ui.select(
-                        kinds,
-                        value=draft.about.get("kind", QUESTIONNAIRE),
-                        label="Kind",
+                with ui.row().classes("gap-3 items-center"):
+                    modality = ui.select(
+                        modalities,
+                        value=draft.about.get("modality", QUESTIONNAIRE),
+                        label="Modality",
                         new_value_mode="add-unique",
                     ).classes("w-48")
+                    demographics = ui.checkbox("Demographics form", value=draft.demographics)
                     construct = ui.input(
                         "Construct", value=draft.about.get("construct_name", "")
                     ).classes("w-96")

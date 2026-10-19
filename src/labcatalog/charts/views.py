@@ -1049,7 +1049,7 @@ def standardized_scores(
 def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     # One panel per wave: that wave's item means in colour, the other waves faint behind it.
     instrument = result.project.instruments[instrument_id]
-    if instrument.kind == "demographics" or not has_options(instrument):
+    if instrument.demographics or not has_options(instrument):
         # Codes such as 1 = Girl, 2 = Boy have no mean worth drawing.
         return None
     means = {(v.dataset, v.column): v.mean for v in result.summary.variables}
@@ -1086,7 +1086,7 @@ def wave_profiles(result: CatalogResult, instrument_id: str) -> go.Figure | None
 def people_profiles(result: CatalogResult, instrument_id: str, dataset: str) -> go.Figure | None:
     # One panel per subscale: every person's answers faint, the mean of everyone in colour.
     instrument = result.project.instruments[instrument_id]
-    if instrument.kind == "demographics" or not has_options(instrument):
+    if instrument.demographics or not has_options(instrument):
         return None
     columns = {
         v.item_id: v

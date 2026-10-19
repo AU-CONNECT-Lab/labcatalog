@@ -10,7 +10,7 @@ from labcatalog.config import ProjectConfig
 from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.metadata import records
 from labcatalog.metadata.bibliography import load_bibliography
-from labcatalog.metadata.completeness import DEMOGRAPHICS, QUESTIONNAIRE
+from labcatalog.metadata.completeness import QUESTIONNAIRE
 from labcatalog.metadata.records import Column, Table
 from labcatalog.project import bib_path, load_config
 from labcatalog.stats.summary import wave_order
@@ -21,7 +21,8 @@ ABOUT = Table(
         Column("id", "ID"),
         Column("name", "Name"),
         Column("abbreviation", "Abbreviation"),
-        Column("kind", "Kind", default=QUESTIONNAIRE),
+        Column("modality", "Modality", default=QUESTIONNAIRE),
+        Column("demographics", "Demographics form", "bool", default=False),
         Column("construct_name", "Construct"),
         Column("description", "Description"),
         Column("instructions", "Instructions"),
@@ -97,13 +98,13 @@ def instrument_sections(
     root: Path, config: ProjectConfig | None, tables: dict[str, Table], data: CommentedMap
 ) -> list[Section]:
     sets = ids(data.get("response_sets"))
-    kinds = (QUESTIONNAIRE, DEMOGRAPHICS, *(config.vocab.modalities if config else ()))
+    modalities = (QUESTIONNAIRE, *(config.vocab.modalities if config else ()))
     keys = tuple(load_bibliography(bib_path(config, root), root, [])) if config else ()
     found = [
         Section(
             "about",
             ABOUT,
-            {"kind": tuple(dict.fromkeys(kinds)), "default_response_set": sets},
+            {"modality": tuple(dict.fromkeys(modalities)), "default_response_set": sets},
             fixed=("id",),
         ),
         Section("response_sets", tables["response_sets"], noun="response set"),

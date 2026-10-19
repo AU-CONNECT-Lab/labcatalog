@@ -51,7 +51,7 @@ def test_writes_an_instrument_per_task_and_a_data_file_per_session(demo_project)
     done = run_derivatives(demo_project, request(table, split=["task"]))
     assert done.left_out == ["device"]
     rest = yaml.safe_load((demo_project / "instruments" / "qc_rest.yaml").read_text())
-    assert rest["kind"] == "fnirs" and rest["description"] == "Measures from pipe 1.2 for rest."
+    assert rest["modality"] == "fnirs" and rest["description"] == "Measures from pipe 1.2 for rest."
     assert rest["items"] == [
         {"id": "sci", "label": "Mean SCI", "text": "Scalp coupling index.", "type": "number"},
         {"id": "snr", "text": "Signal to noise. (dB)", "type": "number"},

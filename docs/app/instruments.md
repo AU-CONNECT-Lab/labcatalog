@@ -21,7 +21,7 @@ With a language model set up (see [Set Up R and Language Models](../how-to/r-and
 
 ### Add an instrument
 
-**Add an instrument** walks through a new instrument in six steps: what it is (ID, name, abbreviation, kind, construct, description, references from `references.bib` with the PDF of each, license); its answer options, copied from an instrument with the same answers or typed in; its items, pasted one per line, with `(R)` at the end of a reverse-keyed item; its scores, starting from **Add a total score**; the datasets it was given in, where **Find the columns** guesses each item's column from the column names; and a last step that shows the lines each file gains before **Save**. It writes `instruments/<id>.yaml`, the rows of each dataset's column map and the administrations in the study files.
+**Add an instrument** walks through a new instrument in six steps: what it is (ID, name, abbreviation, modality, whether it is a demographics form, construct, description, references from `references.bib` with the PDF of each, license); its answer options, copied from an instrument with the same answers or typed in; its items, pasted one per line, with `(R)` at the end of a reverse-keyed item; its scores, starting from **Add a total score**; the datasets it was given in, where **Find the columns** guesses each item's column from the column names; and a last step that shows the lines each file gains before **Save**. It writes `instruments/<id>.yaml`, the rows of each dataset's column map and the administrations in the study files.
 
 ![The Items step of Add an instrument, with three pasted items, one of them reverse-keyed](../images/app/instrument-wizard.png)
 
