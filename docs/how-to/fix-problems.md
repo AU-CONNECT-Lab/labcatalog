@@ -51,7 +51,7 @@ On the Problems page, **Fix** at the end of a row opens a panel for that problem
 | `same_answer` | People gave the same answer to every item of a score. | Look at them; they may have answered without reading. If their answers are real, record the warning as fine. |
 | `possible_identifier` | A column's name suggests it holds names, emails, phone numbers, addresses or birth dates. | Remove it from the data the catalog reads. |
 | `excluded_present` | Rows belong to someone on the exclusion list. | Remove them in your cleaning script. |
-| `prepare_outdated`, `prepare_output_missing` | A prepare step's inputs are newer than its outputs, or an output does not exist. | Run the step from the Fix panel or in the **Prepare data** step of the Set up page. |
+| `prepare_outdated`, `prepare_output_missing` | A prepare step's inputs are newer than its outputs, or an output does not exist. | Run the step from the Fix panel or in the **Add data** step of the Set up page. |
 | `not_downloaded` | A file in a DataLad dataset has no content on this computer. | Get it; see [Using labcatalog with DataLad](datalad.md). |
 
 [Problem Codes](../reference/problem-codes.md) lists every code.

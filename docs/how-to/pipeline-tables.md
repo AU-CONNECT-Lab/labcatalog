@@ -12,7 +12,7 @@ Only columns whose values are all numbers (or `n/a`), or whose sidecar gives the
 
 ## Run it
 
-In the **Describe columns** step of the Set up page, **From a pipeline's table** does the same with a form. On the command line:
+In the **Add data** step of the Set up page, **From a pipeline's table** does the same with a form. On the command line:
 
 ```bash
 labcatalog derivatives derivatives/nirspipe/desc-subjects_qc.tsv --name fnirs_qc --label "fNIRS quality" --study cmx7 --modality fnirs --reporter self --split task --columns "raw_*"

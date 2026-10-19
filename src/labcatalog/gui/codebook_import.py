@@ -10,7 +10,7 @@ from labcatalog.codebook import core as codebook
 from labcatalog.codebook.core import ImportResult
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import pipeline_table, problems
-from labcatalog.gui.common import col, computed, empty, note, open_path, panel, table
+from labcatalog.gui.common import col, computed, note, open_path, panel, table
 from labcatalog.gui.files import choose_path
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
@@ -30,18 +30,6 @@ def render(
     project = result.project
     names = codebook.unmapped_datasets(project)
     if not names:
-        with panel("From a codebook", INTRO):
-            empty(
-                f"Every dataset already has a column map in {defaults.MAPS_DIR}/. To import a "
-                f"codebook for a new data file, add the file under datasets in "
-                f"{defaults.CONFIG_FILENAME}, then press Refresh.",
-                "task_alt",
-            )
-            ui.button(
-                f"Add the file in {defaults.CONFIG_FILENAME}",
-                icon="edit_note",
-                on_click=lambda: on_edit(defaults.CONFIG_FILENAME, None),
-            ).props("flat no-caps").classes("lc-quiet-btn self-center")
         pipeline_table.render(project, view.pipeline)
         return
     if view.dataset not in names:
@@ -170,7 +158,7 @@ def render(
         if view.issues:
             problems.issue_table(view.issues, project.root, on_edit)
 
-    with panel("From a codebook", INTRO) as tools:
+    with panel("Files without a column map", INTRO) as tools:
         steps()
     with tools:
         ui.select(
@@ -180,8 +168,8 @@ def render(
 
 
 INTRO = (
-    "Describe a new data file's columns in three CSV files; labcatalog checks them and writes "
-    "the instrument files and the column map."
+    "Data files listed in labcatalog.yaml whose columns are not linked yet: describe them in "
+    "three CSV files, and labcatalog writes the column map and any new instruments."
 )
 
 

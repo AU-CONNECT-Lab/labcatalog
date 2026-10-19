@@ -45,7 +45,7 @@ The database is opened read only. The CSV file is then a dataset like any other,
 
 ## Run the steps
 
-The **Prepare data** step of the Set up page lists every step with its status and the dates of its files. Press **Run** on one step, **Run outdated** to run only the steps that are not up to date, or **Run all** to run every step in order; a step that fails stops the rest. **Stop** ends the running step, and **Log** shows what the command printed. Press **Refresh** afterwards to read the new data.
+The **Prepare steps** of the **Add data** step of the Set up page list every step with its status and the dates of its files. Press **Run** on one step, **Run outdated** to run only the steps that are not up to date, or **Run all** to run every step in order; a step that fails stops the rest. **Stop** ends the running step, and **Log** shows what the command printed. Press **Refresh** afterwards to read the new data.
 
 On the command line, this runs every step in order and stops at the first failure:
 
@@ -57,7 +57,7 @@ labcatalog prepare
 
 ## Draft a step with a language model
 
-With a language model set on the Settings page (see [Set Up R and Language Models](r-and-models.md)), **Draft a cleaning step** at the bottom of the **Prepare data** step writes a first script for you. Choose the **Dataset**, the **Raw export** it comes from (a CSV file in the project folder) and **R** or **Python**, and press **Draft**.
+With a language model set on the Settings page (see [Set Up R and Language Models](r-and-models.md)), **Draft a cleaning step** at the bottom of the prepare steps in the **Add data** step writes a first script for you. Choose the **Dataset**, the **Raw export** it comes from (a CSV file in the project folder) and **R** or **Python**, and press **Draft**.
 
 The model is given the raw file's column names and, as the project sets on the Settings page, either each column's different values or its first 20 lines; and the dataset's columns from its column map, with each item's answer options, the missing codes and the ID pattern. It writes a script that takes the raw file and the clean file as arguments, as in `Rscript scripts/clean_parent_w1.R raw/parent_w1_export.csv data/parent_w1.csv`.
 

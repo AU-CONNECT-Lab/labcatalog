@@ -1,8 +1,8 @@
-# Describe Columns
+# Files Without a Column Map
 
-**Describe columns**, the third step of the Set up page, creates instrument files and a column map for a data file that has no column map yet. [Add an Instrument](../how-to/add-instrument.md) walks through it. If every dataset already has a map, the step says so: add the new data file under `datasets` in `labcatalog.yaml` (**Add the file in labcatalog.yaml** opens it in Edit files) and press **Refresh**.
+**Files without a column map**, in the [Add data](add-data.md) step of the Set up page, creates instrument files and a column map for a data file listed in `labcatalog.yaml` that has no column map yet; a file added with **Add a data file** gets its map there and then. To describe instruments before there is any data, use the [Codebook](codebook.md) step. [Add an Instrument](../how-to/add-instrument.md) walks through it. When every dataset has a map, only **From a pipeline's table** shows.
 
-![The Describe columns step for a dataset without a column map](../images/app/import.png)
+![Files without a column map, for a dataset without one](../images/app/import.png)
 
 Pick the **Dataset**, then:
 

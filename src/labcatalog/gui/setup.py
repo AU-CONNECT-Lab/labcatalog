@@ -5,14 +5,14 @@ from nicegui import ui
 
 from labcatalog.codebook.core import unmapped_datasets
 from labcatalog.data.prepare import step_states
-from labcatalog.gui import id_check
+from labcatalog.gui import codebook_step, id_check
 from labcatalog.pipeline import CatalogResult
 
-PREPARE, IDS, IMPORT, EDIT, REVIEW = "prepare", "ids", "import", "edit", "review"
+CODEBOOK, DATA, IDS, EDIT, REVIEW = "codebook", "data", "ids", "edit", "review"
 STEPS = {
-    PREPARE: "Prepare data",
+    CODEBOOK: "Codebook",
+    DATA: "Add data",
     IDS: "Check IDs",
-    IMPORT: "Describe columns",
     EDIT: "Edit files",
     REVIEW: "Review",
 }
@@ -22,7 +22,7 @@ AFTER = ("problems", "Problems")
 
 @dataclass
 class SetupView:
-    step: str = PREPARE
+    step: str = CODEBOOK
 
 
 def to_do(result: CatalogResult | None) -> dict[str, str]:
@@ -32,10 +32,12 @@ def to_do(result: CatalogResult | None) -> dict[str, str]:
     waiting = sum(s.status != "up to date" for s in step_states(project))
     unmapped = len(unmapped_datasets(project))
     checking = id_check.waiting(result)
+    drafted = len(codebook_step.drafts(project.root))
+    data = [f"{waiting} to run" if waiting else "", f"{unmapped} to link" if unmapped else ""]
     return {
-        PREPARE: f"{waiting} to run" if waiting else "",
+        CODEBOOK: f"{drafted} drafts" if drafted else "",
+        DATA: " · ".join(filter(None, data)),
         IDS: f"{checking} to check" if checking else "",
-        IMPORT: f"{unmapped} to describe" if unmapped else "",
     }
 
 

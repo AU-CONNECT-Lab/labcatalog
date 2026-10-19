@@ -48,7 +48,7 @@ cd my_project
 datalad get -n data
 ```
 
-`datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The **Prepare data** step of the Set up page also has a Get button next to each file that is not downloaded. On the command line, `labcatalog get` does the same as Get missing content.
+`datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The **Add data** step of the Set up page also has a Get button next to each file that is not downloaded. On the command line, `labcatalog get` does the same as Get missing content.
 
 In the window, **Open > Clone a project** does all of this at once: give where the project's dataset is (a URL, an SSH address or a folder, as `datalad clone` takes it) and the folder to put it in, and labcatalog clones it, downloads the files the project reads and opens it. `labcatalog datalad clone URL FOLDER` does the same on the command line.
 

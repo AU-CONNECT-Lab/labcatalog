@@ -45,7 +45,7 @@ datasets:
 
 ## Add the instruments and map the columns
 
-labcatalog now needs to know which questionnaire each column belongs to. The quickest way is to import a codebook: open the project in the window (`labcatalog gui -p my_project`), go to the **Set up** page, open its **Describe columns** step, pick `parent_w1`, and press **Create the three files**, or **Create from a REDCap data dictionary**, **Create from a Qualtrics survey file** or **Create from an SPSS file** if you have one. Fill in the three CSV files, press **Check and import**, and labcatalog writes the instrument files in `instruments/` and the column map `maps/parent_w1.csv`. [Add an Instrument](../how-to/add-instrument.md) describes this and the other ways.
+labcatalog now needs to know which questionnaire each column belongs to. The quickest way is to import a codebook: open the project in the window (`labcatalog gui -p my_project`), go to the **Set up** page, open its **Add data** step, pick `parent_w1` under **Files without a column map**, and press **Create the three files**, or **Create from a REDCap data dictionary**, **Create from a Qualtrics survey file** or **Create from an SPSS file** if you have one. Fill in the three CSV files, press **Check and import**, and labcatalog writes the instrument files in `instruments/` and the column map `maps/parent_w1.csv`. [Add an Instrument](../how-to/add-instrument.md) describes this and the other ways.
 
 ## Say which instruments were given
 
@@ -57,7 +57,7 @@ administrations:
   - {instrument: my_questionnaire, datasets: [parent_w1]}
 ```
 
-After an import, the Describe columns step shows the exact lines to add.
+After an import, the Add data step shows the exact lines to add.
 
 ## Check the project
 

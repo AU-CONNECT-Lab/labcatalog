@@ -46,7 +46,7 @@ def render(
     with panel("Scoring step", f"The script that computes scores in {dataset}"):
         if step is not None:
             note(
-                f"Prepare data on the Set up page runs {step.run}, which writes "
+                f"The Add data step of the Set up page runs {step.run}, which writes "
                 f"{step.outputs[0]}; the scores are read from there."
             )
             script = step.inputs[-1]
@@ -59,7 +59,7 @@ def render(
         note(
             f"{', '.join(scripted)} {'is' if len(scripted) == 1 else 'are'} computed by a script. "
             "Start one from a template that reads the data and writes each score's column, or use "
-            "a script of your own that does the same; either becomes a step of Prepare data."
+            "a script of your own that does the same; either becomes a prepare step, run in the Add data step of the Set up page."
         )
         with ui.row().classes("items-center gap-2"):
             ui.button("Start an R script", icon="note_add", on_click=lambda: start("r")).props(
@@ -85,7 +85,7 @@ async def registered(
     except LabCatalogError as err:
         ui.notify(str(err), type="negative", multi_line=True)
         return
-    ui.notify(f"Added the step {step.name}; run it in Prepare data on the Set up page")
+    ui.notify(f"Added the step {step.name}; run it in the Add data step of the Set up page")
     await reload()
 
 

@@ -18,6 +18,7 @@ from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import (
     analysis,
     codebook_import,
+    codebook_step,
     common,
     datasets,
     edit,
@@ -43,6 +44,7 @@ from labcatalog.gui import (
 )
 from labcatalog.gui.analysis import AnalysisView
 from labcatalog.gui.codebook_import import ImportView
+from labcatalog.gui.codebook_step import CodebookView
 from labcatalog.gui.datalad import clone_dialog, frozen_text, get_button, versions_tooltip
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.files import FOLDER, choose_path
@@ -187,6 +189,7 @@ class Window:
         self.analysis = AnalysisView()
         self.methods = MethodsView()
         self.importing = ImportView()
+        self.codebook = CodebookView()
         self.editing = EditView()
         self.preparing = PrepareView()
         self.setting_up = SetupView()
@@ -325,15 +328,16 @@ class Window:
             with ui.tab_panel("setup").classes("lc-page"):
                 self.setup_bar()
                 # Every step stays built, so an unsaved edit survives a look at another step.
-                for name, part in (
-                    (setup.PREPARE, self.prepare_panel),
-                    (setup.IDS, self.ids_panel),
-                    (setup.IMPORT, self.import_panel),
-                    (setup.EDIT, self.edit_panel),
-                    (setup.REVIEW, self.review_panel),
+                for name, parts in (
+                    (setup.CODEBOOK, (self.codebook_panel,)),
+                    (setup.DATA, (self.add_data_panel, self.prepare_panel, self.import_panel)),
+                    (setup.IDS, (self.ids_panel,)),
+                    (setup.EDIT, (self.edit_panel,)),
+                    (setup.REVIEW, (self.review_panel,)),
                 ):
                     with ui.column().classes("lc-step w-full") as self.steps[name]:
-                        part()
+                        for part in parts:
+                            part()
                         setup.next_button(name, self.pick_step)
                 self.show_step()
             with ui.tab_panel("problems").classes("lc-page"):
@@ -417,6 +421,7 @@ class Window:
                 self.analysis = AnalysisView()
                 self.methods = MethodsView()
                 self.importing = ImportView()
+                self.codebook = CodebookView()
                 self.editing = EditView()
                 self.preparing = PrepareView()
                 self.setting_up = SetupView()
@@ -564,6 +569,8 @@ class Window:
             self.analysis_panel,
             self.methods_panel,
             self.setup_bar,
+            self.codebook_panel,
+            self.add_data_panel,
             self.prepare_panel,
             self.ids_panel,
             self.import_panel,
@@ -762,6 +769,46 @@ class Window:
     def methods_panel(self) -> None:
         if self.has_catalog():
             methods.render(self.result, self.methods, self.cfa, self.scope)
+
+    @ui.refreshable_method
+    def codebook_panel(self) -> None:
+        if self.result is None:
+            common.empty(self.error or "Open a project folder to describe its instruments.")
+            return
+        codebook_step.render(
+            self.result.project,
+            self.codebook,
+            self.edit_location,
+            lambda: self.in_editor(self.editing.create),
+            lambda: self.in_editor(self.editing.draft),
+            self.reload,
+        )
+
+    def in_editor(self, dialog: Callable[[], None] | None) -> None:
+        # Opens the Edit files step, then one of its dialogs, so its unsaved edits are asked about.
+        self.pick_step(setup.EDIT)
+        if dialog is not None:
+            dialog()
+
+    @ui.refreshable_method
+    def add_data_panel(self) -> None:
+        if not self.has_catalog():
+            return
+        with common.panel("Add a data file", "A data file, its cleaning and its columns"):
+            common.note(
+                "Choose a file as it came from the survey platform or the lab's pipeline; "
+                "labcatalog copies it into the project and links each column to an item of the "
+                "instruments in the codebook. A file that needs cleaning first, such as an "
+                "export with extra header rows, gets a cleaning step below."
+            )
+            if self.result.project.config.studies:
+                ui.button(
+                    "Add a data file",
+                    icon="add",
+                    on_click=lambda: new_dataset.open_wizard(self.result, self.dataset_added),
+                ).props("no-caps").classes("w-fit")
+            else:
+                common.note("Add a study on the Studies page first.")
 
     @ui.refreshable_method
     def prepare_panel(self) -> None:

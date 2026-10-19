@@ -55,12 +55,15 @@ def render(
     config_path = root / defaults.CONFIG_FILENAME
     if not project.config.prepare:
         with panel(
-            "No prepare steps yet",
-            f"Add them to {defaults.CONFIG_FILENAME} like this; each step runs one command in "
-            "the project folder, and its outputs are usually the data files listed under "
-            "datasets.",
+            "Prepare steps",
+            "None yet: a file that needs cleaning, or a score computed by a script, gets one",
         ) as tools:
-            ui.code(EXAMPLE, language="yaml").classes("w-full")
+            with ui.expansion(f"Add one by hand in {defaults.CONFIG_FILENAME}").classes("w-full"):
+                note(
+                    "Each step runs one command in the project folder, and its outputs are "
+                    "usually the data files listed under datasets."
+                )
+                ui.code(EXAMPLE, language="yaml").classes("w-full")
         with tools:
             ui.button(
                 f"Open {defaults.CONFIG_FILENAME}", on_click=lambda: open_path(config_path)
@@ -156,7 +159,9 @@ def render(
             ui.button("Run all", icon="play_arrow", on_click=confirm_all).set_enabled(
                 not view.running
             )
-        with panel("Steps", "In the order they run"):
+        with panel(
+            "Prepare steps", "Scripts that clean the data or compute scores, in the order they run"
+        ):
             for state in states:
                 step_row(state, view, start, show_log, on_success)
         log_panel(view)

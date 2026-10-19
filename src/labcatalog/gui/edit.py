@@ -29,6 +29,9 @@ class EditView:
     line: int | None = None
     # Set by the page, so other pages can open a file in it.
     open: Callable[[str, int | None], None] | None = None
+    # Also set by the page: its New instrument and New instrument from a PDF dialogs.
+    create: Callable[[], None] | None = None
+    draft: Callable[[], None] | None = None
     # Whether the instrument's structure above the editor is open.
     structure: bool = True
 
@@ -503,6 +506,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         ui.timer(1.0, follow)
 
     view.open = jump
+    view.create = lambda: leave(create)
+    view.draft = draft
     with ui.element("div").classes("w-full") as frame:
         page()
 

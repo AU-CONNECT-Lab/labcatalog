@@ -4,7 +4,8 @@ There are five ways to add an instrument. Which one fits depends on what you sta
 
 | You have | Use |
 |---|---|
-| A new data file and its codebook (REDCap, Qualtrics, SPSS, or a document) | A codebook import, which also writes the column map |
+| A codebook (REDCap, Qualtrics, SPSS, or a document), with or without data yet | The **Codebook** step of the Set up page, before any data |
+| A new data file and its codebook | A codebook import for that file, which also writes the column map |
 | Only a PDF of the instrument | A draft from a language model |
 | The items and a data file that has their columns | **Add an instrument** on the Instruments page |
 | Nothing but the items | Edit files on the Set up page, or write the file by hand |
@@ -13,13 +14,17 @@ There are five ways to add an instrument. Which one fits depends on what you sta
 
 **Add an instrument** on the Instruments page asks for the instrument's name and answer options, takes the items pasted one per line, offers a total score, and finds the item columns in the datasets you choose. It writes the instrument file, the column map rows and the administrations in one go, after showing what each file gains. See [Instruments](../app/instruments.md#add-an-instrument). The same steps fill in an instrument that is missing a description, scores or a reference: open its page and press **Complete this instrument**.
 
-## Import a codebook
+## Before any data: the Codebook step
+
+The **Codebook** step of the Set up page makes new instruments from a codebook without a data file: the same three CSV files in `codebook/_instruments/`, created empty or from a REDCap, Qualtrics or SPSS dictionary, filled in by hand or with a language model, then **Check and import** writes the instrument files. **Add data** then links a data file's columns to them. See [Codebook](../app/codebook.md).
+
+## Import a codebook for a data file
 
 A codebook import describes every column of one data file in three CSV files: `items.csv` (each column's instrument, item, wording, type and options), `instruments.csv` (each instrument's name, abbreviation and construct) and `scores.csv` (each score and its items). labcatalog checks them, then writes the instrument files and the dataset's column map. It works for a dataset that has no column map yet; add the dataset to `labcatalog.yaml` first (see [Add a Wave or Dataset](add-dataset.md)).
 
 In the window:
 
-1. Open the **Set up** page, go to its **Describe columns** step and pick the dataset.
+1. Open the **Set up** page, go to its **Add data** step and, under **Files without a column map**, pick the dataset.
 2. Create the three files. **Create the three files** lists the data file's columns and leaves the rest for you. If you have a codebook in a standard format, start from it instead: **Create from a REDCap data dictionary** (the CSV from REDCap's Data Dictionary page), **Create from a Qualtrics survey file** (the `.qsf` from Tools, Import/Export, Export Survey), or **Create from an SPSS file** (a `.sav` with variable and value labels). These fill in wording, options and item types.
 3. Fill in what is still empty. **Open folder** opens `codebook/<dataset>/`; edit the files in Excel or any editor and save them as CSV UTF-8. **What goes in each column** explains every column.
 4. Press **Check and import**. labcatalog lists every problem by file and line; fix them and press it again. When the files are right, it writes `instruments/<id>.yaml` for each new instrument and `maps/<dataset>.csv`.

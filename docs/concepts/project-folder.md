@@ -41,7 +41,7 @@ The data files the catalog reads. labcatalog never changes them. Many labs keep 
 
 ## scripts/
 
-Your own scripts that turn raw exports and pipeline outputs into the files in `data/`. labcatalog runs them only when you ask, from the **Prepare data** step of the Set up page or with `labcatalog prepare`.
+Your own scripts that turn raw exports and pipeline outputs into the files in `data/`. labcatalog runs them only when you ask, from the **Add data** step of the Set up page or with `labcatalog prepare`.
 
 ## references/
 

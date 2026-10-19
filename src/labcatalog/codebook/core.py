@@ -41,7 +41,7 @@ NEW_COLUMN = (
     "the variable name the data will use for the item, when the codebook gives one; otherwise empty"
 )
 
-# What each column holds; the Describe columns step shows these and the AI prompt quotes them.
+# What each column holds; the Set up page shows these and the AI prompt quotes them.
 COLUMNS: dict[str, dict[str, str]] = {
     ITEMS: {
         "column": "the data file's column name; already filled in, do not change it",

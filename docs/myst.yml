@@ -32,9 +32,11 @@ project:
         - file: app/datasets.md
         - file: app/analysis.md
         - file: app/methods.md
+        - file: app/codebook.md
+        - file: app/add-data.md
         - file: app/prepare.md
-        - file: app/ids.md
         - file: app/import.md
+        - file: app/ids.md
         - file: app/edit.md
         - file: app/review.md
         - file: app/problems.md

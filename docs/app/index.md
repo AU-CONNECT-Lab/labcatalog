@@ -25,7 +25,7 @@ The **Problems** tab shows how many problems the project has, in red when any is
 
 ## The Set up page
 
-Set up holds the work of building a project, in the order it is usually done. A row of numbered steps runs across the top: **Prepare data**, **Check IDs**, **Describe columns**, **Edit files** and **Review**. Click a step to open it; a step with something left to do says so next to its name, such as "3 to run" for prepare steps that are not up to date, "2 to check" for data files with ID problems or "1 to describe" for a dataset with no column map. **Next** at the bottom of each step opens the one after it, and from the last step the Problems page. Switching steps keeps unsaved changes in Edit files.
+Set up holds the work of building a project, in the order it is usually done. A row of numbered steps runs across the top: **Codebook**, **Add data**, **Check IDs**, **Edit files** and **Review**. Click a step to open it; a step with something left to do says so next to its name, such as "2 drafts" for instrument drafts to check, "3 to run" for prepare steps that are not up to date, "1 to link" for a data file with no column map, or "2 to check" for data files with ID problems. **Next** at the bottom of each step opens the one after it, and from the last step the Problems page. Switching steps keeps unsaved changes in Edit files.
 
 ## The pages
 
@@ -37,6 +37,6 @@ Set up holds the work of building a project, in the order it is usually done. A 
 | [Datasets](datasets.md) | Each data file: who is in it, completeness, missing values; freezes. |
 | [Analysis](analysis.md) | Correlations, regression, group comparisons and multilevel models. |
 | [Methods](methods.md) | Draft text and tables for a methods section. |
-| Set up | Steps in order: [Prepare data](prepare.md) runs the scripts that make the data, [Check IDs](ids.md) checks and corrects each file's IDs, [Describe columns](import.md) creates instruments and a column map from a codebook, [Edit files](edit.md) edits the project's files, [Review](review.md) looks over each data file and its scores. |
+| Set up | Steps in order: [Codebook](codebook.md) describes the instruments before there is data, [Add data](add-data.md) adds data files, their [prepare steps](prepare.md) and their column maps, [Check IDs](ids.md) checks and corrects each file's IDs, [Edit files](edit.md) edits the project's files, [Review](review.md) looks over each data file and its scores. |
 | [Problems](problems.md) | Every mismatch between metadata and data. |
 | [Settings](settings.md) | R, DataLad, the language model, charts and tables. |
