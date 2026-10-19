@@ -11,6 +11,7 @@ from labcatalog.gui.common import apa, code_tabs, col, computed, note, p_value, 
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import analysis
 from labcatalog.stats import multilevel as ml
 
@@ -98,8 +99,14 @@ def render(result: CatalogResult, view) -> None:
                     for shown in papers.values():
                         paper.paper_table(shown)
                     paper.results_text(
-                        results.multilevel_text(fitted, label, common.decimals()),
+                        results.multilevel_text(
+                            fitted,
+                            label,
+                            common.decimals(),
+                            Wording(result.project.config.templates),
+                        ),
                         list(papers.values()),
+                        "multilevel",
                     )
                     fig = views.trajectories(long, fitted, label)
                     drawn = paper.Chart(charts.show(fig), fig)

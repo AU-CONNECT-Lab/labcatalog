@@ -638,49 +638,59 @@ def step_sentence(step: InvarianceStep, before: dict[str, float | None], wording
     )
 
 
-def multilevel_text(fitted: Fitted, outcome: str, digits: int = 2) -> str:
-    package = "lme4" if fitted.engine == LME4 else "statsmodels"
-    nested = f" in {fitted.groups} groups" if fitted.groups is not None else ""
-    sentences = [
-        f"A multilevel model of {outcome}, fitted by REML in {package}, used "
-        f"{fitted.observations} observations from {fitted.people} people{nested}."
-    ]
+def multilevel_text(
+    fitted: Fitted, outcome: str, digits: int = 2, wording: Wording = BUILT_IN
+) -> str:
+    design = {
+        "outcome": outcome,
+        "package": "lme4" if fitted.engine == LME4 else "statsmodels",
+        "observations": fitted.observations,
+        "people": fitted.people,
+    }
+    if fitted.groups is None:
+        sentences = [wording.say("multilevel", "design", **design)]
+    else:
+        sentences = [wording.say("multilevel", "design_groups", groups=fitted.groups, **design)]
     if fitted.icc:
         found = [
-            f"{bounded(icc, digits)} at the {level.lower()} level" for level, icc in fitted.icc
+            wording.say("multilevel", "icc_each", icc=bounded(icc, digits), level=level.lower())
+            for level, icc in fitted.icc
         ]
-        sentences.append(
-            f"In the model with only the random intercepts, the ICC was {series(found)}."
-        )
+        sentences.append(wording.say("multilevel", "icc", iccs=series(found)))
     terms = [t for t in fitted.fixed if t.label != "Intercept"]
     if terms:
-        sentences.append(f"Fixed effects: {'; '.join(term_text(t, digits) for t in terms)}.")
+        found = "; ".join(term_text(t, digits, wording) for t in terms)
+        sentences.append(wording.say("multilevel", "fixed", terms=found))
     if fitted.random:
-        found = [variance_text(v, digits) for v in fitted.random]
-        sentences.append(f"Random effects: {series(found)}.")
+        found = [variance_text(v, digits, wording) for v in fitted.random]
+        sentences.append(wording.say("multilevel", "random", variances=series(found)))
     if fitted.singular:
-        sentences.append("The fit was singular, so some random effects are estimated as zero.")
+        sentences.append(wording.say("multilevel", "singular"))
     return " ".join(sentences)
 
 
-def term_text(term: Term, digits: int) -> str:
+def term_text(term: Term, digits: int, wording: Wording) -> str:
     test = "z" if term.df is None else f"t({term.df:.1f})"
-    return (
-        f"{term.label}, b = {number(term.estimate, digits)}, SE = {number(term.se, digits)}, "
-        f"{test} = {number(term.statistic, digits)}, {p_text(term.p)}, "
-        f"95% CI [{number(term.low, digits)}, {number(term.high, digits)}]"
+    values = {
+        "b": f"b = {number(term.estimate, digits)}",
+        "se": f"SE = {number(term.se, digits)}",
+        "test": f"{test} = {number(term.statistic, digits)}",
+        "p": p_text(term.p),
+        "ci": f"95% CI [{number(term.low, digits)}, {number(term.high, digits)}]",
+    }
+    return wording.say(
+        "multilevel", "term", term=term.label, statistics=", ".join(values.values()), **values
     )
 
 
-def variance_text(variance: Variance, digits: int) -> str:
+def variance_text(variance: Variance, digits: int, wording: Wording) -> str:
     sd = f"SD = {number(variance.sd, digits)}"
     if variance.level == RESIDUAL:
-        return f"{sd} for the residuals"
+        return wording.say("multilevel", "residual", sd=sd)
+    level = variance.level.lower()
     if variance.term == "Intercept":
-        return f"{sd} for the {variance.level.lower()} intercepts"
-    tied = (
-        f" (r = {bounded(variance.correlation, digits)} with the intercepts)"
-        if variance.correlation is not None
-        else ""
-    )
-    return f"{sd} for the {variance.level.lower()} slopes of {variance.term}{tied}"
+        return wording.say("multilevel", "intercepts", sd=sd, level=level)
+    if variance.correlation is None:
+        return wording.say("multilevel", "slopes", sd=sd, level=level, term=variance.term)
+    r = f"r = {bounded(variance.correlation, digits)}"
+    return wording.say("multilevel", "slopes_r", sd=sd, level=level, term=variance.term, r=r)

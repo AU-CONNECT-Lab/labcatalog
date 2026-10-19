@@ -126,6 +126,8 @@ FITTED_EXAMPLE = {
     "indicators": "items",
 }
 STEP_FIT_EXAMPLE = "χ²(38) = 52.40, CFI = .981, RMSEA = .042, SRMR = .051"
+DESIGN = ("outcome", "package", "observations", "people")
+DESIGN_EXAMPLE = {"outcome": "Mood", "package": "lme4", "observations": "512", "people": "180"}
 TEMPLATES: dict[str, Template] = {
     t.key: t
     for t in (
@@ -659,6 +661,114 @@ TEMPLATES: dict[str, Template] = {
             ),
             "The Results paragraph of an invariance test, on an instrument's page and the "
             "Invariance tab.",
+        ),
+        Template(
+            "multilevel",
+            "Multilevel model",
+            RESULTS,
+            (
+                Slot(
+                    "design",
+                    "The model and its data",
+                    "A multilevel model of {outcome}, fitted by REML in {package}, used "
+                    "{observations} observations from {people} people.",
+                    DESIGN,
+                    DESIGN_EXAMPLE,
+                ),
+                Slot(
+                    "design_groups",
+                    "The model and its data, with people in groups",
+                    "A multilevel model of {outcome}, fitted by REML in {package}, used "
+                    "{observations} observations from {people} people in {groups} groups.",
+                    (*DESIGN, "groups"),
+                    DESIGN_EXAMPLE | {"groups": "64"},
+                ),
+                Slot(
+                    "icc",
+                    "The ICC of each level",
+                    "In the model with only the random intercepts, the ICC was {iccs}.",
+                    ("iccs",),
+                    {"iccs": ".42 at the person level and .18 at the family level"},
+                ),
+                Slot(
+                    "icc_each",
+                    "Each level in that list",
+                    "{icc} at the {level} level",
+                    ("icc", "level"),
+                    {"icc": ".42", "level": "person"},
+                ),
+                Slot(
+                    "fixed",
+                    "The fixed effects",
+                    "Fixed effects: {terms}.",
+                    ("terms",),
+                    {
+                        "terms": "Wave, b = -0.12, SE = 0.04, t(118.2) = -3.00, p = .003, 95% CI "
+                        "[-0.20, -0.04]"
+                    },
+                ),
+                Slot(
+                    "term",
+                    "Each fixed effect, separated by semicolons",
+                    "{term}, {statistics}",
+                    ("term", "statistics", "b", "se", "test", "p", "ci"),
+                    {
+                        "term": "Wave",
+                        "statistics": "b = -0.12, SE = 0.04, t(118.2) = -3.00, p = .003, 95% CI "
+                        "[-0.20, -0.04]",
+                        "b": "b = -0.12",
+                        "se": "SE = 0.04",
+                        "test": "t(118.2) = -3.00",
+                        "p": "p = .003",
+                        "ci": "95% CI [-0.20, -0.04]",
+                    },
+                ),
+                Slot(
+                    "random",
+                    "The random effects",
+                    "Random effects: {variances}.",
+                    ("variances",),
+                    {
+                        "variances": "SD = 0.61 for the person intercepts and SD = 0.48 for the "
+                        "residuals"
+                    },
+                ),
+                Slot(
+                    "intercepts",
+                    "Random intercepts in that list",
+                    "{sd} for the {level} intercepts",
+                    ("sd", "level"),
+                    {"sd": "SD = 0.61", "level": "person"},
+                ),
+                Slot(
+                    "slopes",
+                    "Random slopes in that list",
+                    "{sd} for the {level} slopes of {term}",
+                    ("sd", "level", "term"),
+                    {"sd": "SD = 0.09", "level": "person", "term": "Wave"},
+                ),
+                Slot(
+                    "slopes_r",
+                    "Random slopes correlated with the intercepts",
+                    "{sd} for the {level} slopes of {term} ({r} with the intercepts)",
+                    ("sd", "level", "term", "r"),
+                    {"sd": "SD = 0.09", "level": "person", "term": "Wave", "r": "r = -.31"},
+                ),
+                Slot(
+                    "residual",
+                    "The residuals in that list",
+                    "{sd} for the residuals",
+                    ("sd",),
+                    {"sd": "SD = 0.48"},
+                ),
+                Slot(
+                    "singular",
+                    "A singular fit",
+                    "The fit was singular, so some random effects are estimated as zero.",
+                    (),
+                ),
+            ),
+            "The Results paragraph of the Multilevel model tab.",
         ),
     )
 }
