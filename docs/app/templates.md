@@ -1,6 +1,6 @@
 # Templates
 
-The Templates page holds the wording of the paragraphs labcatalog writes. Each paragraph comes from a template: text with placeholders in braces, such as `{counts}` or `{alpha}`, that the numbers fill in. The templates are listed on the left, grouped by the part of a paper they belong to; click one to open it. A **Wording** button beside a paragraph on the [Methods](methods.md) page or an instrument's page opens its template here.
+The Templates page holds the wording of the paragraphs labcatalog writes. Each paragraph comes from a template: text with placeholders in braces, such as `{counts}` or `{alpha}`, that the numbers fill in. The templates are listed on the left, grouped by the part of a paper they belong to; click one to open it. A **Wording** button beside a paragraph on the [Methods](methods.md) page, the [Analysis](analysis.md) page or an instrument's page opens its template here.
 
 ## Editing a template
 
