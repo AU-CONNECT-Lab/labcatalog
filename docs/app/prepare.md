@@ -6,7 +6,7 @@ The **Prepare steps** of the [Add data](add-data.md) step of the Set up page run
 
 ## The steps
 
-Each step shows its name, its status, its command, and its inputs and outputs with their dates. Click a file to open it. **Script** opens the script the step runs on the [Scripts](scripts.md) page. The status is one of:
+Each step shows its name, its status, its command, and its inputs and outputs with their dates. Click a file to open it. **Script** opens the code of the script the step runs under the step, to read or change and **Save**; **Open on the Scripts page** shows it on the [Scripts](scripts.md) page with the other steps that run it. The status is one of:
 
 | Status | Meaning |
 |---|---|

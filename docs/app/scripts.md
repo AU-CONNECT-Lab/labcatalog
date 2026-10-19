@@ -1,6 +1,6 @@
 # Scripts
 
-The Scripts page holds every script of the project in one place: the scripts the [prepare steps](prepare.md) run, the analyses kept from the Custom tab of the [Analysis](analysis.md) page, and any other R or Python file in `scripts/` or `analyses/`. **Script** beside a step in the **Add data** step of the Set up page opens its script here.
+The Scripts page holds every script of the project in one place: the scripts the [prepare steps](prepare.md) run, the analyses kept from the Custom tab of the [Analysis](analysis.md) page, and any other R or Python file in `scripts/` or `analyses/`. Beside a step in the **Add data** step of the Set up page, **Script** shows the script's code under the step, with a link to it here.
 
 ## The list
 

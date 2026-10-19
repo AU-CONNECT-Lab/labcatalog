@@ -7,9 +7,10 @@ from nicegui import ui
 from labcatalog.config import PrepareStep
 from labcatalog.data.prepare import step_state
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import prepare, theme
-from labcatalog.gui.common import computed, empty, folding_panel, note, open_path, page_head, panel
+from labcatalog.gui import prepare
+from labcatalog.gui.common import computed, empty, folding_panel, note, page_head, panel
 from labcatalog.gui.prepare import PrepareView
+from labcatalog.gui.script_editor import script_editor
 from labcatalog.metadata import changes, editing
 from labcatalog.metadata.scripts import (
     LANGUAGES,
@@ -153,47 +154,18 @@ def script_part(
     on_saved: Callable[[], Awaitable[None]],
 ) -> None:
     root = result.project.root
-    opened = editing.open_file(root, script.path)
-    language = language_of(script.path)
 
-    def touched() -> None:
+    def edited() -> None:
         view.edited = True
-        save.enable()
 
     def saved() -> None:
-        nonlocal opened
-        try:
-            opened = editing.save_file(root, opened, code.value)
-        except LabCatalogError as err:
-            ui.notify(str(err), type="negative", multi_line=True)
-            return
         view.edited = False
-        save.disable()
-        ui.notify(f"Saved {script.path}")
         redraw()
 
     with panel(
         script.path, help_text="The script's code; saving it puts its steps out of date"
     ) as tools:
-        code = (
-            ui.codemirror(
-                opened.text,
-                language=LANGUAGES[language].name if language else None,
-                line_wrapping=True,
-                theme=theme.codemirror_theme(),
-                on_change=touched,
-            )
-            .classes("w-full")
-            .style("height: 55vh")
-        )
-    with tools:
-        ui.button(
-            "Open in your editor",
-            icon="open_in_new",
-            on_click=lambda: open_path(root / script.path),
-        ).props("flat dense no-caps").classes("lc-quiet-btn")
-        save = ui.button("Save", icon="save", on_click=saved).props("dense no-caps")
-        save.disable()
+        script_editor(root, script.path, tools, on_edit=edited, on_saved=saved)
     if script.analysis:
         analysis_part(result, script, on_saved)
     else:

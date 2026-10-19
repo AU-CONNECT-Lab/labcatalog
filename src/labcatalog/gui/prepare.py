@@ -14,6 +14,7 @@ from labcatalog.gui.common import computed, empty, note, open_path, page_head, p
 from labcatalog.gui.datalad import get_button
 from labcatalog.gui.files import choose_path
 from labcatalog.gui.look import look
+from labcatalog.gui.script_editor import script_editor
 from labcatalog.metadata.scripts import script_of
 from labcatalog.paths import portable_path, posix_str
 from labcatalog.pipeline import CatalogResult, run_cleaning_draft, run_get
@@ -123,7 +124,7 @@ def render(
         ):
             for state in states:
                 script = script_of(project.root, state.step)
-                step_row(state, view, start, show_log, on_success, script)
+                step_row(state, view, start, show_log, on_success, script, project.root)
         log_panel(view)
 
     steps()
@@ -202,8 +203,23 @@ def step_row(
     show_log: Callable[[str], None],
     on_got: Callable[[], Awaitable[None]],
     script: str | None = None,
+    root: Path | None = None,
 ) -> None:
+    # With a script and the project folder, Script opens its code under the row.
     step = state.step
+
+    def toggle() -> None:
+        if not code.default_slot.children:
+            with code:
+                with ui.row().classes("w-full items-center no-wrap gap-2") as tools:
+                    ui.label(script).classes("font-mono lc-note grow")
+                    ui.button(
+                        "Open on the Scripts page",
+                        on_click=lambda: look().open_script(script),
+                    ).props("flat dense no-caps").classes("lc-quiet-btn")
+                script_editor(root, script, tools, height="40vh")
+        code.visible = not code.visible
+
     last = view.session.runs.get(step.name)
     kind = STATUS_KINDS[state.status]
     with ui.row().classes("lc-item w-full items-start no-wrap gap-3"):
@@ -224,15 +240,16 @@ def step_row(
                                 file_label(f, on_got)
         with ui.row().classes("items-center no-wrap gap-1"):
             if script:
-                opened = look().open_script
-                ui.button("Script", icon="code", on_click=lambda: opened(script)).props(
+                ui.button("Script", icon="code", on_click=toggle).props(
                     "flat dense no-caps"
-                ).classes("lc-quiet-btn").tooltip(f"Open {script} on the Scripts page")
+                ).classes("lc-quiet-btn").tooltip(f"Show or hide {script}")
             if last:
                 ui.button("Log", on_click=lambda: show_log(step.name)).props("flat dense no-caps")
             ui.button("Run", icon="play_arrow", on_click=lambda: start([step.name])).props(
                 "flat dense no-caps"
             ).classes("lc-quiet-btn").set_enabled(not view.running)
+    code = ui.column().classes("w-full gap-1 pl-6")
+    code.visible = False
 
 
 def file_label(f: FileState, on_got: Callable[[], Awaitable[None]]) -> None:
