@@ -445,3 +445,76 @@ def test_r_and_python_agree_on_a_pooled_model(both):
     for label, value in terms["r"].items():
         assert terms["python"][label] == pytest.approx(value, abs=1e-3)
     assert fitted["r"].people == long.frame[ml.PERSON].nunique()
+
+
+def test_rows_to_impute_are_those_missing_only_a_covariate(result):
+    model = growth()
+    long = ml.long_frame(result, model)
+    frame = long.frame
+    gender = long.covariates[0].column
+    expected = (frame[long.outcome].notna() & frame[gender].isna()).sum()
+    assert ml.imputed_rows(model, long) == expected > 0
+    assert ml.covariate_columns(long) == ([gender], [], [gender])
+
+
+def test_a_split_covariate_is_kept_as_measured_for_the_imputation(result):
+    long = ml.long_frame(result, replace(eeg_model([EPOCHS, GENDER]), split=True))
+    whole = ml.long_frame(result, eeg_model([EPOCHS, GENDER])).frame["epochs_kept"]
+    assert ml.data_frame(long, False) is long.frame
+    assert ml.data_frame(long, True)["epochs_kept"].equals(whole)
+    assert ml.covariate_columns(long) == (["dem_gender_w1"], ["epochs_kept"], ["dem_gender_w1"])
+
+
+@needs_r
+def test_imputing_keeps_the_rows_a_missing_covariate_left_out(result):
+    model = growth()
+    long = ml.long_frame(result, model)
+    plain = ml.run(result, model, long, "EMS", rscript())
+    imputed = ml.run(result, model, long, "EMS", rscript(), ml.Imputing(3, 1))
+    assert imputed.imputations == 3 and plain.imputations is None
+    assert imputed.dropped == plain.dropped - ml.imputed_rows(model, long)
+    assert [t.label for t in imputed.fixed] == [t.label for t in plain.fixed]
+    assert imputed.reml_criterion is None and imputed.aic is None
+    # Pooled with Satterthwaite's df as the complete-data df, so never more than those.
+    assert all(t.df is not None and 0 < t.df < plain.observations for t in imputed.fixed)
+    assert [level for level, _ in imputed.icc] == [level for level, _ in plain.icc]
+
+
+@needs_r
+def test_imputing_a_split_covariate_splits_it_again(result):
+    model = replace(eeg_model([EPOCHS, GENDER]), split=True)
+    long = ml.long_frame(result, model)
+    imputed = ml.run(result, model, long, "FAA", rscript(), ml.Imputing(3, 1))
+    assert [t.label for t in imputed.fixed][2:4] == [
+        f"EEG epochs kept (each wave){ml.PERSON_MEAN}",
+        f"EEG epochs kept (each wave){ml.DEVIATION}",
+    ]
+
+
+@needs_r
+def test_pooled_studies_are_imputed_each_by_itself(both):
+    model = ml.Model(EMS, BOTH, covariates=[STRESS], slope=False)
+    long = ml.long_frame(both, model)
+    assert ml.imputed_rows(model, long) > 0
+    r, _ = ml.scripts(both, model, long, "EMS", ml.Imputing(3, 1))
+    assert "each study by itself" in r and "blocks <- split(" in r
+    imputed = ml.run(both, model, long, "EMS", rscript(), ml.Imputing(3, 1))
+    assert "Study: Mock Study 2" in [t.label for t in imputed.fixed]
+
+
+@needs_r
+def test_saved_imputed_r_script_runs_on_its_data(result, tmp_path):
+    model = growth()
+    long = ml.long_frame(result, model)
+    imputing = ml.Imputing(3, 1)
+    r, python = ml.scripts(result, model, long, "EMS", imputing)
+    assert "mitml::testEstimates" in r and "lme4, lmerTest, performance, mice, mitml" in r
+    assert python.count("Multiple imputation runs in R") == 1
+    ml.data_frame(long, True).to_csv(tmp_path / ml.DATA_FILE, index=False)
+    (tmp_path / "multilevel.R").write_text(r, encoding="utf-8")
+    done = subprocess.run(
+        [rscript(), "multilevel.R"], cwd=tmp_path, capture_output=True, text=True, check=False
+    )
+    assert done.returncode == 0, done.stderr
+    assert "Estimate" in done.stdout
+    assert list(tmp_path.glob("imputation_*.rds"))

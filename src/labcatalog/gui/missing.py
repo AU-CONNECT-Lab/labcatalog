@@ -272,10 +272,9 @@ def imputing(result: CatalogResult, view) -> bool:
 
 
 # The sections that use the imputation; the rest say what they do instead.
-IMPUTED_PARTS = ("missing", "correlation", "regression", "groups")
+IMPUTED_PARTS = ("missing", "correlation", "regression", "groups", "multilevel")
 INSTEAD = {
     "mediation": "full-information maximum likelihood or complete cases, as chosen in it",
-    "multilevel": "everyone with values, as mixed models allow",
     "panel": "full-information maximum likelihood",
     "measurement": "the people who answered every item",
 }
@@ -295,10 +294,11 @@ def sample_switch(
     method = view.missing_method or result.project.config.stats.missing
     method_toggle(imputation.METHODS, method, choose, "Missing values")
     if imputing(result, view):
-        m = view.imputations or result.project.config.stats.imputations
+        m, _ = settings(result, view)
         with ui.row().classes("items-center gap-1"):
             note(
-                f"{m} imputed data sets, for the correlation table, regression and group comparison."
+                f"{m} imputed data sets, for the correlation table, regression, group comparison "
+                "and the multilevel model's covariates."
             )
             ui.button("Missing data", on_click=open_missing).props("flat dense no-caps size=sm")
 
@@ -340,10 +340,14 @@ def auxiliary_keys(result: CatalogResult, view) -> list[str]:
     return [k for k in view.auxiliaries if k in options and k not in taken]
 
 
-def imputation_plan(result: CatalogResult, view, data: script.AnalysisData):
+def settings(result: CatalogResult, view) -> tuple[int, int]:
+    # How many imputed data sets and the seed: the Missing data tab's, else the project's.
     stats = result.project.config.stats
-    m = view.imputations or stats.imputations
-    seed = stats.seed if view.seed is None else view.seed
+    return view.imputations or stats.imputations, stats.seed if view.seed is None else view.seed
+
+
+def imputation_plan(result: CatalogResult, view, data: script.AnalysisData):
+    m, seed = settings(result, view)
     keys, helpers = imputed_keys(result, view), auxiliary_keys(result, view)
     return imputation.plan(data, keys, helpers, m, seed)
 

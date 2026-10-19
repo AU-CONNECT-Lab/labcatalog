@@ -2,6 +2,7 @@ import contextlib
 import io
 import re
 import tempfile
+import textwrap
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -10,7 +11,7 @@ import pandas as pd
 
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.codegen import number
-from labcatalog.stats import analysis
+from labcatalog.stats import analysis, imputation
 from labcatalog.stats.analysis import CHOICE, ITEM_PREFIX, item_key, item_variable
 from labcatalog.stats.analysis_script import (
     PYTHON,
@@ -78,20 +79,28 @@ print(summary(fit))
 bounds <- confint(fit, parm = "beta_", method = "Wald")
 print(bounds)
 """
+R_RANDOM = """\
+random_of <- function(fit) {
+  parts <- as.data.frame(lme4::VarCorr(fit))
+  parts$grp <- sub("[.][0-9]+$", "", parts$grp)
+  variances <- parts[is.na(parts$var2), ]
+  random <- data.frame(level = variances$grp,
+                       term = ifelse(is.na(variances$var1), "", variances$var1),
+                       variance = variances$vcov, sd = variances$sdcor, correlation = NA)
+  for (i in which(!is.na(parts$var2))) {
+    random$correlation[random$level == parts$grp[i] & random$term == parts$var2[i]] <-
+      parts$sdcor[i]
+  }
+  random
+}
+"""
 R_FOOTER = """\
 icc <- data.frame(level = icc$Group, icc = icc$ICC)
 coefs <- summary(fit)$coefficients
 fixed <- data.frame(term = rownames(coefs), estimate = coefs[, 1], se = coefs[, 2],
                     df = coefs[, 3], statistic = coefs[, 4], p = coefs[, 5],
                     low = bounds[, 1], high = bounds[, 2])
-parts <- as.data.frame(lme4::VarCorr(fit))
-parts$grp <- sub("[.][0-9]+$", "", parts$grp)
-variances <- parts[is.na(parts$var2), ]
-random <- data.frame(level = variances$grp, term = ifelse(is.na(variances$var1), "", variances$var1),
-                     variance = variances$vcov, sd = variances$sdcor, correlation = NA)
-for (i in which(!is.na(parts$var2))) {
-  random$correlation[random$level == parts$grp[i] & random$term == parts$var2[i]] <- parts$sdcor[i]
-}
+random <- random_of(fit)
 fit_stats <- data.frame(observations = nrow(d), people = length(unique(d[[PERSON_COLUMN]])),
                         groups = GROUPS, dropped = before - nrow(d),
                         reml_criterion = lme4::REMLcrit(fit),
@@ -171,6 +180,112 @@ small = random["level"].ne("Residual") & (random["sd"] < 1e-4 * np.sqrt(fit.scal
 notes = pd.DataFrame(dict(note=(["singular"] if small.any() else [])
                           + ([] if fit.converged else ["did not converge"]) + caught))
 """
+R_IMPUTE = """\
+# Multiple imputation with mice of the covariates where they are missing: {m} imputed data sets
+# by predictive mean matching (answer options as categories), seed {seed}{by_study}. Each person
+# is one row with each wave's values side by side, so their outcomes and other waves predict
+# them{grouped}. Outcomes are not imputed: the mixed model already uses every wave a person has.
+# Each column is predicted by those that correlate at least {mincor} with it or with its
+# missingness (quickpred). The imputation is kept in the file below, named after the data and
+# these choices, and read again; delete the file to impute again.
+imputation_file <- {file}
+person_columns <- c({person_columns})
+wave_columns <- c({wave_columns})
+factor_columns <- c({factor_columns})
+people <- unique(d[[{person}]])
+waves <- unique(d[[{wave}]])
+first_value <- function(v) v[!is.na(v)][match(people, d[[{person}]][!is.na(v)])]
+wide <- data.frame(row.names = seq_along(people))
+for (column in person_columns) wide[[column]] <- first_value(d[[column]])
+for (k in seq_along(waves)) {{
+  rows <- d[[{wave}]] == waves[k]
+  for (column in c({outcome}, wave_columns)) {{
+    wide[[paste0(column, "_w", k)]] <- d[[column]][rows][match(people, d[[{person}]][rows])]
+  }}
+}}
+answers <- c(intersect(person_columns, factor_columns),
+             paste0(rep(intersect(wave_columns, factor_columns), each = length(waves)), "_w",
+                    seq_along(waves)))
+{blocks}
+impute <- function(part) {{
+  part <- part[colSums(!is.na(part)) > 0]
+  categories <- intersect(answers, names(part))
+  part[categories] <- lapply(part[categories], factor)
+  mice::mice(part, m = {m}, seed = {seed}, predictorMatrix = mice::quickpred(part, mincor = {mincor}),
+             printFlag = FALSE)
+}}
+if (!file.exists(imputation_file)) {{
+  saveRDS(lapply(blocks, function(rows) impute(wide[rows, , drop = FALSE])), imputation_file)
+}}
+imputation <- readRDS(imputation_file)
+# Each imputed data set: the rows as they were with the covariates filled in{split}.
+completed <- lapply(seq_len({m}), function(i) {{
+  filled <- wide
+  for (k in seq_along(blocks)) {{
+    part <- mice::complete(imputation[[k]], i)
+    part[] <- lapply(part, function(v) if (is.factor(v)) as.numeric(as.character(v)) else v)
+    filled[blocks[[k]], names(part)] <- part
+  }}
+  x <- d
+  person <- match(x[[{person}]], people)
+  for (column in person_columns) x[[column]] <- filled[[column]][person]
+  for (k in seq_along(waves)) {{
+    rows <- x[[{wave}]] == waves[k]
+    for (column in wave_columns) {{
+      x[[column]][rows] <- filled[[paste0(column, "_w", k)]][person[rows]]
+    }}
+  }}
+{splits}  x
+}})
+"""
+R_POOLED_MODEL = """\
+# {title}
+# Fitted by REML with lme4 in each imputed data set and pooled with Rubin's rules
+# (mitml::testEstimates), with Barnard and Rubin's df from each term's Satterthwaite df
+# (lmerTest) averaged over the data sets, and 95% CIs from them. ICCs, variances and
+# correlations are averaged over the data sets. Answer options are factors with the first option
+# with data as the reference. Rows missing any variable of the model that is not imputed are
+# left out.
+used <- c({used})
+before <- nrow(d)
+average <- function(values) Reduce(`+`, values) / length(values)
+fit_set <- function(d) {{
+{factors}  d <- droplevels(d[complete.cases(d[, used]), ])
+  list(d = d,
+       null_model = lmerTest::lmer({y} ~ 1 + {null_random}, data = d, REML = TRUE),
+       fit = lmerTest::lmer({y} ~ {fixed} + {random}, data = d, REML = TRUE))
+}}
+sets <- lapply(completed, fit_set)
+fits <- lapply(sets, function(s) s$fit)
+iccs <- lapply(sets, function(s) performance::icc(s$null_model, by_group = TRUE))
+icc <- data.frame(level = iccs[[1]]$Group, icc = average(lapply(iccs, function(x) x$ICC)))
+print(icc)
+df_com <- average(lapply(fits, function(f) summary(f)$coefficients[, "df"]))
+pooled <- mitml::testEstimates(fits, df.com = df_com)
+print(pooled)
+bounds <- confint(pooled)
+print(bounds)
+{random_of}randoms <- lapply(fits, random_of)
+random <- randoms[[1]]
+random$variance <- average(lapply(randoms, function(x) x$variance))
+random$sd <- sqrt(random$variance)
+random$correlation <- average(lapply(randoms, function(x) x$correlation))
+print(random)
+"""
+R_POOLED_FOOTER = """\
+coefs <- pooled$estimates
+fixed <- data.frame(term = rownames(coefs), estimate = coefs[, "Estimate"],
+                    se = coefs[, "Std.Error"], df = coefs[, "df"], statistic = coefs[, "t.value"],
+                    p = coefs[, "P(>|t|)"], low = bounds[, 1], high = bounds[, 2])
+# The rows each model used, the same in every imputed data set.
+d <- sets[[1]]$d
+fit_stats <- data.frame(observations = nrow(d), people = length(unique(d[[PERSON_COLUMN]])),
+                        groups = GROUPS, dropped = before - nrow(d), reml_criterion = NA,
+                        log_likelihood = NA, aic = NA, bic = NA, imputations = length(fits))
+messages <- unique(unlist(lapply(fits, function(f) f@optinfo$conv$lme4$messages)))
+notes <- data.frame(note = as.character(c(if (any(sapply(fits, lme4::isSingular))) "singular",
+                                          messages)))
+"""
 
 
 @dataclass
@@ -220,6 +335,15 @@ class Covariate:
 
 
 @dataclass
+class Split:
+    # An each-wave covariate as measured, and the person mean and deviation that replace it.
+    column: str
+    between: str
+    within: str
+    values: pd.Series
+
+
+@dataclass
 class Long:
     frame: pd.DataFrame
     outcome: str
@@ -228,6 +352,13 @@ class Long:
     # Rows whose ID is missing or repeats within its file.
     left_out: int
     time_label: str = TIME_LABEL
+    splits: list[Split] = field(default_factory=list)
+
+
+@dataclass
+class Imputing:
+    m: int
+    seed: int
 
 
 @dataclass
@@ -262,12 +393,13 @@ class Fitted:
     groups: int | None
     dropped: int
     left_out: int
-    reml_criterion: float
-    log_likelihood: float
+    reml_criterion: float | None
+    log_likelihood: float | None
     aic: float | None
     bic: float | None
     singular: bool
     notes: list[str]
+    imputations: int | None = None
 
 
 def group_name(result: CatalogResult) -> str | None:
@@ -493,12 +625,13 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
             part[c.column] = c.lookup(people, links, configs[name].wave)
         parts.append(part)
     frame = pd.concat(parts, ignore_index=True)
+    splits = []
     if model.split:
-        frame, covariates = split_within(frame, covariates, taken)
+        frame, covariates, splits = split_within(frame, covariates, taken)
     label = TIME_LABEL
     if origin is not None:
         label = f"Time ({model.time}s since wave {configs[ordered[0]].wave} began)"
-    return Long(frame, outcome, group, covariates, left_out, label)
+    return Long(frame, outcome, group, covariates, left_out, label, splits)
 
 
 def pooled_frame(result: CatalogResult, model: Model, studies: list[str]) -> Long:
@@ -535,7 +668,13 @@ def pooled_frame(result: CatalogResult, model: Model, studies: list[str]) -> Lon
     if label != TIME_LABEL:
         label = f"Time ({model.time}s since each study's first wave began)"
     left_out = sum(long.left_out for long in longs)
-    return Long(frame, first.outcome, first.group, [*first.covariates, study], left_out, label)
+    # Each study's frame names its split covariates as the first study's does.
+    splits = [
+        replace(s, values=pd.concat([long.splits[n].values for long in longs], ignore_index=True))
+        for n, s in enumerate(first.splits)
+    ]
+    covariates = [*first.covariates, study]
+    return Long(frame, first.outcome, first.group, covariates, left_out, label, splits)
 
 
 def pooled(long: Long) -> bool:
@@ -554,9 +693,9 @@ def splittable(c: Covariate) -> bool:
 
 def split_within(
     frame: pd.DataFrame, covariates: list[Covariate], taken: set[str]
-) -> tuple[pd.DataFrame, list[Covariate]]:
+) -> tuple[pd.DataFrame, list[Covariate], list[Split]]:
     # Between people: the person's mean over the waves; within: each wave minus that mean.
-    found = []
+    found, splits = [], []
     for c in covariates:
         if not splittable(c):
             found.append(c)
@@ -575,7 +714,8 @@ def split_within(
         frame.insert(position, within.column, values - mean)
         frame.insert(position, between.column, mean)
         found += [between, within]
-    return frame, found
+        splits.append(Split(c.column, between.column, within.column, values))
+    return frame, found, splits
 
 
 def covariate(result: CatalogResult, key: str, taken: set[str], study: str) -> Covariate:
@@ -690,16 +830,20 @@ def title(model: Model, long: Long, label: str) -> str:
     return f"{heading} Time is {model.time}s since the earliest visit date in {first}."
 
 
+def r_factors(long: Long) -> str:
+    return "".join(
+        f"d[[{r_string(c.column)}]] <- factor(d[[{r_string(c.column)}]], "
+        f"levels = c({', '.join(number(v) for v, _ in c.levels)}), "
+        f"labels = c({', '.join(r_string(t) for _, t in c.levels)}))\n"
+        for c in long.covariates
+        if c.levels
+    )
+
+
 def code(model: Model, long: Long, label: str) -> tuple[str, str]:
     parts = structure(model, long)
     used = ", ".join(r_string(name) for name in parts["used"])
     factors = [c for c in long.covariates if c.levels]
-    r_factors = "".join(
-        f"d[[{r_string(c.column)}]] <- factor(d[[{r_string(c.column)}]], "
-        f"levels = c({', '.join(number(v) for v, _ in c.levels)}), "
-        f"labels = c({', '.join(r_string(t) for _, t in c.levels)}))\n"
-        for c in factors
-    )
     python_factors = "".join(
         f"d[{r_string(c.column)}] = pd.Categorical(d[{r_string(c.column)}].map("
         f"{{{', '.join(f'{number(v)}: {r_string(t)}' for v, t in c.levels)}}}), "
@@ -713,7 +857,7 @@ def code(model: Model, long: Long, label: str) -> tuple[str, str]:
     heading = title(model, long, label)
     r = R_MODEL.format(
         title=heading,
-        factors=r_factors,
+        factors=r_factors(long),
         used=used,
         y=long.outcome,
         fixed=parts["fixed"],
@@ -739,41 +883,154 @@ def code(model: Model, long: Long, label: str) -> tuple[str, str]:
     return r, python
 
 
-def footers(long: Long) -> tuple[str, str]:
+def covariate_columns(long: Long) -> tuple[list[str], list[str], list[str]]:
+    # The covariates as measured, before any split: one value per person, each wave's own, answers.
+    split = {s.between: s.column for s in long.splits} | {s.within: s.column for s in long.splits}
+    person, waves, factors = [], [], []
+    for c in long.covariates:
+        if c.key == analysis.STUDY_KEY:
+            continue
+        column = split.get(c.column, c.column)
+        found = waves if each_wave(c.key) else person
+        if column not in found:
+            found.append(column)
+        if c.levels:
+            factors.append(column)
+    return person, waves, factors
+
+
+def imputed_rows(model: Model, long: Long) -> int:
+    # Rows the model leaves out only for a missing covariate.
+    covariates = [c.column for c in long.covariates]
+    rest = [name for name in structure(model, long)["used"] if name not in covariates]
+    frame = long.frame
+    return int((frame[rest].notna().all(axis=1) & frame[covariates].isna().any(axis=1)).sum())
+
+
+def data_frame(long: Long, imputing: bool) -> pd.DataFrame:
+    # The imputation fills in each split covariate as measured, and splits it again.
+    if not (imputing and long.splits):
+        return long.frame
+    return long.frame.assign(**{s.column: s.values for s in long.splits})
+
+
+def imputation_plan(long: Long, imputing: Imputing) -> imputation.ImputationPlan:
+    # Only names the kept imputation, after everything it reads.
+    person, waves, factors = covariate_columns(long)
+    study = [c.column for c in long.covariates if c.key == analysis.STUDY_KEY]
+    numbers = [PERSON, WAVE, long.outcome, *study, *person, *waves]
+    return imputation.ImputationPlan(
+        imputing.m,
+        imputing.seed,
+        numbers=[n for n in numbers if n not in factors],
+        factors=factors,
+        by_study=pooled(long),
+    )
+
+
+def imputed_code(model: Model, long: Long, label: str, imputing: Imputing, file: str) -> str:
+    person, waves, factors = covariate_columns(long)
+    study = next((c.column for c in long.covariates if c.key == analysis.STUDY_KEY), None)
+    blocks = (
+        f"blocks <- split(seq_along(people), first_value(d[[{r_string(study)}]]))"
+        if study
+        else "blocks <- list(seq_along(people))"
+    )
+    person_id = r_string(PERSON)
+    splits = "".join(
+        f"  x[[{r_string(s.between)}]] <- ave(x[[{r_string(s.column)}]], x[[{person_id}]], "
+        "FUN = function(v) mean(v, na.rm = TRUE))\n"
+        f"  x[[{r_string(s.within)}]] <- x[[{r_string(s.column)}]] - x[[{r_string(s.between)}]]\n"
+        for s in long.splits
+    )
+    impute = R_IMPUTE.format(
+        m=imputing.m,
+        seed=imputing.seed,
+        by_study=", each study by itself" if study else "",
+        grouped=f"; people of one {long.group} are imputed as if apart" if long.group else "",
+        mincor=imputation.MIN_CORRELATION,
+        file=r_string(file),
+        person_columns=imputation.quoted(person),
+        wave_columns=imputation.quoted(waves),
+        factor_columns=imputation.quoted(factors),
+        person=person_id,
+        wave=r_string(WAVE),
+        outcome=r_string(long.outcome),
+        blocks=blocks,
+        split="\n# and the split covariates split again" if long.splits else "",
+        splits=splits,
+    )
+    parts = structure(model, long)
+    fitted = R_POOLED_MODEL.format(
+        title=title(model, long, label),
+        used=", ".join(r_string(name) for name in parts["used"]),
+        factors=textwrap.indent(r_factors(long), "  "),
+        y=long.outcome,
+        fixed=parts["fixed"],
+        random=parts["random"],
+        null_random=parts["null_random"],
+        random_of=R_RANDOM,
+    )
+    return impute + fitted
+
+
+def footers(long: Long, imputing: bool = False) -> tuple[str, str]:
     groups_r = f"length(unique(d[[{r_string(long.group)}]]))" if long.group else "NA"
     groups_py = f"d[{r_string(long.group)}].nunique()" if long.group else "np.nan"
-    r = R_FOOTER.replace("PERSON_COLUMN", r_string(PERSON)).replace("GROUPS", groups_r)
+    footer = R_POOLED_FOOTER if imputing else R_RANDOM + R_FOOTER
+    r = footer.replace("PERSON_COLUMN", r_string(PERSON)).replace("GROUPS", groups_r)
     python = PYTHON_FOOTER.replace("PERSON_COLUMN", r_string(PERSON)).replace("GROUPS", groups_py)
     return r, python
 
 
-def headers(result: CatalogResult, path: str) -> tuple[str, str]:
+def packages(imputing: Imputing | None) -> tuple[str, ...]:
+    return (*PACKAGES, "mice", "mitml") if imputing else PACKAGES
+
+
+def headers(result: CatalogResult, path: str, imputing: Imputing | None = None) -> tuple[str, str]:
     project = result.project.config.project.name
     return (
         R_HEADER.format(
             project=project,
-            names=", ".join(PACKAGES),
-            install=install_command(PACKAGES),
+            names=", ".join(packages(imputing)),
+            install=install_command(packages(imputing)),
             path=r_string(path),
         ),
         PYTHON_HEADER.format(project=project, path=r_string(path)),
     )
 
 
-def scripts(result: CatalogResult, model: Model, long: Long, label: str) -> tuple[str, str]:
-    r_head, py_head = headers(result, DATA_FILE)
+def scripts(
+    result: CatalogResult, model: Model, long: Long, label: str, imputing: Imputing | None = None
+) -> tuple[str, str]:
+    r_head, py_head = headers(result, DATA_FILE, imputing)
     r, python = code(model, long, label)
+    if imputing:
+        file = imputation.file_name(data_frame(long, True), imputation_plan(long, imputing))
+        r = imputed_code(model, long, label, imputing, file)
+        python = imputation.PYTHON_IMPUTE + python
     return f"{r_head}\n{r}", f"{py_head}\n{python}"
 
 
-def run(result: CatalogResult, model: Model, long: Long, label: str, rscript: str | None) -> Fitted:
+def run(
+    result: CatalogResult,
+    model: Model,
+    long: Long,
+    label: str,
+    rscript: str | None,
+    imputing: Imputing | None = None,
+) -> Fitted:
     # R when the Settings page names an Rscript, otherwise the Python version, run here.
     r, python = code(model, long, label)
-    r_footer, python_footer = footers(long)
+    r_footer, python_footer = footers(long, imputing is not None)
+    frame = data_frame(long, imputing is not None)
+    if imputing:
+        file = imputation.cache_path(frame, imputation_plan(long, imputing)).as_posix()
+        r = imputed_code(model, long, label, imputing, file)
     with tempfile.TemporaryDirectory() as temp:
         folder = Path(temp)
-        long.frame.to_csv(folder / DATA_FILE, index=False)
-        r_head, py_head = headers(result, (folder / DATA_FILE).as_posix())
+        frame.to_csv(folder / DATA_FILE, index=False)
+        r_head, py_head = headers(result, (folder / DATA_FILE).as_posix(), imputing)
         if rscript:
             writes = [
                 f"write.csv({name}, {r_string((folder / f'{name}.csv').as_posix())}, "
@@ -781,7 +1038,8 @@ def run(result: CatalogResult, model: Model, long: Long, label: str, rscript: st
                 for name in OUTPUTS
             ]
             path = folder / "multilevel.R"
-            text = "\n".join([package_check(PACKAGES), r_head, r, r_footer, *writes])
+            check = package_check(packages(imputing))
+            text = "\n".join([check, r_head, r, r_footer, *writes])
             path.write_text(text, encoding="utf-8")
             run_r(rscript, [str(path)])
             found = {n: pd.read_csv(folder / f"{n}.csv") for n in OUTPUTS}
@@ -835,12 +1093,13 @@ def read(found: dict[str, pd.DataFrame], long: Long, engine: str) -> Fitted:
         groups=None if pd.isna(stats["groups"]) else int(stats["groups"]),
         dropped=int(stats["dropped"]),
         left_out=long.left_out,
-        reml_criterion=float(stats["reml_criterion"]),
-        log_likelihood=float(stats["log_likelihood"]),
+        reml_criterion=none(stats["reml_criterion"]),
+        log_likelihood=none(stats["log_likelihood"]),
         aic=none(stats["aic"]),
         bic=none(stats["bic"]),
         singular=SINGULAR in notes,
         notes=[n for n in notes if n != SINGULAR],
+        imputations=int(stats["imputations"]) if "imputations" in stats.index else None,
     )
 
 

@@ -5,7 +5,7 @@ from nicegui import ui
 
 from labcatalog.charts import plot_code, views
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, common, paper
+from labcatalog.gui import charts, common, missing, paper
 from labcatalog.gui.analysis_tables import decimal, later, rscript
 from labcatalog.gui.common import apa, code_tabs, col, computed, note, p_value, panel
 from labcatalog.pipeline import CatalogResult
@@ -66,12 +66,23 @@ def render(result: CatalogResult, view) -> None:
                 return
             long = ml.long_frame(result, model)
             label = outcomes[model.outcome]
+            imputing = None
+            if missing.imputing(result, view):
+                rows = ml.imputed_rows(model, long)
+                if rows:
+                    imputing = ml.Imputing(*missing.settings(result, view))
+                    note(
+                        f"The covariates missing in {rows} rows are imputed from each person's "
+                        f"other waves in {imputing.m} data sets; outcomes are not imputed."
+                    )
+                else:
+                    note("No covariate is missing where the outcome is, so nothing is imputed.")
 
             async def fill() -> Callable:
-                fitted, engine = await fit(result, model, long, label)
-                r_text, python_text = script_texts(result, model, long, label)
+                fitted, engine = await fit(result, model, long, label, imputing)
+                r_text, python_text = script_texts(result, model, long, label, imputing)
                 texts = {
-                    ml.DATA_FILE: long.frame.to_csv(index=False),
+                    ml.DATA_FILE: ml.data_frame(long, imputing is not None).to_csv(index=False),
                     R_FILE: r_text,
                     PYTHON_FILE: python_text,
                 }
@@ -206,10 +217,14 @@ def render(result: CatalogResult, view) -> None:
 
 
 def script_texts(
-    result: CatalogResult, model: ml.Model, long: ml.Long, label: str
+    result: CatalogResult,
+    model: ml.Model,
+    long: ml.Long,
+    label: str,
+    imputing: ml.Imputing | None = None,
 ) -> tuple[str, str]:
     # The model's R and Python scripts, each followed by the trajectory figure.
-    r_text, python_text = ml.scripts(result, model, long, label)
+    r_text, python_text = ml.scripts(result, model, long, label, imputing)
     by_wave = long.time_label == ml.TIME_LABEL
     columns = {"person": ml.PERSON, "wave": ml.WAVE, "time": ml.TIME, "y": long.outcome}
     r_plot, python_plot = plot_code.trajectories(
@@ -241,9 +256,18 @@ def random_note(model: ml.Model, long: ml.Long) -> str:
 
 
 async def fit(
-    result: CatalogResult, model: ml.Model, long: ml.Long, label: str
+    result: CatalogResult,
+    model: ml.Model,
+    long: ml.Long,
+    label: str,
+    imputing: ml.Imputing | None = None,
 ) -> tuple[ml.Fitted, str]:
     path = rscript()
+    if imputing:
+        if not path:
+            raise LabCatalogError(missing.NO_R)
+        fitted = await computed(ml.run, result, model, long, label, path, imputing)
+        return fitted, "Imputed in R with mice; fitted with lme4 and lmerTest, pooled with mitml."
     try:
         fitted = await computed(ml.run, result, model, long, label, path)
     except LabCatalogError as err:
@@ -293,6 +317,11 @@ def fixed_note(fitted: ml.Fitted, long: ml.Long) -> str:
         "from R's by a few percent"
     )
     parts = [f"Fitted by REML; {tested}; Wald 95% CIs."]
+    if fitted.imputations:
+        parts = [
+            f"Fitted by REML in each of {fitted.imputations} imputed data sets and pooled with "
+            "Rubin's rules; df from Barnard and Rubin's method on each term's Satterthwaite df."
+        ]
     if any(c.label.endswith(ml.PERSON_MEAN) for c in long.covariates):
         parts.append(
             "Each-wave number covariates are split into each person's mean over the chosen "
@@ -335,8 +364,16 @@ def summary_table(fitted: ml.Fitted) -> tuple[list[dict], list[dict]]:
             if fitted.groups is not None
             else []
         ),
-        {"measure": "REML criterion", "value": decimal(fitted.reml_criterion)},
-        {"measure": "Log-likelihood (REML)", "value": decimal(fitted.log_likelihood)},
+        *(
+            [{"measure": "REML criterion", "value": decimal(fitted.reml_criterion)}]
+            if fitted.reml_criterion is not None
+            else []
+        ),
+        *(
+            [{"measure": "Log-likelihood (REML)", "value": decimal(fitted.log_likelihood)}]
+            if fitted.log_likelihood is not None
+            else []
+        ),
         *([{"measure": "AIC", "value": decimal(fitted.aic)}] if fitted.aic is not None else []),
         *([{"measure": "BIC", "value": decimal(fitted.bic)}] if fitted.bic is not None else []),
     ]
@@ -347,8 +384,14 @@ def summary_note(fitted: ml.Fitted) -> str:
     parts = [
         "ICC from the model with only the random intercepts: each level's share of the "
         "variance (performance::icc in R).",
-        "Models fitted by REML cannot be compared on AIC or BIC when their fixed effects differ.",
     ]
+    if fitted.imputations:
+        parts.append(f"ICCs averaged over the {fitted.imputations} imputed data sets.")
+    else:
+        parts.append(
+            "Models fitted by REML cannot be compared on AIC or BIC when their fixed effects "
+            "differ."
+        )
     if fitted.left_out:
         parts.append(f"{fitted.left_out} rows left out for a missing or repeated ID.")
     if fitted.dropped:
