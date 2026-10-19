@@ -365,6 +365,11 @@ body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.0
   font-weight: 600;
 }
 .q-expansion-item.lc-expansion .q-expansion-item__content { padding: 0 16px 12px; }
+/* A panel that is only its title bar. */
+.lc-panel.lc-bar { padding: 14px 20px; }
+/* A panel folded to its title bar. */
+.q-expansion-item.lc-fold > .q-expansion-item__container > .q-item { padding: 14px 20px; min-height: 0; }
+.q-expansion-item.lc-fold .q-expansion-item__content { padding: 10px 20px 16px; border-top: 1px solid var(--lc-rule); }
 
 /* ---- Instrument page ---- */
 .lc-crumb-sep { color: var(--lc-faint); }

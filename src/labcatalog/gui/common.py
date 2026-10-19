@@ -51,17 +51,34 @@ async def computed(callback, *args):
 
 
 @contextmanager
-def panel(title: str, subtitle: str = "") -> Iterator[ui.row]:
+def panel(title: str, subtitle: str = "", help_text: str = "") -> Iterator[ui.row]:
     # Yields the title bar's right-hand row, for controls that belong to the panel.
     with ui.column().classes("lc-panel w-full gap-0"):
         with ui.row().classes("lc-panel-head w-full items-center no-wrap gap-4"):
-            with ui.column().classes("grow gap-0"):
-                ui.label(title).classes("lc-panel-title")
-                if subtitle:
-                    ui.label(subtitle).classes("lc-panel-subtitle")
+            panel_title(title, subtitle, help_text)
             tools = ui.row().classes("shrink-0 items-center no-wrap gap-3")
         with ui.column().classes("lc-panel-body w-full gap-2"):
             yield tools
+
+
+@contextmanager
+def folding_panel(title: str, subtitle: str = "", opened: bool = False) -> Iterator[None]:
+    # A panel whose title bar opens and closes it.
+    with ui.expansion(value=opened).classes("lc-panel lc-fold w-full") as fold:
+        with fold.add_slot("header"):
+            panel_title(title, subtitle)
+        with ui.column().classes("w-full gap-2"):
+            yield
+
+
+def panel_title(title: str, subtitle: str, help_text: str = "") -> None:
+    with ui.column().classes("grow gap-0"):
+        with ui.row().classes("items-center no-wrap gap-1"):
+            ui.label(title).classes("lc-panel-title")
+            if help_text:
+                help_button(help_text)
+        if subtitle:
+            ui.label(subtitle).classes("lc-panel-subtitle")
 
 
 def page_head(title: str, summary: str = "", help_text: str = "") -> ui.row:

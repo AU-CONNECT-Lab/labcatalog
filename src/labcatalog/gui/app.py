@@ -807,19 +807,21 @@ class Window:
     def add_data_panel(self) -> None:
         if not self.has_catalog():
             return
-        with common.panel("Add a data file", "A data file, its cleaning and its columns"):
-            common.note(
+        with ui.row().classes("lc-panel lc-bar w-full items-center no-wrap gap-4"):
+            common.panel_title(
+                "Add a data file",
+                "A data file, its cleaning and its columns",
                 "Choose a file as it came from the survey platform or the lab's pipeline; "
                 "labcatalog copies it into the project and links each column to an item of the "
                 "instruments in the codebook. A file that needs cleaning first, such as an "
-                "export with extra header rows, gets a cleaning step below."
+                "export with extra header rows, gets a cleaning step below.",
             )
             if self.result.project.config.studies:
                 ui.button(
                     "Add a data file",
                     icon="add",
                     on_click=lambda: new_dataset.open_wizard(self.result, self.dataset_added),
-                ).props("no-caps").classes("w-fit")
+                ).props("no-caps").classes("shrink-0")
             else:
                 common.note("Add a study on the Studies page first.")
 

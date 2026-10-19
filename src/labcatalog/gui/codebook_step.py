@@ -9,7 +9,7 @@ from labcatalog.codebook import core as codebook
 from labcatalog.codebook.core import ImportResult
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import codebook_import, problems
-from labcatalog.gui.common import col, computed, note, open_path, panel, table
+from labcatalog.gui.common import col, computed, folding_panel, note, open_path, table
 from labcatalog.gui.files import choose_path
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing
@@ -150,9 +150,10 @@ def render(
 
     # Folded unless a codebook is under way, so the editor below is what the step opens on.
     begun = any(path.exists() for path in paths.values()) or bool(view.issues)
-    with panel("From a codebook", "New instruments from a data dictionary or any codebook"):
-        with ui.expansion("Make instruments from a codebook", value=begun).classes("w-full"):
-            steps()
+    with folding_panel(
+        "From a codebook", "New instruments from a data dictionary or any codebook", begun
+    ):
+        steps()
 
 
 def imported_dialog(root: Path, outcome: ImportResult) -> None:
