@@ -21,7 +21,7 @@ from labcatalog.gui.common import (
 from labcatalog.gui.database import database_button
 from labcatalog.gui.filter_bar import Filters, filter_bar
 from labcatalog.issues import Issue
-from labcatalog.metadata.browse import build_dataset_index, dataset_counts, dataset_matches
+from labcatalog.metadata.browse import build_dataset_index, row_counts, row_matches
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats.summary import DatasetSummary
 
@@ -74,7 +74,7 @@ def render(
 
         @ui.refreshable
         def listing() -> None:
-            names = dataset_matches(index, filters.selected, filters.query)
+            names = row_matches(index, filters.selected, filters.query)
             found = {n: summaries[n] for n in names if n in summaries}
             if not found:
                 empty("No dataset matches the search and filters.")
@@ -88,7 +88,7 @@ def render(
 
         filter_bar(
             index.facets,
-            lambda: dataset_counts(index, filters.selected, filters.query),
+            lambda: row_counts(index, filters.selected, filters.query),
             filters,
             listing.refresh,
         )
@@ -308,6 +308,23 @@ def facts(
 
 def data_path(result: CatalogResult, dataset: str) -> str | None:
     return next((f.path for f in result.manifest.files if f.dataset == dataset), None)
+
+
+def issue_datasets(result: CatalogResult) -> list[str | None]:
+    # The dataset each issue is about, by its details or by the file it names.
+    issues = result.report.issues
+    if result.project is None:
+        return [None] * len(issues)
+    names = {d.name for d in result.project.config.datasets}
+    owner = {
+        id(issue): d.name
+        for d in result.project.config.datasets
+        for issue in dataset_issues(result, d.name)
+    }
+    return [
+        found if (found := issue.details.get("dataset")) in names else owner.get(id(issue))
+        for issue in issues
+    ]
 
 
 def issue_levels(result: CatalogResult) -> dict[str, set[str]]:

@@ -4,6 +4,7 @@ from datetime import date
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, dataset_by_name, rosters
 from labcatalog.data.resolve import as_text_dict
+from labcatalog.issues import Issue
 from labcatalog.metadata.completeness import gaps
 from labcatalog.project import Project
 from labcatalog.schema import Instrument
@@ -18,6 +19,8 @@ PROBLEMS = "problems"
 HAS_ERRORS = "errors"
 HAS_WARNINGS = "warnings"
 NO_PROBLEMS = "none"
+LEVEL, CODE = "level", "code"
+LEVELS = {"error": "errors", "warning": "warnings", "info": "notes"}
 
 
 @dataclass
@@ -38,8 +41,9 @@ class Administered:
 
 
 @dataclass
-class DatasetIndex:
-    datasets: list[str]
+class RowIndex:
+    # The rows a list filters, such as its datasets, by key.
+    keys: list[str]
     facets: list[Facet]
     values: dict[str, dict[str, set[str]]]
     text: dict[str, str]
@@ -141,7 +145,7 @@ def dataset_facet_names(config: ProjectConfig) -> list[str]:
     return [*DATASET_FACETS, *custom]
 
 
-def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> DatasetIndex:
+def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> RowIndex:
     # levels: the levels of each dataset's issues, such as error and warning.
     config = project.config
     names = dataset_facet_names(config)
@@ -182,9 +186,49 @@ def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> Datase
         ]
         text[dataset.name] = "\n".join(p for p in parts if p).lower()
     rows = list(values.values())
-    return DatasetIndex(
-        datasets=[d.name for d in config.datasets],
+    return RowIndex(
+        keys=[d.name for d in config.datasets],
         facets=[*(facet(config, name, rows) for name in names), problems_facet(rows)],
+        values=values,
+        text=text,
+    )
+
+
+def build_issue_index(
+    config: ProjectConfig | None, issues: list[Issue], datasets: list[str | None]
+) -> RowIndex:
+    # datasets: each issue's dataset; one about no dataset shows whatever dataset is chosen.
+    names = list(DATASET_FACETS) if config is not None else []
+    values, text = {}, {}
+    for n, (issue, name) in enumerate(zip(issues, datasets, strict=True)):
+        found = {LEVEL: {issue.level}, CODE: {issue.code}}
+        if names and name is not None:
+            dataset = dataset_by_name(config, name)
+            known = {
+                "study": dataset.study,
+                "wave": wave_key(dataset.study, dataset.wave),
+                "reporter": dataset.reporter,
+                "modality": dataset.modality,
+            }
+            found |= {facet_name: {known[facet_name]} for facet_name in names}
+        values[str(n)] = found
+        parts = [issue.message, issue.location or "", issue.code, name or ""]
+        text[str(n)] = "\n".join(parts).lower()
+    present = [v for v in values.values() if names[0] in v] if names else []
+    every = {f: {value for v in present for value in v[f]} for f in names}
+    for found in values.values():
+        for facet_name in names:
+            found.setdefault(facet_name, every[facet_name])
+    rows = [values[str(n)] for n, name in enumerate(datasets) if name is not None]
+    level = {v: label for v, label in LEVELS.items() if any(v in r[LEVEL] for r in values.values())}
+    codes = sorted({issue.code for issue in issues})
+    return RowIndex(
+        keys=list(values),
+        facets=[
+            Facet(name=LEVEL, label="Level", values=level),
+            *(facet(config, name, rows) for name in names),
+            Facet(name=CODE, label="Code", values={c: c for c in codes}),
+        ],
         values=values,
         text=text,
     )
@@ -207,25 +251,23 @@ def problems_facet(rows: list[dict[str, set[str]]]) -> Facet:
     return Facet(name=PROBLEMS, label="Problems", values=shown)
 
 
-def dataset_matches(
-    index: DatasetIndex, selected: dict[str, set[str]], query: str = ""
-) -> list[str]:
+def row_matches(index: RowIndex, selected: dict[str, set[str]], query: str = "") -> list[str]:
     terms = query.lower().split()
     return [
         d
-        for d in index.datasets
+        for d in index.keys
         if chosen(index.values[d], selected) and all(t in index.text[d] for t in terms)
     ]
 
 
-def dataset_counts(
-    index: DatasetIndex, selected: dict[str, set[str]], query: str = ""
+def row_counts(
+    index: RowIndex, selected: dict[str, set[str]], query: str = ""
 ) -> dict[str, dict[str, int]]:
     # Each facet is counted with the other facets applied, so its own values stay alternatives.
     result = {}
     for found in index.facets:
         others = {name: values for name, values in selected.items() if name != found.name}
-        hits = dataset_matches(index, others, query)
+        hits = row_matches(index, others, query)
         result[found.name] = {
             value: sum(value in index.values[d][found.name] for d in hits) for value in found.values
         }

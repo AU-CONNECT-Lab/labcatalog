@@ -1,16 +1,20 @@
 from labcatalog.data.resolve import as_text_dict
+from labcatalog.issues import Issue
 from labcatalog.metadata.browse import (
+    CODE,
     HAS_ERRORS,
     HAS_WARNINGS,
+    LEVEL,
     NO_PROBLEMS,
     PROBLEMS,
     build_dataset_index,
     build_index,
+    build_issue_index,
     counts,
-    dataset_counts,
-    dataset_matches,
     facet_names,
     matches,
+    row_counts,
+    row_matches,
 )
 from labcatalog.metadata.completeness import gaps
 from labcatalog.pipeline import load_validated, run_validate
@@ -314,24 +318,24 @@ def test_datasets_filter_by_study_wave_and_modality(example_project):
     facets = {f.name: f for f in index.facets}
     assert list(facets) == ["study", "wave", "reporter", "modality", PROBLEMS]
     assert facets["wave"].values["mock_study_2/baseline"].endswith(": baseline")
-    found = dataset_matches(index, {"study": {"mock_study"}, "modality": {"eeg"}})
+    found = row_matches(index, {"study": {"mock_study"}, "modality": {"eeg"}})
     assert found == ["eeg_w1", "eeg_w3"]
-    found = dataset_matches(index, {"wave": {"mock_study_2/baseline"}, "reporter": {"child"}})
+    found = row_matches(index, {"wave": {"mock_study_2/baseline"}, "reporter": {"child"}})
     assert found == ["s2_child_baseline", "s2_watch_baseline"]
 
 
 def test_dataset_search_reaches_instruments_and_columns(example_project):
     index = dataset_index_for(example_project)
-    by_column = dataset_matches(index, {}, "eps_1_w1")
+    by_column = row_matches(index, {}, "eps_1_w1")
     assert by_column == ["parent_w1"]
-    by_instrument = set(dataset_matches(index, {}, "example_parent_stress"))
+    by_instrument = set(row_matches(index, {}, "example_parent_stress"))
     assert "parent_w1" in by_instrument and "child_w1" not in by_instrument
-    assert dataset_matches(index, {}, "eps_1_w1 eeg") == []
+    assert row_matches(index, {}, "eps_1_w1 eeg") == []
 
 
-def test_dataset_counts_keep_the_facets_own_values_open(example_project):
+def test_row_counts_keep_the_facets_own_values_open(example_project):
     index = dataset_index_for(example_project)
-    found = dataset_counts(index, {"study": {"mock_study_2"}, "modality": {"actigraphy"}})
+    found = row_counts(index, {"study": {"mock_study_2"}, "modality": {"actigraphy"}})
     assert found["study"]["mock_study"] == 0
     assert found["modality"]["questionnaire"] == 4
     assert found["modality"]["actigraphy"] == 2
@@ -340,22 +344,44 @@ def test_dataset_counts_keep_the_facets_own_values_open(example_project):
 def test_datasets_filter_by_their_worst_problem(example_project):
     levels = {"parent_w1": {"warning", "error"}, "child_w1": {"warning"}}
     index = dataset_index_for(example_project, levels)
-    assert dataset_matches(index, {PROBLEMS: {HAS_ERRORS}}) == ["parent_w1"]
-    assert dataset_matches(index, {PROBLEMS: {HAS_WARNINGS}}) == ["child_w1"]
-    assert len(dataset_matches(index, {PROBLEMS: {NO_PROBLEMS}})) == len(index.datasets) - 2
+    assert row_matches(index, {PROBLEMS: {HAS_ERRORS}}) == ["parent_w1"]
+    assert row_matches(index, {PROBLEMS: {HAS_WARNINGS}}) == ["child_w1"]
+    assert len(row_matches(index, {PROBLEMS: {NO_PROBLEMS}})) == len(index.keys) - 2
 
 
 def test_dataset_search_reaches_every_setting(example_project):
     index = dataset_index_for(example_project)
     config = load_validated(example_project)[0].config
     first = config.datasets[0]
-    assert dataset_matches(index, {}, first.path) == [first.name]
-    assert dataset_matches(index, {}, str(first.snapshot_date))
+    assert row_matches(index, {}, first.path) == [first.name]
+    assert row_matches(index, {}, str(first.snapshot_date))
 
 
 def test_dataset_search_reaches_item_text(example_project):
     project = load_validated(example_project)[0]
     item = project.instruments["example_parent_stress"].items[0]
     words = " ".join(next(iter(as_text_dict(item.text).values())).split()[:4])
-    found = dataset_matches(dataset_index_for(example_project), {}, words)
+    found = row_matches(dataset_index_for(example_project), {}, words)
     assert "parent_w1" in found and "child_w1" not in found
+
+
+def test_issues_filter_by_their_dataset_and_keep_the_projects_own(example_project):
+    config = load_validated(example_project)[0].config
+    issues = [
+        Issue(level="error", code="id_duplicate", message="Repeated ID 1005P"),
+        Issue(level="warning", code="id_whitespace", message="ID with spaces"),
+        Issue(level="warning", code="unknown_reference", message="No such key"),
+    ]
+    index = build_issue_index(config, issues, ["parent_w3", "s2_child_baseline", None])
+    assert {f.name for f in index.facets} >= {LEVEL, CODE, "study", "wave"}
+    assert row_matches(index, {"study": {"mock_study"}}) == ["0", "2"]
+    assert row_matches(index, {LEVEL: {"warning"}}) == ["1", "2"]
+    assert row_matches(index, {CODE: {"id_duplicate"}}, "1005p") == ["0"]
+    assert row_counts(index, {"study": {"mock_study_2"}})[LEVEL] == {"error": 0, "warning": 2}
+
+
+def test_issues_without_a_project_filter_by_level_and_code():
+    issues = [Issue(level="error", code="invalid_yaml", message="Bad file")]
+    index = build_issue_index(None, issues, [None])
+    assert [f.name for f in index.facets] == [LEVEL, CODE]
+    assert row_matches(index, {LEVEL: {"error"}}) == ["0"]

@@ -48,6 +48,7 @@ from labcatalog.gui.datalad import clone_dialog, frozen_text, get_button, versio
 from labcatalog.gui.datasets import DatasetsView
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.files import FOLDER, choose_path
+from labcatalog.gui.filter_bar import Filters
 from labcatalog.gui.gate import Gate
 from labcatalog.gui.instruments import (
     CFA_DONE,
@@ -185,6 +186,7 @@ class Window:
         self.view = BrowseView()
         self.studying = StudiesView()
         self.datasets_view = DatasetsView()
+        self.problem_filters = Filters()
         self.analysis = AnalysisView()
         self.methods = MethodsView()
         self.importing = ImportView()
@@ -428,6 +430,7 @@ class Window:
                 self.view = BrowseView()
                 self.studying = StudiesView()
                 self.datasets_view = DatasetsView()
+                self.problem_filters = Filters()
                 self.analysis = AnalysisView()
                 self.methods = MethodsView()
                 self.importing = ImportView()
@@ -696,9 +699,11 @@ class Window:
         if self.scope is None:
             self.view.selected.pop("study", None)
             self.datasets_view.filters.selected.pop("study", None)
+            self.problem_filters.selected.pop("study", None)
             return
         self.view.selected["study"] = {self.scope}
         self.datasets_view.filters.selected["study"] = {self.scope}
+        self.problem_filters.selected["study"] = {self.scope}
         self.studying.study = self.scope
         self.methods.study = self.scope
 
@@ -875,8 +880,16 @@ class Window:
         if self.result is None:
             common.empty(self.error or "Open a project folder to check it.", "folder_open")
         else:
+            project = self.result.project
             problems.render(
-                self.result.report, self.root, self.edit_location, self.open_fix, self.reload
+                self.result.report,
+                project.config if project else None,
+                datasets.issue_datasets(self.result),
+                self.problem_filters,
+                self.root,
+                self.edit_location,
+                self.open_fix,
+                self.reload,
             )
         self.get_missing_button()
 

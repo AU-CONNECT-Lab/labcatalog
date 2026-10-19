@@ -8,7 +8,7 @@ The window opens the project that was open when it last closed, or the example p
 
 ## One study or all
 
-A picker at the top right chooses the study the pages show. **All studies** shows every study. With one study chosen, the Overview shows its datasets, waves, people, instruments and milestones; the Instruments and Datasets pages start with that study's filter set; the Analysis page offers its datasets; and the Studies and Methods pages open it. Set up, Problems and Settings always cover the whole project. The window remembers the choice for each project.
+A picker at the top right chooses the study the pages show. **All studies** shows every study. With one study chosen, the Overview shows its datasets, waves, people, instruments and milestones; the Instruments and Datasets pages start with that study's filter set; the Analysis page offers its datasets; and the Studies and Methods pages open it. The Problems page starts with that study's filter set too. Set up and Settings always cover the whole project. The window remembers the choice for each project.
 
 ## Refreshing after a change
 

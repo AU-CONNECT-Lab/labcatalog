@@ -4,7 +4,7 @@ The Problems page lists every problem `labcatalog check` finds: mismatches betwe
 
 ![The Problems page listing the example's problems](../images/app/problems.png)
 
-At the top are the number of errors and warnings, a toggle to show **All**, **Errors** or **Warnings**, and a **Search** box that filters the table.
+At the top are the number of errors and warnings and the same search and filter bar as on the [Datasets](datasets.md) page: the search box finds a problem by its message, file, code or dataset, and the buttons narrow it by **Level**, by the **Study**, **Wave**, **Reporter** and **Modality** of the dataset it is about, and by **Code**. A problem in a file of the whole project, such as an instrument or `labcatalog.yaml`, stays whatever study, wave, reporter or modality is chosen. The study chosen in the picker at the top right sets **Study** when you choose it.
 
 ## The table
 

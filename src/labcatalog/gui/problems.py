@@ -4,6 +4,7 @@ from pathlib import Path
 from nicegui import ui
 
 from labcatalog import defaults
+from labcatalog.config import ProjectConfig
 from labcatalog.data.check import CheckReport
 from labcatalog.gui.common import (
     col,
@@ -15,8 +16,10 @@ from labcatalog.gui.common import (
     split_location,
     table,
 )
+from labcatalog.gui.filter_bar import Filters, filter_bar
 from labcatalog.issues import Issue, summarize_issues
 from labcatalog.metadata import accepted, editing
+from labcatalog.metadata.browse import build_issue_index, row_counts, row_matches
 
 COLUMNS = [
     col("level", "Level"),
@@ -25,7 +28,6 @@ COLUMNS = [
     col("code", "Code"),
 ]
 FIX_COLUMN = col("fix", "", sortable=False)
-LEVEL_FILTERS = {"all": "All", "error": "Errors", "warning": "Warnings"}
 
 LEVEL_CELL = r"""
 <q-td :props="props" class="whitespace-nowrap">
@@ -58,30 +60,41 @@ FIX_CELL = r"""
 
 def render(
     report: CheckReport,
+    config: ProjectConfig | None,
+    datasets: list[str | None],
+    filters: Filters,
     root: Path,
     edit: Callable[[str, int | None], None],
     fix: Callable[[Issue], None],
     shown_again: Callable[[], Awaitable[None]],
 ) -> None:
+    # datasets: the dataset each issue is about, None for the project's own files.
     issues = report.issues
+    index = build_issue_index(config, issues, datasets)
+    editable = editable_paths(root)
+
+    def changed() -> None:
+        kept = {int(k) for k in row_matches(index, filters.selected, filters.query)}
+        shown.update_rows(keyed(issue_rows(issues, kept, editable)))
+        count.set_text(f"{len(kept)} of {len(issues)} shown" if filters.any() else "")
+
     with panel(
         summarize_issues(issues), help_text="Fix says what a problem means and who usually fixes it"
-    ) as tools:
+    ):
         if not issues:
             empty("No problems found.", "check_circle")
+        else:
+            filter_bar(
+                index.facets,
+                lambda: row_counts(index, filters.selected, filters.query),
+                filters,
+                changed,
+            )
+            count = ui.label().classes("lc-note")
         shown = issue_table(issues, root, edit, fix)
         shown.visible = bool(issues)
-    with tools:
-        level = ui.toggle(LEVEL_FILTERS, value="all").props("dense no-caps")
-        search = ui.input(placeholder="Search").props("outlined dense clearable").classes("w-64")
-        with search.add_slot("prepend"):
-            ui.icon("search").classes("lc-faint")
-    search.bind_value_to(shown, "filter")
-    level.on_value_change(
-        lambda e: shown.update_rows(
-            keyed(issue_rows(issues, None if e.value == "all" else e.value, editable_paths(root)))
-        )
-    )
+    if issues:
+        changed()
     if report.accepted:
         accepted_section(report.accepted, root, shown_again)
 
@@ -142,11 +155,11 @@ def editable_paths(root: Path) -> set[str]:
     return {path for group in editing.editable_files(root).values() for path in group}
 
 
-def issue_rows(issues: list[Issue], level: str | None, editable: set[str]) -> list[dict]:
+def issue_rows(issues: list[Issue], kept: set[int] | None, editable: set[str]) -> list[dict]:
     # n points back into issues, whatever the filter leaves out.
     return [
         issue.model_dump(exclude={"details"})
         | {"n": n, "in_editor": split_location(issue.location or "")[0] in editable}
         for n, issue in enumerate(issues)
-        if level is None or issue.level == level
+        if kept is None or n in kept
     ]
