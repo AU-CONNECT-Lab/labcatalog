@@ -690,6 +690,7 @@ class Window:
             self.datasets_panel,
             self.analysis_panel,
             self.methods_panel,
+            self.scripts_panel,
         ):
             panel.refresh()
 
@@ -717,10 +718,12 @@ class Window:
             self.view.selected.pop("study", None)
             self.datasets_view.filters.selected.pop("study", None)
             self.problem_filters.selected.pop("study", None)
+            self.scripting.filters.selected.pop("study", None)
             return
         self.view.selected["study"] = {self.scope}
         self.datasets_view.filters.selected["study"] = {self.scope}
         self.problem_filters.selected["study"] = {self.scope}
+        self.scripting.filters.selected["study"] = {self.scope}
         self.studying.study = self.scope
         self.methods.study = self.scope
 
@@ -892,7 +895,9 @@ class Window:
 
     def open_script(self, path: str | None) -> None:
         if path is not None:
-            self.scripting.path, self.scripting.step = path, None
+            self.scripting.key = path
+            self.scripting.filters.selected.clear()
+            self.scripting.filters.query = ""
         self.scripts_panel.refresh()
         self.tabs.set_value("scripts")
 

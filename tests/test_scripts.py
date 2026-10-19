@@ -4,10 +4,14 @@ import yaml
 from labcatalog.config import PrepareStep
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import changes
+from labcatalog.metadata.browse import row_matches
 from labcatalog.metadata.scripts import (
+    UNUSED,
+    entries,
     new_script,
     project_scripts,
     remove_step_change,
+    script_index,
     script_of,
     step_change,
 )
@@ -60,3 +64,28 @@ def test_a_step_is_added_renamed_and_removed(mock_project):
     changes.write(project, [remove_step_change(project, "tidy_a")])
     data = yaml.safe_load((mock_project / "labcatalog.yaml").read_text(encoding="utf-8"))
     assert "tidy_a" not in {s["name"] for s in data["prepare"]}
+
+
+def test_scripts_are_filtered_by_what_their_steps_write(mock_project):
+    (mock_project / "scripts" / "draft.R").write_text("x <- 1\n", encoding="utf-8")
+    project = load_project(mock_project)
+    listed = entries(project, project_scripts(project))
+    statuses = {
+        s.name: "outdated" if s.name == "extract_fmri_w1" else "up to date"
+        for s in project.config.prepare
+    }
+    index = script_index(project, listed, statuses)
+    assert row_matches(index, {"modality": {"fmri"}}) == [
+        "scripts/extract_fmri.py",
+        "scripts/draft.R",
+    ]
+    assert row_matches(index, {"status": {"outdated"}}) == ["scripts/extract_fmri.py"]
+    assert row_matches(index, {"kind": {UNUSED}}) == ["scripts/draft.R"]
+    assert row_matches(index, {"language": {"r"}}) == ["scripts/draft.R"]
+    assert row_matches(index, {}, "parent_w2_export") == ["scripts/clean_export.py"]
+    clean = next(e for e in listed if e.key == "scripts/clean_export.py")
+    assert {
+        project_dataset.study
+        for project_dataset in project.config.datasets
+        if project_dataset.name in clean.datasets
+    } == {"mock_study"}

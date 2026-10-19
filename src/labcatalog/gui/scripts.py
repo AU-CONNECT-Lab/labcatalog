@@ -1,36 +1,47 @@
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 
 from nicegui import ui
 
-from labcatalog.config import PrepareStep
-from labcatalog.data.prepare import step_state
+from labcatalog.config import PrepareStep, dataset_by_name
+from labcatalog.data.prepare import step_state, step_states
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import prepare
 from labcatalog.gui.common import computed, empty, folding_panel, note, page_head, panel
+from labcatalog.gui.filter_bar import Filters, filter_bar
 from labcatalog.gui.prepare import PrepareView
 from labcatalog.gui.script_editor import script_editor
 from labcatalog.metadata import changes, editing
+from labcatalog.metadata.browse import row_counts, row_matches
 from labcatalog.metadata.scripts import (
+    ANALYSIS,
+    KINDS,
     LANGUAGES,
+    PREPARE,
+    UNUSED,
+    Entry,
     Script,
     command,
+    entries,
     language_of,
     new_script,
     project_scripts,
     remove_step_change,
+    script_index,
     step_change,
+    written,
 )
 from labcatalog.pipeline import CatalogResult
+from labcatalog.project import Project
 
 
 @dataclass
 class ScriptsView:
-    # The script shown, or a step whose command names no script.
-    path: str | None = None
-    step: str | None = None
+    # The line shown: a script's path, or step: and the name of a step that names no script.
+    key: str | None = None
     edited: bool = False
+    filters: Filters = field(default_factory=Filters)
 
 
 def render(
@@ -41,32 +52,26 @@ def render(
 ) -> None:
     project = result.project
     found = project_scripts(project)
-    listed = [*found.steps, *found.analyses, *(Script(p) for p in found.unused)]
-    by_path = {s.path: s for s in listed}
-    loose = {s.name: s for s in found.commands}
-    if view.path not in by_path and view.step not in loose:
-        view.path = listed[0].path if listed else None
-        view.step = None if listed or not loose else next(iter(loose))
+    listed = entries(project, found)
+    by_key = {e.key: e for e in listed}
+    statuses = {s.step.name: s.status for s in step_states(project)}
+    index = script_index(project, listed, statuses)
+    filters = view.filters
 
     def leave(then: Callable[[], None]) -> None:
         if not view.edited:
             then()
             return
         with frame, ui.dialog() as dialog, ui.card():
-            ui.label(f"Discard your changes to {view.path}?")
+            ui.label(f"Discard your changes to {view.key}?")
             with ui.row():
                 ui.button("Discard", on_click=lambda: (dialog.close(), then()))
                 ui.button("Keep editing", on_click=dialog.close).props("flat")
         dialog.open()
 
-    def go(path: str | None, step: str | None = None) -> None:
-        view.path, view.step, view.edited = path, step, False
+    def go(key: str) -> None:
+        view.key, view.edited = key, False
         page.refresh()
-
-    def pick(item, chosen: bool) -> None:
-        item.props("dense clickable").classes("lc-pick")
-        if chosen:
-            item.classes("lc-info font-medium")
 
     async def made(language: str, name: str, dialog: ui.dialog) -> None:
         try:
@@ -75,7 +80,9 @@ def render(
             ui.notify(str(err), type="negative")
             return
         dialog.close()
-        view.path, view.step, view.edited = path, None, False
+        view.key, view.edited = path, False
+        filters.selected.clear()
+        filters.query = ""
         await on_saved()
 
     def new_dialog() -> None:
@@ -91,41 +98,41 @@ def render(
                 ui.button("Create", on_click=lambda: made(language.value, name.value or "", dialog))
         dialog.open()
 
+    def line(entry: Entry, steps: list[PrepareStep]) -> None:
+        title = entry.script.path.split("/")[-1] if entry.script else entry.step.name
+        item = (
+            ui.item(title, on_click=partial(leave, partial(go, entry.key)))
+            .props("dense clickable")
+            .classes("lc-pick")
+        )
+        if entry.key == view.key:
+            item.classes("lc-info font-medium")
+        if entry.script is None:
+            item.tooltip("Its command names no script in the project")
+        for step in steps if entry.script else []:
+            ui.label(step.name).classes("lc-note pl-6 -mt-1")
+
     @ui.refreshable
     def page() -> None:
+        kept = [by_key[k] for k in row_matches(index, filters.selected, filters.query)]
+        if view.key not in {e.key for e in kept}:
+            view.key = kept[0].key if kept else None
         with ui.row().classes("w-full no-wrap items-start gap-6"):
             with ui.column().classes("w-64 shrink-0 lc-side"):
-                groups = (
-                    ("Prepare steps", found.steps, "The scripts the prepare steps run"),
-                    ("Analyses", found.analyses, "Kept from the Custom tab of the Analysis page"),
-                    ("Not run", [Script(p) for p in found.unused], "Nothing runs these yet"),
-                )
-                for title, scripts, help_text in groups:
-                    if not scripts and not (title == "Prepare steps" and loose):
-                        continue
-                    with panel(title, help_text=help_text), ui.column().classes("w-full gap-0"):
-                        for script in scripts:
-                            item = ui.item(
-                                script.path.split("/")[-1],
-                                on_click=partial(leave, partial(go, script.path)),
-                            )
-                            pick(item, script.path == view.path)
-                            if len(script.steps) > 1:
-                                item.tooltip(f"Run by {len(script.steps)} steps")
-                        if title == "Prepare steps":
-                            for name in loose:
-                                item = ui.item(
-                                    name, on_click=partial(leave, partial(go, None, name))
-                                )
-                                pick(item, name == view.step)
-                                item.tooltip("Its command names no script in the project")
+                if not kept:
+                    note("No script matches the search and filters.")
+                for title, rows in groups(project, kept):
+                    with panel(title), ui.column().classes("w-full gap-0"):
+                        for entry, steps in rows:
+                            line(entry, steps)
             with ui.column().classes("grow min-w-0 gap-4"):
-                if view.path in by_path:
-                    script_part(result, by_path[view.path], view, running, page.refresh, on_saved)
-                elif view.step in loose:
-                    steps_part(result, None, [loose[view.step]], running, page.refresh, on_saved)
-                else:
+                entry = by_key.get(view.key)
+                if entry is None:
                     empty("No scripts yet; press New script to write one.", "code")
+                elif entry.script:
+                    script_part(result, entry.script, view, running, page.refresh, on_saved)
+                else:
+                    steps_part(result, None, [entry.step], running, page.refresh, on_saved)
         with folding_panel(
             "Draft a cleaning step",
             help_text="A language model writes a script that turns a raw export into a dataset's file",
@@ -142,7 +149,43 @@ def render(
             ui.button("New script", icon="add", on_click=lambda: leave(new_dialog)).props(
                 "flat no-caps"
             )
+        filter_bar(
+            index.facets,
+            lambda: row_counts(index, filters.selected, filters.query),
+            filters,
+            page.refresh,
+        )
         page()
+
+
+def groups(
+    project: Project, kept: list[Entry]
+) -> list[tuple[str, list[tuple[Entry, list[PrepareStep]]]]]:
+    # Prepare scripts by the modality of what their steps write, each with those steps.
+    config = project.config
+    by_modality: dict[str, list[tuple[Entry, list[PrepareStep]]]] = {}
+    for entry in (e for e in kept if e.kind == PREPARE):
+        steps: dict[str, list[PrepareStep]] = {}
+        for step in entry.steps:
+            modalities = {dataset_by_name(config, d).modality for d in written(project, [step])}
+            for modality in modalities or {""}:
+                steps.setdefault(modality, []).append(step)
+        for modality, own in steps.items():
+            by_modality.setdefault(modality, []).append((entry, own))
+    order = config.vocab.modalities
+
+    def place(modality: str) -> tuple[bool, int]:
+        return modality == "", order.index(modality) if modality in order else len(order)
+
+    found = [
+        (config.vocab.modality_label(m) if m else "Other steps", by_modality[m])
+        for m in sorted(by_modality, key=place)
+    ]
+    for kind in (ANALYSIS, UNUSED):
+        rows = [(e, []) for e in kept if e.kind == kind]
+        if rows:
+            found.append((KINDS[kind], rows))
+    return found
 
 
 def script_part(

@@ -4,9 +4,11 @@ The Scripts page holds every script of the project in one place: the scripts the
 
 ## The list
 
-The scripts are listed on the left in three groups; click one to open it.
+The bar above the list narrows it, as on the [Datasets](datasets.md) page. A script belongs to the datasets its steps write, and an analysis to the datasets it uses, so the **Search** box finds a script by its path, its steps' names, commands, inputs and outputs, or an analysis's request, and the filters choose by the **Study**, **Wave**, **Reporter** and **Modality** of those datasets, and by the lab's own dataset fields. Three more are the page's own: **Kind** (prepare step, analysis, or not run), **Status** (of the steps that run it: up to date, outdated, missing output, missing input) and **Language**. The study chosen at the top of the window is where the filters start. A script that writes no dataset of the project stays in the list whatever study, wave, reporter or modality is chosen.
 
-- **Prepare steps**: each script a step runs, found in the step's command or its inputs. One script can be run by several steps, such as one cleaning script for every wave; hover over it to see how many. A step whose command names no script of the project, such as a command of its own program, is listed by its name.
+The scripts are listed on the left; click one to open it.
+
+- The scripts the prepare steps run come first, grouped by the modality of the files their steps write, with the steps under each. A script is found in the step's command or its inputs. One script can be run by several steps, such as one cleaning script for every wave, and is listed under each modality its steps write. A step whose command names no script of the project, such as a command of its own program, is listed by its name; steps that write no dataset are under **Other steps**.
 - **Analyses**: the scripts listed under `analyses` in `labcatalog.yaml`.
 - **Not run**: R and Python files in `scripts/` and `analyses/` that nothing runs yet.
 

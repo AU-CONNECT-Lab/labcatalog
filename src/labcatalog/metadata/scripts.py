@@ -5,10 +5,20 @@ from pathlib import Path, PurePosixPath
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 
 from labcatalog import defaults
-from labcatalog.config import PrepareStep, SavedAnalysis
+from labcatalog.config import PrepareStep, ProjectConfig, SavedAnalysis, dataset_by_name
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
+from labcatalog.metadata.browse import (
+    Facet,
+    RowIndex,
+    as_set,
+    dataset_facet_names,
+    facet,
+    wave_key,
+    widened,
+)
 from labcatalog.metadata.changes import Change
+from labcatalog.metadata.validate import same_file
 from labcatalog.paths import posix_str
 from labcatalog.project import Project
 
@@ -154,3 +164,102 @@ def remove_step_change(project: Project, name: str) -> Change:
     if not steps:
         data.pop("prepare", None)
     return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
+
+
+KIND, STATUS, LANGUAGE = "kind", "status", "language"
+PREPARE, ANALYSIS, UNUSED = "prepare", "analysis", "unused"
+KINDS = {PREPARE: "Prepare steps", ANALYSIS: "Analyses", UNUSED: "Not run"}
+STATUSES = ("up to date", "outdated", "missing output", "missing input")
+
+
+@dataclass
+class Entry:
+    # One line of the Scripts page: a script, or a step whose command names no script.
+    key: str
+    kind: str
+    script: Script | None = None
+    step: PrepareStep | None = None
+    datasets: list[str] = field(default_factory=list)
+
+    @property
+    def steps(self) -> list[PrepareStep]:
+        return self.script.steps if self.script else [self.step]
+
+
+def entries(project: Project, found: Scripts) -> list[Entry]:
+    return [
+        *(Entry(s.path, PREPARE, s, datasets=written(project, s.steps)) for s in found.steps),
+        *(
+            Entry(f"step:{s.name}", PREPARE, step=s, datasets=written(project, [s]))
+            for s in found.commands
+        ),
+        *(Entry(s.path, ANALYSIS, s, datasets=list(s.analysis.datasets)) for s in found.analyses),
+        *(Entry(p, UNUSED, Script(p)) for p in found.unused),
+    ]
+
+
+def written(project: Project, steps: list[PrepareStep]) -> list[str]:
+    # The datasets whose files the steps write.
+    outputs = {same_file(project, path) for step in steps for path in step.outputs}
+    return [
+        d.name for d in project.config.datasets if d.path and same_file(project, d.path) in outputs
+    ]
+
+
+def script_index(project: Project, listed: list[Entry], statuses: dict[str, str]) -> RowIndex:
+    # statuses: each prepare step's status, by name.
+    config = project.config
+    names = dataset_facet_names(config)
+    values, text = {}, {}
+    for entry in listed:
+        datasets = [dataset_by_name(config, d) for d in entry.datasets if has_dataset(config, d)]
+        found = {name: set() for name in names}
+        for d in datasets:
+            known = {
+                "study": d.study,
+                "wave": wave_key(d.study, d.wave),
+                "reporter": d.reporter,
+                "modality": d.modality,
+            }
+            custom = {**config.studies[d.study].custom, **d.custom}
+            for name in names:
+                found[name] |= as_set(known[name] if name in known else custom.get(name))
+        path = entry.script.path if entry.script else ""
+        language = language_of(path)
+        found[KIND] = {entry.kind}
+        found[STATUS] = {statuses[s.name] for s in entry.steps if entry.kind == PREPARE}
+        found[LANGUAGE] = {language} if language else set()
+        values[entry.key] = widened(config, found)
+        parts = [path, *entry.datasets]
+        for step in entry.steps if entry.kind == PREPARE else []:
+            parts += [step.name, step.run, *step.inputs, *step.outputs]
+        if entry.script and entry.script.analysis:
+            parts += [entry.script.analysis.name, entry.script.analysis.request]
+        text[entry.key] = "\n".join(parts).lower()
+    # A script of the project's own, writing no dataset, shows whatever datasets are chosen.
+    rows = list(values.values())
+    every = {name: {v for row in rows for v in row[name]} for name in names}
+    for row in rows:
+        if not any(row[name] for name in names):
+            for name in names:
+                row[name] = set(every[name])
+    present = {name: {v for row in rows for v in row[name]} for name in (KIND, STATUS, LANGUAGE)}
+    return RowIndex(
+        keys=[e.key for e in listed],
+        facets=[
+            Facet(KIND, "Kind", {k: v for k, v in KINDS.items() if k in present[KIND]}),
+            *(facet(config, name, rows) for name in names),
+            Facet(STATUS, "Status", {s: s for s in STATUSES if s in present[STATUS]}),
+            Facet(
+                LANGUAGE,
+                "Language",
+                {k: v.name for k, v in LANGUAGES.items() if k in present[LANGUAGE]},
+            ),
+        ],
+        values=values,
+        text=text,
+    )
+
+
+def has_dataset(config: ProjectConfig, name: str) -> bool:
+    return any(d.name == name for d in config.datasets)
