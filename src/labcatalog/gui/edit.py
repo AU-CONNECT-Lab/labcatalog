@@ -156,10 +156,12 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         return text
 
     async def save() -> None:
-        text = await declared(await edited_text())
+        # Renamed options first, so their old values are not taken for new tags.
+        text = await edited_text()
         elsewhere = None
         if text is not None and view.path == defaults.CONFIG_FILENAME:
             text, elsewhere = await field_changes(text)
+        text = await declared(text)
         if text is not None and write(text):
             if elsewhere:
                 saved = field_values.apply_elsewhere(root, *elsewhere)
@@ -169,24 +171,32 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             await on_saved()
 
     async def field_changes(text: str) -> tuple[str | None, tuple | None]:
-        # A field renamed or deleted takes its values in every file with it, once agreed.
+        # A field or option renamed, or a field deleted, takes its values in every file, once agreed.
         renames, removed = field_values.field_changes(shown.opened.text, text)
-        if not (renames or removed):
+        options = field_values.option_changes(shown.opened.text, text, renames)
+        if not (renames or removed or options):
             return text, None
         uses = field_values.field_uses(root, [*renames, *removed])
+        option_uses = field_values.option_uses(root, options, renames)
         with frame, ui.dialog() as dialog, ui.card():
             ui.label("Change the fields' values in every file?")
             for old, new in renames.items():
                 ui.label(f"Rename {old} to {new}: {uses[old]} value(s)").classes("lc-note")
             for old in removed:
                 ui.label(f"Delete {old} and its {uses[old]} value(s)").classes("lc-note")
+            for name, chosen in options.items():
+                for old, new in chosen.items():
+                    held = option_uses[name, old]
+                    ui.label(f"In {name}, rename {old} to {new}: {held} value(s)").classes(
+                        "lc-note"
+                    )
             with ui.row():
                 ui.button("Change and save", on_click=lambda: dialog.submit(True))
                 ui.button("Keep editing", on_click=lambda: dialog.submit(False)).props("flat")
         if not await dialog:
             return None, None
-        changed = field_values.changed_values(text, renames, removed)
-        return (text if changed is None else changed), (renames, removed)
+        changed = field_values.changed_values(text, renames, removed, options)
+        return (text if changed is None else changed), (renames, removed, options)
 
     async def move() -> None:
         text = await declared(await edited_text())

@@ -57,9 +57,38 @@ def test_a_dataset_field_sits_on_each_datasets_line_and_takes_new_values(mock_pr
     )
     config.write_text(text, encoding="utf-8")
     found = {s.key: s for s in forms.sections(mock_project, "labcatalog.yaml", text)}
-    assert list(found) == ["datasets", "custom_fields"]
+    assert list(found) == ["custom_fields", "datasets"]
     assert "custom:site" in found["datasets"].primary
     typed = text.replace(
         "snapshot_date: 2026-10-10}", "snapshot_date: 2026-10-10, custom: {site: Emory}}", 1
     )
     assert editing.new_tags(mock_project, typed) == {"site": ["Emory"]}
+
+
+def test_an_option_renamed_in_place_is_found_and_a_removed_one_is_not():
+    old = "custom_fields:\n  - {name: site, choices: [Auburn, Opelika]}\n"
+    assert fields.option_changes(old, old.replace("Opelika", "Lee"), {}) == {
+        "site": {"Opelika": "Lee"}
+    }
+    renamed = old.replace("site", "place").replace("Auburn", "AU")
+    assert fields.option_changes(old, renamed, {"site": "place"}) == {"place": {"Auburn": "AU"}}
+    assert fields.option_changes(old, old.replace(", Opelika", ""), {}) == {}
+
+
+def test_renaming_an_option_renames_it_in_tags_and_choices_in_every_file(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    old = config.read_text(encoding="utf-8")
+    new = old.replace("parenting, sleep]", "parenting, sleep and settling]")
+    renames, removed = fields.field_changes(old, new)
+    options = fields.option_changes(old, new, renames)
+    assert options == {"topics": {"sleep": "sleep and settling"}}
+    assert fields.option_uses(mock_project, options, renames)["topics", "sleep"] > 0
+    config.write_text(
+        fields.changed_values(new, renames, removed, options) or new, encoding="utf-8"
+    )
+    saved = fields.apply_elsewhere(mock_project, renames, removed, options)
+    assert "instruments/example_child_sleep.yaml" in saved
+    sleep = (mock_project / "instruments/example_child_sleep.yaml").read_text(encoding="utf-8")
+    assert "topics: [sleep and settling]" in sleep and "topics: [sleep]" not in sleep
+    assert fields.option_uses(mock_project, options, renames)["topics", "sleep"] == 0
+    assert not [i for i in validate_project(load_project(mock_project)) if i.level == "error"]
