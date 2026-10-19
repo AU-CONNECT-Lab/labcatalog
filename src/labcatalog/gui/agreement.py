@@ -9,6 +9,7 @@ from labcatalog.gui.common import apa, col, computed, fmt, note, p_value, panel
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import agreement, analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats.agreement import Agreement
@@ -46,12 +47,13 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
             studies = dict(analysis.study_options(result, sample)) if by_study else {}
             if by_study:
                 tables["study_agreement"] = study_table(found_agreement, names, studies)
-            text = results.agreement_text(found_agreement, studies=studies)
+            wording = Wording(result.project.config.templates)
+            text = results.agreement_text(found_agreement, studies=studies, wording=wording)
 
             def content() -> None:
                 for shown in tables.values():
                     paper.paper_table(shown)
-                paper.results_text(text, list(tables.values()))
+                paper.results_text(text, list(tables.values()), "agreement")
                 paper.result_actions(result, "agreement", tables, None, texts, engine)
                 analysis_tables.code_view(texts)
 

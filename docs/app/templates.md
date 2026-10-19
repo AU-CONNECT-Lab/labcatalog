@@ -36,6 +36,7 @@ A Results template names each sentence it changes; the others keep the built-in 
 | `regression` | `predictor` and `predictor_ns`: `predictor`, `outcome`, `statistics`, `b`, `se`, `p`, `r2`, `n`; `intro`: none |
 | `missing` | `all`: `people`, `variables`; `complete`: `people`, `complete`, `percent`, `which`; `each`: `missing`, `percent`; `range`: `low`, `low_percent`, `low_label`, `high`, `high_percent`, `high_label` |
 | `groups` | `two`, `two_ns`, `more` and `more_ns`: `outcome`, `groups`, `statistics`, `test`, `p`, `effect`; `group`: `label`, `statistics`, `m`, `sd` |
+| `agreement` | `icc`: `among`, `n`, `whom`, `single`, `mean`; `kappa`: `among`, `n`, `kappa`; `kappa_weighted`: those and `weighted`; `light`: `n_pairs`, `raters`, `light`, `low`, `high`; `studies`: `name`, `values`; `study`: `value`, `study` |
 
 In the Results templates, a statistic placeholder holds the symbol and the value as APA writes them (`r(118) = .32`, `p < .001`); `statistic` and `statistics` hold them all, in order. `verb` is "was" or "were" to agree with the count.
 

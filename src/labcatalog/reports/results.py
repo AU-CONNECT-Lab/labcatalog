@@ -156,9 +156,12 @@ def missing_text(missing: MissingData, labels: list[str], wording: Wording = BUI
 
 
 def agreement_text(
-    agreement: Agreement, digits: int = 2, studies: dict[float, str] | None = None
+    agreement: Agreement,
+    digits: int = 2,
+    studies: dict[float, str] | None = None,
+    wording: Wording = BUILT_IN,
 ) -> str:
-    text = pooled_agreement_text(agreement, digits)
+    text = pooled_agreement_text(agreement, digits, wording)
     if not studies or not text:
         return text
     if agreement.kind == ICC:
@@ -175,24 +178,30 @@ def agreement_text(
             else pairs[0].kappa
             for k, pairs in (agreement.study_kappas or {}).items()
         }
-    each = [f"{bounded(v, digits)} in {studies[k]}" for k, v in values.items() if v is not None]
+    each = [
+        wording.say("agreement", "study", value=bounded(v, digits), study=studies[k])
+        for k, v in values.items()
+        if v is not None
+    ]
     if not each:
         return text
-    return f"{text} In each study on its own, {name} was {series(each)}."
+    return f"{text} {wording.say('agreement', 'studies', name=name, values=series(each))}"
 
 
-def pooled_agreement_text(agreement: Agreement, digits: int) -> str:
+def pooled_agreement_text(agreement: Agreement, digits: int, wording: Wording) -> str:
     k = agreement.raters
     among = "between the two raters" if k == 2 else f"among the {k} raters"
     if agreement.kind == ICC:
         rows = {r.type: r for r in agreement.icc}
         single, mean = rows["ICC2"], rows["ICC2k"]
-        whom = "either" if k == 2 else "any of them"
-        return (
-            f"Agreement {among}, on the {agreement.n} people rated by {whom}, was "
-            f"{interval('ICC(2,1)', single.icc, single.low, single.high, digits, bounded)} "
-            "(two-way random effects, absolute agreement, single rater); for the mean of the "
-            f"raters, {interval('ICC(2,k)', mean.icc, mean.low, mean.high, digits, bounded)}."
+        return wording.say(
+            "agreement",
+            "icc",
+            among=among,
+            n=agreement.n,
+            whom="either" if k == 2 else "any of them",
+            single=interval("ICC(2,1)", single.icc, single.low, single.high, digits, bounded),
+            mean=interval("ICC(2,k)", mean.icc, mean.low, mean.high, digits, bounded),
         )
     pairs = agreement.kappas
     if k == 2:
@@ -200,20 +209,25 @@ def pooled_agreement_text(agreement: Agreement, digits: int) -> str:
         if pair.kappa is None:
             return ""
         plain = interval("κ", pair.kappa, pair.kappa_low, pair.kappa_high, digits, bounded)
-        text = f"Agreement {among}, on the {pair.n} people both rated, was Cohen's {plain}"
         if pair.weighted is None:
-            return f"{text}."
+            return wording.say("agreement", "kappa", among=among, n=pair.n, kappa=plain)
         weighted = interval(
             "κ", pair.weighted, pair.weighted_low, pair.weighted_high, digits, bounded
         )
-        return f"{text}; with quadratic weights, {weighted}."
+        return wording.say(
+            "agreement", "kappa_weighted", among=among, n=pair.n, kappa=plain, weighted=weighted
+        )
     values = [p.kappa for p in pairs if p.kappa is not None]
     if agreement.light is None:
         return ""
-    return (
-        f"Cohen's κ averaged over the {len(pairs)} pairs of the {k} raters (Light's κ) was "
-        f"{bounded(agreement.light, digits)}, ranging from {bounded(min(values), digits)} to "
-        f"{bounded(max(values), digits)} across pairs."
+    return wording.say(
+        "agreement",
+        "light",
+        n_pairs=len(pairs),
+        raters=k,
+        light=bounded(agreement.light, digits),
+        low=bounded(min(values), digits),
+        high=bounded(max(values), digits),
     )
 
 

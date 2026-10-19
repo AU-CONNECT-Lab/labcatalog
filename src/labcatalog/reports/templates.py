@@ -107,6 +107,11 @@ MORE_NS_EXAMPLE = MORE_EXAMPLE | {
     "p": "p = .335",
     "effect": "η² = .01, 95% CI [.00, .05]",
 }
+KAPPA_EXAMPLE = {
+    "among": "between the two raters",
+    "n": "60",
+    "kappa": "κ = .71, 95% CI [.57, .85]",
+}
 TEMPLATES: dict[str, Template] = {
     t.key: t
     for t in (
@@ -350,6 +355,66 @@ TEMPLATES: dict[str, Template] = {
                 ),
             ),
             "The Results paragraph of the Group comparison tab.",
+        ),
+        Template(
+            "agreement",
+            "Rater agreement",
+            RESULTS,
+            (
+                Slot(
+                    "icc",
+                    "Intraclass correlations, for ratings that are numbers",
+                    "Agreement {among}, on the {n} people rated by {whom}, was {single} (two-way "
+                    "random effects, absolute agreement, single rater); for the mean of the "
+                    "raters, {mean}.",
+                    ("among", "n", "whom", "single", "mean"),
+                    {
+                        "among": "between the two raters",
+                        "n": "60",
+                        "whom": "either",
+                        "single": "ICC(2,1) = .81, 95% CI [.70, .88]",
+                        "mean": "ICC(2,k) = .89, 95% CI [.82, .94]",
+                    },
+                ),
+                Slot(
+                    "kappa",
+                    "Cohen's κ, for two raters",
+                    "Agreement {among}, on the {n} people both rated, was Cohen's {kappa}.",
+                    ("among", "n", "kappa"),
+                    KAPPA_EXAMPLE,
+                ),
+                Slot(
+                    "kappa_weighted",
+                    "Cohen's κ with its weighted value, for ordered answers",
+                    "Agreement {among}, on the {n} people both rated, was Cohen's {kappa}; with "
+                    "quadratic weights, {weighted}.",
+                    ("among", "n", "kappa", "weighted"),
+                    KAPPA_EXAMPLE | {"weighted": "κ = .78, 95% CI [.66, .90]"},
+                ),
+                Slot(
+                    "light",
+                    "Light's κ, for three or more raters",
+                    "Cohen's κ averaged over the {n_pairs} pairs of the {raters} raters (Light's "
+                    "κ) was {light}, ranging from {low} to {high} across pairs.",
+                    ("n_pairs", "raters", "light", "low", "high"),
+                    {"n_pairs": "3", "raters": "3", "light": ".68", "low": ".61", "high": ".74"},
+                ),
+                Slot(
+                    "studies",
+                    "Each study on its own, with several studies",
+                    "In each study on its own, {name} was {values}.",
+                    ("name", "values"),
+                    {"name": "ICC(2,1)", "values": ".79 in Study A and .84 in Study B"},
+                ),
+                Slot(
+                    "study",
+                    "Each study in that list",
+                    "{value} in {study}",
+                    ("value", "study"),
+                    {"value": ".79", "study": "Study A"},
+                ),
+            ),
+            "The Results paragraph of the Rater agreement tab.",
         ),
     )
 }
