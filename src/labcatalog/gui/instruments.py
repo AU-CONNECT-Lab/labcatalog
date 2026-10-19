@@ -564,6 +564,7 @@ def active_filters(index: BrowseIndex, view: BrowseView, changed: Callable[[], N
             ui.chip(
                 f"{facet.label}: {facet.values[value]}",
                 removable=True,
+                color=None,
                 on_value_change=lambda _, n=facet.name, v=value: remove(n, v),
             ).props("dense").classes("lc-filter-chip")
 
