@@ -144,8 +144,8 @@ def editor(
                     value=current[slot.key],
                     on_change=touched,
                 )
-                .props("autogrow outlined")
-                .classes("w-full")
+                .props("outlined")
+                .classes("lc-grow w-full")
             )
             boxes[slot.key] = box
             with ui.row().classes("gap-1 items-center"):
