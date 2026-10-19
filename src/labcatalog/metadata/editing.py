@@ -119,7 +119,7 @@ def save_step(root: Path, step: PrepareStep) -> None:
     opened = open_file(root, defaults.CONFIG_FILENAME)
     data = records.load(opened.text)
     steps = data.setdefault("prepare", CommentedSeq())
-    entry = CommentedMap(step.model_dump())
+    entry = CommentedMap(step.model_dump(exclude_none=True))
     entry.fa.set_flow_style()
     for key in ("inputs", "outputs"):
         entry[key] = CommentedSeq(entry[key])

@@ -231,6 +231,7 @@ def placement_for(project: Project, template: str, name: str, suffix: str) -> Pl
         run=renamed(step.run, template, name),
         inputs=[renamed(p, template, name) for p in step.inputs],
         outputs=[renamed(p, template, name) for p in step.outputs],
+        stage=step.stage,
     )
     changed = [p for p, q in zip(new.inputs, step.inputs, strict=True) if p != q]
     files = [p for p in changed if Path(p).suffix]

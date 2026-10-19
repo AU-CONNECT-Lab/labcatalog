@@ -16,9 +16,11 @@ from labcatalog.metadata import changes, editing
 from labcatalog.metadata.browse import row_counts, row_matches
 from labcatalog.metadata.scripts import (
     ANALYSIS,
-    KINDS,
     LANGUAGES,
+    NO_STAGE,
     PREPARE,
+    STAGE_HELP,
+    STAGES,
     UNUSED,
     Entry,
     Script,
@@ -121,10 +123,13 @@ def render(
             with ui.column().classes("w-64 shrink-0 lc-side"):
                 if not kept:
                     note("No script matches the search and filters.")
-                for title, rows in groups(project, kept):
+                for title, parts in groups(project, kept):
                     with panel(title), ui.column().classes("w-full gap-0"):
-                        for entry, steps in rows:
-                            line(entry, steps)
+                        for modality, rows in parts:
+                            if modality:
+                                ui.label(modality).classes("lc-facet mt-2")
+                            for entry, steps in rows:
+                                line(entry, steps)
             with ui.column().classes("grow min-w-0 gap-4"):
                 entry = by_key.get(view.key)
                 if entry is None:
@@ -158,34 +163,44 @@ def render(
         page()
 
 
-def groups(
-    project: Project, kept: list[Entry]
-) -> list[tuple[str, list[tuple[Entry, list[PrepareStep]]]]]:
-    # Prepare scripts by the modality of what their steps write, each with those steps.
+Rows = list[tuple[Entry, list[PrepareStep]]]
+
+
+def stage_choices() -> dict[str, str]:
+    return {k: f"{STAGES[k]}: {v}" for k, v in STAGE_HELP.items()} | {NO_STAGE: STAGES[NO_STAGE]}
+
+
+def groups(project: Project, kept: list[Entry]) -> list[tuple[str, list[tuple[str, Rows]]]]:
+    # Each stage, with the scripts its steps run under the modality of what those steps write.
     config = project.config
-    by_modality: dict[str, list[tuple[Entry, list[PrepareStep]]]] = {}
+    found: dict[str, dict[str, Rows]] = {}
     for entry in (e for e in kept if e.kind == PREPARE):
-        steps: dict[str, list[PrepareStep]] = {}
+        steps: dict[tuple[str, str], list[PrepareStep]] = {}
         for step in entry.steps:
             modalities = {dataset_by_name(config, d).modality for d in written(project, [step])}
             for modality in modalities or {""}:
-                steps.setdefault(modality, []).append(step)
-        for modality, own in steps.items():
-            by_modality.setdefault(modality, []).append((entry, own))
+                steps.setdefault((step.stage or NO_STAGE, modality), []).append(step)
+        for (stage, modality), own in steps.items():
+            found.setdefault(stage, {}).setdefault(modality, []).append((entry, own))
     order = config.vocab.modalities
 
     def place(modality: str) -> tuple[bool, int]:
         return modality == "", order.index(modality) if modality in order else len(order)
 
-    found = [
-        (config.vocab.modality_label(m) if m else "Other steps", by_modality[m])
-        for m in sorted(by_modality, key=place)
-    ]
-    for kind in (ANALYSIS, UNUSED):
-        rows = [(e, []) for e in kept if e.kind == kind]
-        if rows:
-            found.append((KINDS[kind], rows))
-    return found
+    shown = []
+    for stage, title in STAGES.items():
+        if stage in (ANALYSIS, UNUSED):
+            rows = [(e, []) for e in kept if e.kind == stage]
+            if rows:
+                shown.append((title, [("", rows)]))
+        elif stage in found:
+            by_modality = found[stage]
+            parts = [
+                (config.vocab.modality_label(m) if m else "Other", by_modality[m])
+                for m in sorted(by_modality, key=place)
+            ]
+            shown.append((title, parts))
+    return shown
 
 
 def script_part(
@@ -261,7 +276,13 @@ def steps_part(
         )
         with ui.dialog() as dialog, ui.card().classes("w-[44rem] max-w-full"):
             ui.label("Edit the step" if step else "Add a step").classes("text-lg font-medium")
-            name = ui.input("Name", value=start_from.name).classes("w-full")
+            with ui.row().classes("w-full items-center no-wrap gap-3"):
+                name = ui.input("Name", value=start_from.name).classes("grow")
+                stage = (
+                    ui.select(stage_choices(), value=start_from.stage or NO_STAGE, label="Stage")
+                    .props("dense outlined options-dense")
+                    .classes("w-72")
+                )
             run = ui.input("Command", value=start_from.run).classes("w-full font-mono")
             note(
                 "Runs in the project folder. A file the command reads is an input; one it writes is an output."
@@ -287,6 +308,7 @@ def steps_part(
                         run=(run.value or "").strip(),
                         inputs=lines(inputs),
                         outputs=lines(outputs),
+                        stage=None if stage.value == NO_STAGE else stage.value,
                     )
                     change = step_change(project, step.name if step else None, found)
                 except (LabCatalogError, ValueError) as err:

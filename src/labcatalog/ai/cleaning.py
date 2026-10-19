@@ -259,6 +259,7 @@ def draft_script(
         run=command(language, script, raw, clean),
         inputs=[raw, script],
         outputs=[clean],
+        stage="clean",
     )
     text = "\n".join(header) + "\n\n" + output["script"].strip() + "\n"
     return CleaningDraft(dataset, script, text, None, step, meta, [], output["notes"])

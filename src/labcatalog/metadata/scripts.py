@@ -143,7 +143,7 @@ def step_change(project: Project, old: str | None, step: PrepareStep) -> Change:
     taken = {str(s.get("name")) for s in steps} - {old}
     if step.name in taken:
         raise EditError(f"Another step is already named {step.name}")
-    entry = CommentedMap(step.model_dump())
+    entry = CommentedMap(step.model_dump(exclude_none=True))
     entry.fa.set_flow_style()
     for key in ("inputs", "outputs"):
         entry[key] = CommentedSeq(entry[key])
@@ -166,9 +166,26 @@ def remove_step_change(project: Project, name: str) -> Change:
     return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
 
 
-KIND, STATUS, LANGUAGE = "kind", "status", "language"
+STAGE, STATUS, LANGUAGE = "stage", "status", "language"
 PREPARE, ANALYSIS, UNUSED = "prepare", "analysis", "unused"
-KINDS = {PREPARE: "Prepare steps", ANALYSIS: "Analyses", UNUSED: "Not run"}
+NO_STAGE = "none"
+# The stages of the work, in the order data goes through them, with the scripts nothing runs.
+STAGES = {
+    "clean": "Clean",
+    "process": "Process",
+    "extract": "Extract",
+    "score": "Score",
+    NO_STAGE: "No stage",
+    ANALYSIS: "Analyses",
+    UNUSED: "Not run",
+}
+# What each stage of a prepare step does, for the step's dialog and the New script window.
+STAGE_HELP = {
+    "clean": "turns a raw export into a dataset's file",
+    "process": "runs a modality's pipeline on raw recordings",
+    "extract": "gathers each person's pipeline output into one row per person",
+    "score": "computes an instrument's scores",
+}
 STATUSES = ("up to date", "outdated", "missing output", "missing input")
 
 
@@ -226,7 +243,7 @@ def script_index(project: Project, listed: list[Entry], statuses: dict[str, str]
                 found[name] |= as_set(known[name] if name in known else custom.get(name))
         path = entry.script.path if entry.script else ""
         language = language_of(path)
-        found[KIND] = {entry.kind}
+        found[STAGE] = stages_of(entry)
         found[STATUS] = {statuses[s.name] for s in entry.steps if entry.kind == PREPARE}
         found[LANGUAGE] = {language} if language else set()
         values[entry.key] = widened(config, found)
@@ -243,11 +260,11 @@ def script_index(project: Project, listed: list[Entry], statuses: dict[str, str]
         if not any(row[name] for name in names):
             for name in names:
                 row[name] = set(every[name])
-    present = {name: {v for row in rows for v in row[name]} for name in (KIND, STATUS, LANGUAGE)}
+    present = {name: {v for row in rows for v in row[name]} for name in (STAGE, STATUS, LANGUAGE)}
     return RowIndex(
         keys=[e.key for e in listed],
         facets=[
-            Facet(KIND, "Kind", {k: v for k, v in KINDS.items() if k in present[KIND]}),
+            Facet(STAGE, "Stage", {k: v for k, v in STAGES.items() if k in present[STAGE]}),
             *(facet(config, name, rows) for name in names),
             Facet(STATUS, "Status", {s: s for s in STATUSES if s in present[STATUS]}),
             Facet(
@@ -259,6 +276,12 @@ def script_index(project: Project, listed: list[Entry], statuses: dict[str, str]
         values=values,
         text=text,
     )
+
+
+def stages_of(entry: Entry) -> set[str]:
+    if entry.kind != PREPARE:
+        return {entry.kind}
+    return {s.stage or NO_STAGE for s in entry.steps}
 
 
 def has_dataset(config: ProjectConfig, name: str) -> bool:

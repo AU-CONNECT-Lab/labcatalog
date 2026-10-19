@@ -67,6 +67,7 @@ def scoring_step(project: Project, instrument_id: str, dataset: str, script: str
         run=" ".join([command, *quoted]),
         inputs=[data, script],
         outputs=[output],
+        stage="score",
     )
 
 

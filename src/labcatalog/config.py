@@ -213,6 +213,8 @@ class PrepareStep(StrictModel):
     run: str
     inputs: list[str] = []
     outputs: list[str]
+    # What the step does: clean an export, process recordings, extract features, or score.
+    stage: Literal["clean", "process", "extract", "score"] | None = None
 
 
 class SavedAnalysis(StrictModel):
