@@ -1,7 +1,9 @@
 import os
+import re
 from pathlib import Path
 
 POINTER = b"/annex/objects/"
+SIZE = re.compile(r"^[A-Z0-9]+-s(\d+)-")
 DATALAD_CONFIG = Path(".datalad") / "config"
 
 
@@ -13,6 +15,17 @@ def is_placeholder(path: Path) -> bool:
         return False
     with path.open("rb") as handle:
         return handle.read(len(POINTER)) == POINTER
+
+
+def annexed_size(path: Path) -> int | None:
+    # A git-annex key names the content's size, as in SHA256E-s1234--<hash>.tsv; some keys do not.
+    if path.is_symlink():
+        target = os.readlink(path)
+    else:
+        with path.open("rb") as handle:
+            target = handle.read(1024).decode("utf-8", errors="replace")
+    found = SIZE.search(target.replace("\\", "/").rsplit("/", 1)[-1])
+    return int(found[1]) if found else None
 
 
 def fetch_advice(path: Path) -> str:

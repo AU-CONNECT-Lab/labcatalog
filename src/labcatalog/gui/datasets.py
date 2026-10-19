@@ -6,10 +6,12 @@ from nicegui import ui
 from labcatalog import defaults
 from labcatalog.charts import views
 from labcatalog.config import dataset_by_name, map_name_of
+from labcatalog.datalad.sync import size_text
 from labcatalog.gui import codebook_import, datalad, id_fix, new_dataset, problems, review
 from labcatalog.gui.common import (
     code_tabs,
     col,
+    computed,
     empty,
     note,
     open_path,
@@ -23,6 +25,7 @@ from labcatalog.gui.filter_bar import Filters, filter_bar
 from labcatalog.issues import Issue
 from labcatalog.metadata.browse import build_dataset_index, row_counts, row_matches
 from labcatalog.pipeline import CatalogResult
+from labcatalog.sources.folder_source import FolderSize, folder_size
 from labcatalog.stats.summary import DatasetSummary
 
 LIST, REVIEW = "list", "review"
@@ -298,12 +301,39 @@ def facts(
                 ui.button(
                     path, icon="open_in_new", on_click=lambda: open_path(result.project.root / path)
                 ).props("flat dense no-caps").tooltip("Open in its own app")
-        with ui.element("div").classes("lc-stats w-full"):
+        with ui.element("div").classes("lc-stats w-full") as stats:
             for name, value in rows:
-                with ui.column().classes("gap-0"):
-                    ui.label(name).classes("lc-fact-key")
-                    shown = f"{value:,}" if isinstance(value, int) else str(value)
-                    ui.label(shown).classes("lc-stat")
+                stat(name, value)
+        if dataset.source == "folder":
+            # Every file is looked at, which takes a while in a large folder.
+            async def sizes() -> None:
+                try:
+                    found = await computed(folder_size, dataset, result.project.root)
+                except OSError:
+                    return
+                if stats.is_deleted:
+                    return
+                with stats:
+                    for name, value in size_rows(found):
+                        stat(name, value)
+
+            ui.timer(0, sizes, once=True)
+
+
+def stat(name: str, value: object) -> None:
+    with ui.column().classes("gap-0"):
+        ui.label(name).classes("lc-fact-key")
+        ui.label(f"{value:,}" if isinstance(value, int) else str(value)).classes("lc-stat")
+
+
+def size_rows(found: FolderSize) -> list[tuple[str, object]]:
+    rows: list[tuple[str, object]] = [("Files", found.files), ("Size", size_text(found.size))]
+    if found.unknown:
+        rows[-1] = ("Size", f"over {size_text(found.size)}")
+    if found.here < found.files:
+        here = f"{found.here:,} of {found.files:,} files, {size_text(found.here_size)}"
+        rows.append(("On this computer", here))
+    return rows
 
 
 def data_path(result: CatalogResult, dataset: str) -> str | None:

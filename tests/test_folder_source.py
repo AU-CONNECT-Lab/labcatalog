@@ -1,11 +1,13 @@
 import pytest
 
+from labcatalog.config import DatasetConfig
 from labcatalog.data.manifest import build_manifest, file_times
 from labcatalog.exceptions import DataSourceError
+from labcatalog.gui.datasets import size_rows
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
 from labcatalog.sources import load_datasets
-from labcatalog.sources.folder_source import file_pattern
+from labcatalog.sources.folder_source import FolderSize, file_pattern, folder_size
 
 SCANS = (
     "  - {name: scans_w1, modality: fmri, study: mock_study, wave: 1, reporter: child, "
@@ -82,3 +84,33 @@ def test_changes_inside_a_folder_dataset_are_not_watched(mock_project):
     # Such folders may hold thousands of files, too many to look at every few seconds.
     add_scans(mock_project)
     assert not [p for p in file_times(mock_project) if "bids" in p.parts]
+
+
+def test_a_folder_dataset_counts_its_size_and_what_is_on_this_computer(tmp_path):
+    folder = tmp_path / "raw"
+    for person, size in (("01", 100), ("02", 250)):
+        path = folder / f"sub-{person}" / f"sub-{person}_eeg.edf"
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"x" * size)
+    # Content not fetched yet: git-annex leaves a pointer that names the size.
+    (folder / "sub-03").mkdir()
+    (folder / "sub-03" / "sub-03_eeg.edf").write_bytes(b"/annex/objects/SHA256E-s4000--ab12.edf\n")
+    (folder / "notes.txt").write_text("not a recording", encoding="utf-8")
+    dataset = DatasetConfig(
+        name="eeg_w1",
+        modality="eeg",
+        study="s",
+        wave="1",
+        reporter="child",
+        source="folder",
+        path="raw",
+        files="sub-{id}/sub-*_eeg.edf",
+    )
+    assert folder_size(dataset, tmp_path) == FolderSize(
+        files=3, size=4350, here=2, here_size=350, unknown=0
+    )
+    assert size_rows(folder_size(dataset, tmp_path)) == [
+        ("Files", 3),
+        ("Size", "4.3 KB"),
+        ("On this computer", "2 of 3 files, 350 bytes"),
+    ]
