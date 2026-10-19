@@ -11,6 +11,12 @@ from labcatalog.stats.summary import wave_order
 EVERY_WAVE = "every wave"
 COMPLETE = "complete"
 NOT_GIVEN = "not in a dataset"
+DATASET_FACETS = ("study", "wave", "reporter", "modality")
+# A dataset's worst problem, as its Problems filter offers it.
+PROBLEMS = "problems"
+HAS_ERRORS = "errors"
+HAS_WARNINGS = "warnings"
+NO_PROBLEMS = "none"
 
 
 @dataclass
@@ -28,6 +34,14 @@ class Administered:
     instrument_id: str
     dataset: str | None
     values: dict[str, set[str]]
+
+
+@dataclass
+class DatasetIndex:
+    datasets: list[str]
+    facets: list[Facet]
+    values: dict[str, dict[str, set[str]]]
+    text: dict[str, str]
 
 
 @dataclass
@@ -102,7 +116,7 @@ def build_index(project: Project) -> BrowseIndex:
             rows.append(Administered(instrument_id, None, widened(config, values)))
     return BrowseIndex(
         instruments=list(project.instruments),
-        facets=[facet(config, name, rows) for name in names],
+        facets=[facet(config, name, [row.values for row in rows]) for name in names],
         rows=rows,
         text={
             i: "\n".join([search_text(instrument), *sorted(columns.get(i, ()))]).lower()
@@ -115,6 +129,108 @@ def build_index(project: Project) -> BrowseIndex:
             for i, instrument in project.instruments.items()
         },
     )
+
+
+def dataset_facet_names(config: ProjectConfig) -> list[str]:
+    custom = [
+        f.name
+        for f in config.custom_fields
+        if f.applies_to in ("dataset", "study") and f.type in defaults.FACET_FIELD_TYPES
+    ]
+    return [*DATASET_FACETS, *custom]
+
+
+def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> DatasetIndex:
+    # levels: the levels of each dataset's issues, such as error and warning.
+    config = project.config
+    names = dataset_facet_names(config)
+    held: dict[str, set[str]] = {}
+    for content in project.studies.values():
+        for administration in content.administrations:
+            for name in administration.datasets:
+                held.setdefault(name, set()).add(administration.instrument)
+    values, text = {}, {}
+    for dataset in config.datasets:
+        study = config.studies[dataset.study]
+        known = {
+            "study": dataset.study,
+            "wave": wave_key(dataset.study, dataset.wave),
+            "reporter": dataset.reporter,
+            "modality": dataset.modality,
+        }
+        custom = {**study.custom, **dataset.custom}
+        found = {n: as_set(known[n] if n in known else custom.get(n)) for n in names}
+        found[PROBLEMS] = {worst(levels.get(dataset.name, set()))}
+        values[dataset.name] = widened(config, found)
+        instruments = [
+            project.instruments[i]
+            for i in sorted(held.get(dataset.name, ()))
+            if i in project.instruments
+        ]
+        columns = [e.column for e in project.maps.get(dataset.map_name(), [])]
+        parts = [
+            dataset.name,
+            dataset.path,
+            dataset.study,
+            study.label,
+            dataset.wave,
+            dataset.reporter,
+            config.vocab.modality_label(dataset.modality),
+            *dataset.scores,
+            *(v for value in custom.values() for v in as_set(value)),
+            *(t for i in instruments for t in (i.id, i.name, i.abbreviation)),
+            *columns,
+        ]
+        text[dataset.name] = "\n".join(p for p in parts if p).lower()
+    rows = list(values.values())
+    return DatasetIndex(
+        datasets=[d.name for d in config.datasets],
+        facets=[*(facet(config, name, rows) for name in names), problems_facet(rows)],
+        values=values,
+        text=text,
+    )
+
+
+def worst(levels: set[str]) -> str:
+    if "error" in levels:
+        return HAS_ERRORS
+    return HAS_WARNINGS if "warning" in levels else NO_PROBLEMS
+
+
+def problems_facet(rows: list[dict[str, set[str]]]) -> Facet:
+    present = {value for row in rows for value in row[PROBLEMS]}
+    labels = {HAS_ERRORS: "errors", HAS_WARNINGS: "warnings only", NO_PROBLEMS: "none"}
+    shown = {value: label for value, label in labels.items() if value in present}
+    return Facet(name=PROBLEMS, label="Problems", values=shown)
+
+
+def dataset_matches(
+    index: DatasetIndex, selected: dict[str, set[str]], query: str = ""
+) -> list[str]:
+    terms = query.lower().split()
+    return [
+        d
+        for d in index.datasets
+        if chosen(index.values[d], selected) and all(t in index.text[d] for t in terms)
+    ]
+
+
+def dataset_counts(
+    index: DatasetIndex, selected: dict[str, set[str]], query: str = ""
+) -> dict[str, dict[str, int]]:
+    # Each facet is counted with the other facets applied, so its own values stay alternatives.
+    result = {}
+    for found in index.facets:
+        others = {name: values for name, values in selected.items() if name != found.name}
+        hits = dataset_matches(index, others, query)
+        result[found.name] = {
+            value: sum(value in index.values[d][found.name] for d in hits) for value in found.values
+        }
+    return result
+
+
+def chosen(values: dict[str, set[str]], selected: dict[str, set[str]]) -> bool:
+    return all(not wanted or values[name] & wanted for name, wanted in selected.items())
 
 
 def wave_coverage(project: Project) -> dict[tuple[str, str], str]:
@@ -178,7 +294,7 @@ def counts(
 
 
 def row_selected(row: Administered, selected: dict[str, set[str]]) -> bool:
-    return all(not chosen or row.values[name] & chosen for name, chosen in selected.items())
+    return chosen(row.values, selected)
 
 
 def text_matches(
@@ -228,8 +344,8 @@ def as_set(value: object) -> set[str]:
     return {str(value)}
 
 
-def facet(config: ProjectConfig, name: str, rows: list[Administered]) -> Facet:
-    present = {value for row in rows for value in row.values[name]}
+def facet(config: ProjectConfig, name: str, rows: list[dict[str, set[str]]]) -> Facet:
+    present = {value for row in rows for value in row[name]}
     if name == "study":
         labels = {s: study.label or s for s, study in config.studies.items()}
     elif name == "wave":

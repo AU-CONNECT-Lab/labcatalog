@@ -48,6 +48,7 @@ from labcatalog.gui.codebook_step import CodebookView
 from labcatalog.gui.datalad import clone_dialog, frozen_text, get_button, versions_tooltip
 from labcatalog.gui.edit import EditView
 from labcatalog.gui.files import FOLDER, choose_path
+from labcatalog.gui.filter_bar import Filters
 from labcatalog.gui.gate import Gate
 from labcatalog.gui.instruments import (
     CFA_DONE,
@@ -182,6 +183,7 @@ class Window:
         self.index: BrowseIndex | None = None
         self.view = BrowseView()
         self.studying = StudiesView()
+        self.dataset_filters = Filters()
         self.analysis = AnalysisView()
         self.methods = MethodsView()
         self.importing = ImportView()
@@ -421,6 +423,7 @@ class Window:
             if root != self.root:
                 self.view = BrowseView()
                 self.studying = StudiesView()
+                self.dataset_filters = Filters()
                 self.analysis = AnalysisView()
                 self.methods = MethodsView()
                 self.importing = ImportView()
@@ -689,8 +692,10 @@ class Window:
         # The pages that keep their own choice of study start from the one picked at the top.
         if self.scope is None:
             self.view.selected.pop("study", None)
+            self.dataset_filters.selected.pop("study", None)
             return
         self.view.selected["study"] = {self.scope}
+        self.dataset_filters.selected["study"] = {self.scope}
         self.studying.study = self.scope
         self.methods.study = self.scope
 
@@ -771,7 +776,7 @@ class Window:
         if self.has_catalog():
             datasets.render(
                 self.result,
-                self.scope,
+                self.dataset_filters,
                 self.dataset,
                 self.show_dataset,
                 self.open_instrument,

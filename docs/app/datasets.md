@@ -4,6 +4,10 @@ The Datasets page shows each study and its data files: who is in each file, how 
 
 ![The Datasets page listing the example's data files](../images/app/datasets.png)
 
+## Search and filters
+
+The bar above the tables narrows the list. The search box finds a dataset by its name, file path, study, wave, reporter or modality, by the ID, name or abbreviation of an instrument it holds, by a column of its data, and by its custom field values; every word must match. The buttons beside it each open a list of values with the number of datasets that have each: **Study**, **Wave**, **Reporter**, **Modality**, any custom field of datasets or studies that has choices or tags, and **Problems** (datasets with errors, with warnings only, or with none, as on the [Problems](problems.md) page). Ticking several values of one button finds datasets with any of them; values of different buttons must all hold. A button with one value is not shown. Each value ticked shows as a chip below the bar; click its cross to drop it, or **Clear** to drop them all. The study chosen in the picker at the top right sets **Study** when you choose it, and you can change it here.
+
 ## Studies
 
 The datasets are grouped by study, under the study's label; its description and citation are on the [Studies](studies.md) page. Each study's table lists its datasets:

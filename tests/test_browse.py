@@ -1,4 +1,16 @@
-from labcatalog.metadata.browse import build_index, counts, facet_names, matches
+from labcatalog.metadata.browse import (
+    HAS_ERRORS,
+    HAS_WARNINGS,
+    NO_PROBLEMS,
+    PROBLEMS,
+    build_dataset_index,
+    build_index,
+    counts,
+    dataset_counts,
+    dataset_matches,
+    facet_names,
+    matches,
+)
 from labcatalog.metadata.completeness import gaps
 from labcatalog.pipeline import load_validated, run_validate
 
@@ -288,3 +300,45 @@ def test_a_vocabulary_holds_its_tags_and_stands_alone(mock_project):
     assert any("not both" in m for m in (i.message for i in run_validate(mock_project)))
     edit(mock_project / "labcatalog.yaml", "vocabulary: rdoc, choices: [a]}", "vocabulary: dsm}")
     assert any("no vocabulary dsm" in m for m in (i.message for i in run_validate(mock_project)))
+
+
+def dataset_index_for(root, levels=None):
+    project, issues = load_validated(root)
+    assert project is not None, issues
+    return build_dataset_index(project, levels or {})
+
+
+def test_datasets_filter_by_study_wave_and_modality(example_project):
+    index = dataset_index_for(example_project)
+    facets = {f.name: f for f in index.facets}
+    assert list(facets) == ["study", "wave", "reporter", "modality", PROBLEMS]
+    assert facets["wave"].values["mock_study_2/baseline"].endswith(": baseline")
+    found = dataset_matches(index, {"study": {"mock_study"}, "modality": {"eeg"}})
+    assert found == ["eeg_w1", "eeg_w3"]
+    found = dataset_matches(index, {"wave": {"mock_study_2/baseline"}, "reporter": {"child"}})
+    assert found == ["s2_child_baseline", "s2_watch_baseline"]
+
+
+def test_dataset_search_reaches_instruments_and_columns(example_project):
+    index = dataset_index_for(example_project)
+    by_column = dataset_matches(index, {}, "eps_1_w1")
+    assert by_column == ["parent_w1"]
+    by_instrument = set(dataset_matches(index, {}, "example_parent_stress"))
+    assert "parent_w1" in by_instrument and "child_w1" not in by_instrument
+    assert dataset_matches(index, {}, "eps_1_w1 eeg") == []
+
+
+def test_dataset_counts_keep_the_facets_own_values_open(example_project):
+    index = dataset_index_for(example_project)
+    found = dataset_counts(index, {"study": {"mock_study_2"}, "modality": {"actigraphy"}})
+    assert found["study"]["mock_study"] == 0
+    assert found["modality"]["questionnaire"] == 4
+    assert found["modality"]["actigraphy"] == 2
+
+
+def test_datasets_filter_by_their_worst_problem(example_project):
+    levels = {"parent_w1": {"warning", "error"}, "child_w1": {"warning"}}
+    index = dataset_index_for(example_project, levels)
+    assert dataset_matches(index, {PROBLEMS: {HAS_ERRORS}}) == ["parent_w1"]
+    assert dataset_matches(index, {PROBLEMS: {HAS_WARNINGS}}) == ["child_w1"]
+    assert len(dataset_matches(index, {PROBLEMS: {NO_PROBLEMS}})) == len(index.datasets) - 2

@@ -10,6 +10,7 @@ from labcatalog.gui.common import (
     code_tabs,
     col,
     empty,
+    note,
     open_path,
     page_head,
     panel,
@@ -17,14 +18,16 @@ from labcatalog.gui.common import (
     without_line,
 )
 from labcatalog.gui.database import database_button
+from labcatalog.gui.filter_bar import Filters, filter_bar
 from labcatalog.issues import Issue
+from labcatalog.metadata.browse import build_dataset_index, dataset_counts, dataset_matches
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats.summary import DatasetSummary
 
 
 def render(
     result: CatalogResult,
-    study: str | None,
+    filters: Filters,
     selected: str | None,
     on_select: Callable[[str | None], None],
     on_instrument: Callable[[str], None],
@@ -33,8 +36,7 @@ def render(
     on_edit: Callable[[str, int | None], None],
     on_added: Callable[[str], Awaitable[None]],
 ) -> None:
-    shown = {d.name for d in result.project.config.datasets if study in (None, d.study)}
-    summaries = {d.dataset: d for d in result.summary.datasets if d.dataset in shown}
+    summaries = {d.dataset: d for d in result.summary.datasets}
     if selected not in summaries:
         with page_head("Datasets", list_summary(result, summaries)):
             if result.project.config.studies:
@@ -47,13 +49,28 @@ def render(
                 database_button(result)
                 datalad.freeze_button(result, on_frozen)
         if not summaries:
-            empty(
-                "No datasets in this study yet; press Add a dataset."
-                if study
-                else "No datasets yet; press Add a dataset, after adding a study on the Studies page."
-            )
+            empty("No datasets yet; press Add a dataset, after adding a study on the Studies page.")
             return
-        studies(result, summaries, on_select)
+        index = build_dataset_index(result.project, issue_levels(result))
+
+        @ui.refreshable
+        def listing() -> None:
+            names = dataset_matches(index, filters.selected, filters.query)
+            found = {n: summaries[n] for n in names if n in summaries}
+            if not found:
+                empty("No dataset matches the search and filters.")
+                return
+            if filters.any():
+                note(f"{len(found)} of {len(summaries)} datasets")
+            studies(result, found, on_select)
+
+        filter_bar(
+            index.facets,
+            lambda: dataset_counts(index, filters.selected, filters.query),
+            filters,
+            listing.refresh,
+        )
+        listing()
         # A frozen copy, which has no freezes to open, is not for saving or pushing.
         if on_open_freeze is not None:
             datalad.versions_panel(result, on_frozen)
@@ -268,6 +285,13 @@ def facts(
 
 def data_path(result: CatalogResult, dataset: str) -> str | None:
     return next((f.path for f in result.manifest.files if f.dataset == dataset), None)
+
+
+def issue_levels(result: CatalogResult) -> dict[str, set[str]]:
+    return {
+        d.name: {issue.level for issue in dataset_issues(result, d.name)}
+        for d in result.project.config.datasets
+    }
 
 
 def dataset_issues(result: CatalogResult, dataset: str) -> list[Issue]:
