@@ -38,3 +38,17 @@ def test_each_wave_can_be_drawn_apart_on_one_scale():
     drawn = review.separate([("#111111", [0, 2, 4]), ("#222222", [1, 1])])
     assert drawn.count("<svg") == 2 and drawn.count("<rect") == 5
     assert f'height="{review.PLOT_HEIGHT:.1f}" fill="#111111"' in drawn
+
+
+def test_files_of_other_instruments_and_numbers_get_their_own_rows(mock_project):
+    groups = review.review_groups(run_catalog(mock_project))
+    series = [[w.dataset for w in g.waves] for g in groups]
+    assert ["parent_w1", "parent_w2", "parent_w3"] in series
+    assert ["parent_child_w1", "parent_child_w2", "parent_child_w3"] in series
+    numbers = [
+        line
+        for g in groups
+        for line in g.scores
+        if all(w is None or w.alpha is None for w in line.waves)
+    ]
+    assert numbers and all(any(w is not None and w.n for w in line.waves) for line in numbers)

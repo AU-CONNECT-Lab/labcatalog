@@ -60,12 +60,25 @@ def review_groups(result: CatalogResult) -> list[ReviewGroup]:
     summary = result.summary
     by_key = {s.key: s for s in result.catalog.scores}
     summaries = {d.dataset: d for d in summary.datasets}
-    keyed: dict[tuple[str, str, str], list[str]] = {}
+    # Files of one study, reporter and modality that share an instrument are one series.
+    given: dict[str, set[str]] = {}
+    for v in result.catalog.variables:
+        given.setdefault(v.dataset, set()).add(v.instrument_id)
+    keyed: dict[tuple, list[str]] = {}
+    held: dict[tuple, set[str]] = {}
     for name in summaries:
         d = dataset_by_name(config, name)
-        keyed.setdefault((d.study, d.reporter, d.modality), []).append(name)
+        mine = given.get(name, set())
+        n = 0
+        while (d.study, d.reporter, d.modality, n) in held and not (
+            held[(d.study, d.reporter, d.modality, n)] & mine
+        ):
+            n += 1
+        key = (d.study, d.reporter, d.modality, n)
+        keyed.setdefault(key, []).append(name)
+        held[key] = held.get(key, set()) | mine
     groups = []
-    for (study, reporter, modality), names in keyed.items():
+    for (study, reporter, modality, _), names in keyed.items():
         order = list(config.studies[study].waves)
         names.sort(
             key=lambda n: (
@@ -76,6 +89,7 @@ def review_groups(result: CatalogResult) -> list[ReviewGroup]:
         lines: dict[tuple[str, str], ScoreLine] = {}
         for i, name in enumerate(names):
             rows = summaries[name].n_rows
+            scored = {c for s in result.catalog.scores_for(name) for c in s.columns}
             for s in summary.scores:
                 if s.dataset != name:
                     continue
@@ -94,6 +108,30 @@ def review_groups(result: CatalogResult) -> list[ReviewGroup]:
                     s.mean,
                     s.sd,
                     s.alpha,
+                    [count for _, _, count in s.histogram],
+                )
+            # Numbers in no score, such as a pipeline's measures, are shown the same way.
+            numbers = {
+                v.column: v
+                for v in result.catalog.variables_for(name)
+                if v.type == "number" and v.column not in scored
+            }
+            for s in summary.variables:
+                if s.dataset != name or s.column not in numbers:
+                    continue
+                v = numbers[s.column]
+                place = (v.instrument_id, v.item_id)
+                if place not in lines:
+                    instrument = result.project.instruments[v.instrument_id]
+                    label = f"{instrument.abbreviation or instrument.id} {v.item_id}"
+                    lines[place] = ScoreLine(label, [None] * len(names))
+                lines[place].waves[i] = ScoreWave(
+                    s.n_valid,
+                    rows - s.n_valid,
+                    rows,
+                    s.mean,
+                    s.sd,
+                    None,
                     [count for _, _, count in s.histogram],
                 )
         title = f"{config.studies[study].label or study} · {reporter} · {config.vocab.modality_label(modality)}"
