@@ -15,6 +15,7 @@ from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import analysis_tables, common, paper, preferences, theme
 from labcatalog.gui.common import caption, computed, note, panel
+from labcatalog.gui.look import look
 from labcatalog.metadata import editing
 from labcatalog.pipeline import CatalogResult, run_analysis_draft, run_analysis_fix
 from labcatalog.processes import end_tree
@@ -319,6 +320,9 @@ def render(
                         ui.button(saved.name, on_click=partial(open_saved, saved)).props(
                             "flat dense no-caps"
                         ).tooltip(saved.request or saved.script)
+                        ui.button(
+                            icon="code", on_click=lambda s=saved.script: look().open_script(s)
+                        ).props("flat dense size=sm").tooltip("Open on the Scripts page")
                         ui.button(icon="close", on_click=partial(remove, saved)).props(
                             "flat dense size=sm"
                         ).tooltip("Remove")
