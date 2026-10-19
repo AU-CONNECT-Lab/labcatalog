@@ -48,6 +48,7 @@ from labcatalog.pipeline import (
     run_freeze,
     run_get_dataset,
     run_history,
+    run_open_freeze,
     run_push_freeze,
     run_rerun,
 )
@@ -199,8 +200,32 @@ OPEN_CELL = r"""
 <q-td :props="props">
   <q-btn v-if="props.row.tagged" flat dense no-caps color="primary" label="Open"
          @click="$parent.$emit('open_freeze', props.row)" />
+  <q-btn v-if="props.row.tagged" flat dense no-caps label="Copy to..."
+         @click="$parent.$emit('copy_freeze', props.row)" />
 </q-td>
 """
+
+
+async def copy_freeze(root: Path, name: str) -> None:
+    # A copy to keep, such as for a submission, in a new folder of the chosen one.
+    datalad = preferences.load().get(preferences.DATALAD)
+    if not datalad:
+        ui.notify("Set the path to datalad on the Settings page first", type="warning")
+        return
+    parent = await choose_path(FOLDER, start=root.parent)
+    if parent is None:
+        return
+    target = parent / f"{root.name}-{name}"
+    if target.exists():
+        ui.notify(f"{target} already exists; choose another folder", type="warning")
+        return
+    ui.notify(f"Copying {name} to {target}")
+    try:
+        copy = await computed(run_open_freeze, root, name, datalad, target)
+    except LabCatalogError as err:
+        ui.notify(str(err), type="negative", multi_line=True)
+        return
+    ui.notify(f"Copied {name} to {copy}", type="positive", multi_line=True)
 
 
 def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) -> None:
@@ -230,6 +255,7 @@ def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) 
     if on_open:
         shown.add_slot("body-cell-open", OPEN_CELL)
         shown.on("open_freeze", lambda e: on_open(e.args["name"]))
+        shown.on("copy_freeze", lambda e: copy_freeze(root, e.args["name"]))
 
 
 def frozen_text(record: Freeze, result: CatalogResult | None) -> str:

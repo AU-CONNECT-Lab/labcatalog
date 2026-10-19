@@ -92,3 +92,5 @@ git push <sibling> <freeze name>
 ```
 
 To see the data as they were at a freeze, open the Datasets page and press Open next to it in the Freezes table. labcatalog clones the datasets into a temporary folder, checks out the tag, downloads the files the project reads, and opens that copy. The window's title bar says whether every data file matches the freeze record; a mismatch usually means a data path in `labcatalog.yaml` is absolute or starts with `~`, so the copy read today's file. Edits in the copy do not change the project. Back to the project returns to it.
+
+To keep a copy, such as the data of a submission, press **Copy to...** instead and choose a folder: labcatalog makes the same copy in a new folder in it, named after the project and the freeze (`mood_study-2026-06-submission`), and leaves the window on the project. Open the copy later with **Open project**.

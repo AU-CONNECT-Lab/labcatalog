@@ -64,7 +64,7 @@ When the data are in DataLad, the **Data versions** panel lists each dataset the
 
 A freeze records every data file the catalog reads, with its checksum, rows and participants, so you can say later which data a result used. Press **Freeze**, give the freeze a name such as `2026-06-submission`, and press **Freeze** in the dialog. The record goes to `freezes/`. If the data are in DataLad, the freeze also saves each dataset and tags it with the name, so that version can be opened again later; otherwise the record shows whether the data changed, but cannot bring back data that were overwritten.
 
-The **Freezes** table lists every freeze, newest first. A freeze with a DataLad tag has an **Open** button, which opens a copy of the project as it was at that freeze. The header then says which freeze is shown and whether the data match its record, and **Back to the project** returns to the current project. See [Using labcatalog with DataLad](../how-to/datalad.md).
+The **Freezes** table lists every freeze, newest first. A freeze with a DataLad tag has an **Open** button, which opens a copy of the project as it was at that freeze. The header then says which freeze is shown and whether the data match its record, and **Back to the project** returns to the current project. **Copy to...** makes the same copy in a new folder of the folder you choose, to keep. See [Using labcatalog with DataLad](../how-to/datalad.md).
 
 ## Get missing content
 
