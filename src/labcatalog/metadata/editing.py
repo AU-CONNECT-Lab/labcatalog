@@ -205,14 +205,19 @@ def instrument_from_text(text: str) -> Instrument:
 
 
 def new_tags(root: Path, text: str) -> dict[str, list[str]]:
-    # Tags typed into a file that their field's declaration does not list yet.
-    fields = {f.name: f for f in custom_fields(root) if f.type == "tags" and f.choices}
+    # Tags and choices typed into a file that their field's declaration does not list yet.
+    fields = {
+        f.name: f
+        for f in custom_fields(root)
+        if f.type in ("tags", "choice") and f.choices and not f.vocabulary
+    }
     data = records.load(text)
     if not isinstance(data, dict):
         return {}
     blocks = [data.get("custom")]
-    for key in ("scores", "administrations", "datasets"):
+    for key in ("scores", "items", "administrations", "datasets"):
         blocks += [entry.get("custom") for entry in data.get(key) or [] if isinstance(entry, dict)]
+    blocks += [s.get("custom") for s in (data.get("studies") or {}).values() if isinstance(s, dict)]
     found: dict[str, list[str]] = {}
     for block in blocks:
         for name, value in (block or {}).items():

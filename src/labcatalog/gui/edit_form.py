@@ -257,7 +257,8 @@ def widget(row: dict, column: Column, section: forms.Section, touch: Callable[[]
     if options:
         if value not in options:
             options.append(value)
-        fixed = column.kind == "choice"
+        # A lab's own field takes new values too; saving then adds them to its choices.
+        fixed = column.kind == "choice" and not key.startswith(records.CUSTOM + records.NESTED)
         return ui.select(
             options,
             label=column.label,

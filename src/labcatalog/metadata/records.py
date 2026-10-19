@@ -141,12 +141,27 @@ DATASETS = Table(
         Column("snapshot_date", "Snapshot date"),
     ),
 )
+FIELDS = Table(
+    "Fields",
+    (
+        Column("name", "Name"),
+        Column("label", "Label"),
+        Column(
+            "applies_to",
+            "Applies to",
+            "choice",
+            ("dataset", "instrument", "score", "item", "administration", "study"),
+        ),
+        Column("type", "Type", "choice", ("choice", "tags", "text", "number", "date")),
+        Column("choices", "Choices", "list"),
+    ),
+)
 INSTRUMENT_TABLES = {"items": ITEMS, "scores": SCORES, "response_sets": OPTIONS}
 TABLES = {
     defaults.INSTRUMENTS_DIR: INSTRUMENT_TABLES,
     defaults.DRAFTS_DIR: INSTRUMENT_TABLES,
     defaults.STUDIES_DIR: {"administrations": ADMINISTRATIONS, "overrides": OVERRIDES},
-    "": {"datasets": DATASETS},
+    "": {"datasets": DATASETS, "custom_fields": FIELDS},
 }
 
 

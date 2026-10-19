@@ -16,7 +16,7 @@ def changes(before: str, after: str) -> list[str]:
 
 def test_tables_belong_to_their_files():
     assert list(records.tables_for(MOOD)) == ["items", "scores", "response_sets"]
-    assert list(records.tables_for("labcatalog.yaml")) == ["datasets"]
+    assert list(records.tables_for("labcatalog.yaml")) == ["datasets", "custom_fields"]
     assert list(records.tables_for(STUDY)) == ["administrations", "overrides"]
     assert list(records.tables_for("maps/child_w1.csv")) == [records.MAP]
     assert records.tables_for("data/child_w1.csv") == {}

@@ -13,6 +13,7 @@ from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
 from labcatalog.gui.files import PDF_FILES, choose_path
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
+from labcatalog.metadata import fields as field_values
 from labcatalog.pipeline import run_instrument_draft
 
 TEXT = "text"
@@ -156,9 +157,36 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
 
     async def save() -> None:
         text = await declared(await edited_text())
+        elsewhere = None
+        if text is not None and view.path == defaults.CONFIG_FILENAME:
+            text, elsewhere = await field_changes(text)
         if text is not None and write(text):
+            if elsewhere:
+                saved = field_values.apply_elsewhere(root, *elsewhere)
+                if saved:
+                    ui.notify(f"Also changed {', '.join(saved)}")
             ui.notify(f"Saved {view.path}")
             await on_saved()
+
+    async def field_changes(text: str) -> tuple[str | None, tuple | None]:
+        # A field renamed or deleted takes its values in every file with it, once agreed.
+        renames, removed = field_values.field_changes(shown.opened.text, text)
+        if not (renames or removed):
+            return text, None
+        uses = field_values.field_uses(root, [*renames, *removed])
+        with frame, ui.dialog() as dialog, ui.card():
+            ui.label("Change the fields' values in every file?")
+            for old, new in renames.items():
+                ui.label(f"Rename {old} to {new}: {uses[old]} value(s)").classes("lc-note")
+            for old in removed:
+                ui.label(f"Delete {old} and its {uses[old]} value(s)").classes("lc-note")
+            with ui.row():
+                ui.button("Change and save", on_click=lambda: dialog.submit(True))
+                ui.button("Keep editing", on_click=lambda: dialog.submit(False)).props("flat")
+        if not await dialog:
+            return None, None
+        changed = field_values.changed_values(text, renames, removed)
+        return (text if changed is None else changed), (renames, removed)
 
     async def move() -> None:
         text = await declared(await edited_text())

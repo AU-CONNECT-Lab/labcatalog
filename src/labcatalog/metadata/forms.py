@@ -194,15 +194,27 @@ def config_sections(config: ProjectConfig | None, tables: dict[str, Table]) -> l
             "wave": tuple(sorted(waves, key=wave_order)),
             "reporter": tuple(config.vocab.reporters),
         }
+    # The lab's own fields for datasets sit on each dataset's line, after the built-in ones.
+    custom = tuple(
+        c.key
+        for c in tables["datasets"].columns
+        if c.key.startswith(records.CUSTOM + records.NESTED)
+    )
     return [
         Section(
             "datasets",
             tables["datasets"],
             options,
-            primary=("name", "study", "wave", "reporter", "modality"),
-            carried=("study", "wave", "modality", "source"),
+            primary=("name", "study", "wave", "reporter", "modality", *custom),
+            carried=("study", "wave", "modality", "source", *custom),
             noun="dataset",
-        )
+        ),
+        Section(
+            "custom_fields",
+            tables["custom_fields"],
+            primary=("name", "label", "applies_to", "type", "choices"),
+            noun="field",
+        ),
     ]
 
 
