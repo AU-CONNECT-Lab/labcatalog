@@ -9,6 +9,7 @@ from labcatalog.gui.common import col, computed, fmt, method_toggle, note, panel
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import analysis, imputation
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats.analysis import item_variable
@@ -54,7 +55,11 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
             def content() -> None:
                 for shown in papers.values():
                     paper.paper_table(shown)
-                paper.results_text(results.missing_text(missing, labels), list(papers.values()))
+                paper.results_text(
+                    results.missing_text(missing, labels, Wording(result.project.config.templates)),
+                    list(papers.values()),
+                    "missing",
+                )
                 paper.result_actions(result, "missing", papers, None, texts, engine)
                 analysis_tables.code_view(texts)
 

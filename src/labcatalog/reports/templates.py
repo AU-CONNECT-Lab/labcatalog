@@ -76,6 +76,37 @@ PREDICTOR_NS_EXAMPLE = PREDICTOR_EXAMPLE | {
     "p": "p = .512",
     "r2": "R² = .00",
 }
+COMPARISON = ("outcome", "groups", "statistics", "test", "p", "effect")
+TWO_EXAMPLE = {
+    "outcome": "Mood",
+    "groups": "Girls (M = 3.20, SD = 0.90) and Boys (M = 2.80, SD = 1.00)",
+    "statistics": "Welch's t(117.6) = 2.30, p = .023, d = 0.42, 95% CI [0.06, 0.78]",
+    "test": "Welch's t(117.6) = 2.30",
+    "p": "p = .023",
+    "effect": "d = 0.42, 95% CI [0.06, 0.78]",
+}
+TWO_NS_EXAMPLE = TWO_EXAMPLE | {
+    "groups": "Girls (M = 3.00, SD = 0.90) and Boys (M = 2.90, SD = 1.00)",
+    "statistics": "Welch's t(117.6) = 0.58, p = .563, d = 0.11, 95% CI [-0.25, 0.46]",
+    "test": "Welch's t(117.6) = 0.58",
+    "p": "p = .563",
+    "effect": "d = 0.11, 95% CI [-0.25, 0.46]",
+}
+MORE_EXAMPLE = {
+    "outcome": "Mood",
+    "groups": "Wave 1 (M = 3.20, SD = 0.90), Wave 2 (M = 2.90, SD = 1.00), and Wave 3 (M = 2.60, "
+    "SD = 0.80)",
+    "statistics": "F(2, 177) = 6.40, p = .002, η² = .07, 95% CI [.01, .14]",
+    "test": "F(2, 177) = 6.40",
+    "p": "p = .002",
+    "effect": "η² = .07, 95% CI [.01, .14]",
+}
+MORE_NS_EXAMPLE = MORE_EXAMPLE | {
+    "statistics": "F(2, 177) = 1.10, p = .335, η² = .01, 95% CI [.00, .05]",
+    "test": "F(2, 177) = 1.10",
+    "p": "p = .335",
+    "effect": "η² = .01, 95% CI [.00, .05]",
+}
 TEMPLATES: dict[str, Template] = {
     t.key: t
     for t in (
@@ -222,6 +253,103 @@ TEMPLATES: dict[str, Template] = {
                 ),
             ),
             "The Results paragraph under the regression table.",
+        ),
+        Template(
+            "missing",
+            "Missing data",
+            RESULTS,
+            (
+                Slot(
+                    "all",
+                    "When everyone has every value",
+                    "All {people} people had values on the {variables}.",
+                    ("people", "variables"),
+                    {"people": "120", "variables": "4 variables"},
+                ),
+                Slot(
+                    "complete",
+                    "How many have every value",
+                    "Of the {people} people, {complete} ({percent}) had values on {which}.",
+                    ("people", "complete", "percent", "which"),
+                    {
+                        "people": "120",
+                        "complete": "97",
+                        "percent": "80.8%",
+                        "which": "all 4 variables",
+                    },
+                ),
+                Slot(
+                    "each",
+                    "When each variable lacks the same number",
+                    "Each variable was missing for {missing} ({percent}).",
+                    ("missing", "percent"),
+                    {"missing": "6", "percent": "5.0%"},
+                ),
+                Slot(
+                    "range",
+                    "The fewest and most missing, when they differ",
+                    "Missing values ranged from {low} ({low_percent}) for {low_label} to {high} "
+                    "({high_percent}) for {high_label}.",
+                    ("low", "low_percent", "low_label", "high", "high_percent", "high_label"),
+                    {
+                        "low": "2",
+                        "low_percent": "1.7%",
+                        "low_label": "Mood",
+                        "high": "15",
+                        "high_percent": "12.5%",
+                        "high_label": "Sleep problems",
+                    },
+                ),
+            ),
+            "The Results paragraph of the Missing data tab.",
+        ),
+        Template(
+            "groups",
+            "Group comparison",
+            RESULTS,
+            (
+                Slot(
+                    "two",
+                    "Two groups that differ significantly",
+                    "{outcome} differed significantly between {groups}, {statistics}.",
+                    COMPARISON,
+                    TWO_EXAMPLE,
+                ),
+                Slot(
+                    "two_ns",
+                    "Two groups that do not differ significantly",
+                    "{outcome} did not differ significantly between {groups}, {statistics}.",
+                    COMPARISON,
+                    TWO_NS_EXAMPLE,
+                ),
+                Slot(
+                    "more",
+                    "Three or more groups that differ significantly",
+                    "{outcome} differed significantly among {groups}, {statistics}.",
+                    COMPARISON,
+                    MORE_EXAMPLE,
+                ),
+                Slot(
+                    "more_ns",
+                    "Three or more groups that do not differ significantly",
+                    "{outcome} did not differ significantly among {groups}, {statistics}.",
+                    COMPARISON,
+                    MORE_NS_EXAMPLE,
+                ),
+                Slot(
+                    "group",
+                    "Each group in the list",
+                    "{label} ({statistics})",
+                    ("label", "statistics", "m", "sd"),
+                    {
+                        "label": "Girls",
+                        "statistics": "M = 3.20, SD = 0.90",
+                        "m": "M = 3.20",
+                        "sd": "SD = 0.90",
+                    },
+                ),
+            ),
+            "The Results paragraph of the Group comparison tab.",
         ),
     )
 }

@@ -119,28 +119,40 @@ def pair_values(a: str, b: str, c: Correlation, symbol: str, digits: int) -> dic
     }
 
 
-def missing_text(missing: MissingData, labels: list[str]) -> str:
+def missing_text(missing: MissingData, labels: list[str], wording: Wording = BUILT_IN) -> str:
     people, k = missing.people, len(labels)
     if not people:
         return ""
-    things = "variable" if k == 1 else f"{k} variables"
     complete = missing.complete
     if complete == people:
-        return f"All {people} people had values on the {things}."
-    opening = (
-        f"Of the {people} people, {complete} ({percent(complete, people)}) had values on "
-        f"{'the variable' if k == 1 else f'all {k} variables'}."
+        things = "variable" if k == 1 else f"{k} variables"
+        return wording.say("missing", "all", people=people, variables=things)
+    opening = wording.say(
+        "missing",
+        "complete",
+        people=people,
+        complete=complete,
+        percent=percent(complete, people),
+        which="the variable" if k == 1 else f"all {k} variables",
     )
     if k == 1:
         return opening
     shares = sorted(zip(labels, missing.counts, strict=True), key=lambda x: x[1][2])
     (low_label, low), (high_label, high) = shares[0], shares[-1]
     if low[2] == high[2]:
-        return f"{opening} Each variable was missing for {high[2]} ({percent(high[2], people)})."
-    return (
-        f"{opening} Missing values ranged from {low[2]} ({percent(low[2], people)}) for "
-        f"{low_label} to {high[2]} ({percent(high[2], people)}) for {high_label}."
+        each = wording.say("missing", "each", missing=high[2], percent=percent(high[2], people))
+        return f"{opening} {each}"
+    spread = wording.say(
+        "missing",
+        "range",
+        low=low[2],
+        low_percent=percent(low[2], people),
+        low_label=low_label,
+        high=high[2],
+        high_percent=percent(high[2], people),
+        high_label=high_label,
     )
+    return f"{opening} {spread}"
 
 
 def agreement_text(
@@ -324,27 +336,27 @@ def regression_text(
     return " ".join(sentences)
 
 
-def comparison_text(comparison: Comparison, outcome: str, digits: int = 2) -> str:
-    groups = series([described(g, digits) for g in comparison.groups])
-    significant = comparison.p < SIGNIFICANT
+def comparison_text(
+    comparison: Comparison, outcome: str, digits: int = 2, wording: Wording = BUILT_IN
+) -> str:
+    groups = series([described(g, digits, wording) for g in comparison.groups])
     test = f"{TEST_SYMBOLS[comparison.test]}({df_text(comparison)}) = {number(comparison.statistic, digits)}"
+    low, high = comparison.effect_low, comparison.effect_high
     if comparison.test == ANOVA:
-        verb = (
-            "differed significantly among" if significant else "did not differ significantly among"
-        )
-        effect = interval(
-            "η²", comparison.effect, comparison.effect_low, comparison.effect_high, digits, bounded
-        )
+        slot = "more"
+        effect = interval("η²", comparison.effect, low, high, digits, bounded)
     else:
-        verb = (
-            "differed significantly between"
-            if significant
-            else "did not differ significantly between"
-        )
-        effect = interval(
-            "d", comparison.effect, comparison.effect_low, comparison.effect_high, digits, number
-        )
-    return f"{outcome} {verb} {groups}, {test}, {p_text(comparison.p)}, {effect}."
+        slot = "two"
+        effect = interval("d", comparison.effect, low, high, digits, number)
+    values = {"test": test, "p": p_text(comparison.p), "effect": effect}
+    return wording.say(
+        "groups",
+        slot if comparison.p < SIGNIFICANT else f"{slot}_ns",
+        outcome=outcome,
+        groups=groups,
+        statistics=", ".join(values.values()),
+        **values,
+    )
 
 
 def df_text(comparison: Comparison) -> str:
@@ -356,11 +368,13 @@ def df_text(comparison: Comparison) -> str:
     return f"{comparison.df1:g}, {comparison.df2:g}"
 
 
-def described(group: GroupStats, digits: int) -> str:
+def described(group: GroupStats, digits: int, wording: Wording) -> str:
     if group.mean is None:
         return group.label
-    sd = "" if group.sd is None else f", SD = {number(group.sd, digits)}"
-    return f"{group.label} (M = {number(group.mean, digits)}{sd})"
+    m = f"M = {number(group.mean, digits)}"
+    sd = "" if group.sd is None else f"SD = {number(group.sd, digits)}"
+    shown = ", ".join(v for v in (m, sd) if v)
+    return wording.say("groups", "group", label=group.label, statistics=shown, m=m, sd=sd)
 
 
 def interval(

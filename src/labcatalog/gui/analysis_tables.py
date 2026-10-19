@@ -21,6 +21,7 @@ from labcatalog.gui.common import (
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import analysis, imputation
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats.analysis_script import AnalysisData, Code, Comparison
@@ -296,8 +297,14 @@ def group_section(
                 for shown in papers.values():
                     paper.paper_table(shown)
                 paper.results_text(
-                    results.comparison_text(comparison, outcome.label, common.decimals()),
+                    results.comparison_text(
+                        comparison,
+                        outcome.label,
+                        common.decimals(),
+                        Wording(result.project.config.templates),
+                    ),
                     list(papers.values()),
+                    "groups",
                 )
                 paper.result_actions(result, "groups", papers, drawn, texts, engine)
                 code_view(texts, figure=True)
