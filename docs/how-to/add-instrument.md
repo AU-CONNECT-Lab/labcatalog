@@ -32,17 +32,9 @@ In the window:
 
 Items whose wording is the same as an item already in the project are matched to it, so a later wave of a questionnaire you already have only adds its columns to the map.
 
-The same steps on the command line:
-
-```bash
-labcatalog codebook create parent_w2 --redcap path/to/data_dictionary.csv
-# fill in codebook/parent_w2/items.csv, instruments.csv and scores.csv
-labcatalog codebook import parent_w2
-```
-
 ### Let a language model fill in the files
 
-If the codebook is a PDF or a document, a language model can fill in the three files for you. Under **Fill them in with an AI**, press **Copy AI prompt**, paste the prompt into the chat model of your choice together with the codebook, paste its answer into the box, and press **Replace the three files with this answer**. The prompt contains the format and the data file's column names, but no data. Check the files before you import them: the model can misread a codebook. On the command line, `labcatalog codebook prompt <dataset>` prints the same prompt, and `labcatalog codebook answer <dataset> <file>` replaces the three files with the answer saved in a file (or pasted into standard input when no file is given).
+If the codebook is a PDF or a document, a language model can fill in the three files for you. Under **Fill them in with an AI**, press **Copy AI prompt**, paste the prompt into the chat model of your choice together with the codebook, paste its answer into the box, and press **Replace the three files with this answer**. The prompt contains the format and the data file's column names, but no data. Check the files before you import them: the model can misread a codebook.
 
 ## Draft an instrument from its PDF
 
@@ -64,4 +56,4 @@ An editor works just as well. Start the file with this line, so that an editor w
 # yaml-language-server: $schema=../schemas/instrument.schema.json
 ```
 
-Then map the instrument's columns in each dataset's `maps/<dataset>.csv`, add an administration to the study file, and run `labcatalog validate`.
+Then map the instrument's columns in each dataset's `maps/<dataset>.csv`, add an administration to the study file, and press **Refresh** to see any problem on the Problems page.

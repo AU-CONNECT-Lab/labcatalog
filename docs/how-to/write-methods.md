@@ -49,4 +49,4 @@ An instrument can have its own `measures` template, and a study its own `partici
 
 `demographics` gives a sentence for each reporter with blanks, `[ ]`, for the shares of women or girls and of men or boys and the mean age and its SD. labcatalog leaves these to you: which people and which wave they describe, and where age and gender come from, differ from one study to the next. Fill them in after copying the paragraph, or write your own sentence in the template in place of `{demographics}`.
 
-`labcatalog validate` reports a placeholder it does not know.
+The Problems page and `labcatalog check` report a placeholder it does not know.

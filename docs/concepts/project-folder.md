@@ -41,7 +41,7 @@ The data files the catalog reads. labcatalog never changes them. Many labs keep 
 
 ## scripts/
 
-Your own scripts that turn raw exports and pipeline outputs into the files in `data/`. labcatalog runs them only when you ask, from the **Add data** step of the Set up page or with `labcatalog prepare`.
+Your own scripts that turn raw exports and pipeline outputs into the files in `data/`. labcatalog runs them only when you ask, from the **Add data** step of the Set up page or the Scripts page.
 
 ## references/
 
@@ -49,7 +49,7 @@ Your own scripts that turn raw exports and pipeline outputs into the files in `d
 
 ## outputs/
 
-Everything you save from the window or export with `labcatalog export` goes into a new subfolder here, named with the date and time. Each subfolder also holds `manifest.json`, which records which data files, at which checksums, the saved numbers came from.
+Everything you save or export from the window goes into a new subfolder here, named with the date and time. Each subfolder also holds `manifest.json`, which records which data files, at which checksums, the saved numbers came from.
 
 ## drafts/, codebook/ and freezes/
 

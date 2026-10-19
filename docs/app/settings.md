@@ -20,6 +20,10 @@ Saved in `labcatalog.yaml` with **Save**, after which the project reloads:
 
 These are where each page starts. A switch on a section of the Analysis page, or on the factor model panels, tries another choice for what that section shows, without changing the project; the table notes say which was used. See [Statistics](../statistics/index.md).
 
+## Schemas for editors
+
+**Write the schemas** writes the files in `schemas/` that let an editor such as VS Code complete and check the YAML files of the project. A new project already has them; write them again after updating labcatalog.
+
 ## R
 
 The path to `Rscript`. **Save and check** runs R once and reports its version and any missing packages, with the command to install them. See [Set Up R and Language Models](../how-to/r-and-models.md).

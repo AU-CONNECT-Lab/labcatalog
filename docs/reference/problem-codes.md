@@ -1,14 +1,14 @@
 # Problem Codes
 
-Every problem has a level, a code, a message and, usually, a location. On the command line each one is a line:
+Every problem has a level, a code, a message and, usually, a location. On the Problems page each one is a row; `labcatalog check` prints each one as a line:
 
 ```text
 {location}: {level} [{code}] {message}
 ```
 
-Errors mean a result cannot be trusted; warnings point to something worth a look. `labcatalog validate` and `labcatalog check` exit with status 1 when there is any error. [Fix Reported Problems](../how-to/fix-problems.md) explains how to work through them.
+Errors mean a result cannot be trusted; warnings point to something worth a look. `labcatalog check` exits with status 1 when there is any error. [Fix Reported Problems](../how-to/fix-problems.md) explains how to work through them.
 
-Loading comes first: if a file cannot be read (the codes in the first table), the other checks do not run until it is fixed. `check` reads the data only when the metadata have no errors.
+Loading comes first: if a file cannot be read (the codes in the first table), the other checks do not run until it is fixed. The data are read only when the metadata have no errors.
 
 ## Reading the files
 
@@ -73,7 +73,7 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 
 ## Codebook import
 
-Problems found by **Check and import** in the Codebook step or under Files without a column map on the Set up page, or by `labcatalog codebook import`, all have the code `codebook`. The location is the codebook file and line, such as `codebook/parent_w1/items.csv:12`, and the message says what is wrong in that row.
+Problems found by **Check and import** in the Codebook step or under Files without a column map on the Set up page all have the code `codebook`. The location is the codebook file and line, such as `codebook/parent_w1/items.csv:12`, and the message says what is wrong in that row.
 
 ## Accepted warnings
 
@@ -95,6 +95,6 @@ accepted:
 
 A warning is hidden only while its code, location and message all match an entry, so it shows again as soon as its message changes. Entries that match an error do nothing: errors are always reported. `labcatalog check` ends with the number of accepted warnings it did not print. A mistake in the file itself is reported like a mistake in any other project file.
 
-## Errors that stop a command
+## Errors that stop the check
 
-Some problems stop a command before any check can run, and are printed as `Error: ...` instead: a data file or ID column that cannot be found, a data file that is not UTF-8, or a missing exclusion list. Fix the cause and run the command again.
+Some problems stop the check before it can run, and `labcatalog check` prints them as `Error: ...` instead: a data file or ID column that cannot be found, a data file that is not UTF-8, or a missing exclusion list. Fix the cause and check again.

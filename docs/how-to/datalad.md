@@ -11,7 +11,7 @@ uv tool install git-annex
 uv tool install datalad
 ```
 
-On the Settings page, give the path to `datalad` (with uv on Windows it is usually `C:\Users\<you>\.local\bin\datalad.exe`) and press Save and check. labcatalog then puts that folder first on its own PATH, because git itself calls git-annex inside a dataset. The command line (`labcatalog prepare`, `labcatalog freeze`) uses the `datalad` on your PATH instead.
+On the Settings page, give the path to `datalad` (with uv on Windows it is usually `C:\Users\<you>\.local\bin\datalad.exe`) and press Save and check. labcatalog then puts that folder first on its own PATH, because git itself calls git-annex inside a dataset.
 
 If the project's files are in a dataset but git-annex cannot be found, the check reports `git_annex_not_found`: the manifest then leaves out the dataset versions and History cannot show uncommitted changes.
 
@@ -48,9 +48,9 @@ cd my_project
 datalad get -n data
 ```
 
-`datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The **Add data** step of the Set up page also has a Get button next to each file that is not downloaded. On the command line, `labcatalog get` does the same as Get missing content.
+`datalad get -n data` installs the `data` subdataset without downloading its files; skip it if the data are not a subdataset. Then open the project in labcatalog and press Get missing content, which downloads the metadata and every file the project reads (reference PDFs are downloaded one at a time when you open them). The **Add data** step of the Set up page also has a Get button next to each file that is not downloaded.
 
-In the window, **Open > Clone a project** does all of this at once: give where the project's dataset is (a URL, an SSH address or a folder, as `datalad clone` takes it) and the folder to put it in, and labcatalog clones it, downloads the files the project reads and opens it. `labcatalog datalad clone URL FOLDER` does the same on the command line.
+In the window, **Open > Clone a project** does all of this at once: give where the project's dataset is (a URL, an SSH address or a folder, as `datalad clone` takes it) and the folder to put it in, and labcatalog clones it, downloads the files the project reads and opens it.
 
 ## Saving, pushing and updating
 
@@ -60,15 +60,13 @@ The **Data versions** panel of the Datasets page keeps the datasets the project 
 - **Push** runs `datalad push` to each dataset's sibling, deepest first. Unsaved changes stay on this computer until they are saved.
 - **Update** runs `datalad update --how merge` from each sibling, the outermost dataset first, and then downloads the files the project reads, as **Get missing content** does.
 
-A dataset is pushed to and updated from its only sibling, or `origin` when it has several; a dataset with several siblings and no `origin` is left for you to push from a terminal. The panel needs the path to datalad on the Settings page. On the command line, `labcatalog datalad status`, `save`, `update` and `push` do the same.
+A dataset is pushed to and updated from its only sibling, or `origin` when it has several; a dataset with several siblings and no `origin` is left for you to push from a terminal. The panel needs the path to datalad on the Settings page.
 
 The table's **Here** column shows how much of each dataset's file content is on this computer. Below the table, pick a dataset (when there are several) and:
 
 - **History** lists its last 50 saved versions, newest first, with when, who and what changed. A version that `datalad run` saved, such as a prepare step's, has **Rerun**, which runs its command again with `datalad rerun` and saves what it writes as a new version; like the prepare steps, it waits while someone else runs them.
 - **Get everything** downloads all the dataset's file content.
 - **Free space** removes the dataset's file content from this computer with `datalad drop`; the files stay listed and Get everything brings them back. DataLad leaves any file it cannot find a copy of elsewhere, so push first.
-
-On the command line, `labcatalog datalad history`, `rerun` and `drop` do the same.
 
 ## Prepare steps through datalad run
 
@@ -84,13 +82,13 @@ The project folder and every input and output must be inside a dataset (subdatas
 
 ## Freezes
 
-A freeze (the Freeze button on the Datasets page, or `labcatalog freeze <name>`) writes a record of every data file labcatalog reads to `freezes/`: checksums, rows and participants. When the data are in DataLad, it also saves the files labcatalog uses and tags each dataset with the freeze's name.
+A freeze (**Freeze** in the [Freezes](../app/datasets.md#freezes) panel of the Datasets page) writes a record of every data file labcatalog reads to `freezes/`: checksums, rows and participants. When the data are in DataLad, it also saves the files labcatalog uses and tags each dataset with the freeze's name.
 
-The tag and the frozen data stay on your computer until you push them. `datalad push` sends neither tags nor the content of versions that are no longer the current one, so they have to be pushed right after freezing. When a dataset has one sibling, or several of which one is `origin`, the Freeze dialog offers **Then push the tag and the data to ...**, ticked by default, and `labcatalog freeze <name> --push` does the same. If the push fails, the freeze stays as it is. Push by hand with these two commands for each dataset, which is also what to do for a dataset whose sibling is not clear:
+The tag and the frozen data stay on your computer until you push them. `datalad push` sends neither tags nor the content of versions that are no longer the current one, so they have to be pushed right after freezing. When a dataset has one sibling, or several of which one is `origin`, the Freeze dialog offers **Then push the tag and the data to ...**, ticked by default. If the push fails, the freeze stays as it is. Push by hand with these two commands for each dataset, which is also what to do for a dataset whose sibling is not clear:
 
 ```bash
 datalad push --to <sibling> --data anything
 git push <sibling> <freeze name>
 ```
 
-To see the data as they were at a freeze, open the Datasets page and press Open next to it in the Freezes table. labcatalog clones the datasets into a temporary folder, checks out the tag, downloads the files the project reads, and opens that copy. The window's title bar says whether every data file matches the freeze record; a mismatch usually means a data path in `labcatalog.yaml` is absolute or starts with `~`, so the copy read today's file. Edits in the copy do not change the project. Back to the project returns to it. On the command line, `labcatalog open-freeze <name> --to <folder>` makes the same copy in a folder you choose.
+To see the data as they were at a freeze, open the Datasets page and press Open next to it in the Freezes table. labcatalog clones the datasets into a temporary folder, checks out the tag, downloads the files the project reads, and opens that copy. The window's title bar says whether every data file matches the freeze record; a mismatch usually means a data path in `labcatalog.yaml` is absolute or starts with `~`, so the copy read today's file. Edits in the copy do not change the project. Back to the project returns to it.

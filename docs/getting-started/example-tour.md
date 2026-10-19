@@ -6,18 +6,11 @@ labcatalog comes with a fictional project of two studies. The Mock Family Study 
 
 The window opens the example the first time you start it, and **Open example**, under **Open** in the header, opens it at any time. It is the window's own copy, so changes you make while trying things out never touch the installed package; **Reset the example** on the Settings page puts it back as installed.
 
-To have the example in a folder of your own instead, copy it there and open it:
-
-```bash
-labcatalog init my_example
-labcatalog gui -p my_example
-```
-
-`my_example` is then an ordinary project folder: change anything in it and press **Refresh** in the window to see the effect. To start over, delete the folder and run `labcatalog init` again.
+The copy is an ordinary project folder; hover over the project's name in the header to see where it is. Change anything in it and press **Refresh** in the window to see the effect. To have the example in a folder of your own instead, copy that folder there and open the copy with **Open project**.
 
 ## Look around the project folder
 
-Open `my_example` in a file browser or editor. The parts you will meet in every project:
+Open the example's folder in a file browser or editor. The parts you will meet in every project:
 
 - `labcatalog.yaml`: the project's settings, its studies and their waves, and one entry per data file.
 - `instruments/`: one YAML file per questionnaire or measure.

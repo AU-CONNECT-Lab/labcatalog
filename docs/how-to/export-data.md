@@ -2,7 +2,7 @@
 
 An export collects the variables, data and statistics of chosen instruments into one folder, ready to hand to a student or a collaborator or to open in other software.
 
-## In the window
+## Export
 
 1. On the **Instruments** page, tick the instruments you want and press **Export**. The dialog has three steps.
 2. **Instruments**: the ticked instruments. Add or remove any here.
@@ -13,15 +13,6 @@ An export collects the variables, data and statistics of chosen instruments into
    - **One table, a row per group**: the same, with one row per group, such as a family. Shown when the project has a group.
 5. Press **Export**, then **Open folder**.
 
-## On the command line
-
-```bash
-labcatalog export example_mood example_parent_stress
-labcatalog export example_mood --dataset child_w1 --dataset child_w2 --by id
-```
-
-The arguments are instrument IDs. `--dataset` limits the export to some datasets (all of them by default), and `--by` chooses the layout: `dataset`, `id`, or the group's name.
-
 ## What is in the folder
 
 The export writes a new folder in `outputs/`:
@@ -30,7 +21,7 @@ The export writes a new folder in `outputs/`:
 |---|---|
 | `variables.csv` | Every item and score in each dataset: its study, wave, reporter, column, instrument, wording, type, options, allowed range and missing codes. |
 | `<dataset>.csv` or `data_by_<id or group>.csv` | The data: the ID, group and date columns, the chosen items as they are in the data, and the scores labcatalog computes. |
-| `score_statistics.csv` | Each score's n, mean, SD, range and α in each dataset, and ω when the window has fitted the factor models (the command line leaves it empty). |
+| `score_statistics.csv` | Each score's n, mean, SD, range and α in each dataset, and ω when the window has fitted the factor models (empty otherwise). |
 | `item_statistics.csv` | The same for each item. |
 | `manifest.json` | The data files and checksums the export came from. |
 

@@ -57,7 +57,7 @@ labcatalog needs Python 3.11 or newer. Install it with [uv](https://docs.astral.
 uv tool install "git+https://github.com/AU-CONNECT-Lab/labcatalog"
 ```
 
-or with `pip install "git+https://github.com/AU-CONNECT-Lab/labcatalog"` in an environment of your choice. Then start it with `labcatalog gui`. The first time, it opens a fictional example project to look around in; **Open** in the header opens your own project folder.
+or with `pip install "git+https://github.com/AU-CONNECT-Lab/labcatalog"` in an environment of your choice. Then start it with `labcatalog`. The first time, it opens a fictional example project to look around in; **Open** in the header opens your own project folder.
 
 ## Documentation
 

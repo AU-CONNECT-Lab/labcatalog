@@ -4,14 +4,10 @@ This page sets up a project for one data file and one questionnaire. Everything 
 
 ## Create the folder
 
-```bash
-labcatalog init my_project --no-example
-```
-
-This creates `my_project/` with an almost empty `labcatalog.yaml`, the folders `instruments/`, `studies/`, `maps/` and `data/`, and `schemas/`. The comments in `labcatalog.yaml` show an example of every setting.
+In the window, choose **New project** under **Open** in the header, give the name `my_project` and the folder to put it in, and press **Create**. labcatalog creates `my_project/` with an almost empty `labcatalog.yaml`, the folders `instruments/`, `studies/`, `maps/` and `data/`, and `schemas/`, and opens it. The comments in `labcatalog.yaml` show an example of every setting.
 
 :::{tip}
-The files in `schemas/` let an editor check your YAML and complete it as you type. In VS Code, install the YAML extension by Red Hat; every file labcatalog writes starts with a line that points the editor to the right schema.
+The files in `schemas/` let an editor check your YAML and complete it as you type. In VS Code, install the YAML extension by Red Hat; every file labcatalog writes starts with a line that points the editor to the right schema. After updating labcatalog, write the schemas again with **Write the schemas** on the [Settings](../app/settings.md#schemas-for-editors) page.
 :::
 
 ## Describe the study
@@ -45,7 +41,7 @@ datasets:
 
 ## Add the instruments and map the columns
 
-labcatalog now needs to know which questionnaire each column belongs to. The quickest way is to import a codebook: open the project in the window (`labcatalog gui -p my_project`), go to the **Set up** page, open its **Add data** step, pick `parent_w1` under **Files without a column map**, and press **Create the three files**, or **Create from a REDCap data dictionary**, **Create from a Qualtrics survey file** or **Create from an SPSS file** if you have one. Fill in the three CSV files, press **Check and import**, and labcatalog writes the instrument files in `instruments/` and the column map `maps/parent_w1.csv`. [Add an Instrument](../how-to/add-instrument.md) describes this and the other ways.
+labcatalog now needs to know which questionnaire each column belongs to. The quickest way is to import a codebook: go to the **Set up** page of the window, open its **Add data** step, pick `parent_w1` under **Files without a column map**, and press **Create the three files**, or **Create from a REDCap data dictionary**, **Create from a Qualtrics survey file** or **Create from an SPSS file** if you have one. Fill in the three CSV files, press **Check and import**, and labcatalog writes the instrument files in `instruments/` and the column map `maps/parent_w1.csv`. [Add an Instrument](../how-to/add-instrument.md) describes this and the other ways.
 
 ## Say which instruments were given
 
@@ -61,9 +57,4 @@ After an import, the Add data step shows the exact lines to add.
 
 ## Check the project
 
-```bash
-labcatalog validate -p my_project
-labcatalog check -p my_project
-```
-
-`validate` checks the YAML files and column maps without reading the data. `check` reads the data and reports every value that does not fit the metadata. In the window, press **Refresh** and open the **Problems** page to see the same list.
+In the window, press **Refresh** and open the **Problems** page. It lists every mistake in the YAML files and column maps, and every value in the data that does not fit the metadata. `labcatalog check -p my_project` prints the same list in a terminal.

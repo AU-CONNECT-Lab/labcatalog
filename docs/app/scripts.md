@@ -32,11 +32,12 @@ When the project is in git, as every DataLad dataset is, **History** at the bott
 **New script** asks for the script's **Stage** and language, R or Python, then what it works on:
 
 - **Clean**: the dataset it writes and the raw export it reads. The script is `scripts/clean_<dataset>`, with a `clean()` function that gets the export as a table and returns the clean table.
+- **From a database**: the dataset it writes and the SQLite or DuckDB file it reads. The script is `scripts/query_<dataset>`, with a `QUERY` to write whose rows become the dataset's file; the lines below it open the database read only and run it. Its step `query_<dataset>` has the stage clean. See [Register Prepare Steps](../how-to/prepare-steps.md#from-a-database).
 - **Extract**: the dataset it writes and the folder of pipeline output, one file per person. The script has a `features()` function that gets one person's file and returns their row; the lines below it go through the folder, take each person's ID from the file name, and write the table.
 - **Process**: a name, the folder of raw recordings and the folder the pipeline writes. The script has a `process()` function that gets one recording and the folder to write to.
 - **Score**: the instrument and the dataset, as on the instrument's page, which writes the scoring script with the columns of each score.
 - **Other**: a name, for a script with only the lines that read its input file and write its output file.
 
-A script for a stage begins with what it reads and writes: the command its step runs, the dataset's file, ID column, the columns its column map names and its missing codes. Only the function is left to write; the lines after it apply it to the files. Its step, with its stage, is added to `labcatalog.yaml` with it, after the same check as **Add a step**.
+A script for a stage begins with what it reads and writes: the command its step runs, the dataset's file, ID column, the columns its column map names and its missing codes. Only the function, or the query, is left to write; the lines after it apply it to the files. Its step, with its stage, is added to `labcatalog.yaml` with it, after the same check as **Add a step**.
 
 **Draft a cleaning step**, at the bottom of the page, has a language model write a cleaning script for a dataset; see [Register Prepare Steps](../how-to/prepare-steps.md#draft-a-step-with-a-language-model).

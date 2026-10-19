@@ -172,4 +172,4 @@ The project's wording of the paragraphs labcatalog writes, by template, each a t
 
 ## schema_version
 
-The version of this file's format, written by `labcatalog init`. Leave it as it is.
+The version of this file's format, written when labcatalog makes the project. Leave it as it is.

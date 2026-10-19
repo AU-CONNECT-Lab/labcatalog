@@ -1,10 +1,10 @@
 # Using the App
 
-Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to open a project directly. The pages are listed across the top, in groups: browsing the catalog (Overview, Instruments, Datasets), writing it up (Analysis, Methods), setting up the project (the numbered Set up steps: Codebook, Add data and Check IDs) and Problems. Two pages open from the top right instead: **Studies** beside the study picker opens the Studies page, and the gear opens Settings. This section describes the pages one by one.
+Open the window with `labcatalog`, or with `labcatalog -p <folder>` to open a project directly. The pages are listed across the top, in groups: browsing the catalog (Overview, Instruments, Datasets), writing it up (Analysis, Methods), setting up the project (the numbered Set up steps: Codebook, Add data and Check IDs) and Problems. Two pages open from the top right instead: **Studies** beside the study picker opens the Studies page, and the gear opens Settings. This section describes the pages one by one.
 
 ## Opening a project
 
-The window opens the project that was open when it last closed, or the example project the first time. **Open** in the header has two choices: **Open project** chooses a project folder, the one with `labcatalog.yaml` in it, and **Open example** opens the example. The header then shows the project's name (hover over it for the folder) and the date the data are as of, from the datasets' `snapshot_date`.
+The window opens the project that was open when it last closed, or the example project the first time. **Open** in the header has four choices: **Open project** chooses a project folder, the one with `labcatalog.yaml` in it; **New project** asks for a name and a folder, makes a folder of that name with an empty `labcatalog.yaml`, the folders a project uses and the schemas, and opens it; **Clone a project** clones a project kept in DataLad (see [Using labcatalog with DataLad](../how-to/datalad.md#working-from-a-clone)); and **Open example** opens the example. The header then shows the project's name (hover over it for the folder) and the date the data are as of, from the datasets' `snapshot_date`.
 
 ## One study or all
 

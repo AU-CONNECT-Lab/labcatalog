@@ -1,6 +1,6 @@
 # Fix Reported Problems
 
-labcatalog checks a project in two passes. `labcatalog validate` reads only the metadata: the YAML files and the column maps. `labcatalog check` also reads the data and compares every value with what the metadata allow. The **Problems** page shows the result of both, and updates when you press **Refresh**.
+labcatalog checks a project in two passes. The first reads only the metadata: the YAML files and the column maps. The second also reads the data and compares every value with what the metadata allow. The **Problems** page shows the result of both, and updates when you press **Refresh**. `labcatalog check` prints the same list in a terminal (see [Command Line](../reference/cli.md)).
 
 ## Read a problem
 
@@ -17,7 +17,7 @@ maps/child_w2.csv:14: error [map_row] instrument and item must be filled togethe
 
 The location names the file, and where it can, the line or the entry: `datasets[3] (child_w1).reporter` is the `reporter` of the third dataset in `labcatalog.yaml`. On the Problems page, the location is a link that opens the file in the editor in the **Codebook** step of the Set up page at that line.
 
-The command line exits with status 1 when there are errors, so `labcatalog check` can stop a script or a CI job.
+`labcatalog check` exits with status 1 when there are errors, so it can stop a script or a CI job.
 
 ## Use the Fix panel
 

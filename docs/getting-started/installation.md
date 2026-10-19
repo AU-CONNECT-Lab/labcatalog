@@ -1,6 +1,6 @@
 # Installation
 
-labcatalog is a Python package with a desktop window and a command line. It needs Python 3.11 or newer. R and a language model are optional.
+labcatalog is a Python package with a desktop window. It needs Python 3.11 or newer. R and a language model are optional.
 
 ## Requirements
 
@@ -43,14 +43,10 @@ Everything else works without it. What the model writes is always a draft for yo
 
 ## Check the installation
 
-```bash
-labcatalog --help
-```
-
-This lists the commands. Then open the window:
+Open the window:
 
 ```bash
-labcatalog gui
+labcatalog
 ```
 
 The first time, the window opens the example project; after that, it opens the project that was open when it last closed. The next page tours the example.

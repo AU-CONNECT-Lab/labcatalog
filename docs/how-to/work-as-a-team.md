@@ -11,7 +11,7 @@ When the lab signs in to one computer, for example through Remote Desktop, each 
 On a computer reached only through SSH, such as a compute node of a cluster, start labcatalog in browser mode:
 
 ```bash
-labcatalog gui --browser --port 8931 -p /path/to/project
+labcatalog --browser --port 8931 -p /path/to/project
 ```
 
 It prints a link such as `http://127.0.0.1:8931/?token=...` and keeps running until you press Ctrl+C. labcatalog only answers on that computer itself, so connect your own computer to it with an SSH tunnel, in a second terminal on your own computer:
@@ -50,4 +50,4 @@ With the project in Box, OneDrive or a similar service, each person runs labcata
 
 labcatalog reads the project when it opens it and when you press Refresh. When files change after that, because someone else saved or the sync service brought a new copy, a **Changed on disk** mark appears at the top; hold the pointer over it to see which files, and click it to read the project again. It does not read them again by itself, so nothing you have not saved is lost. Saving a file someone else changed after you opened it is refused, so the other change is not overwritten: open the file again and make your change there.
 
-While someone runs the [prepare steps](prepare-steps.md), the project folder holds `prepare_running.json`, which names who and since when. Starting the steps meanwhile asks first, because two runs would write the same files; **Run anyway** is for a run that ended without cleaning up, for example when its window was closed. On the command line, delete the file once that run has ended.
+While someone runs the [prepare steps](prepare-steps.md), the project folder holds `prepare_running.json`, which names who and since when. Starting the steps meanwhile asks first, because two runs would write the same files; **Run anyway** is for a run that ended without cleaning up, for example when its window was closed.

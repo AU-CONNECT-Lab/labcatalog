@@ -91,7 +91,7 @@ Groups are used in three places:
 - Correlations between datasets. A parent's stress and their child's mood are in different files with different IDs. `stats.correlate_by: family` pairs rows by family instead of by ID. The default is `id`; `none` turns off the correlations between scores on the instrument pages.
 
   When a file holds several people of one family, say two children, the family is taken person by person: each child is a row, rows of the same person in other files pair by ID, and a file with one row for the family (one parent) gives that row to each child. That parent then counts once for each child, so the rows are not independent; a multilevel model with people nested in families allows for that. When two files each hold several people of a family with no one in common (two children and two parents), their answers do not pair across those files. A parent's answers about a particular child go in a file of their own, one row per child with the child's ID, so they pair with that child; give the dataset a `respondent_column` with the parent's ID so that participant counts count the parent, not the child.
-- Exports. `labcatalog export --by family` writes one wide row per family.
+- Exports. **One table, a row per group** in the [export](../how-to/export-data.md) dialog writes one wide row per family.
 - Multilevel models, with people nested in groups.
 
 ## Missing codes
