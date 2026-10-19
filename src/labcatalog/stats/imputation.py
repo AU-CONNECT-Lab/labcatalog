@@ -399,17 +399,25 @@ groups <- data.frame(group = c({labels}), n = as.vector(table(sets[[1]]$group)),
                      sd = rowMeans(sapply(sets, function(s) tapply(s$y, s$group, sd))))
 print(groups)
 """
+# TODO(review): d's variance in each imputed data set is the hand-written large-sample formula.
 R_STUDENT = """\
 # Student's t test pooled over the imputed data sets (the group coefficient of lm, mice::pool,
-# Barnard-Rubin df), signed as the first group minus the second; Cohen's d with the pooled SD
-# averaged over the data sets (effectsize).
+# Barnard-Rubin df), signed as the first group minus the second. Cohen's d with the pooled SD
+# (effectsize) in each data set, pooled with Rubin's rules (mice::pool.scalar), each data set's
+# variance of d from its large-sample formula, (n1 + n2) / (n1 n2) + d^2 / (2 (n1 + n2)); its
+# 95% CI is the pooled d plus or minus t at Barnard and Rubin's df times the pooled SE.
 fits <- mice::as.mira(lapply(sets, function(s) lm(y ~ group, data = s)))
 pooled <- summary(mice::pool(fits), conf.int = TRUE)[2, ]
 print(pooled)
 d_values <- sapply(sets, function(s) effectsize::cohens_d(y ~ group, data = s)$Cohens_d)
+sizes <- as.vector(table(sets[[1]]$group))
+d_variances <- sum(sizes) / prod(sizes) + d_values^2 / (2 * sum(sizes))
+d_pooled <- mice::pool.scalar(d_values, d_variances, n = sum(sizes), k = 2)
+d_margin <- qt(0.975, d_pooled$df) * sqrt(d_pooled$t)
 test_result <- data.frame(statistic = -pooled$statistic, df1 = pooled$df, df2 = NA,
                           p = pooled$p.value, low = -pooled$conf.high, high = -pooled$conf.low,
-                          effect = mean(d_values), effect_low = NA, effect_high = NA,
+                          effect = d_pooled$qbar, effect_low = d_pooled$qbar - d_margin,
+                          effect_high = d_pooled$qbar + d_margin,
                           omega = NA, omega_low = NA, omega_high = NA)
 print(test_result)
 """

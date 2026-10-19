@@ -139,6 +139,7 @@ def test_pooled_group_comparisons_keep_everyone_whose_group_is_known(
     if comparison.test == script.STUDENT:
         first, second = comparison.groups
         assert comparison.low < first.mean - second.mean < comparison.high
+        assert comparison.effect_low < comparison.effect < comparison.effect_high
     else:
         assert comparison.test == script.ANOVA and comparison.df2 > 0
 

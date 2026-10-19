@@ -386,9 +386,9 @@ def imputed_note(comparison: Comparison, m: int) -> str:
     if comparison.test != script.ANOVA:
         first, second = comparison.groups[0], comparison.groups[1]
         return (
-            f"{pooled}: Student's t from the group coefficient (Rubin's rules), and d, Cohen's "
-            f"d with the pooled SD, averaged over the data sets. The difference is {first.label} "
-            f"minus {second.label}, with its 95% confidence interval."
+            f"{pooled}: Student's t from the group coefficient and d, Cohen's d with the pooled "
+            f"SD, each pooled with Rubin's rules. The difference is {first.label} minus "
+            f"{second.label}, with its 95% confidence interval."
         )
     return f"{pooled}: F from the Wald test of the groups (D1), and η² and ω² averaged over them."
 
