@@ -150,14 +150,10 @@ def select(options: dict, value, label: str) -> ui.select:
 
 
 def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
-    with panel("R", help_text="Factor models, ω and the Analysis page"):
-        note(
-            "Factor models (CFA) and ω run in R with lavaan and semTools, and the Analysis page "
-            "uses R first, with psych and effectsize, and lme4, lmerTest and performance for "
-            "the multilevel model; without R they use Python, except invariance across waves, "
-            "which needs R. Install R and the packages yourself; this installs the packages "
-            "when typed in R:"
-        )
+    with panel(
+        "R", help_text="Factor models and ω need R; the Analysis page uses R first, then Python."
+    ):
+        note("Install R and the packages yourself; this installs the packages when typed in R:")
         command(install_command(ALL_PACKAGES))
         with ui.row().classes("w-full items-start no-wrap gap-2 mt-1"):
             path = path_input(
@@ -226,13 +222,10 @@ def r_section(on_rscript: Callable[[], Awaitable[None]]) -> None:
 
 
 def mplus_section() -> None:
-    with panel("Mplus", help_text="Factor models as Mplus inputs"):
-        note(
-            "Save to outputs under a factor model's tables also writes each model as an Mplus "
-            "input (.inp) with its data (.dat). With the path to Mplus set here, a Run in Mplus "
-            "button runs them; the results are in the .out files beside them. The numbers on the "
-            "pages still come from R or Python."
-        )
+    with panel(
+        "Mplus",
+        help_text="Saves each factor model as an Mplus input; with the path set, Run in Mplus runs it.",
+    ):
         with ui.row().classes("w-full items-start no-wrap gap-2 mt-1"):
             path = path_input(
                 "Mplus",
@@ -358,13 +351,9 @@ def example_section(on_reset_example: Callable[[], Awaitable[None]]) -> None:
 def models_section(on_model: Callable[[], None]) -> None:
     provider = common.llm().provider
     with panel(
-        "Language model", help_text="Scoring scripts and descriptions drafted from reference PDFs"
+        "Language model",
+        help_text="Drafts scoring scripts and descriptions from reference PDFs; the key stays on this computer.",
     ):
-        note(
-            "On an instrument's page, a language model can write the scoring scripts and draft "
-            "the description for the Measures paragraph from the instrument's reference PDF. The "
-            "project names the provider and model; the key or the server stays on this computer."
-        )
         env = KEY_ENV.get(provider)
         if env:
             note(

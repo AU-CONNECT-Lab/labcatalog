@@ -66,11 +66,10 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
         view.missing = value or []
         body.refresh()
 
-    with panel("Missing data", help_text="Who has a value on each chosen variable"):
-        note(
-            "The correlation table, regression and group comparison use everyone with values on "
-            "what each needs; each table's note gives its n."
-        )
+    with panel(
+        "Missing data",
+        help_text="Who has a value on each chosen variable; each table uses everyone with values on what it needs.",
+    ):
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             chosen = (
                 ui.select(

@@ -353,8 +353,7 @@ def ask_panel(
             note("Set a language model on the Settings page to search the catalog with it.")
             return
         note(
-            "Describe what you are looking for in your own words. Sends the instruments' names, "
-            "labels and item texts, never any data, to the model set on the Settings page."
+            "Describe it in your own words; only names, labels and item texts go to the model, never data."
         )
         with ui.row().classes("w-full items-center gap-2 no-wrap"):
             box = (
@@ -1275,10 +1274,7 @@ def measures_section(
         with tools:
             copy_text(text)
         ui.label(text).classes("lc-prose")
-        note(
-            "Add description: to the instrument's YAML for what it measures; change the wording "
-            "with measures: in labcatalog.yaml or in the instrument's YAML."
-        )
+        note("Change the wording with description: and measures: in the YAML files.")
 
 
 def description_draft(result: CatalogResult, instrument: Instrument) -> None:

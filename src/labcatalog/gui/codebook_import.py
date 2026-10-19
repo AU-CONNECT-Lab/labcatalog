@@ -89,12 +89,7 @@ def render(
             kept_menu(project, view.dataset, refreshed)
         if not any(path.exists() for path in paths.values()):
             note(
-                "labcatalog lists every column of the data file and guesses its instrument "
-                "and item from the column name. Given the data dictionary of a REDCap project "
-                "(Project Setup, Data Dictionary, Download) or a Qualtrics survey file (Survey, "
-                "Tools, Import/Export, Export Survey), it also fills in each item's wording, "
-                "options and type, with Qualtrics blocks as instruments. An SPSS file (.sav) of "
-                "the same data gives the wording and options from its variable and value labels."
+                "labcatalog guesses each column's item from its name; a REDCap dictionary, Qualtrics survey file or SPSS file also gives the wording and options."
             )
             with ui.row().classes("items-center gap-2 mt-1"):
                 ui.button("Create the three files", icon="note_add", on_click=create)

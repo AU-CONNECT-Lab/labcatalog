@@ -155,13 +155,8 @@ def render(
 
     with panel(
         "Measurement model",
-        help_text="Several scores, each a factor of its items, fitted together on the Sample",
+        help_text="Each score is a factor of its items, the factors correlated; pick subscales or totals, not both.",
     ):
-        note(
-            "Each chosen score becomes a factor of its own items, and the factors correlate "
-            "freely: the measurement model to report before a structural model. Scores must not "
-            "share items, so pick subscales or totals, not both."
-        )
         if analysis.pooling(result, sample.datasets):
             note(
                 "The datasets come from several studies, so every factor is regressed on the "

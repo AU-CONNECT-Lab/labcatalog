@@ -92,10 +92,7 @@ def render(
             codebook_import.kept_menu(project, codebook.NEW, refreshed)
         if not any(path.exists() for path in paths.values()):
             note(
-                "Start from the data dictionary of a REDCap project, a Qualtrics survey file or "
-                "an SPSS file, which give each item's wording, options and type, or from empty "
-                "files to fill in from any codebook. No data file is needed yet; Add data links a "
-                "data file's columns to these instruments."
+                "Start from a REDCap dictionary, a Qualtrics survey file or an SPSS file, or from empty files to fill in; no data needed yet."
             )
             with ui.row().classes("items-center gap-2 mt-1"):
                 ui.button("Create empty files", icon="note_add", on_click=lambda: create())

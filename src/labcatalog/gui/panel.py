@@ -26,7 +26,7 @@ ROWS = {
 def render(result: CatalogResult, view) -> None:
     with panel(
         "Cross-lagged panel",
-        help_text="X and Y over three or more waves, within and between people",
+        help_text="RI-CLPM beside CLPM, in R with lavaan: stable differences between people apart from how X and Y carry over.",
     ):
         choices = analysis.of_instruments(pm.choices(result), view.instruments)
         if len(choices) < 2:
@@ -44,16 +44,7 @@ def render(result: CatalogResult, view) -> None:
                 (k for k in keys if analysis.instrument_of(k) != other),
                 next(k for k in keys if k != view.panel_x),
             )
-        note(
-            "A random intercept cross-lagged panel model (RI-CLPM) separates the stable "
-            "differences between people from how each person's X and Y carry over to the next "
-            "wave. It is fitted with the lagged paths free and equal across waves, beside the "
-            "cross-lagged panel model without random intercepts (CLPM), in R with lavaan. This "
-            "section picks its own waves and keeps everyone with a value; the Sample on the left "
-            "does not apply. With several studies chosen, each study is a group with its own "
-            "means and variances, their nth waves side by side, and two more models hold the "
-            "lagged paths equal across the studies."
-        )
+        note("This section picks its own waves; the Sample on the left does not apply.")
 
         def offered() -> list[str]:
             return pm.panel_studies(result, view.panel_x, view.panel_y)

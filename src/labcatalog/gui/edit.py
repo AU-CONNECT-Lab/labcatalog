@@ -398,8 +398,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
         if table().csv:
             note(
-                "One row per column of the data file: the instrument and item it holds, or both "
-                "empty for the ID, dates and other columns. Drag a row by its handle to move it."
+                "One row per data column: its instrument and item, or both empty for the ID and dates. Drag a row to move it."
             )
         else:
             note(

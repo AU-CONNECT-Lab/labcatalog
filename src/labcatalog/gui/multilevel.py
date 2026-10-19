@@ -34,7 +34,8 @@ SINGULAR = (
 
 def render(result: CatalogResult, view) -> None:
     with panel(
-        "Multilevel model", help_text="Change across waves, with people and groups as levels"
+        "Multilevel model",
+        help_text="Waves within people and people within groups, fitted as JASP's linear mixed models are.",
     ):
         outcomes = analysis.of_instruments(ml.outcome_choices(result), view.instruments)
         if not outcomes:
@@ -54,13 +55,7 @@ def render(result: CatalogResult, view) -> None:
         view.multilevel = replace(view.multilevel, covariates=kept)
         model: ml.Model = view.multilevel
         group = ml.group_name(result)
-        note(
-            "Waves within people, people within groups, or both, fitted the way JASP's linear "
-            "mixed models are. This section picks its own waves and keeps everyone with at least "
-            "one; the Sample on the left does not apply. Waves of several studies pool them: "
-            "each study's people and groups are their own, time counts from each study's first "
-            "chosen wave, and the study enters as a fixed effect."
-        )
+        note("This section picks its own waves; the Sample on the left does not apply.")
 
         @ui.refreshable
         def body() -> None:

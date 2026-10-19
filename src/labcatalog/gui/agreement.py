@@ -63,11 +63,10 @@ def render(result: CatalogResult, sample: analysis.Sample, view, choices: dict[s
         view.raters = value or []
         body.refresh()
 
-    with panel("Rater agreement", help_text="How closely raters agree on the same people"):
-        note(
-            "Choose one variable for each rater. Answer options give Cohen's kappa for each pair "
-            "of raters; numbers and scores give intraclass correlations."
-        )
+    with panel(
+        "Rater agreement",
+        help_text="One variable per rater: Cohen's kappa for answer options, intraclass correlations for numbers.",
+    ):
         ui.select(
             options,
             multiple=True,

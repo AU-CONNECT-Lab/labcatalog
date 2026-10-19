@@ -81,12 +81,11 @@ def datalad_section(on_datalad: Callable[[], Awaitable[None]]) -> None:
     example = (
         Path.home() / ".local" / "bin" / ("datalad.exe" if sys.platform == "win32" else "datalad")
     )
-    with panel("DataLad", help_text="Versions of the data, freezes and datalad run"):
-        note(
-            "When the data are in DataLad datasets, labcatalog records which version it read, "
-            "freezes tag that version, and prepare steps can run through datalad run. Install "
-            "DataLad and git-annex yourself, for example by typing these in a terminal:"
-        )
+    with panel(
+        "DataLad",
+        help_text="Records which version of the data each result read, and runs prepare steps through datalad run.",
+    ):
+        note("Install DataLad and git-annex yourself, for example by typing these in a terminal:")
         for line in INSTALL:
             command(line)
         with ui.row().classes("w-full items-start no-wrap gap-2 mt-1"):
@@ -254,7 +253,8 @@ def versions_panel(result: CatalogResult, on_changed: Callable[[], Awaitable[Non
         return
     datalad = preferences.load().get(preferences.DATALAD)
     with panel(
-        "Data versions", help_text="Saved on this computer, pushed and updated with DataLad"
+        "Data versions",
+        help_text="Save keeps a version here, Push sends it to the sibling, Update gets what others pushed.",
     ) as head:
         if not datalad:
             note("Set the path to datalad on the Settings page to save, push and update the data.")
@@ -373,12 +373,6 @@ def versions_table(states: list[DatasetState], root: Path) -> None:
         for s in states
     ]
     table(columns, rows)
-    note(
-        "Save keeps the changes as a new version on this computer, Push sends saved versions and "
-        "their data to the sibling, and Update merges what others pushed and gets the files the "
-        "project reads. New on the sibling counts what the last Update saw. Here is how much of "
-        "the dataset's file content is on this computer."
-    )
 
 
 def dataset_tools(

@@ -500,12 +500,7 @@ def open_wizard(
                 mode.visible = bool(names)
                 with ui.column().classes("gap-2") as repeating:
                     note(
-                        "Pick the dataset this one repeats, usually the same file from the last "
-                        "wave. The new one takes its modality, study, reporter, ID and date "
-                        "columns, and its cleaning step if it has one. A folder of files takes its "
-                        "folder and files rule, with the wave changed where the rule names it. A "
-                        "file with a wave column, which holds every wave, is read again for the "
-                        "new wave."
+                        "Pick the dataset this one repeats, usually the same file from the last wave; the new one takes its columns, study, reporter and cleaning step."
                     )
                     template = ui.select(
                         {n: views.dataset_label(result, n) for n in names},
@@ -518,11 +513,7 @@ def open_wizard(
                         {TABLE: "A table", FOLDER: "A folder of files"}, value=TABLE
                     ).props("dense no-caps")
                     note(
-                        "Say what the data are: the first dataset of a study, or a kind the "
-                        "project has not had before. A table is copied into data/ as it is, with "
-                        "no cleaning step, and its ID and date columns are chosen after the file. "
-                        "A folder of files, such as scans or recordings, stays where it is; each "
-                        "person's row counts their files."
+                        "The first dataset of a study, or a new kind of data. A table is copied into data/ as it is; a folder of files stays where it is."
                     )
                     with ui.row().classes("gap-3"):
                         own_study = ui.select(
