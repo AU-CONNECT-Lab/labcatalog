@@ -6,12 +6,13 @@ from pathlib import Path
 from nicegui import ui
 
 from labcatalog.charts import views
-from labcatalog.config import dataset_by_name
+from labcatalog.config import dataset_by_name, id_pattern
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui import preferences
 from labcatalog.gui.common import computed, note, path_input, show_status
 from labcatalog.gui.files import FOLDER as PICK_FOLDER
 from labcatalog.gui.files import choose_path
-from labcatalog.metadata import changes, new_dataset
+from labcatalog.metadata import changes, folder_rules, new_dataset
 from labcatalog.paths import expand_path, stored_path
 from labcatalog.pipeline import CatalogResult
 
@@ -56,6 +57,12 @@ def open_wizard(
         "wave_column": None,
         "wave_value": first.wave_value or "",
         "paths": [],
+        # What the folder step found: the fields in its paths and the rules they suggest.
+        "fields": [],
+        "id_key": None,
+        "rules": [],
+        "roster": None,
+        "pattern": None,
         "prefilled": None,
         "wave_dates": (None, None),
     }
@@ -195,6 +202,11 @@ def open_wizard(
         text = (folder_path.value or "").strip()
         return expand_path(text, project.root) if text else None
 
+    def own(field: str) -> str:
+        if blank():
+            return own_study.value if field == "study" else reporter.value
+        return getattr(dataset_by_name(config, template.value), field)
+
     async def scan_folder() -> None:
         state["paths"] = []
         found = typed_folder()
@@ -203,7 +215,59 @@ def open_wizard(
         # As typed, so ~ and environment variables stay in labcatalog.yaml.
         text = (folder_path.value or "").strip()
         state["source"] = stored_path(text) if text else None
+        study = own("study")
+        state["pattern"] = id_pattern(config, study)[0]
+        try:
+            state["roster"] = await computed(
+                new_dataset.roster_ids, project, study, own("reporter")
+            )
+        except LabCatalogError:
+            state["roster"] = None
+        state["fields"] = folder_rules.path_fields(state["paths"])
+        await pick_key(folder_rules.id_field(state["fields"], state["pattern"]))
+        if state["rules"] and not (files.value or "").strip():
+            files.set_value(state["rules"][0].files)
         preview.refresh()
+
+    async def pick_key(key: str | None) -> None:
+        state["id_key"] = key
+        state["rules"] = []
+        if key is not None and state["paths"]:
+            state["rules"] = await computed(
+                folder_rules.suggest,
+                state["paths"],
+                key,
+                (wave.value or "").strip(),
+                state["pattern"],
+            )
+        finder.refresh()
+
+    @ui.refreshable
+    def finder() -> None:
+        if state["id_key"] is None or not state["paths"]:
+            return
+        options = {
+            f.key: f"{f.key}- ({f.values} value{'' if f.values == 1 else 's'})"
+            for f in state["fields"]
+        }
+        if state["pattern"]:
+            options[folder_rules.BY_PATTERN] = "The part that matches the ID pattern"
+        ui.select(
+            options,
+            value=state["id_key"],
+            label="The ID is in",
+            on_change=lambda e: pick_key(e.value),
+        ).props("outlined dense").classes("w-80")
+        if not state["rules"]:
+            note("No file's path holds that field.")
+            return
+        with ui.column().classes("gap-0 w-full"):
+            for rule in state["rules"]:
+                ui.button(
+                    f"{rule.files}: {counted(rule.people, 'person', 'people')}, "
+                    f"{counted(rule.count, 'file', 'files')}",
+                    on_click=lambda r=rule: files.set_value(r.files),
+                ).props("flat dense no-caps align=left").classes("lc-quiet-btn")
 
     @ui.refreshable
     def preview() -> None:
@@ -218,16 +282,26 @@ def open_wizard(
             note(f"{len(state['paths'])} files in the folder. Now say which ones to count.")
             return
         try:
-            seen = new_dataset.preview_folder(state["paths"], rule)
+            seen = folder_rules.count_folder(
+                state["paths"], rule, state["roster"], state["pattern"]
+            )
         except LabCatalogError as err:
             ui.label(str(err)).classes("lc-bad-text")
             return
         status = "lc-ok" if seen.people else "lc-warn"
         ui.label(f"{seen.files} files of {seen.people} people match").classes(f"lc-status {status}")
+        if seen.repeated:
+            repeats = [f"{i} ({n})" for i, n in seen.repeated.items()]
+            note(listed("With more than one file", repeats))
+        if seen.off_pattern:
+            note(listed("Not like the study's ID pattern", seen.off_pattern))
+        if seen.not_in_roster:
+            note(listed("Not in the study's roster", seen.not_in_roster))
+        if seen.roster_without_files:
+            missing = counted(seen.roster_without_files, "person", "people")
+            note(f"In the roster with no file here: {missing}")
         if seen.unmatched:
-            shown = ", ".join(seen.unmatched[:5])
-            more = f" and {len(seen.unmatched) - 5} more" if len(seen.unmatched) > 5 else ""
-            note(f"Not counted ({len(seen.unmatched)}): {shown}{more}")
+            note(listed("Not counted", seen.unmatched))
 
     async def show_rows(status: ui.label) -> bool:
         # The rows the new dataset will read, so a wave written differently shows up here.
@@ -260,7 +334,7 @@ def open_wizard(
             file_status.set_text("Choose the folder first.")
             return
         try:
-            seen = new_dataset.preview_folder(state["paths"], (files.value or "").strip())
+            seen = folder_rules.count_folder(state["paths"], (files.value or "").strip())
             if not seen.people:
                 raise LabCatalogError("No file matches; check the files rule")
             state["placement"] = new_dataset.place(project, draft(), state["source"])
@@ -307,7 +381,14 @@ def open_wizard(
             f"Copying it to {placement.copy_to}"
             + (f" and running {placement.step.name}" if placement.step else "")
         )
-        brought = await computed(new_dataset.bring_in, project, state["source"], placement)
+        brought = await computed(
+            new_dataset.bring_in,
+            project,
+            state["source"],
+            placement,
+            preferences.load().get(preferences.RSCRIPT),
+            preferences.step_python(),
+        )
         state["created"] = brought.created
         if brought.run is not None and brought.run.exit_code != 0:
             file_status.set_text(
@@ -577,6 +658,7 @@ def open_wizard(
                         ui.button(
                             "Choose the folder", icon="folder_open", on_click=choose_folder
                         ).props("flat").classes("lc-quiet-btn")
+                    finder()
                     files = (
                         ui.input(
                             "Files",
@@ -636,3 +718,12 @@ def open_wizard(
     # Closing the window halfway leaves no copied files behind.
     ui.context.client.on_disconnect(cleanup)
     dialog.open()
+
+
+def listed(label: str, values: list[str], shown: int = 5) -> str:
+    more = f" and {len(values) - shown} more" if len(values) > shown else ""
+    return f"{label} ({len(values)}): {', '.join(values[:shown])}{more}"
+
+
+def counted(n: int, one: str, many: str) -> str:
+    return f"{n} {one if n == 1 else many}"

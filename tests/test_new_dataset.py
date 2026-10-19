@@ -3,10 +3,11 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from conftest import rscript
 from test_long_files import make_long
 
 from labcatalog.exceptions import EditError
-from labcatalog.metadata import changes, new_dataset, studies
+from labcatalog.metadata import changes, folder_rules, new_dataset, studies
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
 from labcatalog.sources import load_datasets
@@ -52,7 +53,7 @@ def test_a_new_wave_follows_its_template_into_every_file(project_root, export):
     assert placement.step.name == "clean_child_w4"
     assert "raw/child_w4_export.csv data/child_w4.csv" in placement.step.run
 
-    brought = new_dataset.bring_in(project, export, placement)
+    brought = new_dataset.bring_in(project, export, placement, rscript())
     assert brought.run.exit_code == 0, brought.run.log
     assert brought.created == ["raw/child_w4_export.csv", "data/child_w4.csv"]
     dataset = new_dataset.dataset_config(project, draft, placement)
@@ -165,11 +166,11 @@ def test_a_folder_of_files_is_read_in_place(project_root):
     project = load_project(project_root)
     paths = new_dataset.folder_files(project_root / "bids")
     rule = "sub-{id}/ses-1/func/*_bold.nii.gz"
-    seen = new_dataset.preview_folder(paths, rule)
+    seen = folder_rules.count_folder(paths, rule)
     assert (seen.people, seen.files) == (2, 3)
     assert seen.unmatched == ["README", "sub-2002C/ses-1/anat/sub-2002C_T1w.nii.gz"]
     with pytest.raises(EditError, match="put {id} once"):
-        new_dataset.preview_folder(paths, "sub-*/ses-1/func/*_bold.nii.gz")
+        folder_rules.count_folder(paths, "sub-*/ses-1/func/*_bold.nii.gz")
 
     draft = new_dataset.suggest_blank(project, "mock_study")
     draft.name, draft.blank.modality, draft.blank.reporter = "scans_w1", "fmri", "child"

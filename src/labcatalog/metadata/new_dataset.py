@@ -20,7 +20,7 @@ from labcatalog.metadata.fixes import append_word
 from labcatalog.metadata.varmap import MAP_COLUMNS
 from labcatalog.paths import portable_path
 from labcatalog.project import Project
-from labcatalog.sources.folder_source import ID, file_pattern
+from labcatalog.sources import load_roster
 
 # Fields of the template that describe its own file, so a new dataset does not take them over.
 OWN_FILE = ("files",)
@@ -76,13 +76,6 @@ class Placement:
     copy_to: str | None
     data_path: str
     step: PrepareStep | None = None
-
-
-@dataclass
-class FolderPreview:
-    people: int
-    files: int
-    unmatched: list[str]
 
 
 @dataclass
@@ -166,19 +159,15 @@ def folder_files(folder: Path) -> list[str]:
     return sorted(p.relative_to(folder).as_posix() for p in folder.rglob("*") if not p.is_dir())
 
 
-def preview_folder(paths: list[str], files: str) -> FolderPreview:
-    if files.count(ID) != 1:
-        raise EditError("Files: put {id} once, where each file's path holds the ID")
-    matcher = file_pattern(files)
-    people = set()
-    unmatched = []
-    for path in paths:
-        found = matcher.fullmatch(path)
-        if found:
-            people.add(found.group("id"))
-        else:
-            unmatched.append(path)
-    return FolderPreview(len(people), len(paths) - len(unmatched), unmatched)
+def roster_ids(project: Project, study: str, reporter: str) -> set[str] | None:
+    # With a role column, only the people whose role is the dataset's reporter.
+    if project.config.studies[study].roster is None:
+        return None
+    roster = load_roster(project, study)
+    frame = roster.frame
+    if roster.role_column:
+        frame = frame[frame[roster.role_column].str.strip() == reporter]
+    return set(frame[roster.id_column])
 
 
 def study_of(project: Project, draft: Draft) -> str:
@@ -248,7 +237,13 @@ def renamed(text: str, old: str, new: str) -> str:
     return re.sub(rf"(?<![A-Za-z0-9]){re.escape(old)}(?![A-Za-z0-9])", new, text)
 
 
-def bring_in(project: Project, source: Path, placement: Placement) -> Brought:
+def bring_in(
+    project: Project,
+    source: Path,
+    placement: Placement,
+    rscript: str | None = None,
+    python: str | None = None,
+) -> Brought:
     # Copies the file in and runs the cleaning step; the caller removes `created` on cancel.
     root = project.root
     brought = Brought()
@@ -259,7 +254,7 @@ def bring_in(project: Project, source: Path, placement: Placement) -> Brought:
     if placement.step is not None:
         fresh = [p for p in placement.step.outputs if not (root / p).exists()]
         brought.run = StepRun(placement.step.name, placement.step.run)
-        execute(placement.step, root, brought.run, Session(), None, None, None)
+        execute(placement.step, root, brought.run, Session(), None, rscript, None, python)
         brought.created += [p for p in fresh if (root / p).exists()]
     return brought
 
