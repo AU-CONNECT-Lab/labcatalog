@@ -25,6 +25,8 @@ For a script that steps run, **Steps that run it** lists them as on the Add data
 
 For an analysis, the panel shows what was asked for, its datasets and variables, and **Delete**, which deletes the script and its entry under `analyses`. It runs on the Custom tab.
 
+When the project is in git, as every DataLad dataset is, **History** at the bottom lists the script's commits, newest first, with any change not yet saved as a version on top; open one to see what changed. The script is saved with the data in the same versions (see [Data versions](datasets.md#data-versions)), and a step run through DataLad records which version of the script made its files.
+
 ## New scripts
 
 **New script** asks for the script's **Stage** and language, R or Python, then what it works on:

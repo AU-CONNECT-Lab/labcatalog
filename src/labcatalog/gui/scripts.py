@@ -9,12 +9,21 @@ from labcatalog.data.prepare import step_state, step_states
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import new_script as script_dialog
 from labcatalog.gui import prepare
-from labcatalog.gui.common import computed, empty, folding_panel, note, page_head, panel
+from labcatalog.gui.common import (
+    computed,
+    empty,
+    file_changes,
+    folding_panel,
+    note,
+    page_head,
+    panel,
+)
 from labcatalog.gui.filter_bar import Filters, filter_bar
 from labcatalog.gui.prepare import PrepareView
 from labcatalog.gui.script_editor import script_editor
 from labcatalog.metadata import changes, editing
 from labcatalog.metadata.browse import row_counts, row_matches
+from labcatalog.metadata.history import file_history
 from labcatalog.metadata.scripts import (
     ANALYSIS,
     NO_STAGE,
@@ -225,6 +234,12 @@ def script_part(
         analysis_part(result, script, on_saved)
     else:
         steps_part(result, script, script.steps, running, redraw, on_saved)
+    changes = file_history(root, script.path)
+    if changes is not None:
+        with folding_panel(
+            "History", help_text=f"Changes to {script.path} recorded in git; open one to see them"
+        ):
+            file_changes(script.path, changes)
 
 
 def contract(result: CatalogResult, script: Script) -> None:

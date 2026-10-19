@@ -22,6 +22,7 @@ from labcatalog.gui.common import (
     col,
     computed,
     estimator_toggle,
+    file_changes,
     fmt,
     note,
     open_path,
@@ -816,12 +817,7 @@ def history(project: Project, instrument_id: str, changes: list[Change]) -> None
     with panel(
         "History", help_text=f"Changes to {path} recorded in git; open one to see what changed."
     ):
-        if not changes:
-            note(f"No commits include {path} yet.")
-        for change in changes:
-            caption = f"{change.date}, {change.author}" if change.commit else None
-            with ui.expansion(change.message, caption=caption).classes("w-full"):
-                ui.code(change.diff, language="diff").classes("w-full")
+        file_changes(path, changes)
 
 
 def about(

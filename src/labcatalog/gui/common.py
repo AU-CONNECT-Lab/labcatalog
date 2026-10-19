@@ -14,6 +14,7 @@ from labcatalog.config import LlmConfig, ProjectConfig
 from labcatalog.gui import preferences
 from labcatalog.gui.look import look, scoped
 from labcatalog.metadata.bibliography import Bibliography, citation
+from labcatalog.metadata.history import Change
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.summary import wave_order
 
@@ -111,6 +112,15 @@ def caption(text: str) -> None:
 
 def note(text: str) -> None:
     ui.label(text).classes("lc-note")
+
+
+def file_changes(path: str, changes: list[Change]) -> None:
+    if not changes:
+        note(f"No commits include {path} yet.")
+    for change in changes:
+        caption = f"{change.date}, {change.author}" if change.commit else None
+        with ui.expansion(change.message, caption=caption).classes("w-full"):
+            ui.code(change.diff, language="diff").classes("w-full")
 
 
 def cited(bibliography: Bibliography, key: str) -> None:
