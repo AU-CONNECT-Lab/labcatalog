@@ -2,9 +2,18 @@ import textwrap
 from dataclasses import dataclass
 
 from labcatalog import defaults
-from labcatalog.config import PrepareStep, dataset_by_name, id_column_for, missing_codes_for
+from labcatalog.config import (
+    PrepareStep,
+    dataset_by_name,
+    id_column_for,
+    id_pattern,
+    missing_codes_for,
+)
 from labcatalog.exceptions import EditError
+from labcatalog.metadata import folder_rules
+from labcatalog.metadata.new_dataset import folder_files
 from labcatalog.metadata.scripts import LANGUAGES, command
+from labcatalog.paths import expand_path
 from labcatalog.project import Project
 
 # Each stage's script: the function a person fills in, and the lines that apply it to the files.
@@ -35,10 +44,14 @@ args <- commandArgs(trailingOnly = TRUE)
 write.csv(clean(read.csv(args[1])), args[2], row.names = FALSE)
 """,
     ("extract", "python"): """\
+import re
 import sys
 from pathlib import Path
 
 import pandas as pd
+
+# Each person's file within the folder: {id} where its path holds the ID, * for any part of a name.
+FILES = "FILES_RULE"
 
 
 def features(path: Path) -> dict:
@@ -46,24 +59,44 @@ def features(path: Path) -> dict:
     return {}
 
 
+def person_files(folder: Path) -> list[tuple[str, Path]]:
+    pattern = re.escape(FILES).replace(r"\\*", "[^/]*").replace(r"\\{id\\}", "(?P<id>[^/]+)")
+    found = []
+    for path in sorted(p for p in folder.rglob("*") if p.is_file()):
+        if match := re.fullmatch(pattern, path.relative_to(folder).as_posix()):
+            found.append((match["id"], path))
+    return found
+
+
 if __name__ == "__main__":
     folder, target = Path(sys.argv[1]), sys.argv[2]
-    rows = []
-    for path in sorted(folder.iterdir()):
-        # The person's ID, here taken from the file's name.
-        rows.append({"ID_COLUMN": path.stem, **features(path)})
+    rows = [{"ID_COLUMN": person, **features(path)} for person, path in person_files(folder)]
     pd.DataFrame(rows).to_csv(target, index=False)
 """,
     ("extract", "r"): """\
+# Each person's file within the folder: {id} where its path holds the ID, * for any part of a name.
+FILES <- "FILES_RULE"
+
 features <- function(path) {
   # One person's output: return their row, such as list(alpha_power = 1.2).
   list()
 }
 
+person_files <- function(folder) {
+  pattern <- gsub("([][.+?^$()|\\\\\\\\])", "\\\\\\\\\\\\1", FILES, perl = TRUE)
+  pattern <- gsub("*", "[^/]*", pattern, fixed = TRUE)
+  pattern <- sub("{id}", "([^/]+)", pattern, fixed = TRUE)
+  paths <- list.files(folder, recursive = TRUE)
+  found <- regmatches(paths, regexec(paste0("^", pattern, "$"), paths))
+  found <- Filter(length, found)
+  data.frame(id = vapply(found, `[`, "", 2),
+             path = file.path(folder, vapply(found, `[`, "", 1)))
+}
+
 args <- commandArgs(trailingOnly = TRUE)
-rows <- lapply(list.files(args[1], full.names = TRUE), function(path) {
-  # The person's ID, here taken from the file's name.
-  data.frame(ID_COLUMN = tools::file_path_sans_ext(basename(path)), features(path))
+files <- person_files(args[1])
+rows <- lapply(seq_len(nrow(files)), function(i) {
+  as.data.frame(c(list(ID_COLUMN = files$id[i]), features(files$path[i])))
 })
 write.csv(do.call(rbind, rows), args[2], row.names = FALSE)
 """,
@@ -182,12 +215,16 @@ def stage_script(
         lines += dataset_lines(project, dataset)
     else:
         lines.append(f"It reads each recording in {source} and writes its output to {target}.")
+    files = EACH_FILE
+    if stage == "extract" and dataset is not None:
+        files, line = person_rule(project, source, dataset)
+        lines.append(line)
     lines.append(FUNCTIONS[stage])
     header = "\n".join(
         f"# {part}" for line in lines for part in textwrap.wrap(line, 96, subsequent_indent="  ")
     )
     id_column = id_column_for(project.config, found) if dataset else ""
-    body = BODIES[(stage, language)].replace("ID_COLUMN", id_column)
+    body = BODIES[(stage, language)].replace("ID_COLUMN", id_column).replace("FILES_RULE", files)
     step = PrepareStep(
         name=name, run=run, inputs=inputs, outputs=[target], stage=STEP_STAGES.get(stage, stage)
     )
@@ -207,6 +244,29 @@ FUNCTIONS = {
 # A query's step cleans: it turns the database into a dataset's file.
 STEP_STAGES = {"database": "clean"}
 NAME_STARTS = {"database": "query"}
+# One file per person, named after the ID, when the folder suggests nothing else.
+EACH_FILE = "{id}.*"
+
+
+def person_rule(project: Project, source: str, dataset: str) -> tuple[str, str]:
+    # The rule Add a data file would suggest for the folder, for the dataset's study and wave.
+    config = project.config
+    found = dataset_by_name(config, dataset)
+    folder = expand_path(source, project.root)
+    paths = folder_files(folder) if folder.is_dir() else []
+    pattern = id_pattern(config, found.study)[0]
+    key = folder_rules.id_field(folder_rules.path_fields(paths), pattern)
+    rules = folder_rules.suggest(paths, key, found.wave, pattern) if key is not None else []
+    if not rules:
+        return EACH_FILE, (
+            f"FILES below takes one file per person, named after the ID; {source} has no files "
+            "yet, or none whose path holds an ID, so change it to fit the folder."
+        )
+    rule = rules[0]
+    return rule.files, (
+        f"FILES below is the rule that fits most of {source} now: {rule.people} people, "
+        f"{rule.count} files."
+    )
 
 
 def dataset_lines(project: Project, dataset: str) -> list[str]:

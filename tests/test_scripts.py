@@ -1,5 +1,11 @@
+import subprocess
+import sys
+from pathlib import Path
+
+import pandas as pd
 import pytest
 import yaml
+from conftest import rscript
 
 from labcatalog.config import PrepareStep
 from labcatalog.exceptions import EditError
@@ -15,8 +21,40 @@ from labcatalog.metadata.scripts import (
     script_of,
     step_change,
 )
-from labcatalog.metadata.stage_scripts import stage_script
+from labcatalog.metadata.stage_scripts import EACH_FILE, stage_script
 from labcatalog.project import load_project
+
+
+def bids_folder(root: Path) -> str:
+    for person in ("1001C", "1002C"):
+        for session in ("1", "2"):
+            name = f"sub-{person}_ses-{session}_task-rest_eeg.tsv"
+            path = root / "derivatives" / "bids" / f"sub-{person}" / f"ses-{session}" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("x\n1\n", encoding="utf-8")
+    return "derivatives/bids"
+
+
+@pytest.mark.parametrize("language", ["python", "r"])
+def test_an_extract_script_finds_each_persons_file_by_the_folders_rule(mock_project, language):
+    command = [sys.executable] if language == "python" else [rscript()]
+    if command[0] is None:
+        pytest.skip("R is not installed")
+    project = load_project(mock_project)
+    made = stage_script(project, "extract", language, bids_folder(mock_project), dataset="eeg_w1")
+    assert "sub-{id}/ses-1/sub-*_ses-1_task-rest_eeg.tsv" in made.text
+    assert "2 people, 2 files" in made.text
+    script = mock_project / f"extract{'.py' if language == 'python' else '.R'}"
+    script.write_text(made.text, encoding="utf-8")
+    out = mock_project / "out.csv"
+    subprocess.run([*command, script, mock_project / "derivatives/bids", out], check=True)
+    assert pd.read_csv(out)["pid"].tolist() == ["1001C", "1002C"]
+
+
+def test_an_extract_script_takes_a_file_per_person_when_the_folder_says_nothing(mock_project):
+    project = load_project(mock_project)
+    made = stage_script(project, "extract", "python", "derivatives/new", dataset="eeg_w1")
+    assert f'FILES = "{EACH_FILE}"' in made.text and "has no files yet" in made.text
 
 
 def test_scripts_are_listed_with_the_steps_that_run_them(mock_project):
@@ -108,7 +146,8 @@ def test_a_stage_script_says_what_it_reads_and_writes_and_comes_with_its_step(mo
     change = step_change(project, None, made.step)
     assert changes.check(project, [change]) == []
     extract = stage_script(project, "extract", "r", "derivatives/eeg/ses-1", dataset="eeg_w1")
-    assert "data.frame(pid = " in extract.text and extract.step.stage == "extract"
+    assert "list(pid = " in extract.text and extract.step.stage == "extract"
+    assert 'FILES <- "{id}_bandpower.csv"' in extract.text
     process = stage_script(
         project, "process", "python", "raw/eeg", "derivatives/eeg", name="process_eeg"
     )
