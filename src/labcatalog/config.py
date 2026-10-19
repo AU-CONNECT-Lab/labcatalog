@@ -243,10 +243,8 @@ class ProjectConfig(StrictModel):
     analyses: list[SavedAnalysis] = []
     # Runs each prepare step through datalad run, which records it in the dataset's history.
     prepare_with: Literal["datalad"] | None = None
-    # Template of each instrument's Measures paragraph, in place of the built-in one.
-    measures: str | None = None
-    # Template of each study's Participants paragraph, in place of the built-in one.
-    participants: str | None = None
+    # The lab's wording of the paragraphs labcatalog writes: one text, or a text for each part.
+    templates: dict[str, str | dict[str, str]] = {}
 
 
 def dataset_by_name(config: ProjectConfig, name: str) -> DatasetConfig:

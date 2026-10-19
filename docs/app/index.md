@@ -33,10 +33,11 @@ Set up holds the work of building a project, in the order it is usually done. It
 |---|---|
 | [Overview](overview.md) | The project at a glance: waves, collection, scores. |
 | [Instruments](instruments.md) | Browse, search and export instruments; each instrument's items, scores, reliability and factor structure. |
-| [Studies](studies.md) | Each study's label, reference, waves, milestones and methods text; new, renamed and deleted studies. |
+| [Studies](studies.md) | Each study's label, reference, waves, milestones and procedure text; new, renamed and deleted studies. |
 | [Datasets](datasets.md) | Each data file: who is in it, completeness, missing values; freezes. |
 | [Analysis](analysis.md) | Correlations, regression, group comparisons and multilevel models. |
 | [Methods](methods.md) | Draft text and tables for a methods section. |
+| [Templates](templates.md) | The wording of the paragraphs labcatalog writes. |
 | Set up | Steps in order: [Codebook](codebook.md) describes the instruments before there is data and holds [the editor](edit.md) of the project's files, [Add data](add-data.md) adds data files, their [prepare steps](prepare.md) and their column maps, [Check IDs](ids.md) checks and corrects each file's IDs; then [Review](review.md) on the Datasets page looks over each data file and its scores. |
 | [Problems](problems.md) | Every mismatch between metadata and data. |
 | [Settings](settings.md) | R, DataLad, the language model, charts and tables. |

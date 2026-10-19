@@ -102,6 +102,12 @@ def copy_text(text: str) -> None:
         copy_button("Copy text", "Text", {"text/plain": text})
 
 
+def wording_button(on_click: Callable[[], None]) -> None:
+    ui.button("Wording", icon="edit_note", on_click=on_click).props("flat dense no-caps").classes(
+        "lc-quiet-btn"
+    ).tooltip("Change the template this paragraph is written from")
+
+
 def wants_latex() -> bool:
     return preferences.mine().get(preferences.TABLE_FORMAT) == preferences.LATEX
 

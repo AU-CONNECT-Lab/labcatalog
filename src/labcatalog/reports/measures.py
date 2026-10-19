@@ -1,47 +1,18 @@
-import string
-
 from labcatalog.config import dataset_by_name
 from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.metadata.bibliography import in_text
 from labcatalog.project import Project
+from labcatalog.reports import templates
 from labcatalog.schema import SCRIPT, Instrument
 from labcatalog.stats.cfa import WLSMV, CfaFit
 from labcatalog.stats.summary import Summary
 
-DEFAULT_TEMPLATE = "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}"
-PLACEHOLDERS = (
-    "name",
-    "abbreviation",
-    "cite",
-    "named",
-    "construct",
-    "reporter",
-    "n_items",
-    "scale",
-    "description",
-    "items",
-    "reverse",
-    "scoring",
-    "alpha",
-    "omega",
-)
 # APA writes numbers below ten as words.
 WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 
 
 def template_for(project: Project, instrument: Instrument) -> str:
-    return instrument.measures or project.config.measures or DEFAULT_TEMPLATE
-
-
-def placeholder_problem(template: str, allowed: tuple[str, ...]) -> str | None:
-    try:
-        fields = [f for _, f, _, _ in string.Formatter().parse(template) if f is not None]
-    except ValueError as e:
-        return f"{e}; write a literal brace as {{{{ or }}}}"
-    wrong = [f for f in fields if f not in allowed]
-    if wrong:
-        return f"unknown placeholder {{{wrong[0]}}}; use one of {', '.join(allowed)}"
-    return None
+    return instrument.measures or templates.project_text(project.config, "measures")
 
 
 def paragraph(
@@ -51,9 +22,10 @@ def paragraph(
     instrument: Instrument,
     dataset: str,
     fits: list[CfaFit],
+    template: str | None = None,
 ) -> str:
     values = placeholder_values(project, catalog, summary, instrument, dataset, fits)
-    text = template_for(project, instrument).format_map(values)
+    text = (template or template_for(project, instrument)).format_map(values)
     return " ".join(text.split())
 
 

@@ -88,7 +88,7 @@ def test_a_modality_label_must_name_a_modality(mock_project):
 def test_study_template_wins_over_the_project_one(mock_project):
     config = mock_project / "labcatalog.yaml"
     data = yaml.safe_load(config.read_text(encoding="utf-8"))
-    data["participants"] = "{study}: {n_waves} waves. {retention}"
+    data["templates"] = {"participants": "{study}: {n_waves} waves. {retention}"}
     config.write_text(yaml.safe_dump(data), encoding="utf-8")
     result = run_catalog(mock_project)
     text = participants.paragraph(result.project, result.summary, "mock_study")
@@ -101,7 +101,7 @@ def test_study_template_wins_over_the_project_one(mock_project):
 def test_unknown_participants_placeholder_is_an_error(mock_project):
     config = mock_project / "labcatalog.yaml"
     data = yaml.safe_load(config.read_text(encoding="utf-8"))
-    data["participants"] = "{name} took part."
+    data["templates"] = {"participants": "{name} took part."}
     config.write_text(yaml.safe_dump(data), encoding="utf-8")
     issues = validate_project(load_project(mock_project))
     found = [i for i in issues if i.message.startswith("participants:")]

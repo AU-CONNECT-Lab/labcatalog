@@ -40,6 +40,7 @@ from labcatalog.gui.paper import (
     results_text,
     save_button,
     without_empty,
+    wording_button,
 )
 from labcatalog.metadata.browse import BrowseIndex, counts, matches
 from labcatalog.metadata.completeness import gaps
@@ -141,6 +142,8 @@ class CfaView:
     invariance_estimator: str | None = None
     refit: Callable[[], Awaitable[None]] | None = None
     retest: Callable[[], Awaitable[None]] | None = None
+    # Opens the Templates page at a template, for a study or instrument or the project.
+    open_template: Callable[[str, str | None], None] | None = None
 
 
 def render(
@@ -1272,9 +1275,9 @@ def measures_section(
         help_text=f"A draft for the paper's Measures section, with α and ω from {dataset}",
     ) as tools:
         with tools:
+            wording_button(partial(cfa.open_template, "measures", instrument.id))
             copy_text(text)
         ui.label(text).classes("lc-prose")
-        note("Change the wording with description: and measures: in the YAML files.")
 
 
 def description_draft(result: CatalogResult, instrument: Instrument) -> None:

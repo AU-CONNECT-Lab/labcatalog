@@ -5,7 +5,7 @@ from labcatalog.gui import analysis as analysis_page
 from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
-from labcatalog.reports import measures
+from labcatalog.reports import measures, templates
 from labcatalog.stats import analysis
 from labcatalog.stats.cfa import ML, WLSMV, CfaFit
 
@@ -45,7 +45,7 @@ def test_default_paragraph_reads_like_a_measures_section(result):
 def test_instrument_template_wins_over_the_project_one(mock_project):
     config = mock_project / "labcatalog.yaml"
     data = yaml.safe_load(config.read_text(encoding="utf-8"))
-    data["measures"] = "{name} by {reporter}."
+    data["templates"] = {"measures": "{name} by {reporter}."}
     config.write_text(yaml.safe_dump(data), encoding="utf-8")
     result = run_catalog(mock_project)
     assert paragraph(result) == "Example Mood Scale by child."
@@ -62,8 +62,9 @@ def test_unknown_placeholders_and_stray_braces_are_errors(mock_project):
     issues = validate_project(load_project(mock_project))
     found = [i for i in issues if i.message.startswith("measures:")]
     assert len(found) == 1 and "unknown placeholder {nmae}" in found[0].message
-    assert measures.placeholder_problem("{name", measures.PLACEHOLDERS) is not None
-    assert measures.placeholder_problem("a {{literal}} {name}", measures.PLACEHOLDERS) is None
+    allowed = templates.TEMPLATES["measures"].slot(templates.PARAGRAPH).placeholders
+    assert templates.placeholder_problem("{name", allowed) is not None
+    assert templates.placeholder_problem("a {{literal}} {name}", allowed) is None
 
 
 def test_the_analysis_page_gives_a_paragraph_per_instrument_it_uses(result):

@@ -13,11 +13,9 @@ from labcatalog.gui.datasets import dataset_table
 from labcatalog.issues import Issue
 from labcatalog.metadata import changes, records, studies
 from labcatalog.pipeline import CatalogResult
-from labcatalog.reports import participants
-from labcatalog.reports.measures import placeholder_problem
 
 NO_REFERENCE = "(none)"
-TABS = {"study": "Study", "text": "Text", "datasets": "Datasets"}
+TABS = {"study": "Study", "text": "Procedure", "datasets": "Datasets"}
 
 
 @dataclass
@@ -252,7 +250,7 @@ def detail(
         try:
             pending = [
                 studies.edit_change(project, study, edited),
-                studies.text_change(project, study, texts, template.value or ""),
+                studies.text_change(project, study, texts),
             ]
             pending = [c for c in pending if c and (c.opened is None or c.text != c.opened.text)]
             issues = await computed(changes.check, project, pending)
@@ -330,7 +328,7 @@ def detail(
         milestones = milestones_panel(found, touched)
         charts.collection_pace(result, study)
     with parts["text"]:
-        boxes, template = text_panels(result, study, touched)
+        boxes = text_panels(result, study, touched)
     with parts["datasets"]:
         datasets_panel(result, study, actions.on_dataset, on_added)
     switch(view.tab)
@@ -391,7 +389,7 @@ def milestones_panel(found, touched: Callable[[], None]) -> ui.aggrid:
 
 def text_panels(
     result: CatalogResult, study: str, touched: Callable[[], None]
-) -> tuple[dict[str, ui.textarea], ui.textarea]:
+) -> dict[str, ui.textarea]:
     project = result.project
     vocab = project.config.vocab
     content = next((c for c in project.studies.values() if c.study == study), None)
@@ -400,7 +398,7 @@ def text_panels(
     modalities = [m for m in vocab.modalities if m in used] + sorted(used - set(vocab.modalities))
     boxes = {}
     with panel(
-        "Methods",
+        "Procedure",
         help_text="How each modality's data were collected and processed, for the Methods page.",
     ):
         if not modalities:
@@ -419,26 +417,7 @@ def text_panels(
                 .classes("w-full")
             )
         note("Leave a blank line between paragraphs.")
-
-    def preview() -> None:
-        text = template.value or project.config.participants or participants.DEFAULT_TEMPLATE
-        problem = placeholder_problem(text, participants.PLACEHOLDERS)
-        shown.set_text(problem or participants.paragraph(project, result.summary, study, text))
-
-    with panel(
-        "Participants", help_text="The template of the Participants paragraph on the Methods page."
-    ):
-        own = (content.participants or "").strip() if content else ""
-        template = (
-            ui.textarea("Template", value=own, on_change=touched)
-            .classes("lc-grow")
-            .classes("w-full")
-        )
-        names = ", ".join(f"{{{p}}}" for p in participants.PLACEHOLDERS)
-        note(f"Placeholders: {names}. Leave it empty to use the project's template.")
-        ui.button("Preview", icon="visibility", on_click=preview).props("flat dense no-caps")
-        shown = ui.label().classes("lc-prose")
-    return boxes, template
+    return boxes
 
 
 def datasets_panel(

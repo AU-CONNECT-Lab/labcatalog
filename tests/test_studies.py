@@ -102,24 +102,21 @@ def test_a_new_study_gets_its_entry_and_study_file(mock_project):
         studies.new_study(after, "Pilot 2", "")
 
 
-def test_methods_and_participants_are_written_as_blocks(mock_project):
+def test_methods_are_written_as_blocks(mock_project):
     project = load_project(mock_project)
     methods = dict(project.studies["mock_study"].methods)
-    assert studies.text_change(project, "mock_study", methods, "") is None
+    assert studies.text_change(project, "mock_study", methods) is None
     methods["eeg"] = "Recorded at 500 Hz.  \r\n\r\nCleaned by hand.\n\n"
     methods["saliva"] = ""
-    template = "{waves} {counts}"
-    change = studies.text_change(project, "mock_study", methods, template)
+    change = studies.text_change(project, "mock_study", methods)
     assert "  eeg: |\n    Recorded at 500 Hz.\n\n    Cleaned by hand.\n  fmri: |" in change.text
     assert "  saliva:" not in change.text
-    assert "\nparticipants: |\n  {waves} {counts}\nadministrations:" in change.text
-    # Only the changed modalities and the new template differ from the file as it was.
-    assert len(changed_lines(change.opened.text, change.text)) == 8
+    # Only the changed modalities differ from the file as it was.
+    assert len(changed_lines(change.opened.text, change.text)) == 6
     assert changes.check(project, [change]) == []
     changes.write(project, [change])
     after = load_project(mock_project).studies["mock_study"]
     assert after.methods["eeg"] == "Recorded at 500 Hz.\n\nCleaned by hand.\n"
-    assert after.participants == "{waves} {counts}\n"
 
 
 def test_a_dataset_can_have_its_own_methods(mock_project):

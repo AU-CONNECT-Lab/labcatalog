@@ -1,16 +1,15 @@
 from labcatalog.config import Vocab, WaveConfig
 from labcatalog.project import Project
+from labcatalog.reports import templates
 from labcatalog.reports.measures import number, series
 from labcatalog.stats.summary import ModalityCount, Summary, WaveRetention, wave_order
 
-DEFAULT_TEMPLATE = "{waves} {counts} {demographics} {retention} {modalities}"
-PLACEHOLDERS = ("study", "n_waves", "waves", "counts", "demographics", "retention", "modalities")
 BLANK = "[ ]"
 
 
 def template_for(project: Project, study: str) -> str:
     own = [c.participants for c in project.studies.values() if c.study == study and c.participants]
-    return next(iter(own), None) or project.config.participants or DEFAULT_TEMPLATE
+    return next(iter(own), None) or templates.project_text(project.config, "participants")
 
 
 def paragraph(project: Project, summary: Summary, study: str, template: str | None = None) -> str:

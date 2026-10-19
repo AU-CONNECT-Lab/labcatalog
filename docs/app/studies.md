@@ -1,10 +1,10 @@
 # Studies
 
-The Studies page shows and edits each study: its label, description and reference, its waves and milestones from `studies` in `labcatalog.yaml`, and the methods text and Participants template from its study file. **Studies** beside the study picker at the top right opens it. The studies are listed on the left; click one to open it. The page opens the study chosen in the picker, and choosing another on the page leaves the picker as it is. See [Studies, Waves and Datasets](../concepts/studies-waves-datasets.md).
+The Studies page shows and edits each study: its label, description and reference, its waves and milestones from `studies` in `labcatalog.yaml`, and the procedure text from its study file. **Studies** beside the study picker at the top right opens it. The studies are listed on the left; click one to open it. The page opens the study chosen in the picker, and choosing another on the page leaves the picker as it is. See [Studies, Waves and Datasets](../concepts/studies-waves-datasets.md).
 
 ![The Studies page with the example study open](../images/app/studies.png)
 
-A study opens with its label and ID on top, the buttons **Rename**, **Delete**, **Discard** and **Save**, and three tabs: Study, Text and Datasets.
+A study opens with its label and ID on top, the buttons **Rename**, **Delete**, **Discard** and **Save**, and three tabs: Study, Procedure and Datasets.
 
 ## Study
 
@@ -20,11 +20,11 @@ A study opens with its label and ID on top, the buttons **Rename**, **Delete**, 
 
 **Collection pace**: for each reporter, how many people had come in by each week since each wave started, one line per wave, so a wave still collecting can be set against the ones before it. Each person counts once in a wave, from the earliest date in any of their files. It needs a `date_column` on the datasets.
 
-## Text
+## Procedure
 
-**Methods**: one box per modality the study's datasets use, for how its data were collected and processed, and one for each dataset given its own text in the study file. The text is shown on the [Methods](methods.md) page under Procedure and with each dataset. Leave a blank line between paragraphs. It is written to `methods` in the study file.
+One box per modality the study's datasets use, for how its data were collected and processed, and one for each dataset given its own text in the study file. The text is shown on the [Methods](methods.md) page under Procedure and with each dataset. Leave a blank line between paragraphs. It is written to `methods` in the study file.
 
-**Participants**: the template of the study's Participants paragraph on the Methods page, with placeholders such as `{waves}` and `{counts}`; the page lists them all. Leave it empty to use the project's template. **Preview** writes the paragraph from the current data with the template in the box, before you save it.
+The study's own wording of the Participants paragraph is set on the [Templates](templates.md) page.
 
 ## Datasets
 

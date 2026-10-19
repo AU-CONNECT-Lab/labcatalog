@@ -115,9 +115,7 @@ def write_milestones(entry: CommentedMap, rows: list[dict]) -> None:
         records.fill(milestone, MILESTONES, row)
 
 
-def text_change(
-    project: Project, study: str, methods: dict[str, str], participants: str
-) -> Change | None:
+def text_change(project: Project, study: str, methods: dict[str, str]) -> Change | None:
     relative = study_file(project, study)
     opened = None
     text = f"{MODELINE.format('study')}\nstudy: {study}\n"
@@ -132,7 +130,6 @@ def text_change(
         place_key(data, "methods", written, after="study")
     else:
         data.pop("methods", None)
-    set_block(data, "participants", participants, after="methods" if written else "study")
     new = records.dumped(data)
     return None if new == text else Change(relative, new, opened)
 

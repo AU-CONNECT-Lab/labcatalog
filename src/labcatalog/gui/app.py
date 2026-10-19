@@ -39,6 +39,7 @@ from labcatalog.gui import (
     setup,
     shared,
     studies,
+    templates,
     theme,
 )
 from labcatalog.gui.analysis import AnalysisView
@@ -63,6 +64,7 @@ from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
 from labcatalog.gui.setup import SetupView
 from labcatalog.gui.studies import StudiesView
+from labcatalog.gui.templates import TemplatesView
 from labcatalog.issues import Issue
 from labcatalog.metadata import accepted
 from labcatalog.metadata.browse import BrowseIndex, build_index
@@ -81,7 +83,7 @@ WINDOW_SIZE = (1280, 820)
 # Groups of pages, drawn with a line between them; Studies and Settings open from the header.
 PAGES = (
     (("overview", "Overview"), ("instruments", "Instruments"), ("datasets", "Datasets")),
-    (("analysis", "Analysis"), ("methods", "Methods")),
+    (("analysis", "Analysis"), ("methods", "Methods"), ("templates", "Templates")),
     # Set up's steps, numbered, all showing the one Set up page.
     tuple(setup.STEPS.items()),
     (("problems", "Problems"),),
@@ -189,6 +191,7 @@ class Window:
         self.problem_filters = Filters()
         self.analysis = AnalysisView()
         self.methods = MethodsView()
+        self.wording = TemplatesView()
         self.importing = ImportView()
         self.codebook = CodebookView()
         self.editing = EditView()
@@ -202,6 +205,7 @@ class Window:
             reload=self.reload,
             refit=self.fit_factor_models,
             retest=self.test_invariance,
+            open_template=self.open_template,
         )
         self.dataset: str | None = None
         # The study the pages are narrowed to, None for every study.
@@ -339,6 +343,8 @@ class Window:
                 self.analysis_panel()
             with ui.tab_panel("methods").classes("lc-page"):
                 self.methods_panel()
+            with ui.tab_panel("templates").classes("lc-page"):
+                self.templates_panel()
             with ui.tab_panel(SETUP).classes("lc-page"):
                 # Every step stays built, so an unsaved edit survives a look at another step.
                 for name, parts in (
@@ -433,6 +439,7 @@ class Window:
                 self.problem_filters = Filters()
                 self.analysis = AnalysisView()
                 self.methods = MethodsView()
+                self.wording = TemplatesView()
                 self.importing = ImportView()
                 self.codebook = CodebookView()
                 self.editing = EditView()
@@ -581,6 +588,7 @@ class Window:
             self.datasets_panel,
             self.analysis_panel,
             self.methods_panel,
+            self.templates_panel,
             self.codebook_panel,
             self.add_data_panel,
             self.prepare_panel,
@@ -819,6 +827,16 @@ class Window:
     def methods_panel(self) -> None:
         if self.has_catalog():
             methods.render(self.result, self.methods, self.cfa, self.scope)
+
+    @ui.refreshable_method
+    def templates_panel(self) -> None:
+        if self.has_catalog():
+            templates.render(self.result, self.wording, self.reload)
+
+    def open_template(self, key: str, owner: str | None = None) -> None:
+        self.wording.key, self.wording.owner = key, owner or ""
+        self.templates_panel.refresh()
+        self.tabs.set_value("templates")
 
     @ui.refreshable_method
     def codebook_panel(self) -> None:

@@ -166,9 +166,9 @@ The language model the lab uses, set on the Settings page. API keys are never ke
 
 The analyses kept from the Custom tab of the Analysis page, each with a `name`, its `script` (in the `analyses` folder, `.R`, `.py` or `.inp`), the `datasets` and `variables` it reads, `every_dataset` (only people in every dataset, the default, or anyone in one) and the `request` it was drafted from. See [Analysis](../app/analysis.md).
 
-## measures and participants
+## templates
 
-Templates of the Measures and Participants paragraphs on the Methods page. See [Write the Methods Section](../how-to/write-methods.md).
+The project's wording of the paragraphs labcatalog writes, by template: `participants` and `measures`, each one text with placeholders in braces. See [Templates](../app/templates.md).
 
 ## schema_version
 

@@ -33,6 +33,7 @@ project:
         - file: app/review.md
         - file: app/analysis.md
         - file: app/methods.md
+        - file: app/templates.md
         - file: app/codebook.md
         - file: app/add-data.md
         - file: app/prepare.md

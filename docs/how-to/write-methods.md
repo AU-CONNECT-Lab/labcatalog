@@ -30,11 +30,12 @@ The Measures part has one paragraph per instrument given in the chosen wave: its
 
 ## Change the wording
 
-Both paragraphs come from templates with placeholders in braces. To change the wording for the whole project, set a template in `labcatalog.yaml`:
+Both paragraphs come from templates with placeholders in braces. **Wording** beside a paragraph opens its template on the [Templates](../app/templates.md) page, where it can be changed for the whole project, or for one study (Participants) or one instrument (Measures), with a preview from your data. The templates are kept under `templates` in `labcatalog.yaml`:
 
 ```yaml
-measures: "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}"
-participants: "{waves} {counts} {demographics} {retention} {modalities}"
+templates:
+  measures: "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}"
+  participants: "{waves} {counts} {demographics} {retention} {modalities}"
 ```
 
 An instrument can have its own `measures` template, and a study its own `participants` template in its file in `studies/`.

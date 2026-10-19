@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from functools import partial
 
 from nicegui import ui
 
@@ -17,7 +18,7 @@ from labcatalog.gui.common import (
 )
 from labcatalog.gui.datasets import paragraphs
 from labcatalog.gui.instruments import CFA_DONE, CFA_RUNNING, CFA_UNSET, CfaView
-from labcatalog.gui.paper import copy_text, paper_table, save_button
+from labcatalog.gui.paper import copy_text, paper_table, save_button, wording_button
 from labcatalog.metadata.studies import wave_methods
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import measures, participants
@@ -68,7 +69,7 @@ def render(
                     value=view.wave,
                     on_change=lambda e: choose_wave(e.value),
                 ).props("dense no-caps")
-        participants_part(result, view)
+        participants_part(result, view, cfa)
         procedure(result, view.study, view.wave)
         measures_body(result, view, cfa)
 
@@ -83,15 +84,13 @@ def render(
     body()
 
 
-def participants_part(result: CatalogResult, view: MethodsView) -> None:
+def participants_part(result: CatalogResult, view: MethodsView, cfa: CfaView) -> None:
     study = view.study
     text = participants.paragraph(result.project, result.summary, study)
-    with panel(
-        "Participants",
-        help_text="Change the wording with participants: in labcatalog.yaml or the study file.",
-    ) as tools:
+    with panel("Participants", help_text="How many took part at each wave and came back") as tools:
         ui.label(text).classes("lc-prose")
     with tools:
+        wording_button(partial(cfa.open_template, "participants", study))
         copy_text(text)
     group = result.summary.group_name
     counted = (
@@ -234,7 +233,7 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
     used.sort(key=lambda pair: (order.index(pair[0]), datasets.index(pair[1])))
     with panel(
         "Measures",
-        help_text="Each instrument's paragraph; change its wording on the instrument's page.",
+        help_text="Each instrument's paragraph, with its reliability in this wave",
     ) as tools:
         if not used:
             note("No instruments in this wave.")
@@ -243,6 +242,7 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
             ui.label("ω fills in when the factor models finish.").classes("lc-status lc-info")
         texts = measure_paragraphs(result, used, cfa)
     with tools:
+        wording_button(partial(cfa.open_template, "measures", None))
         copy_text("\n\n".join(texts))
 
 

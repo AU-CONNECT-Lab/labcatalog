@@ -15,7 +15,7 @@ from labcatalog.config import (
 from labcatalog.issues import Issue, IssueLevel
 from labcatalog.metadata.varmap import MapEntry
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
-from labcatalog.reports import measures, participants
+from labcatalog.reports import templates
 from labcatalog.schema import SCRIPT, Administration, Instrument
 
 CONFIG = defaults.CONFIG_FILENAME
@@ -728,28 +728,31 @@ def same_file(project: Project, path: str) -> str:
 
 
 def check_templates(project: Project) -> list[Issue]:
-    config = project.config
-    templates = [
-        ("measures", config.measures, CONFIG, measures.PLACEHOLDERS),
-        ("participants", config.participants, CONFIG, participants.PLACEHOLDERS),
-        *[
-            ("measures", instrument.measures, project.instrument_files[name], measures.PLACEHOLDERS)
-            for name, instrument in project.instruments.items()
-        ],
-        *[
-            (
-                "participants",
-                content.participants,
-                project.study_files[name],
-                participants.PLACEHOLDERS,
-            )
-            for name, content in project.studies.items()
-        ],
-    ]
-    return [
-        problem("invalid_value", f"{where}: {found}", location)
-        for where, template, location, allowed in templates
-        if template and (found := measures.placeholder_problem(template, allowed))
+    issues, texts = [], []
+    for key, written in project.config.templates.items():
+        if shape := templates.shape_problem(key, written):
+            issues.append(problem("invalid_value", f"templates: {shape}", CONFIG))
+            continue
+        parts = {templates.PARAGRAPH: written} if isinstance(written, str) else written
+        for slot, text in parts.items():
+            where = key if isinstance(written, str) else f"{key}.{slot}"
+            texts.append((where, text, CONFIG, templates.TEMPLATES[key].slot(slot).placeholders))
+    for key, owned in (
+        (
+            "measures",
+            {project.instrument_files[n]: i.measures for n, i in project.instruments.items()},
+        ),
+        (
+            "participants",
+            {project.study_files[n]: c.participants for n, c in project.studies.items()},
+        ),
+    ):
+        allowed = templates.TEMPLATES[key].slot(templates.PARAGRAPH).placeholders
+        texts += [(key, text, location, allowed) for location, text in owned.items()]
+    return issues + [
+        problem("invalid_value", f"{where}: {wrong}", location)
+        for where, text, location, allowed in texts
+        if text and (wrong := templates.placeholder_problem(text, allowed))
     ]
 
 
