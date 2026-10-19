@@ -30,7 +30,7 @@ prepare:
 | `outputs` | The files the step writes: new files, never one of its inputs, and never a file another step writes. `labcatalog check` and the Problems page report a step that would overwrite what it reads, so the raw files stay as exported. |
 | `stage` | Optional: `clean`, `process`, `extract` or `score`, what the step does. The Scripts page groups and filters by it. |
 
-A step is **outdated** when one of its inputs is newer than one of its outputs. List the script itself among the inputs, so that changing the script also marks the step outdated. A step is **missing output** when an output does not exist yet, and **missing input** when an input does not.
+A step is **outdated** when one of its inputs is newer than one of its outputs. List the script itself among the inputs, so that changing the script also marks the step outdated. A step is **missing output** when an output does not exist yet, and **missing input** when an input does not. A folder counts by its newest file, at any depth, so a recording written again deep in `raw/` makes the step outdated; an empty folder counts as missing.
 
 ## From a database
 

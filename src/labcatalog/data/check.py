@@ -596,6 +596,8 @@ def check_prepare_outputs(project: Project) -> list[Issue]:
                 missing = (
                     fetch_advice(output.resolved)
                     if output.placeholder
+                    else f"{output.path} has no files yet; run the step"
+                    if output.resolved.is_dir()
                     else f"{output.path} does not exist; run the step"
                 )
                 issues.append(

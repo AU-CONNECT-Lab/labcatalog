@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from conftest import rscript
 
+from labcatalog.data import prepare
 from labcatalog.data.prepare import Session, run_steps, running, step_states, stop
 from labcatalog.exceptions import PrepareBusyError
 from labcatalog.metadata.accepted import who
@@ -82,6 +83,30 @@ def test_steps_run_in_order_and_rerun_only_what_is_outdated(project_root):
     assert [r.name for r in runs] == ["clean", "summarize"]
     assert (project_root / "data" / "b.txt").read_text(encoding="utf-8") == "2"
     assert run_steps(load_project(project_root), ["clean", "summarize"], session, True) == []
+
+
+def test_a_folder_counts_as_changed_when_a_file_deep_in_it_changes(tmp_path):
+    recordings, out = tmp_path / "raw" / "sub-1" / "ses-1", tmp_path / "derivatives"
+    recordings.mkdir(parents=True)
+    out.mkdir()
+    state = prepare.file_state(tmp_path, "derivatives")
+    assert state.modified is None
+    assert prepare.status_of([prepare.file_state(tmp_path, "raw")], [state]) == "missing input"
+    (recordings / "eeg.edf").write_text("1", encoding="utf-8")
+    (out / "sub-1").mkdir()
+    (out / "sub-1" / "features.tsv").write_text("2", encoding="utf-8")
+    hour_ago = time.time() - 3600
+    set_time(out / "sub-1" / "features.tsv", hour_ago)
+    # The folders' own times do not change when the recording is written again.
+    set_time(tmp_path / "raw", hour_ago - 60)
+    inputs, outputs = (
+        [prepare.file_state(tmp_path, "raw")],
+        [prepare.file_state(tmp_path, "derivatives")],
+    )
+    assert prepare.status_of(inputs, outputs) == "outdated"
+    set_time(recordings / "eeg.edf", hour_ago - 60)
+    inputs = [prepare.file_state(tmp_path, "raw")]
+    assert prepare.status_of(inputs, outputs) == "up to date"
 
 
 def test_a_failing_step_stops_the_rest(project_root):

@@ -86,8 +86,15 @@ def file_state(root: Path, path: str) -> FileState:
     resolved = expand_path(path, root)
     if is_placeholder(resolved):
         return FileState(path, resolved, None, placeholder=True)
-    modified = datetime.fromtimestamp(resolved.stat().st_mtime) if resolved.exists() else None
-    return FileState(path, resolved, modified)
+    return FileState(path, resolved, modified_time(resolved))
+
+
+def modified_time(path: Path) -> datetime | None:
+    # A folder's own time misses changes deeper in it, so it takes its newest file's; empty is None.
+    if path.is_dir():
+        times = [p.lstat().st_mtime for p in path.rglob("*") if not p.is_dir()]
+        return datetime.fromtimestamp(max(times)) if times else None
+    return datetime.fromtimestamp(path.stat().st_mtime) if path.exists() else None
 
 
 def status_of(inputs: list[FileState], outputs: list[FileState]) -> Status:
