@@ -4,7 +4,7 @@ from labcatalog.metadata import changes
 from labcatalog.metadata.templates import template_change
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
-from labcatalog.reports import templates
+from labcatalog.reports import template_examples, templates
 
 
 def test_a_project_template_is_written_under_templates_and_the_default_removes_it(mock_project):
@@ -67,3 +67,12 @@ def test_each_built_in_part_uses_its_placeholders_and_its_example_fills_it():
             assert templates.placeholder_problem(slot.default, slot.placeholders) is None
             if found.part == templates.RESULTS:
                 assert set(slot.example) == set(slot.placeholders), (found.key, slot.key)
+
+
+def test_each_results_template_has_an_example_written_with_the_wording_being_edited():
+    results_keys = [k for k, t in templates.TEMPLATES.items() if t.part == templates.RESULTS]
+    assert sorted(template_examples.EXAMPLES) == sorted(results_keys)
+    for key, write in template_examples.EXAMPLES.items():
+        assert write(templates.Wording())
+    edited = templates.Wording({"groups": {"two": "{outcome} differed ({p})."}})
+    assert template_examples.groups(edited) == "Mood differed (p = .023)."

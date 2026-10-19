@@ -10,8 +10,8 @@ from labcatalog.gui.common import computed, page_head, panel
 from labcatalog.metadata import changes
 from labcatalog.metadata.templates import same, template_change
 from labcatalog.pipeline import CatalogResult
-from labcatalog.reports import measures, participants, templates
-from labcatalog.reports.templates import INSTRUMENT, PARAGRAPH, STUDY, Slot, Template
+from labcatalog.reports import measures, participants, template_examples, templates
+from labcatalog.reports.templates import INSTRUMENT, PARAGRAPH, STUDY, Template, Wording
 
 # The owner choice that stands for the project's own wording.
 PROJECT = ""
@@ -90,6 +90,7 @@ def editor(
 ) -> None:
     project = result.project
     current = wording(result, found, view.owner)
+    filled = methods_values(result, found, view.owner)
     boxes: dict[str, ui.textarea] = {}
     shown: dict[str, ui.label] = {}
 
@@ -99,11 +100,24 @@ def editor(
         preview()
 
     def preview() -> None:
-        for key, box in boxes.items():
-            slot, text = found.slot(key), box.value or ""
-            problem = templates.placeholder_problem(text, slot.placeholders)
-            shown[key].set_text(problem or previewed(result, found, view.owner, slot, text))
-            shown[key].classes(replace="lc-prose text-negative" if problem else "lc-prose")
+        texts = {k: box.value or "" for k, box in boxes.items()}
+        problems = {
+            k: problem
+            for k, text in texts.items()
+            if (problem := templates.placeholder_problem(text, found.slot(k).placeholders))
+        }
+        for key, label in shown.items():
+            slot = found.slot(key)
+            text = texts[key] or slot.default
+            label.set_text(problems.get(key) or f"Example: {flat(text.format_map(slot.example))}")
+            label.classes(replace="text-negative" if key in problems else "lc-note")
+        whole.classes(replace="text-negative" if problems else "lc-prose")
+        if problems:
+            whole.set_text("; ".join(f"{found.slot(k).label}: {p}" for k, p in problems.items()))
+        elif filled is not None:
+            whole.set_text(flat(texts[PARAGRAPH].format_map(filled)) if filled else no_data(found))
+        else:
+            whole.set_text(template_examples.EXAMPLES[found.key](Wording({found.key: texts})))
 
     def reset() -> None:
         for key, box in boxes.items():
@@ -116,7 +130,7 @@ def editor(
             pending = [change] if change.opened is None or change.text != change.opened.text else []
             issues = await computed(changes.check, project, pending)
             if issues:
-                problems.set_text("; ".join(i.message for i in issues))
+                refused.set_text("; ".join(i.message for i in issues))
                 ui.notify("Not saved: fix the problems listed above", type="warning")
                 return
             changes.write(project, pending)
@@ -127,40 +141,48 @@ def editor(
         ui.notify(f"Saved {found.title}")
         await on_saved()
 
-    with panel(found.title, help_text=found.help):
-        choices = owners(result, found)
-        if len(choices) > 1:
-            ui.select(
-                choices,
-                value=view.owner,
-                label="For",
-                on_change=lambda e: leave(partial(go, found.key, e.value)),
-            ).props("dense outlined options-dense").classes("w-72")
-        ui.label(f"{source(result, found, view.owner)} {preview_help(found)}").classes("lc-note")
-        for slot in found.slots:
-            box = (
-                ui.textarea(
-                    None if found.single else slot.label,
-                    value=current[slot.key],
-                    on_change=touched,
+    with ui.row().classes("w-full no-wrap items-start gap-4"):
+        with ui.column().classes("grow min-w-0 gap-4"), panel(found.title, help_text=found.help):
+            choices = owners(result, found)
+            if len(choices) > 1:
+                ui.select(
+                    choices,
+                    value=view.owner,
+                    label="For",
+                    on_change=lambda e: leave(partial(go, found.key, e.value)),
+                ).props("dense outlined options-dense").classes("w-72")
+            ui.label(source(result, found, view.owner)).classes("lc-note")
+            for slot in found.slots:
+                box = (
+                    ui.textarea(
+                        None if found.single else slot.label,
+                        value=current[slot.key],
+                        on_change=touched,
+                    )
+                    .props("outlined")
+                    .classes("lc-grow w-full")
                 )
-                .props("outlined")
-                .classes("lc-grow w-full")
-            )
-            boxes[slot.key] = box
-            with ui.row().classes("gap-1 items-center"):
-                for name in slot.placeholders:
-                    ui.chip(f"{{{name}}}", on_click=partial(insert, box, f"{{{name}}}")).props(
-                        "dense clickable outline"
-                    ).classes("font-mono")
-            shown[slot.key] = ui.label()
-        problems = ui.label().classes("text-negative")
-        with ui.row().classes("lc-actions w-full"):
-            save_button = ui.button("Save", icon="save", on_click=save).props("no-caps")
-            save_button.disable()
-            ui.button("Reset", icon="restart_alt", on_click=reset).props("flat no-caps").tooltip(
-                "Back to the wording this falls back to; Save to keep it"
-            )
+                boxes[slot.key] = box
+                stand_ins = slot.example if filled is None else filled
+                with ui.row().classes("gap-1 items-center"):
+                    for name in slot.placeholders:
+                        ui.chip(f"{{{name}}}", on_click=partial(insert, box, f"{{{name}}}")).props(
+                            "dense clickable outline"
+                        ).classes("font-mono").tooltip(stand_ins.get(name) or "Empty here")
+                if not found.single:
+                    shown[slot.key] = ui.label()
+            refused = ui.label().classes("text-negative")
+            with ui.row().classes("lc-actions w-full"):
+                save_button = ui.button("Save", icon="save", on_click=save).props("no-caps")
+                save_button.disable()
+                ui.button("Reset", icon="restart_alt", on_click=reset).props(
+                    "flat no-caps"
+                ).tooltip("Back to the wording this falls back to; Save to keep it")
+        with (
+            ui.column().classes("w-96 shrink-0 lc-sticky"),
+            panel("Paragraph", help_text=paragraph_help(found)),
+        ):
+            whole = ui.label().classes("lc-prose")
     preview()
 
 
@@ -207,27 +229,34 @@ def source(result: CatalogResult, found: Template, owner: str) -> str:
     return "The project's own wording." if owner == PROJECT else "Its own wording."
 
 
-def previewed(result: CatalogResult, found: Template, owner: str, slot: Slot, text: str) -> str:
+def methods_values(result: CatalogResult, found: Template, owner: str) -> dict[str, str] | None:
+    # What each placeholder of a Methods template holds in the project's data; None for Results.
     project = result.project
     if found.key == "participants":
         study = owner or next(iter(project.config.studies), None)
-        if study is None:
-            return "No study yet."
-        return participants.paragraph(project, result.summary, study, text)
+        return participants.placeholder_values(project, result.summary, study) if study else {}
     if found.key == "measures":
         given = [(v.instrument_id, v.dataset) for v in result.catalog.variables]
         pairs = [p for p in given if p[0] == owner] if owner else given
         if not pairs:
-            return "Not given in any dataset yet."
+            return {}
         instrument_id, dataset = pairs[0]
         instrument = project.instruments[instrument_id]
-        return measures.paragraph(
-            project, result.catalog, result.summary, instrument, dataset, [], text
+        return measures.placeholder_values(
+            project, result.catalog, result.summary, instrument, dataset, []
         )
-    return " ".join((text or slot.default).format_map(slot.example).split())
+    return None
 
 
-def preview_help(found: Template) -> str:
+def no_data(found: Template) -> str:
+    return "No study yet." if found.key == "participants" else "Not given in any dataset yet."
+
+
+def flat(text: str) -> str:
+    return " ".join(text.split())
+
+
+def paragraph_help(found: Template) -> str:
     if found.part == templates.METHODS:
-        return "The preview is from the project's data, before ω from the factor models."
-    return "Each preview uses made-up numbers."
+        return "From the project's data, before ω from the factor models."
+    return "A made-up result, written with the wording on the left."
