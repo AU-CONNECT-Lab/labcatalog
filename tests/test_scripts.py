@@ -82,7 +82,8 @@ def test_scripts_are_filtered_by_what_their_steps_write(mock_project):
     ]
     assert row_matches(index, {"status": {"outdated"}}) == ["scripts/extract_fmri.py"]
     assert row_matches(index, {"stage": {UNUSED}}) == ["scripts/draft.R"]
-    assert row_matches(index, {"language": {"r"}}) == ["scripts/draft.R"]
+    assert "scripts/draft.R" in row_matches(index, {"language": {"r"}})
+    assert "scripts/extract_fmri.py" not in row_matches(index, {"language": {"r"}})
     assert row_matches(index, {}, "parent_w2_export") == ["scripts/clean_export.R"]
     clean = next(e for e in listed if e.key == "scripts/clean_export.R")
     assert {

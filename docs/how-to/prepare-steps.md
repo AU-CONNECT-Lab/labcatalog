@@ -11,12 +11,13 @@ The [Scripts](../app/scripts.md) page writes a script and its step for you: **Ne
 ```yaml
 prepare:
   - name: clean_parent_w1
-    run: python scripts/clean_export.py raw/parent_w1_export.csv data/parent_w1.csv
-    inputs: [raw/parent_w1_export.csv, scripts/clean_export.py]
+    run: Rscript scripts/clean_export.R raw/parent_w1_export.csv data/parent_w1.csv
+    inputs: [raw/parent_w1_export.csv, scripts/clean_export.R]
     outputs: [data/parent_w1.csv]
+    stage: clean
   - name: extract_eeg_w1
-    run: Rscript scripts/extract_eeg.R derivatives/eeg/ses-1 data/eeg_w1.csv
-    inputs: [derivatives/eeg/ses-1/qc.csv, scripts/extract_eeg.R]
+    run: python scripts/extract_eeg.py derivatives/eeg/ses-1 data/eeg_w1.csv
+    inputs: [derivatives/eeg/ses-1/qc.csv, scripts/extract_eeg.py]
     outputs: [data/eeg_w1.csv]
     stage: extract
 ```

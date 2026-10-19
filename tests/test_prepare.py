@@ -1,9 +1,11 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
 import time
+from glob import glob
 from pathlib import Path
 
 import pytest
@@ -202,14 +204,21 @@ def test_a_step_cannot_overwrite_what_it_reads_or_what_another_step_writes(proje
     assert messages[1] == "prepare: clean, summarize all write raw/A.csv; give each its own file"
 
 
+def rscript() -> str | None:
+    return shutil.which("Rscript") or next(
+        iter(glob("C:/Program Files/R/R-*/bin/Rscript.exe")), None
+    )
+
+
+@pytest.mark.skipif(rscript() is None, reason="R is not installed")
 def test_example_steps_rebuild_the_example_data(mock_project, tmp_path):
     steps = load_project(mock_project).config.prepare
     assert len(steps) == 21
     for step in steps:
-        _, script, export, clean = step.run.split()
+        command, script, export, clean = step.run.split()
         out = tmp_path / Path(clean).name
         subprocess.run(
-            [sys.executable, script, export, str(out)],
+            [sys.executable if command == "python" else rscript(), script, export, str(out)],
             cwd=mock_project,
             check=True,
             capture_output=True,
