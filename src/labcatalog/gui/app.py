@@ -82,9 +82,11 @@ WINDOW_SIZE = (1280, 820)
 PAGES = (
     (("overview", "Overview"), ("instruments", "Instruments"), ("datasets", "Datasets")),
     (("analysis", "Analysis"), ("methods", "Methods")),
-    (("setup", "Set up"),),
+    # Set up's steps, numbered, all showing the one Set up page.
+    tuple(setup.STEPS.items()),
     (("problems", "Problems"),),
 )
+SETUP = "setup"
 SETTINGS = "settings"
 STUDY = "studies"
 # The study picker's choice that narrows nothing; a study ID never has this character.
@@ -191,7 +193,8 @@ class Window:
         self.editing = EditView()
         self.preparing = PrepareView()
         self.setting_up = SetupView()
-        self.step_tabs: ui.tabs | None = None
+        self.step_marks: dict[str, ui.label] = {}
+        self.step_tips: dict[str, ui.tooltip] = {}
         self.steps: dict[str, ui.column] = {}
         self.cfa = CfaView(
             open_settings=lambda: self.tabs.set_value("settings"),
@@ -308,7 +311,11 @@ class Window:
                 for i, group in enumerate(PAGES):
                     if i:
                         ui.separator().props("vertical")
-                    nav |= {name: ui.tab(name, label=label) for name, label in group}
+                    for name, label in group:
+                        if name in setup.STEPS:
+                            nav[name] = self.step_tab(name, label)
+                        else:
+                            nav[name] = ui.tab(name, label=label)
                 ui.tab(SETTINGS, label="Settings").classes("hidden")
                 ui.tab(STUDY, label="Studies").classes("hidden")
                 with nav["problems"]:
@@ -316,9 +323,9 @@ class Window:
                     self.badge.visible = False
         self.tabs = tabs
         ui.timer(DISK_SECONDS, self.watch_disk)
-        tabs.on_value_change(lambda e: self.mark_header(gear, e.value))
+        tabs.on_value_change(lambda e: self.show_page(gear, e.value))
 
-        with ui.tab_panels(tabs, value="overview").classes("w-full bg-transparent"):
+        with ui.tab_panels(value="overview").classes("w-full bg-transparent") as self.pages:
             with ui.tab_panel("overview").classes("lc-page"):
                 self.overview_panel()
             with ui.tab_panel("instruments").classes("lc-page"):
@@ -331,8 +338,7 @@ class Window:
                 self.analysis_panel()
             with ui.tab_panel("methods").classes("lc-page"):
                 self.methods_panel()
-            with ui.tab_panel("setup").classes("lc-page"):
-                self.setup_bar()
+            with ui.tab_panel(SETUP).classes("lc-page"):
                 # Every step stays built, so an unsaved edit survives a look at another step.
                 for name, parts in (
                     (setup.CODEBOOK, (self.codebook_panel, self.edit_panel)),
@@ -574,7 +580,6 @@ class Window:
             self.datasets_panel,
             self.analysis_panel,
             self.methods_panel,
-            self.setup_bar,
             self.codebook_panel,
             self.add_data_panel,
             self.prepare_panel,
@@ -585,6 +590,7 @@ class Window:
             self.problems_panel,
         ):
             panel.refresh()
+        self.show_counts()
         self.project_settings()
 
     async def show_versions(self) -> None:
@@ -705,27 +711,39 @@ class Window:
         self.tabs.set_value("instruments")
 
     def edit_location(self, path: str, line: int | None) -> None:
-        self.tabs.set_value("setup")
-        self.pick_step(setup.CODEBOOK)
+        self.tabs.set_value(setup.CODEBOOK)
         self.editing.open(path, line)
 
     def pick_step(self, name: str) -> None:
-        if name not in setup.STEPS:
-            self.tabs.set_value(name)
-            return
-        self.setting_up.step = name
-        self.step_tabs.set_value(name)
-        self.show_step()
+        self.tabs.set_value(name)
+
+    def show_page(self, gear: ui.button, page: str) -> None:
+        self.mark_header(gear, page)
+        if page in setup.STEPS:
+            self.setting_up.step = page
+            self.show_step()
+        self.pages.set_value(SETUP if page in setup.STEPS else page)
 
     def show_step(self) -> None:
         for name, part in self.steps.items():
             part.visible = name == self.setting_up.step
 
-    @ui.refreshable_method
-    def setup_bar(self) -> None:
-        counts = setup.to_do(self.result)
-        self.step_tabs = setup.step_bar(self.setting_up, counts, self.pick_step)
-        self.show_step()
+    def step_tab(self, name: str, label: str) -> ui.tab:
+        with ui.tab(name, label="") as tab:
+            ui.label(str(list(setup.STEPS).index(name) + 1)).classes("lc-step-num")
+            ui.label(label).classes("q-tab__label")
+            with ui.label().classes("lc-pill lc-warn ml-2") as self.step_marks[name]:
+                self.step_tips[name] = ui.tooltip("")
+            self.step_marks[name].visible = False
+        return tab
+
+    def show_counts(self) -> None:
+        found = setup.counts(self.result)
+        texts = setup.to_do(self.result)
+        for name, mark in self.step_marks.items():
+            mark.set_text(str(sum(found.get(name, {}).values())))
+            self.step_tips[name].set_text(texts.get(name, ""))
+            mark.visible = bool(found.get(name))
 
     async def dataset_added(self, dataset: str) -> None:
         ui.notify(f"Added {dataset}")

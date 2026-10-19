@@ -24,37 +24,27 @@ class SetupView:
     step: str = CODEBOOK
 
 
-def to_do(result: CatalogResult | None) -> dict[str, str]:
+def counts(result: CatalogResult | None) -> dict[str, dict[str, int]]:
+    # What each step still has to do, by kind; a kind with nothing left is left out.
     project = result.project if result else None
     if project is None:
         return {}
-    waiting = sum(s.status != "up to date" for s in step_states(project))
-    unmapped = len(unmapped_datasets(project))
-    checking = id_check.waiting(result)
-    drafted = len(codebook_step.drafts(project.root))
-    data = [f"{waiting} to run" if waiting else "", f"{unmapped} to link" if unmapped else ""]
-    return {
-        CODEBOOK: f"{drafted} drafts" if drafted else "",
-        DATA: " · ".join(filter(None, data)),
-        IDS: f"{checking} to check" if checking else "",
+    found = {
+        CODEBOOK: {"drafts": len(codebook_step.drafts(project.root))},
+        DATA: {
+            "to run": sum(s.status != "up to date" for s in step_states(project)),
+            "to link": len(unmapped_datasets(project)),
+        },
+        IDS: {"to check": id_check.waiting(result)},
     }
+    return {step: {kind: n for kind, n in kinds.items() if n} for step, kinds in found.items()}
 
 
-def step_bar(view: SetupView, counts: dict[str, str], on_pick: Callable[[str], None]) -> ui.tabs:
-    with (
-        ui.tabs(value=view.step, on_change=lambda e: on_pick(e.value))
-        .props("dense no-caps inline-label align=left")
-        .classes("lc-subnav lc-steps w-full") as tabs
-    ):
-        for number, (name, label) in enumerate(STEPS.items(), start=1):
-            if number > 1:
-                ui.icon("chevron_right").classes("lc-step-arrow")
-            with ui.tab(name, label=""):
-                ui.label(str(number)).classes("lc-step-num")
-                ui.label(label).classes("q-tab__label")
-                if counts.get(name):
-                    ui.label(counts[name]).classes("lc-pill lc-warn ml-2")
-    return tabs
+def to_do(result: CatalogResult | None) -> dict[str, str]:
+    return {
+        step: " · ".join(f"{n} {kind}" for kind, n in kinds.items())
+        for step, kinds in counts(result).items()
+    }
 
 
 def next_button(step: str, on_pick: Callable[[str], None]) -> None:

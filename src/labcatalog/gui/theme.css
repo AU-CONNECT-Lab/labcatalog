@@ -392,7 +392,8 @@ body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.0
 .q-tabs.lc-subnav .q-tab--active .q-tab__label { font-weight: 600; }
 .q-tabs.lc-subnav .q-tab__indicator { height: 2px; background: var(--lc-accent); }
 .q-tab-panel.lc-part { padding: 0; gap: 16px; }
-.q-tabs.lc-steps .q-tab__content { gap: 0.5rem; }
+.lc-nav .q-tab__content { gap: 0.4rem; }
+.lc-nav .lc-step-num { width: 1.15rem; height: 1.15rem; font-size: 0.68rem; }
 .lc-step-num {
   display: inline-flex;
   align-items: center;
@@ -406,7 +407,6 @@ body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.0
   color: var(--lc-muted);
 }
 .q-tab--active .lc-step-num { background: var(--lc-accent); border-color: var(--lc-accent); color: var(--lc-on-accent); }
-.lc-step-arrow { align-self: center; color: var(--lc-faint); font-size: 1.1rem; }
 
 .lc-subhead {
   width: 100%;
