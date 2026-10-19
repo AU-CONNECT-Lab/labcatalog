@@ -506,50 +506,55 @@ def fit_indices(values: dict[str, float | None], digits: int) -> str:
     return ", ".join(parts)
 
 
-def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) -> str:
+def mediation_text(
+    model: MediationModel, fit: MediationFit, digits: int = 2, wording: Wording = BUILT_IN
+) -> str:
     x, m, y = model.x.label, model.m.label, model.y.label
     e, moderated = fit.effects, model.moderated
     ws = [moderator.variable.label for moderator in model.moderators]
-    how = method_text(fit)
-    # Asides about the model, each set off by commas.
+
+    def say(slot: str, **values: object) -> str:
+        return wording.say("mediation", slot, **values)
+
     asides = []
     if ws:
-        asides.append(f"with {series(ws)} as moderator{'s' if len(ws) > 1 else ''}")
+        asides.append(say("moderator" if len(ws) == 1 else "moderators", moderators=series(ws)))
     if model.items:
-        asides.append(factors(model))
-    moderator = "".join(f", {a}" for a in asides) + ("," if asides else "")
-    sentences = [
-        f"A mediation model of {x} on {y} through {m}{moderator} was fitted in "
-        f"{fit.package} with "
-        f"{how} (N = {fit.n})."
-    ]
-
-    means = " at the mean of the moderator" if len(ws) == 1 else " at the means of the moderators"
+        asides.append(say("factors"))
+    design = {"x": x, "y": y, "m": m, "package": fit.package, "method": method_text(fit)}
+    if asides:
+        sentences = [say("model_asides", n=fit.n, asides=", ".join(asides), **design)]
+    else:
+        sentences = [say("model", n=fit.n, **design)]
+    means = say("at_mean" if len(ws) == 1 else "at_means")
 
     def path(key: str, symbol: str) -> str:
-        return f"{symbol} = {estimate(e[key], digits)}{means if key in moderated else ''}"
+        text = f"{symbol} = {estimate(e[key], digits)}"
+        return f"{text} {means}" if key in moderated else text
 
-    sentences.append(
-        f"The path from {x} to {m} was {path('a', 'a')}, and the path from {m} to {y}, with {x} "
-        f"held constant, was {path('b', 'b')}."
-    )
+    sentences.append(say("paths", x=x, m=m, y=y, a=path("a", "a"), b=path("b", "b")))
     named = list(zip(model.tags, ws, strict=True))
     names = {f"a_xw{s}": f"{x} × {w} on {m}" for s, w in named}
     names |= {f"b_mw{s}": f"{m} × {w} on {y}" for s, w in named}
     names |= {f"c_xw{s}": f"{x} × {w} on {y}" for s, w in named}
-    parts = [f"{name}, {estimate(e[key], digits)}" for key, name in names.items() if key in e]
+    parts = [
+        say("interaction_each", name=name, estimate=estimate(e[key], digits))
+        for key, name in names.items()
+        if key in e
+    ]
     if parts:
-        word = "interaction was" if len(parts) == 1 else "interactions were"
-        sentences.append(f"The {word} {series(parts)}.")
-    direct = f"the direct effect was {path('c', 'c′')}"
+        slot = "interaction" if len(parts) == 1 else "interactions"
+        sentences.append(say(slot, interactions=series(parts)))
+    direct = path("c", "c′")
     if "indirect" in e:
-        total = f"; the total effect was c = {estimate(e['total'], digits)}" if "total" in e else ""
-        sentences.append(
-            f"The indirect effect through {m} was ab = {estimate(e['indirect'], digits)}, and "
-            f"{direct}{total}."
-        )
+        ab = f"ab = {estimate(e['indirect'], digits)}"
+        if "total" in e:
+            total = f"c = {estimate(e['total'], digits)}"
+            sentences.append(say("indirect_total", m=m, ab=ab, c=direct, total=total))
+        else:
+            sentences.append(say("indirect", m=m, ab=ab, c=direct))
     else:
-        sentences.append(f"{opening_case(direct)}.")
+        sentences.append(say("direct", c=direct))
     places = [
         at_labels(moderator.variable, values)
         for moderator, values in zip(model.moderators, fit.at, strict=True)
@@ -559,30 +564,32 @@ def mediation_text(model: MediationModel, fit: MediationFit, digits: int = 2) ->
         if found and all(label in e for label, _ in found):
             # One moderator says where; with two, each is named with its value.
             parts = [
-                f"{estimate(e[label], digits)} at {places[spots[0][0]][spots[0][1] - 1]}"
+                say(
+                    "condition",
+                    estimate=estimate(e[label], digits),
+                    where=places[spots[0][0]][spots[0][1] - 1],
+                )
                 if len(ws) == 1
-                else f"{estimate(e[label], digits)} with "
-                + " and ".join(f"{ws[k]} at {places[k][i - 1]}" for k, i in spots)
+                else say(
+                    "condition_two",
+                    estimate=estimate(e[label], digits),
+                    where=" and ".join(f"{ws[k]} at {places[k][i - 1]}" for k, i in spots),
+                )
                 for label, spots in found
             ]
-            sentences.append(f"The conditional {kind} effect was {series(parts)}.")
+            sentences.append(say(f"conditional_{kind}", effects=series(parts)))
     for k in indexed(model):
         label = index_label(model, k)
         if label in e:
-            what = (
-                "moderated mediation" if len(ws) == 1 else f"partial moderated mediation by {ws[k]}"
-            )
-            sentences.append(f"The index of {what} was {estimate(e[label], digits)}.")
-    sentences.append(f"Confidence intervals are {intervals_text(fit)}.")
+            value = estimate(e[label], digits)
+            if len(ws) == 1:
+                sentences.append(say("index", estimate=value))
+            else:
+                sentences.append(say("index_partial", moderator=ws[k], estimate=value))
+    sentences.append(say("intervals", intervals=intervals_text(fit)))
     if fit.fit.get("df"):
-        sentences.append(
-            f"The model gave {fit_indices({**fit.fit, 'p': fit.fit['pvalue']}, digits)}."
-        )
+        sentences.append(say("fit", fit=fit_indices({**fit.fit, "p": fit.fit["pvalue"]}, digits)))
     return " ".join(sentences)
-
-
-def factors(model: MediationModel) -> str:
-    return "with each score as a factor of its items"
 
 
 def estimate(effect: Effect, digits: int) -> str:

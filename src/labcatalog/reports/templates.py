@@ -143,6 +143,23 @@ STEPS_EXAMPLE = {
     "outcome": "Mood",
     "steps": "from wave 1 to 2, β = .18, p = .012 and from wave 2 to 3, β = .04, p = .561",
 }
+MEDIATION_MODEL = ("x", "y", "m", "package", "method", "n")
+MEDIATION_EXAMPLE = {
+    "x": "Stress",
+    "y": "Mood",
+    "m": "Sleep problems",
+    "package": "lavaan",
+    "method": "maximum likelihood",
+    "n": "180",
+}
+EFFECTS_EXAMPLE = {
+    "m": "Sleep problems",
+    "ab": "ab = 0.11, 95% CI [0.04, 0.20]",
+    "c": "c′ = 0.21, 95% CI [0.03, 0.39]",
+}
+CONDITIONS_EXAMPLE = {
+    "effects": "0.08, 95% CI [0.02, 0.15] at Age = 9 and 0.14, 95% CI [0.06, 0.24] at Age = 12"
+}
 TEMPLATES: dict[str, Template] = {
     t.key: t
     for t in (
@@ -910,6 +927,186 @@ TEMPLATES: dict[str, Template] = {
                 ),
             ),
             "The Results paragraph of the Cross-lagged panel tab.",
+        ),
+        Template(
+            "mediation",
+            "Mediation",
+            RESULTS,
+            (
+                Slot(
+                    "model",
+                    "The model",
+                    "A mediation model of {x} on {y} through {m} was fitted in {package} with "
+                    "{method} (N = {n}).",
+                    MEDIATION_MODEL,
+                    MEDIATION_EXAMPLE,
+                ),
+                Slot(
+                    "model_asides",
+                    "The model, with moderators or factors",
+                    "A mediation model of {x} on {y} through {m}, {asides}, was fitted in "
+                    "{package} with {method} (N = {n}).",
+                    (*MEDIATION_MODEL, "asides"),
+                    MEDIATION_EXAMPLE | {"asides": "with Age as moderator"},
+                ),
+                Slot(
+                    "moderator",
+                    "{asides} for one moderator",
+                    "with {moderators} as moderator",
+                    ("moderators",),
+                    {"moderators": "Age"},
+                ),
+                Slot(
+                    "moderators",
+                    "{asides} for two moderators",
+                    "with {moderators} as moderators",
+                    ("moderators",),
+                    {"moderators": "Age and Gender"},
+                ),
+                Slot(
+                    "factors",
+                    "{asides} when each score is a factor of its items",
+                    "with each score as a factor of its items",
+                    (),
+                ),
+                Slot(
+                    "paths",
+                    "The a and b paths",
+                    "The path from {x} to {m} was {a}, and the path from {m} to {y}, with {x} held "
+                    "constant, was {b}.",
+                    ("x", "m", "y", "a", "b"),
+                    {
+                        "x": "Stress",
+                        "m": "Sleep problems",
+                        "y": "Mood",
+                        "a": "a = 0.38, 95% CI [0.21, 0.55]",
+                        "b": "b = 0.29, 95% CI [0.12, 0.46]",
+                    },
+                ),
+                Slot(
+                    "at_mean",
+                    "After a moderated path, with one moderator",
+                    "at the mean of the moderator",
+                    (),
+                ),
+                Slot(
+                    "at_means",
+                    "After a moderated path, with two moderators",
+                    "at the means of the moderators",
+                    (),
+                ),
+                Slot(
+                    "interaction",
+                    "One interaction",
+                    "The interaction was {interactions}.",
+                    ("interactions",),
+                    {"interactions": "Stress × Age on Sleep problems, 0.09, 95% CI [0.01, 0.17]"},
+                ),
+                Slot(
+                    "interactions",
+                    "Two or more interactions",
+                    "The interactions were {interactions}.",
+                    ("interactions",),
+                    {
+                        "interactions": "Stress × Age on Sleep problems, 0.09, 95% CI [0.01, "
+                        "0.17] and Sleep problems × Age on Mood, 0.02, 95% CI [-0.06, 0.10]"
+                    },
+                ),
+                Slot(
+                    "interaction_each",
+                    "Each interaction in that list",
+                    "{name}, {estimate}",
+                    ("name", "estimate"),
+                    {
+                        "name": "Stress × Age on Sleep problems",
+                        "estimate": "0.09, 95% CI [0.01, 0.17]",
+                    },
+                ),
+                Slot(
+                    "indirect",
+                    "The indirect and direct effects",
+                    "The indirect effect through {m} was {ab}, and the direct effect was {c}.",
+                    ("m", "ab", "c"),
+                    EFFECTS_EXAMPLE,
+                ),
+                Slot(
+                    "indirect_total",
+                    "The indirect, direct and total effects",
+                    "The indirect effect through {m} was {ab}, and the direct effect was {c}; the "
+                    "total effect was {total}.",
+                    ("m", "ab", "c", "total"),
+                    EFFECTS_EXAMPLE | {"total": "c = 0.32, 95% CI [0.15, 0.49]"},
+                ),
+                Slot(
+                    "direct",
+                    "The direct effect, when there is no single indirect effect",
+                    "The direct effect was {c}.",
+                    ("c",),
+                    {"c": EFFECTS_EXAMPLE["c"]},
+                ),
+                Slot(
+                    "conditional_indirect",
+                    "The indirect effect at each value of the moderator",
+                    "The conditional indirect effect was {effects}.",
+                    ("effects",),
+                    CONDITIONS_EXAMPLE,
+                ),
+                Slot(
+                    "conditional_direct",
+                    "The direct effect at each value of the moderator",
+                    "The conditional direct effect was {effects}.",
+                    ("effects",),
+                    CONDITIONS_EXAMPLE,
+                ),
+                Slot(
+                    "condition",
+                    "Each value in those lists, with one moderator",
+                    "{estimate} at {where}",
+                    ("estimate", "where"),
+                    {"estimate": "0.08, 95% CI [0.02, 0.15]", "where": "Age = 9"},
+                ),
+                Slot(
+                    "condition_two",
+                    "Each value in those lists, with two moderators",
+                    "{estimate} with {where}",
+                    ("estimate", "where"),
+                    {
+                        "estimate": "0.08, 95% CI [0.02, 0.15]",
+                        "where": "Age at 9 and Gender at Girl",
+                    },
+                ),
+                Slot(
+                    "index",
+                    "The index of moderated mediation",
+                    "The index of moderated mediation was {estimate}.",
+                    ("estimate",),
+                    {"estimate": "0.03, 95% CI [0.00, 0.07]"},
+                ),
+                Slot(
+                    "index_partial",
+                    "The index of partial moderated mediation, with two moderators",
+                    "The index of partial moderated mediation by {moderator} was {estimate}.",
+                    ("moderator", "estimate"),
+                    {"moderator": "Age", "estimate": "0.03, 95% CI [0.00, 0.07]"},
+                ),
+                Slot(
+                    "intervals",
+                    "How the confidence intervals were found",
+                    "Confidence intervals are {intervals}.",
+                    ("intervals",),
+                    {"intervals": "percentile bootstrap intervals from 5000 draws"},
+                ),
+                Slot(
+                    "fit",
+                    "The model's fit, when it has degrees of freedom",
+                    "The model gave {fit}.",
+                    ("fit",),
+                    {
+                        "fit": "χ²(2) = 3.10, p = .212, CFI = .99, TLI = .98, RMSEA = .04, SRMR = .02"
+                    },
+                ),
+            ),
+            "The Results paragraph of the Mediation tab.",
         ),
     )
 }

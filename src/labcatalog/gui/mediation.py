@@ -10,6 +10,7 @@ from labcatalog.gui.paper import paper_table, result_actions, results_text
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import mediation as med
@@ -147,7 +148,13 @@ def render(
             table_note(model, fit),
         )
         paper_table(shown)
-        results_text(results.mediation_text(model, fit, common.decimals()), [shown])
+        results_text(
+            results.mediation_text(
+                model, fit, common.decimals(), Wording(result.project.config.templates)
+            ),
+            [shown],
+            "mediation",
+        )
         result_actions(
             result, "mediation", {"mediation": shown}, texts=texts, engine="Computed in R."
         )
