@@ -141,6 +141,21 @@ def overlay(histograms: list[tuple[str, list[int]]]) -> str:
     return f'<svg width="{PLOT_WIDTH}" height="{PLOT_HEIGHT}">{"".join(paths)}</svg>'
 
 
+def separate(histograms: list[tuple[str, list[int]]]) -> str:
+    # One small histogram per wave, one under another, on the scale of the tallest.
+    top = max((max(counts) for _, counts in histograms if counts), default=0) or 1
+    rows = []
+    for color, counts in histograms:
+        step = PLOT_WIDTH / max(len(counts), 1)
+        bars = "".join(
+            f'<rect x="{i * step:.1f}" y="{PLOT_HEIGHT - c / top * PLOT_HEIGHT:.1f}" '
+            f'width="{max(step - 1, 1):.1f}" height="{c / top * PLOT_HEIGHT:.1f}" fill="{color}"/>'
+            for i, c in enumerate(counts)
+        )
+        rows.append(f'<div><svg width="{PLOT_WIDTH}" height="{PLOT_HEIGHT}">{bars}</svg></div>')
+    return "".join(rows)
+
+
 def lines(values: list[tuple[str, str]]) -> str:
     # One line per wave, marked with the wave's colour.
     return "".join(
@@ -160,13 +175,29 @@ def render(result: CatalogResult, open_dataset: Callable[[str], None]) -> None:
         if not groups:
             empty("No data files read yet.")
             return
-        for group in groups:
-            with ui.column().classes("w-full gap-1"):
-                ui.label(group.title).classes("font-medium")
-                for wave in group.waves:
-                    wave_row(wave, open_dataset)
-                if group.scores:
-                    score_table(group)
+        shown = {"apart": False}
+
+        def set_apart(value: bool) -> None:
+            shown["apart"] = value
+            tables.refresh()
+
+        ui.toggle(
+            {False: "Waves together", True: "Each wave apart"},
+            value=False,
+            on_change=lambda e: set_apart(e.value),
+        ).props("dense no-caps")
+
+        @ui.refreshable
+        def tables() -> None:
+            for group in groups:
+                with ui.column().classes("w-full gap-1"):
+                    ui.label(group.title).classes("font-medium")
+                    for wave in group.waves:
+                        wave_row(wave, open_dataset)
+                    if group.scores:
+                        score_table(group, shown["apart"])
+
+        tables()
 
 
 def wave_row(wave: WaveFacts, open_dataset: Callable[[str], None]) -> None:
@@ -191,7 +222,7 @@ def wave_row(wave: WaveFacts, open_dataset: Callable[[str], None]) -> None:
         ).props("flat dense no-caps")
 
 
-def score_table(group: ReviewGroup) -> None:
+def score_table(group: ReviewGroup, apart: bool = False) -> None:
     columns = [
         col("score", "Score"),
         col("n", "n", numeric=True, sortable=False),
@@ -217,7 +248,9 @@ def score_table(group: ReviewGroup) -> None:
                     [(c, "" if s.mean is None else f"{fmt(s.mean)} ({fmt(s.sd)})") for c, s in held]
                 ),
                 "alpha": lines([(c, apa(s.alpha)) for c, s in held]),
-                "shape": overlay([(c, s.histogram) for c, s in held]),
+                "shape": separate([(c, s.histogram) for c, s in held])
+                if apart
+                else overlay([(c, s.histogram) for c, s in held]),
             }
         )
     shown = table(columns, rows)

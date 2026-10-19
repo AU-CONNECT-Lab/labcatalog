@@ -95,6 +95,7 @@ def render(
                     ui.label(f"{row.study}, {row.rows} rows, {row.ids} IDs").classes("lc-note")
                     for code, count in row.problems.items():
                         ui.label(f"{count} {CODES[code]}").classes("lc-pill lc-warn")
+                        ui.label(", ".join(row.shown.get(code, []))).classes("lc-note")
                     if not row.problems:
                         ui.label("All right").classes("lc-pill lc-ok")
                     if row.corrected:
@@ -107,8 +108,6 @@ def render(
                             result, name, on_saved
                         ),
                     ).props("flat dense no-caps")
-                for code, found in row.shown.items():
-                    note(f"{CODES[code].capitalize()}: {', '.join(found)}")
         if rosters := roster_issues(result):
             with ui.row().classes("w-full items-center gap-2"):
                 note(

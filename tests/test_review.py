@@ -32,3 +32,9 @@ def test_the_waves_are_drawn_on_one_scale():
     assert drawn.count("<polyline") == 2
     assert f',{review.PLOT_HEIGHT:.1f}"' in drawn or f",{review.PLOT_HEIGHT:.1f} " in drawn
     assert review.overlay([("#111111", [])]) == ""
+
+
+def test_each_wave_can_be_drawn_apart_on_one_scale():
+    drawn = review.separate([("#111111", [0, 2, 4]), ("#222222", [1, 1])])
+    assert drawn.count("<svg") == 2 and drawn.count("<rect") == 5
+    assert f'height="{review.PLOT_HEIGHT:.1f}" fill="#111111"' in drawn
