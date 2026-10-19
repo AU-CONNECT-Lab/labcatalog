@@ -24,7 +24,7 @@ def test_scripts_are_listed_with_the_steps_that_run_them(mock_project):
     (mock_project / "scripts" / "notes.txt").write_text("not a script\n", encoding="utf-8")
     found = project_scripts(load_project(mock_project))
     by_path = {s.path: s for s in found.steps}
-    assert len(by_path["scripts/clean_export.py"].steps) == 9
+    assert len(by_path["scripts/clean_export.R"].steps) == 9
     assert [s.name for s in by_path["scripts/extract_fmri.py"].steps] == [
         "extract_fmri_w1",
         "extract_fmri_w3",
@@ -83,8 +83,8 @@ def test_scripts_are_filtered_by_what_their_steps_write(mock_project):
     assert row_matches(index, {"status": {"outdated"}}) == ["scripts/extract_fmri.py"]
     assert row_matches(index, {"stage": {UNUSED}}) == ["scripts/draft.R"]
     assert row_matches(index, {"language": {"r"}}) == ["scripts/draft.R"]
-    assert row_matches(index, {}, "parent_w2_export") == ["scripts/clean_export.py"]
-    clean = next(e for e in listed if e.key == "scripts/clean_export.py")
+    assert row_matches(index, {}, "parent_w2_export") == ["scripts/clean_export.R"]
+    clean = next(e for e in listed if e.key == "scripts/clean_export.R")
     assert {
         project_dataset.study
         for project_dataset in project.config.datasets

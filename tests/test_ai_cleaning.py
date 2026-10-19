@@ -74,19 +74,19 @@ def test_a_fix_revises_the_script_that_writes_the_file_with_the_problem(result):
     [issue] = [i for i in result.report.issues if i.code == "id_whitespace"]
     rows = [{"row": "31", "id": "' 1031P'"}]
     step = cleaning.cleaning_step(result.project, "parent_w1")
-    assert cleaning.script_of(step) == "scripts/clean_export.py"
+    assert cleaning.script_of(step) == "scripts/clean_export.R"
     root = result.project.root
-    old = (root / "scripts/clean_export.py").read_text(encoding="utf-8")
-    revised = old.replace('r["pid"], r["StartDate"]', 'r["pid"].strip(), r["StartDate"]')
+    old = (root / "scripts/clean_export.R").read_text(encoding="utf-8")
+    revised = old.replace("pid = kept$pid", "pid = trimws(kept$pid)")
     client = FakeClient({"script": revised, "changes": ["Strip spaces"], "notes": []})
     draft = cleaning.fix_script(result.project, result.catalog, issue, rows, client)
     assert "<script>\n" + old in client.request
     assert f"Problem: {issue.message}" in client.request
     assert "row 31, id ' 1031P'" in client.request
-    assert "Python script" in client.system
+    assert "R script" in client.system
     assert draft.step is None and draft.changes == ["Strip spaces"]
-    assert '+        writer.writerow([r["pid"].strip()' in draft.diff()
+    assert "+  pid = trimws(kept$pid)" in draft.diff()
     config = (root / "labcatalog.yaml").read_text(encoding="utf-8")
     cleaning.save_draft(root, draft)
-    assert (root / "scripts/clean_export.py").read_text(encoding="utf-8") == revised
+    assert (root / "scripts/clean_export.R").read_text(encoding="utf-8") == revised
     assert (root / "labcatalog.yaml").read_text(encoding="utf-8") == config

@@ -5,7 +5,7 @@ methods:
   questionnaire: |
     Parents filled in their questionnaires online in the week after each visit, and one short checklist for each of their children taking part. Children answered theirs on a tablet during the visit, and a research assistant read the items aloud to children who asked.
 
-    Each wave was exported from the survey platform and cleaned with scripts/clean_export.py, which drops preview responses and unfinished attempts and takes the visit date from the start time.
+    Each wave was exported from the survey platform and cleaned with scripts/clean_export.R, which drops preview responses and unfinished attempts and takes the visit date from the start time.
   eeg: |
     Resting EEG was recorded for five minutes with eyes closed from a 32-channel cap at 500 Hz, re-referenced to the average, and cut into two-second epochs; epochs with artefacts were rejected and children with fewer than 20 clean epochs left out. Band power came from Welch's method.
   fmri: |
