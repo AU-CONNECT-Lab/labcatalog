@@ -11,6 +11,7 @@ from labcatalog.gui.paper import paper_table, result_actions, results_text
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import analysis, cfa, mplus
 from labcatalog.stats import measurement as mm
 from labcatalog.stats.cfa import ESTIMATORS, ML, WLSMV, CfaFit, estimator_text
@@ -107,7 +108,11 @@ def render(
             for shown in papers.values():
                 paper_table(shown)
             results_text(
-                results.cfa_text([fit], found.labels, common.decimals()), list(papers.values())
+                results.cfa_text(
+                    [fit], found.labels, common.decimals(), Wording(result.project.config.templates)
+                ),
+                list(papers.values()),
+                "cfa",
             )
             result_actions(result, "measurement", papers, texts=texts, engine="Computed in R.")
         with ui.expansion("Code", icon="code").props("dense").classes("w-full"):

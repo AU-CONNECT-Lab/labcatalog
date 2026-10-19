@@ -68,6 +68,7 @@ from labcatalog.reports.export import (
     write_export,
 )
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.schema import Instrument, Reference, Text
 from labcatalog.stats import mplus
 from labcatalog.stats.cfa import (
@@ -1208,7 +1209,13 @@ def factor_structure(
             for shown in papers.values():
                 paper_table(shown)
             labels = {s.id: s.label for s in instrument.scores}
-            results_text(results.cfa_text(fits, labels, common.decimals()), list(papers.values()))
+            results_text(
+                results.cfa_text(
+                    fits, labels, common.decimals(), Wording(result.project.config.templates)
+                ),
+                list(papers.values()),
+                "cfa",
+            )
             save_button(
                 result,
                 f"cfa_{instrument.id}_{dataset}",

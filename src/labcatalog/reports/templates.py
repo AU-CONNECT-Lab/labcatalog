@@ -112,6 +112,20 @@ KAPPA_EXAMPLE = {
     "n": "60",
     "kappa": "κ = .71, 95% CI [.57, .85]",
 }
+MODEL_EXAMPLE = "a model with one factor for each subscale (Sadness and Worry)"
+NAMES_EXAMPLE = "Sadness and Worry"
+FITTED = ("Model", "model", "package", "estimation", "n", "fit", "indicators")
+FITTED_EXAMPLE = {
+    "Model": "A" + MODEL_EXAMPLE[1:],
+    "model": MODEL_EXAMPLE,
+    "package": "lavaan",
+    "estimation": "the WLSMV estimator and the items as ordered categories",
+    "n": "214",
+    "fit": "χ²(19) = 31.20, p = .038, CFI = .98, TLI = .97, RMSEA = .05, 90% CI [.01, .09], "
+    "SRMR = .04",
+    "indicators": "items",
+}
+STEP_FIT_EXAMPLE = "χ²(38) = 52.40, CFI = .981, RMSEA = .042, SRMR = .051"
 TEMPLATES: dict[str, Template] = {
     t.key: t
     for t in (
@@ -415,6 +429,236 @@ TEMPLATES: dict[str, Template] = {
                 ),
             ),
             "The Results paragraph of the Rater agreement tab.",
+        ),
+        Template(
+            "cfa",
+            "Measurement model",
+            RESULTS,
+            (
+                Slot(
+                    "fit",
+                    "The model and its fit",
+                    "{Model}, fitted in {package} with {estimation} (N = {n}), gave {fit}.",
+                    FITTED,
+                    FITTED_EXAMPLE,
+                ),
+                Slot(
+                    "exact",
+                    "A model with three indicators, which fits exactly",
+                    "{Model}, fitted in {package} with {estimation} (N = {n}), fits exactly with "
+                    "three {indicators}, so it has no fit indices.",
+                    FITTED,
+                    FITTED_EXAMPLE,
+                ),
+                Slot(
+                    "problem",
+                    "A model that could not be used",
+                    "{Model} could not be used: {problem}.",
+                    ("model", "Model", "problem"),
+                    {
+                        "model": MODEL_EXAMPLE,
+                        "Model": "A" + MODEL_EXAMPLE[1:],
+                        "problem": "a loading above 1",
+                    },
+                ),
+                Slot(
+                    "estimation_wlsmv",
+                    "{estimation} with WLSMV",
+                    "the WLSMV estimator and the {indicators} as ordered categories",
+                    ("indicators",),
+                    {"indicators": "items"},
+                ),
+                Slot(
+                    "estimation_mlr",
+                    "{estimation} with MLR",
+                    "robust maximum likelihood (MLR) and the {indicators} as continuous",
+                    ("indicators",),
+                    {"indicators": "items"},
+                ),
+                Slot(
+                    "estimation_ml",
+                    "{estimation} with ML",
+                    "maximum likelihood and the {indicators} as continuous",
+                    ("indicators",),
+                    {"indicators": "items"},
+                ),
+                Slot(
+                    "model_one",
+                    "{model} for one factor",
+                    "a one-factor model of {names}",
+                    ("names",),
+                    {"names": "Total score"},
+                ),
+                Slot(
+                    "model_subscales",
+                    "{model} for a factor per subscale",
+                    "a model with one factor for each subscale ({names})",
+                    ("names",),
+                    {"names": NAMES_EXAMPLE},
+                ),
+                Slot(
+                    "model_second_order",
+                    "{model} for a second-order model",
+                    "a second-order model with a general factor over the subscales ({names})",
+                    ("names",),
+                    {"names": NAMES_EXAMPLE},
+                ),
+                Slot(
+                    "model_subscale_scores",
+                    "{model} for a factor of the subscale scores",
+                    "a one-factor model of the subscale scores ({names})",
+                    ("names",),
+                    {"names": NAMES_EXAMPLE},
+                ),
+                Slot(
+                    "model_measurement",
+                    "{model} for a measurement model of several scores",
+                    "a measurement model with a correlated factor for each of {names}",
+                    ("names",),
+                    {"names": "Mood, Sleep problems, and Stress"},
+                ),
+                Slot(
+                    "covariates",
+                    "When several studies are fitted together",
+                    "Every factor was regressed on the study, so the factor correlations are "
+                    "within studies.",
+                    (),
+                ),
+                Slot(
+                    "three_subscales",
+                    "A second-order model over three subscales",
+                    "With three subscales, its fit equals that of the subscale model.",
+                    (),
+                ),
+                Slot(
+                    "loadings",
+                    "The standardized loadings",
+                    "Standardized loadings ranged from {low} to {high}.",
+                    ("low", "high"),
+                    {"low": ".52", "high": ".84"},
+                ),
+                Slot(
+                    "loadings_general",
+                    "The loadings on a general factor",
+                    "Standardized loadings of the subscales on the general factor ranged from "
+                    "{low} to {high}.",
+                    ("low", "high"),
+                    {"low": ".61", "high": ".88"},
+                ),
+                Slot(
+                    "hierarchical_omega",
+                    "ω of a second-order model",
+                    "Hierarchical ω was {omega}.",
+                    ("omega",),
+                    {"omega": ".79"},
+                ),
+                Slot(
+                    "summed_omega",
+                    "ω of the summed subscale scores",
+                    "ω of the summed subscale scores was {omega}.",
+                    ("omega",),
+                    {"omega": ".83"},
+                ),
+                Slot(
+                    "correlation",
+                    "The correlation of two factors",
+                    "The factors correlated {r}.",
+                    ("r",),
+                    {"r": ".46"},
+                ),
+                Slot(
+                    "correlations",
+                    "The correlations of three or more factors",
+                    "Factor correlations ranged from {low} to {high}.",
+                    ("low", "high"),
+                    {"low": ".31", "high": ".58"},
+                ),
+                Slot(
+                    "omega",
+                    "ω of one factor",
+                    "ω was {omega}.",
+                    ("omega",),
+                    {"omega": ".88"},
+                ),
+                Slot(
+                    "omegas",
+                    "ω of several factors",
+                    "ω was {omegas}.",
+                    ("omegas",),
+                    {"omegas": ".81 for Sadness and .77 for Worry"},
+                ),
+                Slot(
+                    "omega_each",
+                    "Each factor in that list",
+                    "{omega} for {score}",
+                    ("omega", "score"),
+                    {"omega": ".81", "score": "Sadness"},
+                ),
+            ),
+            "The Results paragraph of a factor model, on the Measurement model tab and an "
+            "instrument's page. The Invariance template uses its model descriptions.",
+        ),
+        Template(
+            "invariance",
+            "Invariance",
+            RESULTS,
+            (
+                Slot(
+                    "intro",
+                    "The model and what it is tested across",
+                    "Invariance of {model} across {across} was tested in steps, each holding one "
+                    "more set of parameters equal.",
+                    ("model", "across"),
+                    {"model": MODEL_EXAMPLE, "across": "waves"},
+                ),
+                Slot(
+                    "problem",
+                    "A test that could not be run",
+                    "Invariance of {model} across {across} could not be tested: {problem}.",
+                    ("model", "across", "problem"),
+                    {"model": MODEL_EXAMPLE, "across": "waves", "problem": "too few people"},
+                ),
+                Slot(
+                    "freed",
+                    "Parameters freed by labcatalog.yaml",
+                    "Freed parameters: {freed}.",
+                    ("freed",),
+                    {"freed": "the intercept of item 3"},
+                ),
+                Slot(
+                    "step",
+                    "The first step",
+                    "{step} gave {fit}.",
+                    ("step", "fit"),
+                    {"step": "The configural model", "fit": STEP_FIT_EXAMPLE},
+                ),
+                Slot(
+                    "step_change",
+                    "Each later step, against the one before",
+                    "{step} gave {fit}; against the step before, {change}.",
+                    ("step", "fit", "change"),
+                    {
+                        "step": "Adding equal loadings",
+                        "fit": STEP_FIT_EXAMPLE,
+                        "change": "Δχ²(6) = 7.10, p = .312, ΔCFI = -.002, ΔRMSEA = -.001",
+                    },
+                ),
+                Slot(
+                    "step_problem",
+                    "A step that gave no usable model",
+                    "{step} gave no usable model: {problem}.",
+                    ("step", "problem"),
+                    {"step": "Adding equal intercepts", "problem": "it did not converge"},
+                ),
+                Slot("configural", "{step} for the configural model", "The configural model", ()),
+                Slot(
+                    "thresholds", "{step} for equal thresholds", "Holding the thresholds equal", ()
+                ),
+                Slot("metric", "{step} for equal loadings", "Adding equal loadings", ()),
+                Slot("scalar", "{step} for equal intercepts", "Adding equal intercepts", ()),
+            ),
+            "The Results paragraph of an invariance test, on an instrument's page and the "
+            "Invariance tab.",
         ),
     )
 }

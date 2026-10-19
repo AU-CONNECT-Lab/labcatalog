@@ -11,6 +11,7 @@ from labcatalog.metadata.editing import save_freed
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.schema import Instrument
 from labcatalog.stats import invariance, mplus
 from labcatalog.stats.analysis import STUDY_KEY
@@ -109,7 +110,10 @@ def test_block(
     paper_table(shown)
     labels = {s.id: s.label for s in instrument.scores}
     freed = freed_text(instrument, test.freed)
-    results_text(results.invariance_text(test, labels, across, freed), [shown])
+    wording = Wording(result.project.config.templates)
+    results_text(
+        results.invariance_text(test, labels, across, freed, wording), [shown], "invariance"
+    )
     with ui.row().classes("items-center gap-2"):
         steps = [s.step for s in test.steps if s.step != "configural" and not s.problem]
         if steps:

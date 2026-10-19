@@ -47,11 +47,6 @@ TEST_SYMBOLS = {WELCH: "Welch's t", STUDENT: "t", ANOVA: "F"}
 FIT_INDICES = {"cfi": "CFI", "tli": "TLI", "rmsea": "RMSEA", "srmr": "SRMR"}
 # Invariance steps and changes in fit are read to the third decimal, as in their table.
 FINE = 3
-STEP_PHRASES = {
-    "thresholds": "Holding the thresholds equal",
-    "metric": "Adding equal loadings",
-    "scalar": "Adding equal intercepts",
-}
 
 
 def correlation_text(
@@ -419,61 +414,60 @@ def series(parts: list[str]) -> str:
     return f"{', '.join(parts[:-1])}, and {parts[-1]}"
 
 
-def cfa_text(fits: list[CfaFit], labels: dict[str, str], digits: int = 2) -> str:
-    return " ".join(cfa_sentences(fit, labels, digits) for fit in fits)
+def cfa_text(
+    fits: list[CfaFit], labels: dict[str, str], digits: int = 2, wording: Wording = BUILT_IN
+) -> str:
+    return " ".join(cfa_sentences(fit, labels, digits, wording) for fit in fits)
 
 
-def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int) -> str:
-    model = model_phrase(fit.kind, [labels[s] for s in scores_of(fit)])
+def cfa_sentences(fit: CfaFit, labels: dict[str, str], digits: int, wording: Wording) -> str:
+    model = model_phrase(fit.kind, [labels[s] for s in scores_of(fit)], wording)
+    named = {"model": model, "Model": opening_case(model)}
     if fit.problem:
-        return f"{opening_case(model)} could not be used: {fit.problem}."
-    package = "lavaan" if fit.engine == LAVAAN else "semopy"
+        return wording.say("cfa", "problem", problem=fit.problem, **named)
     indicators = "subscale scores" if fit.kind == SUBSCALE_SCORES else "items"
-    how = (
-        f"the WLSMV estimator and the {indicators} as ordered categories"
-        if fit.estimator == WLSMV
-        else f"robust maximum likelihood (MLR) and the {indicators} as continuous"
-        if fit.estimator == MLR
-        else f"maximum likelihood and the {indicators} as continuous"
+    estimation = {WLSMV: "estimation_wlsmv", MLR: "estimation_mlr"}.get(
+        fit.estimator, "estimation_ml"
     )
-    opening = f"{opening_case(model)}, fitted in {package} with {how} (N = {fit.n}),"
+    opening = named | {
+        "package": "lavaan" if fit.engine == LAVAAN else "semopy",
+        "estimation": wording.say("cfa", estimation, indicators=indicators),
+        "n": fit.n,
+        "indicators": indicators,
+    }
     if fit.fit.get("df") == 0:
-        sentences = [f"{opening} fits exactly with three {indicators}, so it has no fit indices."]
+        sentences = [wording.say("cfa", "exact", **opening)]
     else:
-        sentences = [f"{opening} gave {fit_indices(fit.fit, digits)}."]
+        sentences = [wording.say("cfa", "fit", fit=fit_indices(fit.fit, digits), **opening)]
     if fit.covariates:
-        sentences.append(
-            "Every factor was regressed on the study, so the factor correlations are within "
-            "studies."
-        )
+        sentences.append(wording.say("cfa", "covariates"))
     if fit.kind == SECOND_ORDER and len(fit.factors) == MIN_SUBSCALES:
-        sentences.append("With three subscales, its fit equals that of the subscale model.")
+        sentences.append(wording.say("cfa", "three_subscales"))
     if fit.loadings:
         low, high = min(fit.loadings.values()), max(fit.loadings.values())
-        which = " of the subscales on the general factor" if fit.kind in GENERAL_KINDS else ""
+        slot = "loadings_general" if fit.kind in GENERAL_KINDS else "loadings"
         sentences.append(
-            f"Standardized loadings{which} ranged from {bounded(low, digits)} to "
-            f"{bounded(high, digits)}."
+            wording.say("cfa", slot, low=bounded(low, digits), high=bounded(high, digits))
         )
     if fit.general_omega is not None:
-        name = "Hierarchical ω" if fit.kind == SECOND_ORDER else "ω of the summed subscale scores"
-        sentences.append(f"{name} was {bounded(fit.general_omega, digits)}.")
+        slot = "hierarchical_omega" if fit.kind == SECOND_ORDER else "summed_omega"
+        sentences.append(wording.say("cfa", slot, omega=bounded(fit.general_omega, digits)))
     if fit.kind == MEASUREMENT and fit.correlations:
         values = [c["r"] for c in fit.correlations.values()]
-        low, high = min(values), max(values)
-        sentences.append(
-            f"The factors correlated {bounded(values[0], digits)}."
-            if len(values) == 1
-            else f"Factor correlations ranged from {bounded(low, digits)} to "
-            f"{bounded(high, digits)}."
-        )
+        if len(values) == 1:
+            sentences.append(wording.say("cfa", "correlation", r=bounded(values[0], digits)))
+        else:
+            low, high = bounded(min(values), digits), bounded(max(values), digits)
+            sentences.append(wording.say("cfa", "correlations", low=low, high=high))
     omega = [(labels[s], v) for s, v in fit.omega.items()]
     if len(omega) == 1:
-        sentences.append(f"ω was {bounded(omega[0][1], digits)}.")
+        sentences.append(wording.say("cfa", "omega", omega=bounded(omega[0][1], digits)))
     elif omega:
-        sentences.append(
-            f"ω was {series([f'{bounded(v, digits)} for {name}' for name, v in omega])}."
-        )
+        each = [
+            wording.say("cfa", "omega_each", omega=bounded(v, digits), score=name)
+            for name, v in omega
+        ]
+        sentences.append(wording.say("cfa", "omegas", omegas=series(each)))
     return " ".join(sentences)
 
 
@@ -482,16 +476,16 @@ def opening_case(text: str) -> str:
     return text[:1].upper() + text[1:]
 
 
-def model_phrase(kind: str, names: list[str]) -> str:
-    if kind == MEASUREMENT:
-        return f"a measurement model with a correlated factor for each of {series(names)}"
-    if kind == SUBSCALES:
-        return f"a model with one factor for each subscale ({series(names)})"
-    if kind == SECOND_ORDER:
-        return f"a second-order model with a general factor over the subscales ({series(names)})"
-    if kind == SUBSCALE_SCORES:
-        return f"a one-factor model of the subscale scores ({series(names)})"
-    return f"a one-factor model of {series(names)}"
+MODEL_SLOTS = {
+    MEASUREMENT: "model_measurement",
+    SUBSCALES: "model_subscales",
+    SECOND_ORDER: "model_second_order",
+    SUBSCALE_SCORES: "model_subscale_scores",
+}
+
+
+def model_phrase(kind: str, names: list[str], wording: Wording) -> str:
+    return wording.say("cfa", MODEL_SLOTS.get(kind, "model_one"), names=series(names))
 
 
 def fit_indices(values: dict[str, float | None], digits: int) -> str:
@@ -595,30 +589,33 @@ def estimate(effect: Effect, digits: int) -> str:
 
 
 def invariance_text(
-    test: InvarianceTest, labels: dict[str, str], across: str, freed: str = ""
+    test: InvarianceTest,
+    labels: dict[str, str],
+    across: str,
+    freed: str = "",
+    wording: Wording = BUILT_IN,
 ) -> str:
     # across names the occasions, such as "waves" or "the answers to Child gender".
-    model = model_phrase(test.kind, [labels[s] for s in test.factors])
+    model = model_phrase(test.kind, [labels[s] for s in test.factors], wording)
     if test.problem:
-        return f"Invariance of {model} across {across} could not be tested: {test.problem}."
-    sentences = [
-        f"Invariance of {model} across {across} was tested in steps, each holding one more set "
-        "of parameters equal."
-    ]
+        return wording.say(
+            "invariance", "problem", model=model, across=across, problem=test.problem
+        )
+    sentences = [wording.say("invariance", "intro", model=model, across=across)]
     if freed:
-        sentences.append(f"Freed parameters: {freed}.")
+        sentences.append(wording.say("invariance", "freed", freed=freed))
     previous = None
     for step in sorted(test.steps, key=lambda s: STEPS.index(s.step)):
         before = previous.fit if previous and not previous.problem else {}
-        sentences.append(step_sentence(step, before))
+        sentences.append(step_sentence(step, before, wording))
         previous = step
     return " ".join(sentences)
 
 
-def step_sentence(step: InvarianceStep, before: dict[str, float | None]) -> str:
-    name = STEP_PHRASES.get(step.step, "The configural model")
+def step_sentence(step: InvarianceStep, before: dict[str, float | None], wording: Wording) -> str:
+    name = wording.say("invariance", step.step)
     if step.problem:
-        return f"{name} gave no usable model: {step.problem}."
+        return wording.say("invariance", "step_problem", step=name, problem=step.problem)
     values = step.fit
     found = [f"χ²({values['df']:g}) = {number(values['chisq'], 2)}"] + [
         f"{FIT_INDICES[key]} = {bounded(values[key], FINE)}"
@@ -626,7 +623,7 @@ def step_sentence(step: InvarianceStep, before: dict[str, float | None]) -> str:
         if values.get(key) is not None
     ]
     if step.chisq_diff is None:
-        return f"{name} gave {', '.join(found)}."
+        return wording.say("invariance", "step", step=name, fit=", ".join(found))
     change = [
         f"Δχ²({step.df_diff:g}) = {number(step.chisq_diff, 2)}",
         p_text(step.p_diff),
@@ -636,7 +633,9 @@ def step_sentence(step: InvarianceStep, before: dict[str, float | None]) -> str:
             if values.get(key) is not None and before.get(key) is not None
         ],
     ]
-    return f"{name} gave {', '.join(found)}; against the step before, {', '.join(change)}."
+    return wording.say(
+        "invariance", "step_change", step=name, fit=", ".join(found), change=", ".join(change)
+    )
 
 
 def multilevel_text(fitted: Fitted, outcome: str, digits: int = 2) -> str:

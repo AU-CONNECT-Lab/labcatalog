@@ -59,3 +59,11 @@ def test_unknown_templates_and_parts_are_errors(mock_project):
     config.write_text(yaml.safe_dump(data), encoding="utf-8")
     messages = [i.message for i in validate_project(load_project(mock_project))]
     assert any(m.startswith("regression.intro: unknown placeholder {nope}") for m in messages)
+
+
+def test_each_built_in_part_uses_its_placeholders_and_its_example_fills_it():
+    for found in templates.TEMPLATES.values():
+        for slot in found.slots:
+            assert templates.placeholder_problem(slot.default, slot.placeholders) is None
+            if found.part == templates.RESULTS:
+                assert set(slot.example) == set(slot.placeholders), (found.key, slot.key)
