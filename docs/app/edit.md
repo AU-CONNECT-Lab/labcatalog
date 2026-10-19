@@ -14,7 +14,7 @@ An instrument file has its **Structure** above the editor, the same tree as on t
 
 ## Advanced: text and tables
 
-**Advanced** opens the file as text or as tables, and **Form** goes back. Column maps always open as text.
+**Advanced** opens the file as text or as tables, and **Form** goes back. Column maps have no form and open as a table, one row per column of the data file, with **Instrument** chosen from the project's instruments; **Text** shows the CSV itself.
 
 ### Text mode
 

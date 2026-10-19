@@ -18,7 +18,8 @@ def test_tables_belong_to_their_files():
     assert list(records.tables_for(MOOD)) == ["items", "scores", "response_sets"]
     assert list(records.tables_for("labcatalog.yaml")) == ["datasets"]
     assert list(records.tables_for(STUDY)) == ["administrations", "overrides"]
-    assert records.tables_for("maps/child_w1.csv") == {}
+    assert list(records.tables_for("maps/child_w1.csv")) == [records.MAP]
+    assert records.tables_for("data/child_w1.csv") == {}
 
 
 def test_only_changed_cells_change(mock_project):
@@ -242,3 +243,19 @@ def test_item_fields_get_columns_in_the_items_table(mock_project):
     tables = records.tables_for(MOOD, editing.custom_fields(mock_project))
     assert tables["items"].columns[-1].key == "custom:format"
     assert tables["items"].columns[-1].choices == ("", "statement", "question")
+
+
+def test_a_column_map_reads_and_writes_as_a_table():
+    text = "column,instrument,item\npid,,\nems_1_w1,example_mood,ems_1\n"
+    table = records.tables_for("maps/child_w1.csv", (), ["example_mood"])[records.MAP]
+    assert table.columns[1].choices == ("", "example_mood")
+    rows = records.read_rows(text, records.MAP, table)
+    assert rows[1] == {
+        records.ORIGIN: 1,
+        "column": "ems_1_w1",
+        "instrument": "example_mood",
+        "item": "ems_1",
+    }
+    rows[0]["column"] = "id"
+    written = records.write_rows(text, records.MAP, table, [rows[1], rows[0]])
+    assert written == "column,instrument,item\nems_1_w1,example_mood,ems_1\nid,,\n"

@@ -206,9 +206,12 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             shown.form.edited = False
         page.refresh()
 
+    def instrument_ids() -> list[str]:
+        return [Path(p).stem for p in editing.editable_files(root)["Instruments"]]
+
     def table() -> records.Table:
         return records.with_entries(
-            records.tables_for(view.path, fields)[view.mode], shown.opened.text
+            records.tables_for(view.path, fields, instrument_ids())[view.mode], shown.opened.text
         )
 
     def show(issues: list[Issue]) -> None:
@@ -365,12 +368,18 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     "flat no-caps"
                 )
             ui.button("Reload from disk", icon="refresh", on_click=reload).props("flat no-caps")
-        note(
-            "Lists are written with commas, for example ems_1, ems_2."
-            + ("" if table().single else " Drag a row by its handle to move it.")
-            + " Saving changes only the cells you changed, so comments and the rest of the file "
-            "stay as they were."
-        )
+        if table().csv:
+            note(
+                "One row per column of the data file: the instrument and item it holds, or both "
+                "empty for the ID, dates and other columns. Drag a row by its handle to move it."
+            )
+        else:
+            note(
+                "Lists are written with commas, for example ems_1, ems_2."
+                + ("" if table().single else " Drag a row by its handle to move it.")
+                + " Saving changes only the cells you changed, so comments and the rest of the "
+                "file stay as they were."
+            )
         if table().parent:
             note(
                 "Each row changes one item in the administration chosen first; leave Dataset "
@@ -389,9 +398,12 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
     def page() -> None:
         shown.opened = opened = editing.open_file(root, view.path)
         shown.editor = shown.grid = shown.form = shown.problems = None
-        tables = records.tables_for(view.path, fields)
+        tables = records.tables_for(view.path, fields, instrument_ids())
         if view.mode == FORM:
             shown.form = opened_form(opened)
+        if view.mode == FORM and shown.form is None and tables:
+            # A file with no form, such as a column map, opens in its table.
+            view.mode = next(iter(tables))
         if view.mode not in (FORM, *tables) or (view.mode == FORM and shown.form is None):
             view.mode = TEXT
         with ui.row().classes("w-full no-wrap items-start gap-4"):
@@ -433,9 +445,10 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                             value=view.mode,
                             on_change=lambda e: switch(e.value),
                         ).props("dense no-caps")
-                        ui.button("Form", icon="edit_note", on_click=lambda: switch(FORM)).props(
-                            "flat dense no-caps"
-                        )
+                        if opened_form(opened) is not None:
+                            ui.button(
+                                "Form", icon="edit_note", on_click=lambda: switch(FORM)
+                            ).props("flat dense no-caps")
                 if editing.is_draft(view.path):
                     ui.label(
                         "A draft from a PDF, kept out of the catalog. Check it against the PDF "

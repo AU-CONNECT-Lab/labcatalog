@@ -1,3 +1,4 @@
+import csv
 import io
 from collections.abc import Iterable
 from dataclasses import dataclass, replace
@@ -51,7 +52,21 @@ class Table:
     single: bool = False
     # Set when rows come from a list inside each entry of this list, which rows only point to.
     parent: str | None = None
+    # A CSV file, a row per line, rather than a list in a YAML file.
+    csv: bool = False
 
+
+# A column map: each column of a data file and the item it holds, or nothing.
+MAP = "map"
+MAP_TABLE = Table(
+    "Columns",
+    (
+        Column("column", "Column"),
+        Column("instrument", "Instrument", "choice"),
+        Column("item", "Item"),
+    ),
+    csv=True,
+)
 
 ITEMS = Table(
     "Items",
@@ -144,8 +159,17 @@ OWNERS = {
 }
 
 
-def tables_for(relative: str, fields: Iterable[CustomFieldDef] = ()) -> dict[str, Table]:
+def tables_for(
+    relative: str, fields: Iterable[CustomFieldDef] = (), instruments: Iterable[str] = ()
+) -> dict[str, Table]:
+    # instruments are the IDs a column map's rows can name.
     path = PurePosixPath(relative)
+    if path.suffix == ".csv" and path.parent.name == defaults.MAPS_DIR:
+        column, instrument, item = MAP_TABLE.columns
+        choices = ("", *instruments)
+        return {
+            MAP: replace(MAP_TABLE, columns=(column, replace(instrument, choices=choices), item))
+        }
     if path.suffix not in defaults.YAML_SUFFIXES:
         return {}
     base = TABLES[""] if path.name == defaults.CONFIG_FILENAME else TABLES.get(path.parent.name, {})
@@ -261,6 +285,12 @@ def round_trip() -> YAML:
 
 
 def read_rows(text: str, key: str, table: Table) -> list[dict[str, Any]]:
+    if table.csv:
+        rows = csv.DictReader(io.StringIO(text))
+        return [
+            {ORIGIN: n} | {c.key: row.get(c.key) or "" for c in table.columns}
+            for n, row in enumerate(rows)
+        ]
     data = load(text)
     if table.parent:
         first, *columns = table.columns
@@ -296,6 +326,12 @@ def cells(entry: CommentedMap, columns: Iterable[Column], key: str) -> dict[str,
 
 
 def write_rows(text: str, key: str, table: Table, rows: list[dict]) -> str:
+    if table.csv:
+        out = io.StringIO()
+        writer = csv.writer(out, lineterminator="\n")
+        writer.writerow([c.key for c in table.columns])
+        writer.writerows([[row.get(c.key) or "" for c in table.columns] for row in rows])
+        return out.getvalue()
     loader = round_trip()
     data = loader.load(text) or CommentedMap()
     if table.single:
