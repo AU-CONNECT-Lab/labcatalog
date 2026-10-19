@@ -345,7 +345,7 @@ def render(
             "The analysis",
             placeholder="For example: does the parent's stress predict the child's sleep "
             "problems a year later, with the child's age as a covariate?",
-        ).bind_value(chosen, "wanted").props("outlined autogrow").classes("w-full")
+        ).bind_value(chosen, "wanted").props("outlined").classes("lc-grow w-full")
         with ui.row().classes("items-center gap-3"):
             ui.toggle(
                 LANGUAGE_NAMES, value=chosen.language, on_change=lambda e: set_language(e.value)

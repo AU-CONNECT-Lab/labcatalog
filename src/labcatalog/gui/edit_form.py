@@ -268,9 +268,11 @@ def widget(row: dict, column: Column, section: forms.Section, touch: Callable[[]
             on_change=lambda e: set_value("" if e.value is None else e.value),
         ).props("dense outlined")
     if key in LONG:
-        shown = ui.textarea(
-            column.label, value=str(value), on_change=lambda e: set_value(e.value)
-        ).props("dense outlined autogrow")
+        shown = (
+            ui.textarea(column.label, value=str(value), on_change=lambda e: set_value(e.value))
+            .props("dense outlined")
+            .classes("lc-grow")
+        )
     else:
         shown = ui.input(
             column.label, value=str(value), on_change=lambda e: set_value(e.value)

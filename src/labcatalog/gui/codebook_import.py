@@ -137,9 +137,9 @@ def render(
         ui.button("Copy AI prompt", icon="content_copy", on_click=copy_prompt).props(
             "flat no-caps"
         ).classes("lc-quiet-btn w-fit")
-        ui.textarea("The AI's answer").bind_value(view, "answer").props(
-            "outlined autogrow"
-        ).classes("w-full mt-2")
+        ui.textarea("The AI's answer").bind_value(view, "answer").props("outlined").classes(
+            "lc-grow w-full mt-2"
+        )
         ui.button("Replace the three files with this answer", on_click=save_answer).props(
             "flat no-caps"
         )

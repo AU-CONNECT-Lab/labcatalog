@@ -306,11 +306,9 @@ def open_wizard(
                     construct = ui.input(
                         "Construct", value=draft.about.get("construct_name", "")
                     ).classes("w-96")
-                description = (
-                    ui.textarea("Description", value=draft.about.get("description", ""))
-                    .props("autogrow")
-                    .classes("w-full")
-                )
+                description = ui.textarea(
+                    "Description", value=draft.about.get("description", "")
+                ).classes("lc-grow w-full")
                 with ui.row().classes("gap-3 w-full"):
                     reference = (
                         ui.select(
@@ -352,14 +350,10 @@ def open_wizard(
                 navigation(stepper.next)
             with ui.step(TITLES["items"]):
                 with ui.row().classes("w-full items-end gap-3 no-wrap"):
-                    pasted = (
-                        ui.textarea(
-                            "Paste the items, one per line; end a line with (R) for a "
-                            "reverse-keyed item"
-                        )
-                        .props("autogrow")
-                        .classes("grow")
-                    )
+                    pasted = ui.textarea(
+                        "Paste the items, one per line; end a line with (R) for a "
+                        "reverse-keyed item"
+                    ).classes("lc-grow grow")
                     ui.button("Add these items", on_click=paste_items).props("no-caps")
                 with ui.row().classes("items-center gap-3 w-full"):
                     default_set = ui.select(
