@@ -5,6 +5,7 @@ from labcatalog.pipeline import run_catalog, run_freeze
 from labcatalog.project import init_project
 from labcatalog.reports.database import run_database
 from labcatalog.reports.export import variable_rows
+from tests.test_folder_source import add_scans
 
 
 def test_the_database_holds_the_data_and_what_they_mean(mock_project):
@@ -60,3 +61,25 @@ def test_a_project_without_datasets_still_gets_a_database(tmp_path):
     with duckdb.connect(str(path), read_only=True) as con:
         names = {row[0] for row in con.execute("SELECT table_name FROM duckdb_tables()").fetchall()}
     assert names == {"build"}
+
+
+def test_each_file_of_a_folder_dataset_has_a_row_to_join_with_the_data(mock_project):
+    add_scans(mock_project)
+    (mock_project / "id_map.csv").write_text(
+        "dataset,from,to\nscans_w1,1002C,9999C\n", encoding="utf-8"
+    )
+    path = run_database(mock_project)
+    with duckdb.connect(str(path), read_only=True) as con:
+        files = con.execute("SELECT * FROM folder_files").df()
+        joined = con.execute(
+            'SELECT f.path FROM folder_files f JOIN data."child_w1" c USING (pid)'
+        ).fetchall()
+    assert files.columns.tolist() == ["dataset", "study", "wave", "pid", "path", "size", "here"]
+    func = "bids/sub-{0}/ses-1/func/sub-{0}_ses-1_task-rest{1}_bold.nii.gz"
+    assert files[["dataset", "wave", "pid", "path"]].values.tolist() == [
+        ["scans_w1", "1", "1001C", func.format("1001C", "_run-1")],
+        ["scans_w1", "1", "1001C", func.format("1001C", "_run-2")],
+        ["scans_w1", "1", "9999C", func.format("1002C", "")],
+    ]
+    assert files["size"].tolist() == [1, 1, 1] and files["here"].all()
+    assert len(joined) == 2

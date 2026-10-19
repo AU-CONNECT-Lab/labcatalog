@@ -1,5 +1,6 @@
 import re
 from collections import Counter
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,12 +28,7 @@ class FolderSource:
         folder = expand_path(dataset.path, project_root)
         if not folder.is_dir():
             raise DataSourceError(f"{dataset.name}: folder not found: {folder}")
-        matcher = file_pattern(dataset.files)
-        counts: Counter[str] = Counter()
-        for path in folder.glob(dataset.files.replace(ID, "*")):
-            found = matcher.fullmatch(path.relative_to(folder).as_posix())
-            if found and not path.is_dir():
-                counts[found.group("id")] += 1
+        counts = Counter(person for person, _ in matched(dataset, project_root))
         ids = sorted(counts)
         return pd.DataFrame({id_column: ids, FILES: [str(counts[i]) for i in ids]})
 
@@ -48,25 +44,44 @@ class FolderSize:
     unknown: int = 0
 
 
+@dataclass
+class FolderFile:
+    id: str
+    path: Path
+    # None when its content is not here and its annex key does not give its size.
+    size: int | None
+    here: bool
+
+
 def folder_size(dataset: DatasetConfig, project_root: Path) -> FolderSize:
-    # The files the dataset's rule matches, as the catalog counts them.
+    found = FolderSize()
+    for file in folder_files(dataset, project_root):
+        found.files += 1
+        found.size += file.size or 0
+        found.unknown += file.size is None
+        if file.here:
+            found.here += 1
+            found.here_size += file.size
+    return found
+
+
+def folder_files(dataset: DatasetConfig, project_root: Path) -> list[FolderFile]:
+    files = []
+    for person, path in matched(dataset, project_root):
+        here = not is_placeholder(path)
+        size = path.stat().st_size if here else annexed_size(path)
+        files.append(FolderFile(person, path, size, here))
+    return files
+
+
+def matched(dataset: DatasetConfig, project_root: Path) -> Iterator[tuple[str, Path]]:
+    # The files the dataset's rule matches, as the catalog counts them, each with its ID.
     folder = expand_path(dataset.path, project_root)
     matcher = file_pattern(dataset.files)
-    found = FolderSize()
-    for path in folder.glob(dataset.files.replace(ID, "*")):
-        if path.is_dir() or not matcher.fullmatch(path.relative_to(folder).as_posix()):
-            continue
-        found.files += 1
-        if is_placeholder(path):
-            size = annexed_size(path)
-            found.unknown += size is None
-            found.size += size or 0
-        else:
-            size = path.stat().st_size
-            found.size += size
-            found.here += 1
-            found.here_size += size
-    return found
+    for path in sorted(folder.glob(dataset.files.replace(ID, "*"))):
+        found = matcher.fullmatch(path.relative_to(folder).as_posix())
+        if found and not path.is_dir():
+            yield found.group("id"), path
 
 
 def file_pattern(files: str) -> re.Pattern[str]:

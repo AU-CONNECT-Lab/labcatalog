@@ -5,9 +5,11 @@ import duckdb
 import pandas as pd
 
 from labcatalog import defaults
+from labcatalog.data import id_map
 from labcatalog.exceptions import MetadataError
 from labcatalog.pipeline import CatalogResult, run_catalog
 from labcatalog.reports.export import data_frame, item_statistics, score_statistics, variable_rows
+from labcatalog.sources.folder_source import folder_files
 
 DATA_SCHEMA = "data"
 
@@ -67,8 +69,35 @@ def tables(result: CatalogResult) -> dict[str, pd.DataFrame]:
         "score_statistics": pd.DataFrame(score_statistics(result, plan)),
         "item_statistics": pd.DataFrame(item_statistics(result, plan)),
         "files": pd.DataFrame([f.model_dump() for f in manifest.files]),
+        "folder_files": pd.DataFrame(folder_file_rows(result)),
         "build": pd.DataFrame([build]),
     }
+
+
+def folder_file_rows(result: CatalogResult) -> list[dict]:
+    # Each file of a folder dataset, under its person's ID as corrected, to join with the data.
+    root = result.project.root
+    id_column = result.project.config.defaults.id_column
+    rows = []
+    for name, loaded in result.datasets.items():
+        dataset = loaded.config
+        if dataset.source != "folder":
+            continue
+        corrected = id_map.mapping(root, name)
+        for file in folder_files(dataset, root):
+            path = file.path.relative_to(root) if file.path.is_relative_to(root) else file.path
+            rows.append(
+                {
+                    "dataset": name,
+                    "study": dataset.study,
+                    "wave": str(dataset.wave),
+                    id_column: corrected.get(file.id, file.id),
+                    "path": path.as_posix(),
+                    "size": file.size,
+                    "here": file.here,
+                }
+            )
+    return rows
 
 
 def write_database(result: CatalogResult, path: Path) -> Path:
