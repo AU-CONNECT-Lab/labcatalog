@@ -177,6 +177,7 @@ def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> Datase
             *dataset.scores,
             *(v for value in custom.values() for v in as_set(value)),
             *(t for i in instruments for t in (i.id, i.name, i.abbreviation)),
+            *(t for i in instruments for item in i.items for t in as_text_dict(item.text).values()),
             *columns,
         ]
         text[dataset.name] = "\n".join(p for p in parts if p).lower()

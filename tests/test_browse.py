@@ -1,3 +1,4 @@
+from labcatalog.data.resolve import as_text_dict
 from labcatalog.metadata.browse import (
     HAS_ERRORS,
     HAS_WARNINGS,
@@ -350,3 +351,11 @@ def test_dataset_search_reaches_every_setting(example_project):
     first = config.datasets[0]
     assert dataset_matches(index, {}, first.path) == [first.name]
     assert dataset_matches(index, {}, str(first.snapshot_date))
+
+
+def test_dataset_search_reaches_item_text(example_project):
+    project = load_validated(example_project)[0]
+    item = project.instruments["example_parent_stress"].items[0]
+    words = " ".join(next(iter(as_text_dict(item.text).values())).split()[:4])
+    found = dataset_matches(dataset_index_for(example_project), {}, words)
+    assert "parent_w1" in found and "child_w1" not in found

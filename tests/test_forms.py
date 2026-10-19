@@ -17,10 +17,9 @@ def test_an_instrument_form_offers_the_files_own_ids(mock_project):
 
 
 def test_settings_and_study_forms_offer_the_projects_lists(mock_project):
-    config = forms.sections(
-        mock_project, "labcatalog.yaml", opened(mock_project, "labcatalog.yaml")
-    )
-    assert "parent" in config[0].options["reporter"]
+    found = forms.sections(mock_project, "labcatalog.yaml", opened(mock_project, "labcatalog.yaml"))
+    config = {section.key: section for section in found}
+    assert "parent" in config["datasets"].options["reporter"]
     study = next((mock_project / "studies").glob("*.yaml")).relative_to(mock_project).as_posix()
     administrations = forms.sections(mock_project, study, opened(mock_project, study))[0]
     assert "example_mood" in administrations.options["instrument"]
