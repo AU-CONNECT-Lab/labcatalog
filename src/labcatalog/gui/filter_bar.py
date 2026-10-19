@@ -106,8 +106,8 @@ def filter_bar(
         )
         for facet in shown:
             with (
-                ui.button(title(facet), icon_right="expand_more")
-                .props("flat no-caps")
+                ui.button(title(facet))
+                .props("flat no-caps icon-right=expand_more")
                 .classes("lc-quiet-btn") as buttons[facet.name]
             ):
                 with ui.menu(), ui.column().classes("gap-0 p-3"):
