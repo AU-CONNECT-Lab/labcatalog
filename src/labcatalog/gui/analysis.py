@@ -49,6 +49,16 @@ PARTS = {
     "panel": "Cross-lagged panel",
     "custom": "Custom",
 }
+# Short names on the tabs; the full name shows on hover and heads the panel.
+TAB_LABELS = PARTS | {
+    "missing": "Missing",
+    "correlation": "Correlation",
+    "groups": "Groups",
+    "agreement": "Agreement",
+    "measurement": "CFA",
+    "multilevel": "MLM",
+    "panel": "CLPM",
+}
 
 
 @dataclass
@@ -229,8 +239,10 @@ def render(
                 .props("dense no-caps align=left")
                 .classes("lc-subnav w-full") as tabs
             ):
-                for name, label in PARTS.items():
-                    ui.tab(name, label=label)
+                for name, label in TAB_LABELS.items():
+                    tab = ui.tab(name, label=label)
+                    if label != PARTS[name]:
+                        tab.tooltip(PARTS[name])
             section()
 
 
