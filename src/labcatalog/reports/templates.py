@@ -32,10 +32,6 @@ class Template:
     # The file that can hold its own wording, in place of the project's.
     own: str | None = None
 
-    @property
-    def single(self) -> bool:
-        return len(self.slots) == 1
-
     def slot(self, key: str) -> Slot:
         return next(s for s in self.slots if s.key == key)
 

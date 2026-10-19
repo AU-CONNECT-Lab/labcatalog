@@ -228,6 +228,8 @@ def step_row(
             with ui.row().classes("items-center gap-3"):
                 ui.label(step.name).classes("lc-item-title")
                 ui.label(state.status).classes(f"lc-pill lc-{kind}")
+                if step.stage:
+                    ui.label(step.stage).classes("lc-note")
                 if last:
                     ui.label(f"Last run: {last.outcome}").classes("lc-note")
             ui.label(step.run).classes("lc-step-run")

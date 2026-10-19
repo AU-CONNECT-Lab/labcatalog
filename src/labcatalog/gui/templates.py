@@ -156,7 +156,7 @@ def editor(
             for slot in found.slots:
                 box = (
                     ui.textarea(
-                        None if found.single else slot.label,
+                        slot.label,
                         value=current[slot.key],
                         on_change=touched,
                     )
