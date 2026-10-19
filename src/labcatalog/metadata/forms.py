@@ -57,6 +57,9 @@ class Section:
     # Values to pick from that follow another column of the row: column to (that column, its
     # value to the values).
     follows: dict[str, tuple[str, dict[str, tuple[str, ...]]]] = field(default_factory=dict)
+    # A line under the section's title, and the text of its help button.
+    about: str = ""
+    help: str = ""
 
     def options_for(self, row: dict, key: str) -> tuple[str, ...]:
         if key in self.follows:
@@ -208,12 +211,35 @@ def config_sections(config: ProjectConfig | None, tables: dict[str, Table]) -> l
             primary=("name", "study", "wave", "reporter", "modality", *custom),
             carried=("study", "wave", "modality", "source", *custom),
             noun="dataset",
+            about="One line per data file; the lab's own fields for datasets come after Reporter",
+            help=(
+                "Each line is one data file: its name, study, wave, reporter and modality. More "
+                "fields, the first button at the end of a line, opens the rest, such as the path "
+                "and the ID column.\n\nTo give every dataset a field of your own, such as the site "
+                "or the person who collected it, add it under Fields below with Applies to set to "
+                "dataset, and save. A box for it then follows Reporter on each line."
+            ),
         ),
         Section(
             "custom_fields",
             tables["custom_fields"],
             primary=("name", "label", "applies_to", "type", "choices"),
             noun="field",
+            about="The lab's own fields, added to the instruments, datasets or studies they apply to",
+            help=(
+                "A field is something the lab records that labcatalog has no place for, such as "
+                "the domain of an instrument or the site of a dataset.\n\n"
+                "Name: the key written in the files, such as site.\n"
+                "Label: how it reads in the window, such as Site.\n"
+                "Applies to: where its box shows: on each instrument, score or item in its form, "
+                "on each line under Datasets above, on each administration in a study file, or on "
+                "each study.\n"
+                "Type: choice (one of the Choices), tags (any number of them), text, number or "
+                "date.\n\n"
+                "A choice or tags field is also a filter on the Instruments page, and one that "
+                "applies to datasets or studies a filter on the Datasets page. Renaming or "
+                "deleting a field asks first, then changes every file that uses it."
+            ),
         ),
     ]
 

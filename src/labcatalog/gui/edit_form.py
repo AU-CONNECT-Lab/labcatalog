@@ -136,7 +136,7 @@ def list_section(rows: list[dict], section: forms.Section, touch: Callable[[], N
                     details.set_visibility(False)
                     more.on_click(lambda d=details: d.set_visibility(not d.visible))
 
-    with panel(section.table.label) as tools:
+    with panel(section.table.label, section.about, section.help) as tools:
         with tools:
             ui.button(f"Add {section.noun}", icon="add", on_click=add).props("flat dense no-caps")
         body()

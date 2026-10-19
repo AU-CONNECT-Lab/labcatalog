@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from datetime import date
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, dataset_by_name, rosters
@@ -169,12 +170,9 @@ def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> Datase
         ]
         columns = [e.column for e in project.maps.get(dataset.map_name(), [])]
         parts = [
-            dataset.name,
-            dataset.path,
-            dataset.study,
+            # Every setting of the dataset in labcatalog.yaml, such as its path and ID column.
+            *(str(v) for v in dataset.model_dump(exclude={"custom"}).values() if is_text(v)),
             study.label,
-            dataset.wave,
-            dataset.reporter,
             config.vocab.modality_label(dataset.modality),
             *dataset.scores,
             *(v for value in custom.values() for v in as_set(value)),
@@ -189,6 +187,10 @@ def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> Datase
         values=values,
         text=text,
     )
+
+
+def is_text(value: object) -> bool:
+    return isinstance(value, (str, date))
 
 
 def worst(levels: set[str]) -> str:

@@ -342,3 +342,11 @@ def test_datasets_filter_by_their_worst_problem(example_project):
     assert dataset_matches(index, {PROBLEMS: {HAS_ERRORS}}) == ["parent_w1"]
     assert dataset_matches(index, {PROBLEMS: {HAS_WARNINGS}}) == ["child_w1"]
     assert len(dataset_matches(index, {PROBLEMS: {NO_PROBLEMS}})) == len(index.datasets) - 2
+
+
+def test_dataset_search_reaches_every_setting(example_project):
+    index = dataset_index_for(example_project)
+    config = load_validated(example_project)[0].config
+    first = config.datasets[0]
+    assert dataset_matches(index, {}, first.path) == [first.name]
+    assert dataset_matches(index, {}, str(first.snapshot_date))
