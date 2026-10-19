@@ -51,6 +51,37 @@ def test_an_extract_script_finds_each_persons_file_by_the_folders_rule(mock_proj
     assert pd.read_csv(out)["pid"].tolist() == ["1001C", "1002C"]
 
 
+@pytest.mark.parametrize("language", ["python", "r"])
+def test_a_process_script_runs_on_each_persons_recordings_in_every_session(mock_project, language):
+    command = [sys.executable] if language == "python" else [rscript()]
+    if command[0] is None:
+        pytest.skip("R is not installed")
+    project = load_project(mock_project)
+    source = bids_folder(mock_project)
+    made = stage_script(project, "process", language, source, "derivatives/out", name="run_eeg")
+    assert "sub-{id}/ses-*/sub-*_ses-*_task-rest_eeg.tsv" in made.text
+    assert "2 people, 4 files" in made.text
+    # The function to fill in, filled in: one empty file per recording.
+    if language == "python":
+        text = made.text.replace(
+            "    pass\n", '    (out_dir / f"{person}_{recording.name}").write_text("")\n'
+        )
+    else:
+        text = made.text.replace(
+            "  # One person's raw recording",
+            '  file.create(file.path(out_dir, paste0(person, "_", basename(recording))))\n  #',
+        )
+    script = mock_project / f"process{'.py' if language == 'python' else '.R'}"
+    script.write_text(text, encoding="utf-8")
+    out = mock_project / "derivatives" / "out"
+    subprocess.run([*command, script, mock_project / source, out], check=True)
+    assert sorted(p.name for p in out.iterdir()) == [
+        f"{person}_sub-{person}_ses-{session}_task-rest_eeg.tsv"
+        for person in ("1001C", "1002C")
+        for session in ("1", "2")
+    ]
+
+
 def test_an_extract_script_takes_a_file_per_person_when_the_folder_says_nothing(mock_project):
     project = load_project(mock_project)
     made = stage_script(project, "extract", "python", "derivatives/new", dataset="eeg_w1")
