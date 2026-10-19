@@ -93,3 +93,20 @@ def test_lab_settings_are_saved_into_the_project_without_their_defaults(mock_pro
     assert (config.llm.provider, config.llm.model) == ("local", "qwen3")
     editing.save_settings(mock_project, {"llm": {"provider": "anthropic", "model": None}})
     assert "llm:" not in (mock_project / "labcatalog.yaml").read_text()
+
+
+def test_references_bib_opens_in_the_editor_and_is_checked_as_bibtex(mock_project):
+    assert editing.editable_files(mock_project)["References"] == ["references/references.bib"]
+    [issue] = editing.check_text("references/references.bib", "@article{broken,\n  title = {x\n")
+    assert issue.code == "bib_syntax"
+    assert editing.check_text("references/references.bib", "@misc{ok, title = {Fine}}\n") == []
+
+
+def test_a_bib_outside_the_project_is_not_listed(mock_project, tmp_path):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8").replace(
+        "  root: references", f"  root: {tmp_path.as_posix()}"
+    )
+    config.write_text(text, encoding="utf-8")
+    (tmp_path / "references.bib").write_text("@misc{a, title = {A}}\n", encoding="utf-8")
+    assert editing.editable_files(mock_project)["References"] == []

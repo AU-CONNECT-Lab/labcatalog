@@ -1,6 +1,6 @@
 # The Editor
 
-The editor, below **From a codebook** in the [Codebook](codebook.md) step of the Set up page, edits the project's files: `labcatalog.yaml`, the instrument files, the drafts, the study files and the column maps. The files are listed on the left; click one to open it.
+The editor, below **From a codebook** in the [Codebook](codebook.md) step of the Set up page, edits the project's files: `labcatalog.yaml`, the instrument files, the drafts, the study files, the column maps and `references.bib` when it is inside the project folder. The files are listed on the left; click one to open it. `references.bib` opens as text and is checked as BibTeX when saved.
 
 ![The editor with labcatalog.yaml open](../images/app/edit.png)
 
@@ -38,6 +38,11 @@ A file whose YAML cannot be read opens only as text; fix it there first.
 
 - **New instrument** creates `instruments/<id>.yaml` with the required keys.
 - **New instrument from a PDF** drafts a whole instrument with the language model set on the Settings page. The draft goes to `drafts/`, outside the catalog. Check it against the PDF, then press **Move to instruments**. See [Add an Instrument](../how-to/add-instrument.md).
+
+(editor-references)=
+## References
+
+**Add references** takes BibTeX entries pasted into its box, lists each one's key and title, and adds the new ones at the end of `references.bib`; a key the file already has is left as it is there. In Zotero, set **Quick Copy** (Settings, Export) to BibTeX, select the items and press Ctrl+Shift+C (Cmd+Shift+C on a Mac) to copy them. The same button sits beside **References** in the first step of **Add an instrument**, where the keys it adds are chosen at once.
 
 ## Unsaved changes
 

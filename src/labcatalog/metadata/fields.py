@@ -103,7 +103,12 @@ def changed_values(
 
 def files(root: Path) -> list[str]:
     found = editing.editable_files(root)
-    return [p for group, paths in found.items() if group != "Column maps" for p in paths]
+    return [
+        p
+        for group, paths in found.items()
+        if group not in ("Column maps", "References")
+        for p in paths
+    ]
 
 
 def field_uses(root: Path, names: list[str]) -> dict[str, int]:

@@ -21,8 +21,9 @@ from labcatalog.config import (
 from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.issues import Issue
 from labcatalog.metadata import records
+from labcatalog.metadata.bibliography import load_bibliography
 from labcatalog.metadata.varmap import load_variable_map
-from labcatalog.project import load_config, load_model
+from labcatalog.project import bib_path, load_config, load_model
 from labcatalog.schema import Instrument, StudyContent
 
 FOLDERS: dict[str, type[BaseModel]] = {
@@ -52,7 +53,19 @@ def editable_files(root: Path) -> dict[str, list[str]]:
         "Drafts": listed(defaults.DRAFTS_DIR, defaults.YAML_SUFFIXES),
         "Studies": listed(defaults.STUDIES_DIR, defaults.YAML_SUFFIXES),
         "Column maps": listed(defaults.MAPS_DIR, (".csv",)),
+        "References": bib_file(root),
     }
+
+
+def bib_file(root: Path) -> list[str]:
+    # Only one inside the project, as the editor opens files by their path in it.
+    try:
+        path = bib_path(load_config(root), root).resolve()
+    except MetadataError:
+        return []
+    if path.is_file() and path.is_relative_to(root.resolve()):
+        return [path.relative_to(root.resolve()).as_posix()]
+    return []
 
 
 def custom_fields(root: Path) -> list[CustomFieldDef]:
@@ -80,6 +93,8 @@ def check_text(relative: str, text: str) -> list[Issue]:
         path.write_text(text, encoding="utf-8")
         if path.suffix == ".csv":
             load_variable_map(path, root, issues)
+        elif path.suffix == ".bib":
+            load_bibliography(path, root, issues)
         else:
             load_model(path, FOLDERS.get(path.parent.name, ProjectConfig), root, issues)
     return issues

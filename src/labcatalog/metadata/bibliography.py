@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from pathlib import Path
 
 import bibtexparser
@@ -35,6 +36,41 @@ def load_bibliography(path: Path, root: Path, issues: list[Issue]) -> Bibliograp
     # Braces stay so that "{World Health Organization}" is still one name when names are split.
     library = LatexDecodingMiddleware(keep_braced_groups=True).transform(library)
     return {e.key: {f.key.lower(): f.value for f in e.fields} for e in library.entries}
+
+
+@dataclass
+class Pasted:
+    key: str
+    title: str
+    text: str
+    # Already in references.bib, so the entry there stays as it is.
+    taken: bool
+
+
+def pasted_entries(text: str, existing: Bibliography) -> tuple[list[Pasted], list[Issue]]:
+    library = bibtexparser.parse_string(text, parse_stack=[])
+    issues = [block_issue(block, "pasted text") for block in library.failed_blocks]
+    found = []
+    for entry in library.entries:
+        title = entry.fields_dict.get("title")
+        shown = unbrace(evaluate(title.value, {})) if title else ""
+        found.append(Pasted(entry.key, shown, entry.raw.strip(), entry.key in existing))
+    return found, issues
+
+
+def add_entries(path: Path, entries: list[Pasted]) -> list[str]:
+    # Appended as pasted; a key the file has by now is left out.
+    taken = set(load_bibliography(path, path.parent, []))
+    new = [e for e in entries if e.key not in taken]
+    if not new:
+        return []
+    old = path.read_bytes().decode("utf-8-sig") if path.is_file() else ""
+    newline = "\r\n" if "\r\n" in old else "\n"
+    body = old.replace("\r\n", "\n").rstrip("\n")
+    text = "\n\n".join([*([body] if body else []), *(e.text for e in new)]) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(text.replace("\n", newline).encode("utf-8"))
+    return [e.key for e in new]
 
 
 def block_issue(block: Block, location: str) -> Issue:

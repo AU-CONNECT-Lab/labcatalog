@@ -5,6 +5,7 @@ from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.exceptions import LabCatalogError
+from labcatalog.gui import references
 from labcatalog.gui.common import computed, note
 from labcatalog.gui.edit import cell, grid_options
 from labcatalog.gui.files import PDF_FILES, choose_path
@@ -321,13 +322,27 @@ def open_wizard(
                         .props("use-chips")
                         .classes("w-96")
                     )
+
+                    async def take_added(keys: list[str]) -> None:
+                        reference.set_options(
+                            sorted({*reference.options, *keys}),
+                            value=[*(reference.value or []), *keys],
+                        )
+
+                    ui.button(
+                        "Add references",
+                        icon="library_add",
+                        on_click=lambda: references.add_dialog(
+                            project.config, project.root, take_added
+                        ),
+                    ).props("flat dense no-caps")
                     license_input = ui.input(
                         "License", value=draft.about.get("license", "")
                     ).classes("grow")
                 pdf_rows()
                 note(
-                    "The ID names the file and goes before every item's ID. A reference that is "
-                    "not in references.bib yet is added there by whoever looks after the settings."
+                    "The ID names the file and goes before every item's ID. Add references pastes "
+                    "BibTeX into references.bib."
                 )
                 about_status = ui.label().classes("lc-bad-text")
                 navigation(about_next, back=False)

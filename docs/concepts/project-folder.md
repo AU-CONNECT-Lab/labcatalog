@@ -45,7 +45,7 @@ Your own scripts that turn raw exports and pipeline outputs into the files in `d
 
 ## references/
 
-`references.bib`, exported from a reference manager such as Zotero, and the PDFs of the instruments' references. This folder is often on a shared drive; `references.root` in `labcatalog.yaml` points to it.
+`references.bib`, exported from a reference manager such as Zotero or pasted in with **Add references** (see [The Editor](../app/edit.md#editor-references)), and the PDFs of the instruments' references. This folder is often on a shared drive; `references.root` in `labcatalog.yaml` points to it.
 
 ## outputs/
 

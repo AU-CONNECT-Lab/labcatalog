@@ -7,14 +7,15 @@ from nicegui import ui
 
 from labcatalog import defaults
 from labcatalog.charts import mindmap
-from labcatalog.exceptions import EditError, LabCatalogError
-from labcatalog.gui import common, edit_form, theme
+from labcatalog.exceptions import EditError, LabCatalogError, MetadataError
+from labcatalog.gui import common, edit_form, references, theme
 from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
 from labcatalog.gui.files import PDF_FILES, choose_path
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
 from labcatalog.metadata import fields as field_values
 from labcatalog.pipeline import run_instrument_draft
+from labcatalog.project import load_config
 
 TEXT = "text"
 # Fields to click and fill, the page's default; text and tables sit behind Advanced.
@@ -131,7 +132,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
 
     async def declared(text: str | None) -> str | None:
         # New tags go into the field's choices in labcatalog.yaml, once the user agrees.
-        if text is None or editing.check_text(view.path, text):
+        if text is None or view.path.endswith(".bib") or editing.check_text(view.path, text):
             return text
         tags = editing.new_tags(root, text)
         if not tags:
@@ -243,6 +244,22 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         if shown.form is not None:
             shown.form.edited = False
         page.refresh()
+
+    def add_references() -> None:
+        try:
+            config = load_config(root)
+        except MetadataError as err:
+            ui.notify(f"{defaults.CONFIG_FILENAME} does not load: {err}", type="negative")
+            return
+
+        async def added(keys: list[str]) -> None:
+            if keys:
+                await on_saved()
+                # The file list gains references.bib, and an open copy of it the new entries.
+                leave(partial(go, view.path, view.mode))
+
+        with frame:
+            references.add_dialog(config, root, added)
 
     def instrument_ids() -> list[str]:
         return [Path(p).stem for p in editing.editable_files(root)["Instruments"]]
@@ -360,7 +377,7 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
         shown.editor = (
             ui.codemirror(
                 opened.text,
-                language=None if opened.path.endswith(".csv") else "YAML",
+                language="YAML" if opened.path.endswith(defaults.YAML_SUFFIXES) else None,
                 indent="  ",
                 line_wrapping=True,
                 theme=theme.codemirror_theme(),
@@ -461,6 +478,9 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                     "flat dense no-caps"
                 ).classes("mt-2")
                 ui.button("New instrument from a PDF", icon="picture_as_pdf", on_click=draft).props(
+                    "flat dense no-caps"
+                )
+                ui.button("Add references", icon="library_add", on_click=add_references).props(
                     "flat dense no-caps"
                 )
             with (
