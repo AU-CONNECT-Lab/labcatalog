@@ -181,6 +181,7 @@ class Window:
         # A palette saved by another version may no longer exist.
         self.look = Look(palette=saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
         self.look.who = preferences.mine().get(preferences.WHO)
+        self.look.open_template = self.open_template
         register(ui.context.client, self.look)
         self.root: Path | None = None
         self.result: CatalogResult | None = None
@@ -205,7 +206,6 @@ class Window:
             reload=self.reload,
             refit=self.fit_factor_models,
             retest=self.test_invariance,
-            open_template=self.open_template,
         )
         self.dataset: str | None = None
         # The study the pages are narrowed to, None for every study.

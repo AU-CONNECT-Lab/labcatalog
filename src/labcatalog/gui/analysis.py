@@ -31,6 +31,7 @@ from labcatalog.gui.paper import (
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import measures, results
 from labcatalog.reports.tables import PaperTable
+from labcatalog.reports.templates import Wording
 from labcatalog.stats import analysis, analysis_script, imputation
 from labcatalog.stats import multilevel as ml
 
@@ -455,8 +456,10 @@ def correlation_section(
                         matrix,
                         method == "spearman",
                         common.decimals(),
+                        Wording(result.project.config.templates),
                     ),
                     [shown],
+                    "correlation",
                 )
                 measures_text(measure_paragraphs(result, keys))
                 result_actions(result, "correlations", tables, drawn, texts, engine)
@@ -633,8 +636,15 @@ def pair_section(
                 drawn = Chart(charts.show(fig), fig)
                 paper_table(shown)
                 results_text(
-                    results.regression_text(fits, choices, choices[y_key], common.decimals()),
+                    results.regression_text(
+                        fits,
+                        choices,
+                        choices[y_key],
+                        common.decimals(),
+                        Wording(result.project.config.templates),
+                    ),
                     [shown],
+                    "regression",
                 )
                 measures_text(measure_paragraphs(result, [y_key, *fits]))
                 result_actions(result, "regression", {"regression": shown}, drawn, texts, engine)

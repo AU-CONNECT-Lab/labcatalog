@@ -33,11 +33,29 @@ def test_a_study_and_an_instrument_keep_their_own_wording_unless_it_is_the_proje
     assert change.text == change.opened.text
 
 
+def test_a_template_in_parts_keeps_only_the_parts_that_differ(mock_project):
+    project = load_project(mock_project)
+    found = templates.TEMPLATES["regression"]
+    texts = {s.key: s.default for s in found.slots} | {"intro": "Simple regressions:"}
+    change = template_change(project, "regression", texts)
+    assert "\ntemplates:\n  regression:\n    intro: |\n      Simple regressions:\n" in change.text
+    assert "predictor" not in change.text.split("templates:")[1]
+
+
 def test_unknown_templates_and_parts_are_errors(mock_project):
     config = mock_project / "labcatalog.yaml"
     data = yaml.safe_load(config.read_text(encoding="utf-8"))
-    data["templates"] = {"discussion": "x", "measures": {"paragraph": "x"}}
+    data["templates"] = {
+        "discussion": "x",
+        "measures": {"paragraph": "x"},
+        "regression": {"outro": "x", "intro": "{nope}"},
+    }
     config.write_text(yaml.safe_dump(data), encoding="utf-8")
     messages = [i.message for i in validate_project(load_project(mock_project))]
     assert any(m.startswith("templates: unknown template discussion") for m in messages)
     assert "templates: measures is one text" in messages
+    assert any(m.startswith("templates: regression has no part outro") for m in messages)
+    data["templates"] = {"regression": {"intro": "{nope}"}}
+    config.write_text(yaml.safe_dump(data), encoding="utf-8")
+    messages = [i.message for i in validate_project(load_project(mock_project))]
+    assert any(m.startswith("regression.intro: unknown placeholder {nope}") for m in messages)

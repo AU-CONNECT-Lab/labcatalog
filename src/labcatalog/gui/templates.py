@@ -11,7 +11,7 @@ from labcatalog.metadata import changes
 from labcatalog.metadata.templates import same, template_change
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports import measures, participants, templates
-from labcatalog.reports.templates import INSTRUMENT, PARAGRAPH, STUDY, Template
+from labcatalog.reports.templates import INSTRUMENT, PARAGRAPH, STUDY, Slot, Template
 
 # The owner choice that stands for the project's own wording.
 PROJECT = ""
@@ -91,6 +91,7 @@ def editor(
     project = result.project
     current = wording(result, found, view.owner)
     boxes: dict[str, ui.textarea] = {}
+    shown: dict[str, ui.label] = {}
 
     def touched() -> None:
         view.edited = True
@@ -98,17 +99,11 @@ def editor(
         preview()
 
     def preview() -> None:
-        texts = {k: box.value or "" for k, box in boxes.items()}
-        problem = next(
-            (
-                f"{found.slot(k).label}: {p}"
-                for k, text in texts.items()
-                if (p := templates.placeholder_problem(text, found.slot(k).placeholders))
-            ),
-            None,
-        )
-        shown.set_text(problem or previewed(result, found, view.owner, texts))
-        shown.classes(replace="lc-prose text-negative" if problem else "lc-prose")
+        for key, box in boxes.items():
+            slot, text = found.slot(key), box.value or ""
+            problem = templates.placeholder_problem(text, slot.placeholders)
+            shown[key].set_text(problem or previewed(result, found, view.owner, slot, text))
+            shown[key].classes(replace="lc-prose text-negative" if problem else "lc-prose")
 
     def reset() -> None:
         for key, box in boxes.items():
@@ -141,7 +136,7 @@ def editor(
                 label="For",
                 on_change=lambda e: leave(partial(go, found.key, e.value)),
             ).props("dense outlined options-dense").classes("w-72")
-        ui.label(source(result, found, view.owner)).classes("lc-note")
+        ui.label(f"{source(result, found, view.owner)} {preview_help(found)}").classes("lc-note")
         for slot in found.slots:
             box = (
                 ui.textarea(
@@ -158,6 +153,7 @@ def editor(
                     ui.chip(f"{{{name}}}", on_click=partial(insert, box, f"{{{name}}}")).props(
                         "dense clickable outline"
                     ).classes("font-mono")
+            shown[slot.key] = ui.label()
         problems = ui.label().classes("text-negative")
         with ui.row().classes("lc-actions w-full"):
             save_button = ui.button("Save", icon="save", on_click=save).props("no-caps")
@@ -165,8 +161,6 @@ def editor(
             ui.button("Reset", icon="restart_alt", on_click=reset).props("flat no-caps").tooltip(
                 "Back to the wording this falls back to; Save to keep it"
             )
-    with panel("Preview", help_text=preview_help(found)):
-        shown = ui.label().classes("lc-prose")
     preview()
 
 
@@ -213,9 +207,8 @@ def source(result: CatalogResult, found: Template, owner: str) -> str:
     return "The project's own wording." if owner == PROJECT else "Its own wording."
 
 
-def previewed(result: CatalogResult, found: Template, owner: str, texts: dict[str, str]) -> str:
+def previewed(result: CatalogResult, found: Template, owner: str, slot: Slot, text: str) -> str:
     project = result.project
-    text = texts[PARAGRAPH]
     if found.key == "participants":
         study = owner or next(iter(project.config.studies), None)
         if study is None:
@@ -231,10 +224,10 @@ def previewed(result: CatalogResult, found: Template, owner: str, texts: dict[st
         return measures.paragraph(
             project, result.catalog, result.summary, instrument, dataset, [], text
         )
-    return " ".join(texts[s.key].format_map(s.example) for s in found.slots if texts[s.key].strip())
+    return " ".join((text or slot.default).format_map(slot.example).split())
 
 
 def preview_help(found: Template) -> str:
     if found.part == templates.METHODS:
-        return "From the project's data, before ω from the factor models."
-    return "With made-up numbers, so the wording can be read."
+        return "The preview is from the project's data, before ω from the factor models."
+    return "Each preview uses made-up numbers."

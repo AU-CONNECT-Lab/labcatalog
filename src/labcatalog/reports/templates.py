@@ -39,6 +39,43 @@ class Template:
 
 
 PARAGRAPH = "paragraph"
+PAIR = ("a", "b", "direction", "statistic", "r", "p")
+PAIR_EXAMPLE = {
+    "a": "Sleep problems",
+    "b": "Mood",
+    "direction": "positively",
+    "statistic": "r(118) = .32, p < .001",
+    "r": "r(118) = .32",
+    "p": "p < .001",
+}
+PAIR_NS_EXAMPLE = PAIR_EXAMPLE | {
+    "direction": "negatively",
+    "statistic": "r(118) = -.08, p = .384",
+    "r": "r(118) = -.08",
+    "p": "p = .384",
+}
+PAIRS_EXAMPLE = (
+    "Sleep problems and Mood (r(118) = .32, p < .001) and Screen time and Mood (r(118) = -.21, "
+    "p = .022)"
+)
+PREDICTOR = ("predictor", "outcome", "statistics", "b", "se", "p", "r2", "n")
+PREDICTOR_EXAMPLE = {
+    "predictor": "Sleep problems",
+    "outcome": "Mood",
+    "statistics": "b = 0.41, SE = 0.11, p < .001, R² = .10, n = 120",
+    "b": "b = 0.41",
+    "se": "SE = 0.11",
+    "p": "p < .001",
+    "r2": "R² = .10",
+    "n": "n = 120",
+}
+PREDICTOR_NS_EXAMPLE = PREDICTOR_EXAMPLE | {
+    "statistics": "b = 0.06, SE = 0.09, p = .512, R² = .00, n = 120",
+    "b": "b = 0.06",
+    "se": "SE = 0.09",
+    "p": "p = .512",
+    "r2": "R² = .00",
+}
 TEMPLATES: dict[str, Template] = {
     t.key: t
     for t in (
@@ -95,14 +132,117 @@ TEMPLATES: dict[str, Template] = {
             "Each instrument's paragraph, on the Methods page and the instrument's page.",
             INSTRUMENT,
         ),
+        Template(
+            "correlation",
+            "Correlation",
+            RESULTS,
+            (
+                Slot(
+                    "pair",
+                    "A significant correlation, when there are three or fewer",
+                    "{a} was {direction} correlated with {b}, {statistic}.",
+                    PAIR,
+                    PAIR_EXAMPLE,
+                ),
+                Slot(
+                    "pair_ns",
+                    "A correlation that is not significant, when there are three or fewer",
+                    "{a} was not significantly correlated with {b}, {statistic}.",
+                    PAIR,
+                    PAIR_NS_EXAMPLE,
+                ),
+                Slot(
+                    "count",
+                    "How many were significant, when there are more than three",
+                    "Of the {n_pairs} correlations, {n_significant} {verb} significant at p < .05.",
+                    ("n_pairs", "n_significant", "verb"),
+                    {"n_pairs": "15", "n_significant": "6", "verb": "were"},
+                ),
+                Slot(
+                    "within",
+                    "When every significant one is between scores of the same instrument",
+                    "All of them were between scores of the same instrument.",
+                    (),
+                ),
+                Slot(
+                    "strongest",
+                    "The strongest between instruments, when more than five are",
+                    "Between instruments, the {n_shown} strongest were between {pairs}.",
+                    ("n_shown", "pairs"),
+                    {"n_shown": "5", "pairs": PAIRS_EXAMPLE},
+                ),
+                Slot(
+                    "between",
+                    "Those between instruments, when two to five are",
+                    "Between instruments, they were between {pairs}.",
+                    ("pairs",),
+                    {"pairs": PAIRS_EXAMPLE},
+                ),
+                Slot(
+                    "between_one",
+                    "The one between instruments",
+                    "Between instruments, it was between {pairs}.",
+                    ("pairs",),
+                    {"pairs": "Sleep problems and Mood (r(118) = .32, p < .001)"},
+                ),
+                Slot(
+                    "listed",
+                    "Each pair in those lists",
+                    "{a} and {b} ({statistic})",
+                    PAIR,
+                    PAIR_EXAMPLE,
+                ),
+            ),
+            "The Results paragraph under the correlation table.",
+        ),
+        Template(
+            "regression",
+            "Regression",
+            RESULTS,
+            (
+                Slot(
+                    "intro",
+                    "Before the predictors, when there is more than one",
+                    "Each predictor was entered in its own simple regression.",
+                    (),
+                ),
+                Slot(
+                    "predictor",
+                    "A significant predictor",
+                    "{predictor} significantly predicted {outcome}, {statistics}.",
+                    PREDICTOR,
+                    PREDICTOR_EXAMPLE,
+                ),
+                Slot(
+                    "predictor_ns",
+                    "A predictor that is not significant",
+                    "{predictor} did not significantly predict {outcome}, {statistics}.",
+                    PREDICTOR,
+                    PREDICTOR_NS_EXAMPLE,
+                ),
+            ),
+            "The Results paragraph under the regression table.",
+        ),
     )
 }
 
 
+@dataclass(frozen=True)
+class Wording:
+    # The project's templates; a part it does not set keeps the built-in wording.
+    written: dict[str, str | dict[str, str]] = field(default_factory=dict)
+
+    def text(self, key: str, slot: str = PARAGRAPH) -> str:
+        found = self.written.get(key)
+        own = found.get(slot) if isinstance(found, dict) else found
+        return (own or TEMPLATES[key].slot(slot).default).strip()
+
+    def say(self, key: str, slot: str, **values: object) -> str:
+        return " ".join(self.text(key, slot).format_map(values).split())
+
+
 def project_text(config: ProjectConfig, key: str, slot: str = PARAGRAPH) -> str:
-    written = config.templates.get(key)
-    found = written.get(slot) if isinstance(written, dict) else written
-    return (found or TEMPLATES[key].slot(slot).default).strip()
+    return Wording(config.templates).text(key, slot)
 
 
 def placeholder_problem(template: str, allowed: tuple[str, ...]) -> str | None:

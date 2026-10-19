@@ -1,4 +1,5 @@
 from labcatalog.reports import results
+from labcatalog.reports.templates import Wording
 from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import ANOVA, WELCH, Comparison, GroupStats
 from labcatalog.stats.cfa import (
@@ -65,6 +66,21 @@ def test_regression_reports_each_predictor():
         text
         == "Sleep significantly predicted Mood, b = 0.51, SE = 0.12, p < .001, R² = .16, n = 100."
     )
+
+
+def test_the_projects_wording_replaces_the_built_in_one_part_by_part():
+    wording = Wording(
+        {
+            "correlation": {"pair": "{a} and {b} went together ({r}; {p})."},
+            "regression": {"intro": "Simple regressions:"},
+        }
+    )
+    matrix = matrix_of(2, {(1, 0): (-0.342, 0.0002)})
+    text = results.correlation_text(["Mood", "Sleep"], ["m", "s"], matrix, False, 2, wording)
+    assert text == "Sleep and Mood went together (r(118) = -.34; p < .001)."
+    fit = Fit(Correlation(100, 0.1, 0.4), 0.11, 0.118, 1.0, 0.2)
+    text = results.regression_text({"x": fit, "y": fit}, {"x": "A", "y": "B"}, "C", 2, wording)
+    assert text.startswith("Simple regressions: A did not significantly predict C, b = 0.11,")
 
 
 def test_comparison_names_the_test_the_means_and_the_effect():

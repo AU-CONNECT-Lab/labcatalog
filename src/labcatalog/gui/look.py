@@ -24,6 +24,8 @@ class Look:
     llm: LlmConfig = field(default_factory=LlmConfig)
     # The name the person gave, when one labcatalog serves several people.
     who: str | None = None
+    # Opens the window's Templates page at a template, for a study or instrument or the project.
+    open_template: Callable[[str, str | None], None] | None = None
 
     def use_project(self, config: ProjectConfig | None) -> None:
         self.decimals = config.stats.decimals if config else defaults.DECIMALS

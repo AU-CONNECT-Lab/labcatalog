@@ -1,5 +1,4 @@
 from dataclasses import dataclass, field
-from functools import partial
 
 from nicegui import ui
 
@@ -90,7 +89,7 @@ def participants_part(result: CatalogResult, view: MethodsView, cfa: CfaView) ->
     with panel("Participants", help_text="How many took part at each wave and came back") as tools:
         ui.label(text).classes("lc-prose")
     with tools:
-        wording_button(partial(cfa.open_template, "participants", study))
+        wording_button("participants", study)
         copy_text(text)
     group = result.summary.group_name
     counted = (
@@ -242,7 +241,7 @@ def measures_body(result: CatalogResult, view: MethodsView, cfa: CfaView) -> Non
             ui.label("ω fills in when the factor models finish.").classes("lc-status lc-info")
         texts = measure_paragraphs(result, used, cfa)
     with tools:
-        wording_button(partial(cfa.open_template, "measures", None))
+        wording_button("measures")
         copy_text("\n\n".join(texts))
 
 

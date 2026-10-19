@@ -1,3 +1,4 @@
+from labcatalog.reports.templates import Wording
 from labcatalog.stats.agreement import ICC, KAPPA, Agreement
 from labcatalog.stats.analysis import Correlation, Fit
 from labcatalog.stats.analysis_script import (
@@ -37,6 +38,7 @@ from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
 from labcatalog.stats.multilevel import R as LME4
 from labcatalog.stats.panel import EQUAL, EQUAL_STUDIES, RICLPM, PanelFit, PanelModel
 
+BUILT_IN = Wording()
 SIGNIFICANT = 0.05
 # A table with this many pairs or fewer is told pair by pair; a larger one by its strongest pairs.
 EVERY_PAIR = 3
@@ -58,6 +60,7 @@ def correlation_text(
     matrix: list[list[Correlation]],
     spearman: bool,
     digits: int = 2,
+    wording: Wording = BUILT_IN,
 ) -> str:
     symbol = "rs" if spearman else "r"
     pairs = [
@@ -66,37 +69,54 @@ def correlation_text(
         for j in range(i)
         if matrix[i][j].r is not None
     ]
+
+    def say(slot: str, a: str, b: str, c: Correlation) -> str:
+        values = pair_values(a, b, c, symbol, digits)
+        return wording.say("correlation", slot, **values)
+
     if len(pairs) <= EVERY_PAIR:
-        return " ".join(pair_sentence(a, b, c, symbol, digits) for a, b, c, _ in pairs)
+        return " ".join(
+            say("pair" if c.p < SIGNIFICANT else "pair_ns", a, b, c) for a, b, c, _ in pairs
+        )
     significant = [pair for pair in pairs if pair[2].p < SIGNIFICANT]
-    verb = "was" if len(significant) == 1 else "were"
-    opening = f"Of the {len(pairs)} correlations, {len(significant)} {verb} significant at p < .05."
+    sentences = [
+        wording.say(
+            "correlation",
+            "count",
+            n_pairs=len(pairs),
+            n_significant=len(significant),
+            verb="was" if len(significant) == 1 else "were",
+        )
+    ]
     if not significant:
-        return opening
+        return sentences[0]
     # Scores of one instrument share items, so their correlations say little and are left out.
     between = sorted((p for p in significant if not p[3]), key=lambda p: -abs(p[2].r))
     if not between:
-        return f"{opening} All of them were between scores of the same instrument."
-    lead = (
-        f"Between instruments, the {STRONGEST} strongest were between"
+        sentences.append(wording.say("correlation", "within"))
+        return " ".join(sentences)
+    slot = (
+        "strongest"
         if len(between) > STRONGEST
-        else "Between instruments, they were between"
+        else "between"
         if len(between) > 1
-        else "Between instruments, it was between"
+        else "between_one"
     )
-    shown = [f"{a} and {b} ({statistic(symbol, c, digits)})" for a, b, c, _ in between[:STRONGEST]]
-    return f"{opening} {lead} {series(shown)}."
+    shown = series([say("listed", a, b, c) for a, b, c, _ in between[:STRONGEST]])
+    sentences.append(wording.say("correlation", slot, n_shown=STRONGEST, pairs=shown))
+    return " ".join(sentences)
 
 
-def pair_sentence(a: str, b: str, c: Correlation, symbol: str, digits: int) -> str:
-    if c.p >= SIGNIFICANT:
-        return f"{a} was not significantly correlated with {b}, {statistic(symbol, c, digits)}."
-    direction = "positively" if c.r > 0 else "negatively"
-    return f"{a} was {direction} correlated with {b}, {statistic(symbol, c, digits)}."
-
-
-def statistic(symbol: str, c: Correlation, digits: int) -> str:
-    return f"{symbol}({c.n - 2}) = {bounded(c.r, digits)}, {p_text(c.p)}"
+def pair_values(a: str, b: str, c: Correlation, symbol: str, digits: int) -> dict[str, str]:
+    r = f"{symbol}({c.n - 2}) = {bounded(c.r, digits)}"
+    return {
+        "a": a,
+        "b": b,
+        "direction": "positively" if c.r > 0 else "negatively",
+        "statistic": f"{r}, {p_text(c.p)}",
+        "r": r,
+        "p": p_text(c.p),
+    }
 
 
 def missing_text(missing: MissingData, labels: list[str]) -> str:
@@ -274,18 +294,32 @@ def percent(part: int, whole: int) -> str:
 
 
 def regression_text(
-    fits: dict[str, Fit], labels: dict[str, str], outcome: str, digits: int = 2
+    fits: dict[str, Fit],
+    labels: dict[str, str],
+    outcome: str,
+    digits: int = 2,
+    wording: Wording = BUILT_IN,
 ) -> str:
-    sentences = (
-        ["Each predictor was entered in its own simple regression."] if len(fits) > 1 else []
-    )
+    sentences = [wording.say("regression", "intro")] if len(fits) > 1 else []
     for x, fit in fits.items():
         c = fit.correlation
-        verb = "significantly predicted" if c.p < SIGNIFICANT else "did not significantly predict"
+        values = {
+            "b": f"b = {number(fit.slope, digits)}",
+            "se": f"SE = {number(fit.slope_se, digits)}",
+            "p": p_text(c.p),
+            "r2": f"R² = {bounded(c.r**2, digits)}",
+            "n": f"n = {c.n}",
+        }
+        slot = "predictor" if c.p < SIGNIFICANT else "predictor_ns"
         sentences.append(
-            f"{labels[x]} {verb} {outcome}, b = {number(fit.slope, digits)}, "
-            f"SE = {number(fit.slope_se, digits)}, {p_text(c.p)}, "
-            f"R² = {bounded(c.r**2, digits)}, n = {c.n}."
+            wording.say(
+                "regression",
+                slot,
+                predictor=labels[x],
+                outcome=outcome,
+                statistics=", ".join(values.values()),
+                **values,
+            )
         )
     return " ".join(sentences)
 

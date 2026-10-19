@@ -12,6 +12,7 @@ from nicegui.events import GenericEventArguments
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import common, preferences
 from labcatalog.gui.common import computed, note, open_path
+from labcatalog.gui.look import look
 from labcatalog.paths import portable_path
 from labcatalog.pipeline import CatalogResult, run_interpretation
 from labcatalog.reports import outputs, tables
@@ -37,7 +38,9 @@ def paper_table(shown: PaperTable) -> None:
         copy_button("Copy table", "Table", kinds)
 
 
-def results_text(text: str, shown: list[PaperTable] | None = None) -> None:
+def results_text(
+    text: str, shown: list[PaperTable] | None = None, template: str | None = None
+) -> None:
     if not text:
         return
 
@@ -73,6 +76,8 @@ def results_text(text: str, shown: list[PaperTable] | None = None) -> None:
         ui.label(text).classes("lc-prose")
         with ui.row().classes("items-center gap-2"):
             copy_text(text)
+            if template:
+                wording_button(template)
             if shown and common.model_set():
                 button = ui.button(
                     "Interpret with the language model", icon="psychology", on_click=ask
@@ -102,10 +107,11 @@ def copy_text(text: str) -> None:
         copy_button("Copy text", "Text", {"text/plain": text})
 
 
-def wording_button(on_click: Callable[[], None]) -> None:
-    ui.button("Wording", icon="edit_note", on_click=on_click).props("flat dense no-caps").classes(
-        "lc-quiet-btn"
-    ).tooltip("Change the template this paragraph is written from")
+def wording_button(template: str, owner: str | None = None) -> None:
+    opened = look().open_template
+    ui.button("Wording", icon="edit_note", on_click=lambda: opened(template, owner)).props(
+        "flat dense no-caps"
+    ).classes("lc-quiet-btn").tooltip("Change the template this paragraph is written from")
 
 
 def wants_latex() -> bool:
