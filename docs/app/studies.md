@@ -1,8 +1,8 @@
-# Study
+# Studies
 
-The Study page shows and edits the study chosen in the picker at the top right: its label, description and reference, its waves and milestones from `studies` in `labcatalog.yaml`, and the methods text and Participants template from its study file. The pencil beside the picker opens it; with **All studies** chosen, the pencil first lists the studies to choose from. **New study…** at the end of the picker adds a study and opens it here. See [Studies, Waves and Datasets](../concepts/studies-waves-datasets.md).
+The Studies page shows and edits each study: its label, description and reference, its waves and milestones from `studies` in `labcatalog.yaml`, and the methods text and Participants template from its study file. **Studies** beside the study picker at the top right opens it. The studies are listed on the left; click one to open it. The page opens the study chosen in the picker, and choosing another on the page leaves the picker as it is. See [Studies, Waves and Datasets](../concepts/studies-waves-datasets.md).
 
-![The Study page with the example study open](../images/app/studies.png)
+![The Studies page with the example study open](../images/app/studies.png)
 
 A study opens with its label and ID on top, the buttons **Rename**, **Delete**, **Discard** and **Save**, and three tabs: Study, Text and Datasets.
 
@@ -36,7 +36,7 @@ The study's datasets, as on the [Datasets](datasets.md) page. Click a row to ope
 
 ## New study
 
-**New study…** in the study picker asks for an ID (lower-case letters, digits and underscores, starting with a letter) and a label. It adds the study under `studies` in `labcatalog.yaml` and creates its study file, `studies/<id>.yaml`, with only the `study` key. The picker then shows the new study and this page opens it. Fill in its waves, then add its first dataset on the Datasets tab.
+**New study** asks for an ID (lower-case letters, digits and underscores, starting with a letter) and a label. It adds the study under `studies` in `labcatalog.yaml` and creates its study file, `studies/<id>.yaml`, with only the `study` key. Fill in its waves, then add its first dataset on the Datasets tab.
 
 ## Rename
 

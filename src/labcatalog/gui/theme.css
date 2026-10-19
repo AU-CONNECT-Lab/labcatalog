@@ -455,6 +455,7 @@ body.body--dark .lc-banner { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.0
   color: var(--lc-muted);
 }
 .q-btn.lc-quiet-btn:hover { background: var(--lc-surface); color: var(--lc-ink); }
+.q-btn.lc-quiet-btn.lc-active { background: var(--lc-accent-soft); color: var(--lc-accent); }
 .q-btn.lc-quiet-btn .q-focus-helper { display: none; }
 
 .q-field--outlined .q-field__control { border-radius: 10px; background: var(--lc-panel); }

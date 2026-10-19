@@ -6,7 +6,7 @@ The Datasets page shows each study and its data files: who is in each file, how 
 
 ## Studies
 
-The datasets are grouped by study, under the study's label; its description and citation are on the [Study](studies.md) page. Each study's table lists its datasets:
+The datasets are grouped by study, under the study's label; its description and citation are on the [Studies](studies.md) page. Each study's table lists its datasets:
 
 | Column | Meaning |
 |---|---|

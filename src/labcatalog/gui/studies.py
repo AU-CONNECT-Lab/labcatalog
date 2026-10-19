@@ -31,7 +31,7 @@ class StudiesView:
 def render(
     result: CatalogResult,
     view: StudiesView,
-    on_saved: Callable[[str | None], Awaitable[None]],
+    on_saved: Callable[..., Awaitable[None]],
     on_dataset: Callable[[str], None],
     on_added: Callable[[str], Awaitable[None]],
 ) -> None:
@@ -60,10 +60,19 @@ def render(
         view.edited = False
         page.refresh()
 
-    async def apply(found: list, then: str | None) -> bool:
+    def choose(study: str) -> None:
+        if study != view.study:
+            leave(partial(go, study))
+
+    async def made(study: str) -> None:
+        view.study = study
+        await on_saved()
+
+    async def apply(found: list, old: str, new: str | None) -> bool:
         if not await write(project, found):
             return False
-        await on_saved(then)
+        view.study = new
+        await on_saved(old, new)
         return True
 
     def rename() -> None:
@@ -84,7 +93,7 @@ def render(
                 except LabCatalogError as err:
                     ui.notify(str(err), type="negative")
                     return
-                if await apply(found, new):
+                if await apply(found, old, new):
                     dialog.close()
                     ui.notify(f"Renamed {old} to {new}")
 
@@ -119,7 +128,7 @@ def render(
             typed = ui.input(f"Type {study} to confirm").classes("w-72")
 
             async def remove() -> None:
-                if await apply(found, None):
+                if await apply(found, study, None):
                     dialog.close()
                     ui.notify(f"Deleted {study}")
 
@@ -133,16 +142,36 @@ def render(
     @ui.refreshable
     def page() -> None:
         buttons.clear()
-        if view.study not in config.studies:
-            note(
-                "Choose a study in the list at the top of the window, or add one with New study "
-                "in the same list."
-            )
-            return
-        actions = Actions(
-            touched, go, lambda: leave(rename), lambda: leave(delete), on_saved, on_dataset
-        )
-        detail(result, view, buttons, actions, on_added)
+        names = list(config.studies)
+        if view.study not in names:
+            view.study = names[0] if names else None
+        with ui.row().classes("w-full no-wrap items-start gap-6"):
+            with ui.column().classes("w-64 shrink-0 lc-side"), panel("Studies"):
+                with ui.column().classes("w-full gap-0"):
+                    for study in names:
+                        item = (
+                            ui.item(
+                                config.studies[study].label or study,
+                                on_click=partial(choose, study),
+                            )
+                            .props("dense clickable")
+                            .classes("lc-pick")
+                        )
+                        if study == view.study:
+                            item.classes("lc-info font-medium")
+                ui.button(
+                    "New study",
+                    icon="add",
+                    on_click=lambda: leave(partial(new_study, project, made)),
+                ).props("flat dense no-caps")
+            with ui.column().classes("grow min-w-0 gap-4"):
+                if view.study is None:
+                    note("No studies yet; press New study to add one.")
+                    return
+                actions = Actions(
+                    touched, go, lambda: leave(rename), lambda: leave(delete), on_saved, on_dataset
+                )
+                detail(result, view, buttons, actions, on_added)
 
     buttons: list[ui.button] = []
     with ui.element("div").classes("w-full") as frame:
@@ -193,7 +222,7 @@ class Actions:
     go: Callable[[str | None], None]
     rename: Callable[[], None]
     delete: Callable[[], None]
-    on_saved: Callable[[str | None], Awaitable[None]]
+    on_saved: Callable[..., Awaitable[None]]
     on_dataset: Callable[[str], None]
 
 
@@ -236,7 +265,7 @@ def detail(
             ui.notify(str(err), type="negative", multi_line=True)
             return
         ui.notify(f"Saved {study}")
-        await actions.on_saved(study)
+        await actions.on_saved()
 
     def show(issues: list[Issue]) -> None:
         problems.clear()

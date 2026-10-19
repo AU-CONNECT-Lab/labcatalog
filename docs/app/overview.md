@@ -22,4 +22,4 @@ The next milestones of each study, with the days left until each. It shows when 
 
 ## Timeline
 
-Each wave as a bar from its start to its end date, with the number of people per reporter. A wave without an end date is still collecting: its bar runs to today, the count is compared with the previous wave's, and a faint bar shows when it would end if it took as long as the previous wave. The `milestones` of each study are shown as diamonds, and a dashed line marks today. How fast each wave collected is on the [Study](studies.md) page.
+Each wave as a bar from its start to its end date, with the number of people per reporter. A wave without an end date is still collecting: its bar runs to today, the count is compared with the previous wave's, and a faint bar shows when it would end if it took as long as the previous wave. The `milestones` of each study are shown as diamonds, and a dashed line marks today. How fast each wave collected is on the [Studies](studies.md) page.

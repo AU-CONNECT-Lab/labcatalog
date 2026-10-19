@@ -4,7 +4,7 @@ Every new data file is a new dataset: a new wave of a study you already have, a 
 
 ## Add a wave
 
-Add the wave on the [Study](../app/studies.md) page with **Add wave**, or to its study in `labcatalog.yaml`:
+Add the wave on the [Studies](../app/studies.md) page with **Add wave**, or to its study in `labcatalog.yaml`:
 
 ```yaml
 studies:
@@ -16,7 +16,7 @@ studies:
 
 ## Add a dataset from the window
 
-Press **Add a dataset** on the Datasets page, or on the Datasets tab of the Study page. The window copies the file in, matches its columns to the catalogued items, and shows the changes to `labcatalog.yaml`, the column map and the study file before writing them. A new wave is added to the study with its start taken from the data's first date, and an end you can fill in. It starts in one of two ways:
+Press **Add a dataset** on the Datasets page, or on a study's Datasets tab on the Studies page. The window copies the file in, matches its columns to the catalogued items, and shows the changes to `labcatalog.yaml`, the column map and the study file before writing them. A new wave is added to the study with its start taken from the data's first date, and an end you can fill in. It starts in one of two ways:
 
 - **Repeat a dataset**: for a file like one you already have, such as the same questionnaire in the next wave. The new dataset takes that one's study, modality, reporter and columns, and its cleaning step runs on the new file. A folder dataset takes the same folder and its files rule for the new wave, and a dataset in a file that holds every wave reads that file again for the new wave.
 - **A new kind of file**: for the first dataset of a study, or a new reporter or modality. You choose the study, wave, modality and reporter; a modality or reporter not yet in `vocab` can be typed in and is added. A table is copied into `data/` as it is, and you pick its ID and date columns after the file. A folder of files, such as scans, stays where it is: you give the folder and which files to count, and the window shows how many people and files match.

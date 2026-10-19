@@ -1,6 +1,6 @@
 # Using the App
 
-Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to open a project directly. The pages are listed across the top, in groups: browsing the catalog (Overview, Instruments, Datasets), writing it up (Analysis, Methods), setting up the project (Set up) and Problems. Two pages open from the top right instead: the pencil beside the study picker opens the Study page, and the gear opens Settings. This section describes the pages one by one.
+Open the window with `labcatalog gui`, or with `labcatalog gui -p <folder>` to open a project directly. The pages are listed across the top, in groups: browsing the catalog (Overview, Instruments, Datasets), writing it up (Analysis, Methods), setting up the project (Set up) and Problems. Two pages open from the top right instead: **Studies** beside the study picker opens the Studies page, and the gear opens Settings. This section describes the pages one by one.
 
 ## Opening a project
 
@@ -8,7 +8,7 @@ The window opens the project that was open when it last closed, or the example p
 
 ## One study or all
 
-A picker at the top right chooses the study the pages show. **All studies** shows every study, and **New study…** at the end of the list adds one. With one study chosen, the Overview shows its datasets, waves, people, instruments and milestones; the Instruments page starts with that study's filter set; the Datasets page lists its datasets; the Analysis page offers its datasets; and the Study and Methods pages open it. Set up, Problems and Settings always cover the whole project. The window remembers the choice for each project.
+A picker at the top right chooses the study the pages show. **All studies** shows every study. With one study chosen, the Overview shows its datasets, waves, people, instruments and milestones; the Instruments page starts with that study's filter set; the Datasets page lists its datasets; the Analysis page offers its datasets; and the Studies and Methods pages open it. Set up, Problems and Settings always cover the whole project. The window remembers the choice for each project.
 
 ## Refreshing after a change
 
@@ -33,7 +33,7 @@ Set up holds the work of building a project, in the order it is usually done. A 
 |---|---|
 | [Overview](overview.md) | The project at a glance: waves, collection, scores. |
 | [Instruments](instruments.md) | Browse, search and export instruments; each instrument's items, scores, reliability and factor structure. |
-| [Study](studies.md) | Each study's label, reference, waves, milestones and methods text; new, renamed and deleted studies. |
+| [Studies](studies.md) | Each study's label, reference, waves, milestones and methods text; new, renamed and deleted studies. |
 | [Datasets](datasets.md) | Each data file: who is in it, completeness, missing values; freezes. |
 | [Analysis](analysis.md) | Correlations, regression, group comparisons and multilevel models. |
 | [Methods](methods.md) | Draft text and tables for a methods section. |

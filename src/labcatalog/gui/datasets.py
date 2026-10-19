@@ -50,7 +50,7 @@ def render(
             empty(
                 "No datasets in this study yet; press Add a dataset."
                 if study
-                else "No datasets yet; press Add a dataset, after adding a study with New study in the list at the top of the window."
+                else "No datasets yet; press Add a dataset, after adding a study on the Studies page."
             )
             return
         studies(result, summaries, on_select)

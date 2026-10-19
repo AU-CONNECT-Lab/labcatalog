@@ -77,7 +77,7 @@ from labcatalog.stats import rbridge
 from labcatalog.version import __version__
 
 WINDOW_SIZE = (1280, 820)
-# Groups of pages, drawn with a line between them; Settings and Study open from the header.
+# Groups of pages, drawn with a line between them; Studies and Settings open from the header.
 PAGES = (
     (("overview", "Overview"), ("instruments", "Instruments"), ("datasets", "Datasets")),
     (("analysis", "Analysis"), ("methods", "Methods")),
@@ -86,9 +86,8 @@ PAGES = (
 )
 SETTINGS = "settings"
 STUDY = "studies"
-# The study picker's choices beside the studies; a study ID never has these characters.
+# The study picker's choice that narrows nothing; a study ID never has this character.
 ALL_STUDIES = "*"
-NEW_STUDY = "+"
 # How often the window looks for files changed by someone else.
 DISK_SECONDS = 5
 LOCAL_HOST = "127.0.0.1"
@@ -258,14 +257,14 @@ class Window:
                     .tooltip("The study the pages show")
                 )
                 self.scope_select.visible = False
-                with (
-                    ui.button(icon="edit_note", on_click=lambda: self.open_study())
-                    .props("flat round")
-                    .classes("lc-gear")
-                    .tooltip("This study's details, waves and text") as self.study_button
-                ):
-                    # With every study shown, the button first asks which one.
-                    self.study_menu = ui.menu().props("no-parent-event")
+                self.study_button = (
+                    ui.button(
+                        "Studies", icon="list_alt", on_click=lambda: self.tabs.set_value(STUDY)
+                    )
+                    .props("flat no-caps")
+                    .classes("lc-quiet-btn")
+                    .tooltip("Each study's details, waves and text")
+                )
                 self.study_button.visible = False
                 self.spinner = ui.spinner(size="sm")
                 self.spinner.visible = False
@@ -309,7 +308,7 @@ class Window:
                         ui.separator().props("vertical")
                     nav |= {name: ui.tab(name, label=label) for name, label in group}
                 ui.tab(SETTINGS, label="Settings").classes("hidden")
-                ui.tab(STUDY, label="Study").classes("hidden")
+                ui.tab(STUDY, label="Studies").classes("hidden")
                 with nav["problems"]:
                     self.badge = ui.label().classes("lc-pill ml-2")
                     self.badge.visible = False
@@ -629,49 +628,25 @@ class Window:
         studies = self.result.project.config.studies if self.result and self.result.project else {}
         if self.scope not in studies:
             self.scope = None
-        self.studying.study = self.scope
-        named = {s: c.label or s for s, c in studies.items()}
-        options = {ALL_STUDIES: "All studies"} | named | {NEW_STUDY: "New study…"}
+        options = {ALL_STUDIES: "All studies"} | {s: c.label or s for s, c in studies.items()}
         self.scope_select.set_options(options, value=self.scope or ALL_STUDIES)
         shown = self.result is not None and self.result.project is not None
         self.scope_select.visible = self.study_button.visible = shown
-        self.study_menu.clear()
-        with self.study_menu:
-            for study, label in named.items():
-                ui.menu_item(label, on_click=partial(self.open_study, study))
 
     def mark_header(self, gear: ui.button, page: str) -> None:
         for button, mine in ((gear, SETTINGS), (self.study_button, STUDY)):
             button.classes(**{"add" if page == mine else "remove": "lc-active"})
 
-    def open_study(self, study: str | None = None) -> None:
-        if study is not None:
-            self.set_scope(study)
-        if self.scope is None:
-            self.study_menu.open()
-            return
-        self.tabs.set_value(STUDY)
-
-    async def study_saved(self, study: str | None) -> None:
-        # A new, renamed or deleted study becomes the one the pages show.
-        if study != self.scope:
-            self.scope = study
+    async def studies_saved(self, old: str | None = None, new: str | None = None) -> None:
+        # The pages keep showing a study the Studies page renamed.
+        if old is not None and old == self.scope:
+            self.scope = new
             saved = preferences.mine().get(preferences.STUDY_SCOPE, {})
-            preferences.save_mine({preferences.STUDY_SCOPE: {**saved, str(self.root): study}})
+            preferences.save_mine({preferences.STUDY_SCOPE: {**saved, str(self.root): new}})
             self.follow_scope()
         await self.reload()
-        if study is None and self.tabs.value == STUDY:
-            self.tabs.set_value("overview")
-
-    async def made_study(self, study: str) -> None:
-        await self.study_saved(study)
-        self.tabs.set_value(STUDY)
 
     def set_scope(self, value: str) -> None:
-        if value == NEW_STUDY:
-            self.scope_select.set_value(self.scope or ALL_STUDIES)
-            studies.new_study(self.result.project, self.made_study)
-            return
         scope = None if value == ALL_STUDIES else value
         if scope == self.scope:
             return
@@ -693,7 +668,7 @@ class Window:
             panel.refresh()
 
     def confirm_scope(self, scope: str | None) -> None:
-        # Narrowing the pages draws the Study page again, which would drop its unsaved changes.
+        # Narrowing the pages draws the Studies page again, which would drop its unsaved changes.
         def discard() -> None:
             dialog.close()
             self.studying.edited = False
@@ -712,11 +687,11 @@ class Window:
 
     def follow_scope(self) -> None:
         # The pages that keep their own choice of study start from the one picked at the top.
-        self.studying.study = self.scope
         if self.scope is None:
             self.view.selected.pop("study", None)
             return
         self.view.selected["study"] = {self.scope}
+        self.studying.study = self.scope
         self.methods.study = self.scope
 
     def open_instrument(self, instrument_id: str | None) -> None:
@@ -780,7 +755,11 @@ class Window:
     def studies_panel(self) -> None:
         if self.has_catalog():
             studies.render(
-                self.result, self.studying, self.study_saved, self.open_dataset, self.dataset_added
+                self.result,
+                self.studying,
+                self.studies_saved,
+                self.open_dataset,
+                self.dataset_added,
             )
 
     def open_dataset(self, dataset: str) -> None:
@@ -842,9 +821,7 @@ class Window:
                     on_click=lambda: new_dataset.open_wizard(self.result, self.dataset_added),
                 ).props("no-caps").classes("w-fit")
             else:
-                common.note(
-                    "Add a study first with New study in the study list at the top of the window."
-                )
+                common.note("Add a study on the Studies page first.")
 
     @ui.refreshable_method
     def prepare_panel(self) -> None:
