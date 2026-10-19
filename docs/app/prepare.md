@@ -23,6 +23,7 @@ A file in a DataLad dataset whose content is not on this computer is marked "not
 - **Run all** runs every step in order, after asking.
 - **Run outdated** runs, in order, the steps that are not up to date. Each step is checked just before its turn, so a step whose inputs were just rebuilt runs too.
 - **Stop** ends the running step and anything it started.
+- **Job command** copies `labcatalog run` with the project's folder, which runs the outdated steps without the window, for a job on a cluster (see [Command Line](../reference/cli.md#run)).
 
 A step that fails stops the rest. After a step has run, its status line shows the outcome and **Log** shows what it printed; the log follows the running step live and has a **Copy log** button. When a step succeeds, the catalog reloads.
 

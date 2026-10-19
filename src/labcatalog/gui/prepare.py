@@ -100,6 +100,8 @@ def render(
         )
     )
 
+    job = f'labcatalog run -p "{posix_str(project.root)}"'
+
     @ui.refreshable
     def steps() -> None:
         states = step_states(project)
@@ -109,6 +111,12 @@ def render(
             ui.button(
                 f"Open {defaults.CONFIG_FILENAME}", on_click=lambda: open_path(config_path)
             ).props("flat no-caps")
+            ui.button(
+                "Job command", icon="terminal", on_click=lambda: common.copy_command(job)
+            ).props("flat no-caps").classes("lc-quiet-btn").tooltip(
+                f"Copies {job}, which runs the outdated steps, checks the project and builds its "
+                "database without the window, for a job on a cluster"
+            )
             ui.button("Stop", icon="stop", on_click=lambda: stop(view.session)).props(
                 "flat no-caps"
             ).classes("lc-quiet-btn").set_enabled(view.running)

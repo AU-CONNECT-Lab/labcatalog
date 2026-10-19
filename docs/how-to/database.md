@@ -4,7 +4,7 @@ labcatalog can write the whole project into one DuckDB file: every dataset as a 
 
 ## Build it
 
-On the **Datasets** page, press **Build database**. It writes `database/labcatalog.duckdb` in the project folder, built from scratch each time, from the data as the window has them loaded; press **Refresh** first if the files changed since. If a build fails, the previous database stays.
+On the **Datasets** page, press **Build database**. It writes `database/labcatalog.duckdb` in the project folder, built from scratch each time, from the data as the window has them loaded; press **Refresh** first if the files changed since. If a build fails, the previous database stays. `labcatalog run` builds it too, after the prepare steps (see [Command Line](../reference/cli.md#run)).
 
 The database holds row-level data, so keep it out of git: add `database/` to the project's `.gitignore`.
 

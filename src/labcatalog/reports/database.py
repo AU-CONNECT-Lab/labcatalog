@@ -87,7 +87,9 @@ def write_database(result: CatalogResult, path: Path) -> Path:
                 )
                 write_table(con, f'{DATA_SCHEMA}."{name}"', frame)
             for name, frame in tables(result).items():
-                write_table(con, name, frame)
+                # A project with nothing of a kind yet, such as no scores, has no table for it.
+                if len(frame.columns):
+                    write_table(con, name, frame)
         partial.replace(path)
     finally:
         partial.unlink(missing_ok=True)

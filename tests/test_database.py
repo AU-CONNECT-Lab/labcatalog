@@ -2,6 +2,7 @@ import duckdb
 import pandas as pd
 
 from labcatalog.pipeline import run_catalog, run_freeze
+from labcatalog.project import init_project
 from labcatalog.reports.database import run_database
 from labcatalog.reports.export import variable_rows
 
@@ -52,3 +53,10 @@ def test_a_freeze_keeps_its_own_copy_of_the_database(mock_project):
     copy = path.with_suffix(".duckdb")
     with duckdb.connect(str(copy), read_only=True) as con:
         assert con.execute('SELECT count(*) FROM data."child_w1"').fetchone()[0] > 0
+
+
+def test_a_project_without_datasets_still_gets_a_database(tmp_path):
+    path = run_database(init_project(tmp_path / "blank", example=False))
+    with duckdb.connect(str(path), read_only=True) as con:
+        names = {row[0] for row in con.execute("SELECT table_name FROM duckdb_tables()").fetchall()}
+    assert names == {"build"}

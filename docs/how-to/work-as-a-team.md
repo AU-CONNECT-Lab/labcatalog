@@ -30,6 +30,20 @@ Then open the printed link in the browser on your own computer. The link holds a
 
 In the browser, files are those of the server. Choosing a file shows the server's folders, so the files to work with have to be there first (copied with `scp`, a cluster's file browser, or a shared drive). Opening a file, such as a data file named in a problem, downloads a copy, and opening a folder copies its path on the server. Set the path to `Rscript` on the Settings page as on a desktop (on Linux often `/usr/bin/Rscript`, or the one a cluster's `module load R` puts on the PATH).
 
+### Run the steps as a job
+
+When a pipeline on the cluster writes what the prepare steps read, such as each person's features or matrices, `labcatalog run` runs the outdated steps without the window, then checks the project and builds its database (see [Command Line](../reference/cli.md#run)). Press **Job command** on the Prepare steps of the Set up page to copy the command with the project's folder. A job script for Slurm, with the environment labcatalog is installed in:
+
+```bash
+#!/bin/bash
+#SBATCH --job-name=labcatalog
+#SBATCH --time=01:00:00
+source ~/venvs/labcatalog/bin/activate
+labcatalog run -p /path/to/project
+```
+
+To start it when the pipeline's job has ended well, give that job's number: `sbatch --dependency=afterok:123456 labcatalog_job.sh`. What the steps print goes to the job's output file, and the job fails when a step fails or the check finds errors. The steps use the Rscript, Python and DataLad set on the Settings page by the account that runs the job, so open labcatalog in browser mode once on the cluster to set them.
+
 ## One labcatalog for the whole lab
 
 When the lab has a computer that stays on, such as the one everyone signs in to, one labcatalog can serve every project in a folder to everyone, in their own browsers; nobody else installs anything. The person who looks after that computer starts it:

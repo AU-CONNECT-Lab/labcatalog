@@ -1,6 +1,6 @@
 # Command Line
 
-labcatalog has three commands: one opens the window, one serves projects to several people in their browsers, and one checks a project for automation. Everything else is done in the window.
+labcatalog has four commands: one opens the window, one serves projects to several people in their browsers, one runs a project's prepare steps as a job, and one checks a project for automation. Everything else is done in the window.
 
 ## Open the window
 
@@ -21,6 +21,16 @@ labcatalog serve PROJECTS [--port PORT] [--host HOST]
 ```
 
 Serve the projects in the folder `PROJECTS` to several people at once, in their browsers: each picks a project from the folder, gives their name once and keeps their own appearance and last project. labcatalog prints a link with a key, as `--browser` does. `--host` is `127.0.0.1` unless given, for an SSH tunnel or a reverse proxy on the same computer; `0.0.0.0` lets everyone on the network who has the link open it. See [Working as a Team](../how-to/work-as-a-team.md#one-labcatalog-for-the-whole-lab).
+
+## run
+
+```bash
+labcatalog run [-p PROJECT]
+```
+
+Run the outdated prepare steps of the project folder (the current folder unless `--project`, `-p`, is given), then check the project and build its database, without the window: for a job on a cluster that follows the job of a pipeline whose output the steps read, or a job that runs every night. It runs the steps as **Run outdated** does on the [Prepare steps](../app/prepare.md#running), in order and each checked just before its turn, and prints what each one prints as it runs. Then it writes `database/labcatalog.duckdb` as **Build database** does (see [Query the Data in a Database](../how-to/database.md)) and prints the problems as `check` does. **Job command** on the Prepare steps copies this command with the project's folder.
+
+A step that fails stops the rest, and then labcatalog neither checks the project nor builds the database. When the metadata have errors, labcatalog prints them and runs no step. Like the window, it does not start the steps while someone else is running those of the same project. Rscript, Python and DataLad are those set on the Settings page by the same account on the same computer; on a cluster, open labcatalog once in browser mode to set them (see [Working as a Team](../how-to/work-as-a-team.md#run-the-steps-as-a-job)). It exits with status 0 when every step succeeded and the check finds no errors, 1 when a step fails, the steps cannot start or the check finds errors, and 3 when the folder has no `labcatalog.yaml`.
 
 ## check
 

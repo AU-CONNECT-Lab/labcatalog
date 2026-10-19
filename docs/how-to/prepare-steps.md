@@ -51,6 +51,8 @@ The script opens the database read only: a file that starts with the SQLite head
 
 The **Prepare steps** of the **Add data** step of the Set up page list every step with its status and the dates of its files. Press **Run** on one step, **Run outdated** to run only the steps that are not up to date, or **Run all** to run every step in order; a step that fails stops the rest. **Stop** ends the running step, and **Log** shows what the command printed. Press **Refresh** afterwards to read the new data.
 
+To run the outdated steps without the window, for example in a cluster job that follows the pipeline whose output they read, use `labcatalog run` (see [Run the steps as a job](work-as-a-team.md#run-the-steps-as-a-job)); **Job command** copies it with the project's folder.
+
 `labcatalog check` and the Problems page also warn about outdated steps (`prepare_outdated`).
 
 ## Draft a step with a language model
