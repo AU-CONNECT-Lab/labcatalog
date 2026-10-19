@@ -287,5 +287,5 @@ def test_problem_rows_say_whether_the_file_opens_on_the_edit_page(mock_project):
     assert [row["in_editor"] for row in rows] == [True, False]
     # A filtered row still points at its own problem, for the Fix button.
     issues.append(Issue(level="warning", code="y", message="w", details={"step": "s"}))
-    [row] = problems.issue_rows(issues, "warning", set())
+    [row] = problems.issue_rows(issues, {2}, set())
     assert row["n"] == 2 and "details" not in row
