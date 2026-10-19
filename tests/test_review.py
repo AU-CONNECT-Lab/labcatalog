@@ -27,16 +27,9 @@ def test_the_waves_of_one_reporters_files_share_a_table_of_scores(mock_project):
     assert sorted(w.dataset for g in groups for w in g.waves) == sorted(every)
 
 
-def test_the_waves_are_drawn_on_one_scale():
-    drawn = review.overlay([("#111111", [0, 2, 4]), ("#222222", [1, 1]), ("#333333", [])])
-    assert drawn.count("<polyline") == 2
-    assert f',{review.PLOT_HEIGHT:.1f}"' in drawn or f",{review.PLOT_HEIGHT:.1f} " in drawn
-    assert review.overlay([("#111111", [])]) == ""
-
-
 def test_each_wave_can_be_drawn_apart_on_one_scale():
-    drawn = review.separate([("#111111", [0, 2, 4]), ("#222222", [1, 1])])
-    assert drawn.count("<svg") == 2 and drawn.count("<rect") == 5
+    drawn = review.separate([("#111111", [0, 2, 4]), ("#222222", [1, 1]), ("#333333", None)])
+    assert drawn.count("<svg") == 2 and drawn.count("<rect") == 5 and drawn.count("—") == 1
     assert f'height="{review.PLOT_HEIGHT:.1f}" fill="#111111"' in drawn
 
 

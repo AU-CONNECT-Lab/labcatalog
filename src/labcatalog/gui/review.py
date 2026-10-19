@@ -10,7 +10,9 @@ from labcatalog.gui.common import apa, col, empty, fmt, note, panel, table
 from labcatalog.pipeline import CatalogResult
 
 PLOT_WIDTH = 120
-PLOT_HEIGHT = 26
+PLOT_HEIGHT = 18
+# Every wave's line in a cell has this height, so a wave's numbers and chart sit side by side.
+LINE = "height:24px;display:flex;align-items:center;justify-content:flex-end"
 
 
 @dataclass
@@ -160,44 +162,33 @@ def facts(result: CatalogResult, d, order: list[str]) -> WaveFacts:
     )
 
 
-def overlay(histograms: list[tuple[str, list[int]]]) -> str:
-    # Each wave's histogram as a step line in its colour, on one scale, so the waves can be compared.
-    drawn = [(color, counts) for color, counts in histograms if counts]
-    if not drawn:
-        return ""
-    top = max((max(counts) for _, counts in drawn), default=0) or 1
-    paths = []
-    for color, counts in drawn:
-        step = PLOT_WIDTH / len(counts)
-        points = []
-        for i, count in enumerate(counts):
-            y = PLOT_HEIGHT - count / top * (PLOT_HEIGHT - 1)
-            points += [f"{i * step:.1f},{y:.1f}", f"{(i + 1) * step:.1f},{y:.1f}"]
-        paths.append(
-            f'<polyline points="{" ".join(points)}" fill="none" stroke="{color}" stroke-width="1.5"/>'
-        )
-    return f'<svg width="{PLOT_WIDTH}" height="{PLOT_HEIGHT}">{"".join(paths)}</svg>'
-
-
-def separate(histograms: list[tuple[str, list[int]]]) -> str:
-    # One small histogram per wave, one under another, on the scale of the tallest.
+def separate(histograms: list[tuple[str, list[int] | None]]) -> str:
+    # One small histogram per wave, on its line, all on the scale of the tallest bar.
     top = max((max(counts) for _, counts in histograms if counts), default=0) or 1
     rows = []
-    for color, counts in histograms:
-        step = PLOT_WIDTH / max(len(counts), 1)
+    for _, counts in histograms:
+        if not counts:
+            rows.append(f'<div style="{LINE}">—</div>')
+            continue
+        color = next(c for c, h in histograms if h is counts)
+        step = PLOT_WIDTH / len(counts)
         bars = "".join(
             f'<rect x="{i * step:.1f}" y="{PLOT_HEIGHT - c / top * PLOT_HEIGHT:.1f}" '
             f'width="{max(step - 1, 1):.1f}" height="{c / top * PLOT_HEIGHT:.1f}" fill="{color}"/>'
             for i, c in enumerate(counts)
         )
-        rows.append(f'<div><svg width="{PLOT_WIDTH}" height="{PLOT_HEIGHT}">{bars}</svg></div>')
+        rows.append(
+            f'<div style="{LINE}"><svg width="{PLOT_WIDTH}" height="{PLOT_HEIGHT}">{bars}</svg></div>'
+        )
     return "".join(rows)
 
 
-def lines(values: list[tuple[str, str]]) -> str:
-    # One line per wave, marked with the wave's colour.
+def lines(values: list[tuple[str, str | None]]) -> str:
+    # One line per wave, marked with the wave's colour; a dash where the wave lacks the score.
     return "".join(
-        f'<div><span style="color:{color}">●</span> {escape(text)}</div>' for color, text in values
+        f'<div style="{LINE}"><span style="color:{color}">●</span>&nbsp;'
+        f"{'—' if text is None else escape(text)}</div>"
+        for color, text in values
     )
 
 
@@ -213,29 +204,13 @@ def render(result: CatalogResult, open_dataset: Callable[[str], None]) -> None:
         if not groups:
             empty("No data files read yet.")
             return
-        shown = {"apart": False}
-
-        def set_apart(value: bool) -> None:
-            shown["apart"] = value
-            tables.refresh()
-
-        ui.toggle(
-            {False: "Waves together", True: "Each wave apart"},
-            value=False,
-            on_change=lambda e: set_apart(e.value),
-        ).props("dense no-caps")
-
-        @ui.refreshable
-        def tables() -> None:
-            for group in groups:
-                with ui.column().classes("w-full gap-1"):
-                    ui.label(group.title).classes("font-medium")
-                    for wave in group.waves:
-                        wave_row(wave, open_dataset)
-                    if group.scores:
-                        score_table(group, shown["apart"])
-
-        tables()
+        for group in groups:
+            with ui.column().classes("w-full gap-1"):
+                ui.label(group.title).classes("font-medium")
+                for wave in group.waves:
+                    wave_row(wave, open_dataset)
+                if group.scores:
+                    score_table(group)
 
 
 def wave_row(wave: WaveFacts, open_dataset: Callable[[str], None]) -> None:
@@ -260,7 +235,7 @@ def wave_row(wave: WaveFacts, open_dataset: Callable[[str], None]) -> None:
         ).props("flat dense no-caps")
 
 
-def score_table(group: ReviewGroup, apart: bool = False) -> None:
+def score_table(group: ReviewGroup) -> None:
     columns = [
         col("score", "Score"),
         col("n", "n", numeric=True, sortable=False),
@@ -271,24 +246,21 @@ def score_table(group: ReviewGroup, apart: bool = False) -> None:
     ]
     rows = []
     for line in group.scores:
-        held = [(w.color, s) for w, s in zip(group.waves, line.waves, strict=True) if s is not None]
+        held = [(w.color, s) for w, s in zip(group.waves, line.waves, strict=True)]
+
+        def cells(text: Callable[[ScoreWave], str], held=held) -> str:
+            return lines([(c, None if s is None else text(s)) for c, s in held])
+
         rows.append(
             {
                 "score": line.label,
-                "n": lines([(c, str(s.n)) for c, s in held]),
-                "missing": lines(
-                    [
-                        (c, f"{s.missing} ({s.missing / s.rows:.0%})" if s.rows else "")
-                        for c, s in held
-                    ]
+                "n": cells(lambda s: str(s.n)),
+                "missing": cells(
+                    lambda s: f"{s.missing} ({s.missing / s.rows:.0%})" if s.rows else ""
                 ),
-                "m": lines(
-                    [(c, "" if s.mean is None else f"{fmt(s.mean)} ({fmt(s.sd)})") for c, s in held]
-                ),
-                "alpha": lines([(c, apa(s.alpha)) for c, s in held]),
-                "shape": separate([(c, s.histogram) for c, s in held])
-                if apart
-                else overlay([(c, s.histogram) for c, s in held]),
+                "m": cells(lambda s: "" if s.mean is None else f"{fmt(s.mean)} ({fmt(s.sd)})"),
+                "alpha": cells(lambda s: apa(s.alpha)),
+                "shape": separate([(c, None if s is None else s.histogram) for c, s in held]),
             }
         )
     shown = table(columns, rows)
