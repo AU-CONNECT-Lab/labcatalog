@@ -19,6 +19,7 @@ from labcatalog.exceptions import DataSourceError
 from labcatalog.issues import Issue
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
 from labcatalog.metadata.editing import save_step
+from labcatalog.metadata.scripts import LANGUAGES, command, language_of
 from labcatalog.metadata.validate import same_file
 from labcatalog.paths import posix_str
 from labcatalog.project import Project
@@ -76,21 +77,6 @@ SCHEMA = ToolSchema(
 )
 
 
-@dataclass(frozen=True)
-class Language:
-    name: str
-    suffix: str
-    command: str
-    libraries: str
-    arguments: str
-
-
-LANGUAGES = {
-    "r": Language("R", ".R", "Rscript", "base R", "commandArgs(trailingOnly = TRUE)"),
-    "python": Language(
-        "Python", ".py", "python", "the Python standard library and pandas", "sys.argv"
-    ),
-}
 # What the language model sees of the raw file: each column's values, or its first lines.
 VALUES = "values"
 ROWS = "rows"
@@ -122,11 +108,6 @@ class CleaningDraft:
         return "\n".join(lines)
 
 
-def language_of(path: str) -> str | None:
-    suffix = Path(path).suffix.lower()
-    return next((k for k, lang in LANGUAGES.items() if lang.suffix.lower() == suffix), None)
-
-
 def cleaning_step(project: Project, dataset: str) -> PrepareStep | None:
     # The step that writes this dataset's file with a script the model can revise.
     path = dataset_by_name(project.config, dataset).path
@@ -145,11 +126,6 @@ def script_of(step: PrepareStep) -> str | None:
 
 def raw_of(step: PrepareStep) -> str | None:
     return next((p for p in step.inputs if not language_of(p)), None)
-
-
-def command(language: str, script: str, raw: str, clean: str) -> str:
-    quoted = [f'"{p}"' if " " in p else p for p in (script, raw, clean)]
-    return " ".join([LANGUAGES[language].command, *quoted])
 
 
 def usage(language: str) -> str:

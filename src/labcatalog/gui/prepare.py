@@ -13,17 +13,12 @@ from labcatalog.gui.cleaning import LANGUAGE_NAMES, review, sent_text
 from labcatalog.gui.common import computed, empty, note, open_path, page_head, panel, path_input
 from labcatalog.gui.datalad import get_button
 from labcatalog.gui.files import choose_path
+from labcatalog.gui.look import look
+from labcatalog.metadata.scripts import script_of
 from labcatalog.paths import portable_path, posix_str
 from labcatalog.pipeline import CatalogResult, run_cleaning_draft, run_get
-from labcatalog.project import load_project
+from labcatalog.project import Project, load_project
 
-EXAMPLE = """\
-prepare:
-  - name: clean_parent_w1
-    run: Rscript scripts/clean_parent.R
-    inputs: [raw/parent_w1_export.csv, scripts/clean_parent.R]
-    outputs: [data/parent_w1.csv]
-"""
 STATUS_KINDS = {
     "up to date": "ok",
     "outdated": "warn",
@@ -58,55 +53,20 @@ def render(
             "Prepare steps",
             "None yet: a file that needs cleaning, or a score computed by a script, gets one",
         ) as tools:
-            with ui.expansion(f"Add one by hand in {defaults.CONFIG_FILENAME}").classes("w-full"):
-                note(
-                    "Each step runs one command in the project folder, and its outputs are "
-                    "usually the data files listed under datasets."
-                )
-                ui.code(EXAMPLE, language="yaml").classes("w-full")
+            note(
+                "Each step runs one command in the project folder, and its outputs are usually "
+                "the data files listed under datasets. Write a script and give it a step on the "
+                "Scripts page, or have a language model draft a cleaning step there."
+            )
         with tools:
-            ui.button(
-                f"Open {defaults.CONFIG_FILENAME}", on_click=lambda: open_path(config_path)
-            ).props("flat no-caps").classes("lc-quiet-btn")
-        draft_panel(result, on_success)
+            ui.button("Scripts", icon="code", on_click=lambda: look().open_script(None)).props(
+                "flat no-caps"
+            ).classes("lc-quiet-btn")
         return
     names = [step.name for step in project.config.prepare]
 
-    async def start(chosen: list[str], outdated_only: bool = False, anyway: bool = False) -> None:
-        view.running = True
-        steps.refresh()
-        tools = preferences.load()
-        try:
-            runs = await computed(
-                run_steps,
-                project,
-                chosen,
-                view.session,
-                outdated_only,
-                None,
-                tools.get(preferences.RSCRIPT),
-                tools.get(preferences.DATALAD),
-                anyway,
-                preferences.step_python(),
-            )
-        except PrepareBusyError as err:
-            view.running = False
-            steps.refresh()
-            confirm_busy(err, lambda: start(chosen, outdated_only, anyway=True))
-            return
-        except DataladError as err:
-            view.running = False
-            steps.refresh()
-            ui.notify(str(err), type="negative", multi_line=True)
-            return
-        view.running = False
-        if runs:
-            view.shown = runs[-1].name
-        steps.refresh()
-        if not runs:
-            ui.notify("Every step is up to date")
-        elif any(r.exit_code == 0 for r in runs):
-            await on_success()
+    async def start(chosen: list[str], outdated_only: bool = False) -> None:
+        await run_chosen(project, view, chosen, steps.refresh, on_success, outdated_only)
 
     def confirm_all() -> None:
         with ui.dialog() as dialog, ui.card().classes("w-[40rem] max-w-full"):
@@ -162,11 +122,59 @@ def render(
             help_text="Scripts that clean the data or compute scores, in the order they run",
         ):
             for state in states:
-                step_row(state, view, start, show_log, on_success)
+                script = script_of(project.root, state.step)
+                step_row(state, view, start, show_log, on_success, script)
         log_panel(view)
-        draft_panel(result, on_success)
 
     steps()
+
+
+async def run_chosen(
+    project: Project,
+    view: PrepareView,
+    chosen: list[str],
+    redraw: Callable[[], None],
+    on_success: Callable[[], Awaitable[None]],
+    outdated_only: bool = False,
+    anyway: bool = False,
+) -> None:
+    view.running = True
+    redraw()
+    tools = preferences.load()
+    try:
+        runs = await computed(
+            run_steps,
+            project,
+            chosen,
+            view.session,
+            outdated_only,
+            None,
+            tools.get(preferences.RSCRIPT),
+            tools.get(preferences.DATALAD),
+            anyway,
+            preferences.step_python(),
+        )
+    except PrepareBusyError as err:
+        view.running = False
+        redraw()
+        confirm_busy(
+            err,
+            lambda: run_chosen(project, view, chosen, redraw, on_success, outdated_only, True),
+        )
+        return
+    except DataladError as err:
+        view.running = False
+        redraw()
+        ui.notify(str(err), type="negative", multi_line=True)
+        return
+    view.running = False
+    if runs:
+        view.shown = runs[-1].name
+    redraw()
+    if not runs:
+        ui.notify("Every step is up to date")
+    elif any(r.exit_code == 0 for r in runs):
+        await on_success()
 
 
 def confirm_busy(err: PrepareBusyError, run_anyway: Callable[[], Awaitable[None]]) -> None:
@@ -193,6 +201,7 @@ def step_row(
     start: Callable[[list[str]], Awaitable[None]],
     show_log: Callable[[str], None],
     on_got: Callable[[], Awaitable[None]],
+    script: str | None = None,
 ) -> None:
     step = state.step
     last = view.session.runs.get(step.name)
@@ -214,6 +223,11 @@ def step_row(
                             for f in files:
                                 file_label(f, on_got)
         with ui.row().classes("items-center no-wrap gap-1"):
+            if script:
+                opened = look().open_script
+                ui.button("Script", icon="code", on_click=lambda: opened(script)).props(
+                    "flat dense no-caps"
+                ).classes("lc-quiet-btn").tooltip(f"Open {script} on the Scripts page")
             if last:
                 ui.button("Log", on_click=lambda: show_log(step.name)).props("flat dense no-caps")
             ui.button("Run", icon="play_arrow", on_click=lambda: start([step.name])).props(

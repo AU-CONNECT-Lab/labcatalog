@@ -1,12 +1,12 @@
 # Prepare Steps
 
-The **Prepare steps** of the [Add data](add-data.md) step of the Set up page run the prepare steps in `labcatalog.yaml`, the scripts that turn raw exports and pipeline outputs into the data the catalog reads. See [Register Prepare Steps](../how-to/prepare-steps.md) for how to write them. A project with no steps yet shows an example to copy.
+The **Prepare steps** of the [Add data](add-data.md) step of the Set up page run the prepare steps in `labcatalog.yaml`, the scripts that turn raw exports and pipeline outputs into the data the catalog reads. See [Register Prepare Steps](../how-to/prepare-steps.md) for how to write them. Steps are written, changed and removed, and their scripts edited, on the [Scripts](scripts.md) page.
 
 ![The prepare steps of the Add data step](../images/app/prepare.png)
 
 ## The steps
 
-Each step shows its name, its status, its command, and its inputs and outputs with their dates. Click a file to open it. The status is one of:
+Each step shows its name, its status, its command, and its inputs and outputs with their dates. Click a file to open it. **Script** opens the script the step runs on the [Scripts](scripts.md) page. The status is one of:
 
 | Status | Meaning |
 |---|---|

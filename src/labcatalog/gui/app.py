@@ -34,6 +34,7 @@ from labcatalog.gui import (
     preferences,
     prepare,
     problems,
+    scripts,
     serving,
     settings,
     setup,
@@ -62,6 +63,7 @@ from labcatalog.gui.instruments import (
 from labcatalog.gui.look import Look, register, within
 from labcatalog.gui.methods import MethodsView
 from labcatalog.gui.prepare import PrepareView
+from labcatalog.gui.scripts import ScriptsView
 from labcatalog.gui.setup import SetupView
 from labcatalog.gui.studies import StudiesView
 from labcatalog.gui.templates import TemplatesView
@@ -86,6 +88,7 @@ PAGES = (
     (("analysis", "Analysis"), ("methods", "Methods"), ("templates", "Templates")),
     # Set up's steps, numbered, all showing the one Set up page.
     tuple(setup.STEPS.items()),
+    (("scripts", "Scripts"),),
     (("problems", "Problems"),),
 )
 SETUP = "setup"
@@ -182,6 +185,7 @@ class Window:
         self.look = Look(palette=saved if saved in style.PALETTES else style.DEFAULT_PALETTE)
         self.look.who = preferences.mine().get(preferences.WHO)
         self.look.open_template = self.open_template
+        self.look.open_script = self.open_script
         register(ui.context.client, self.look)
         self.root: Path | None = None
         self.result: CatalogResult | None = None
@@ -197,6 +201,7 @@ class Window:
         self.codebook = CodebookView()
         self.editing = EditView()
         self.preparing = PrepareView()
+        self.scripting = ScriptsView()
         self.setting_up = SetupView()
         self.step_marks: dict[str, ui.label] = {}
         self.step_tips: dict[str, ui.tooltip] = {}
@@ -357,6 +362,8 @@ class Window:
                             part()
                         setup.next_button(name, self.pick_step)
                 self.show_step()
+            with ui.tab_panel("scripts").classes("lc-page"):
+                self.scripts_panel()
             with ui.tab_panel("problems").classes("lc-page"):
                 self.problems_panel()
             with ui.tab_panel("settings").classes("lc-page"):
@@ -444,6 +451,7 @@ class Window:
                 self.codebook = CodebookView()
                 self.editing = EditView()
                 self.preparing = PrepareView()
+                self.scripting = ScriptsView()
                 self.setting_up = SetupView()
                 self.cfa.estimator = self.cfa.invariance_estimator = None
                 self.root = root
@@ -592,6 +600,7 @@ class Window:
             self.codebook_panel,
             self.add_data_panel,
             self.prepare_panel,
+            self.scripts_panel,
             self.ids_panel,
             self.import_panel,
             self.edit_panel,
@@ -875,6 +884,17 @@ class Window:
             common.empty("Open a project folder to run its prepare steps.", "folder_open")
         else:
             prepare.render(self.root, self.result, self.preparing, lambda: self.load(self.root))
+
+    @ui.refreshable_method
+    def scripts_panel(self) -> None:
+        if self.has_catalog():
+            scripts.render(self.result, self.scripting, self.preparing, self.reload)
+
+    def open_script(self, path: str | None) -> None:
+        if path is not None:
+            self.scripting.path, self.scripting.step = path, None
+        self.scripts_panel.refresh()
+        self.tabs.set_value("scripts")
 
     @ui.refreshable_method
     def edit_panel(self) -> None:

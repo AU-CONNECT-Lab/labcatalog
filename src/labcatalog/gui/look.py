@@ -26,6 +26,8 @@ class Look:
     who: str | None = None
     # Opens the window's Templates page at a template, for a study or instrument or the project.
     open_template: Callable[[str, str | None], None] | None = None
+    # Opens the Scripts page at a script, or as it was when None.
+    open_script: Callable[[str | None], None] | None = None
 
     def use_project(self, config: ProjectConfig | None) -> None:
         self.decimals = config.stats.decimals if config else defaults.DECIMALS

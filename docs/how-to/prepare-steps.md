@@ -6,7 +6,7 @@ labcatalog does not care what the scripts do or what language they are in. It ru
 
 ## Write a step
 
-Steps go under `prepare` in `labcatalog.yaml`, in the order they should run:
+The [Scripts](../app/scripts.md) page writes a script and its step for you: **New script**, then **Add a step**. Steps go under `prepare` in `labcatalog.yaml`, in the order they should run:
 
 ```yaml
 prepare:
@@ -57,7 +57,7 @@ labcatalog prepare
 
 ## Draft a step with a language model
 
-With a language model set on the Settings page (see [Set Up R and Language Models](r-and-models.md)), **Draft a cleaning step** at the bottom of the prepare steps in the **Add data** step writes a first script for you. Choose the **Dataset**, the **Raw export** it comes from (a CSV file in the project folder) and **R** or **Python**, and press **Draft**.
+With a language model set on the Settings page (see [Set Up R and Language Models](r-and-models.md)), **Draft a cleaning step** at the bottom of the [Scripts](../app/scripts.md) page writes a first script for you. Choose the **Dataset**, the **Raw export** it comes from (a CSV file in the project folder) and **R** or **Python**, and press **Draft**.
 
 The model is given the raw file's column names and, as the project sets on the Settings page, either each column's different values or its first 20 lines; and the dataset's columns from its column map, with each item's answer options, the missing codes and the ID pattern. It writes a script that takes the raw file and the clean file as arguments, as in `Rscript scripts/clean_parent_w1.R raw/parent_w1_export.csv data/parent_w1.csv`.
 

@@ -39,6 +39,7 @@ project:
         - file: app/prepare.md
         - file: app/import.md
         - file: app/ids.md
+        - file: app/scripts.md
         - file: app/edit.md
         - file: app/problems.md
         - file: app/settings.md
