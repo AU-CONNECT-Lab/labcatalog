@@ -170,7 +170,7 @@ TEMPLATES: dict[str, Template] = {
             (
                 Slot(
                     PARAGRAPH,
-                    "Paragraph",
+                    "The paragraph: its sentences, in order",
                     "{waves} {counts} {demographics} {retention} {modalities}",
                     (
                         "study",
@@ -181,6 +181,131 @@ TEMPLATES: dict[str, Template] = {
                         "retention",
                         "modalities",
                     ),
+                ),
+                Slot(
+                    "waves_many",
+                    "{waves}, for a study of several waves",
+                    "Data were collected in {n_waves} waves: {waves}.",
+                    ("n_waves", "waves"),
+                    {
+                        "n_waves": "three",
+                        "waves": "Wave 1 (2024-03-01 to 2024-10-31), Wave 2 (2025-03-01 to "
+                        "2025-10-31), and Wave 3 (since 2026-03-01)",
+                    },
+                ),
+                Slot(
+                    "waves_one",
+                    "{waves}, for a study of one wave",
+                    "Data were collected in {wave}.",
+                    ("wave",),
+                    {"wave": "Wave 1 (2024-03-01 to 2024-10-31)"},
+                ),
+                Slot(
+                    "wave_dated",
+                    "Each wave in those, with its dates",
+                    "Wave {wave} ({dates})",
+                    ("wave", "dates"),
+                    {"wave": "1", "dates": "2024-03-01 to 2024-10-31"},
+                ),
+                Slot(
+                    "wave",
+                    "Each wave in those, without dates",
+                    "Wave {wave}",
+                    ("wave",),
+                    {"wave": "1"},
+                ),
+                Slot(
+                    "count",
+                    "{counts}: who took part at each wave",
+                    "At Wave {wave}, {respondents} respondents took part.",
+                    ("wave", "respondents"),
+                    {"wave": "1", "respondents": "192 parent and 217 child"},
+                ),
+                Slot(
+                    "count_groups",
+                    "{counts}, when people come in groups",
+                    "At Wave {wave}, {respondents} respondents from {n_groups} {group} groups "
+                    "({n_complete} with every reporter) took part.",
+                    ("wave", "respondents", "n_groups", "group", "n_complete"),
+                    {
+                        "wave": "1",
+                        "respondents": "192 parent and 217 child",
+                        "n_groups": "191",
+                        "group": "family",
+                        "n_complete": "185",
+                    },
+                ),
+                Slot(
+                    "demographics",
+                    "{demographics}: a sentence for each reporter, with blanks to fill in",
+                    "Of the {respondents}, [ ]% were women or girls/men or boys, and their mean "
+                    "age was [ ] years (SD = [ ]).",
+                    ("respondents",),
+                    {"respondents": "parent respondents"},
+                ),
+                Slot(
+                    "returned",
+                    "{retention}: who came back at each later wave",
+                    "At Wave {wave}, {again} from Wave {previous} took part again; {new} "
+                    "respondents were new.",
+                    ("wave", "previous", "again", "new"),
+                    {
+                        "wave": "2",
+                        "previous": "1",
+                        "again": "160 of 192 parent respondents (83%) and 170 of 217 child "
+                        "respondents (78%)",
+                        "new": "12 parent and 9 child",
+                    },
+                ),
+                Slot(
+                    "returned_each",
+                    "Each reporter in that sentence",
+                    "{n} of {total} {respondents} ({percent})",
+                    ("n", "total", "respondents", "percent"),
+                    {
+                        "n": "160",
+                        "total": "192",
+                        "respondents": "parent respondents",
+                        "percent": "83%",
+                    },
+                ),
+                Slot(
+                    "modality",
+                    "{modalities}: who has data from a modality not everyone has",
+                    "Data from {modality} were available for {counts}.",
+                    ("modality", "counts"),
+                    {
+                        "modality": "EEG",
+                        "counts": "150 of 217 child respondents at Wave 1 (69%) and 140 of 195 at "
+                        "Wave 3 (72%)",
+                    },
+                ),
+                Slot(
+                    "modality_each",
+                    "Each wave in that sentence",
+                    "{n} of {total} {respondents} at Wave {wave} {share}",
+                    ("n", "total", "respondents", "wave", "share"),
+                    {
+                        "n": "150",
+                        "total": "217",
+                        "respondents": "child respondents",
+                        "wave": "1",
+                        "share": "(69%)",
+                    },
+                ),
+                Slot(
+                    "modality_again",
+                    "Who had a modality again at its next wave",
+                    "Of these, {again}.",
+                    ("again",),
+                    {"again": "120 of the 150 from Wave 1 had them again at Wave 3 (80%)"},
+                ),
+                Slot(
+                    "modality_again_each",
+                    "Each wave in that sentence",
+                    "{n} of the {total} from Wave {previous} had them again at Wave {wave} {share}",
+                    ("n", "total", "previous", "wave", "share"),
+                    {"n": "120", "total": "150", "previous": "1", "wave": "3", "share": "(80%)"},
                 ),
             ),
             "The Participants paragraph of the Methods page, for each study.",
@@ -193,7 +318,7 @@ TEMPLATES: dict[str, Template] = {
             (
                 Slot(
                     PARAGRAPH,
-                    "Paragraph",
+                    "The paragraph: its sentences, in order",
                     "We used {named}. {description} {items} {reverse} {scoring} {alpha} {omega}",
                     (
                         "name",
@@ -211,6 +336,117 @@ TEMPLATES: dict[str, Template] = {
                         "alpha",
                         "omega",
                     ),
+                ),
+                Slot(
+                    "named",
+                    "{named}, with its abbreviation or reference",
+                    "the {name} ({details})",
+                    ("name", "details"),
+                    {"name": "Example Mood Scale", "details": "EMS; Sample, 2019"},
+                ),
+                Slot(
+                    "named_plain",
+                    "{named}, with neither",
+                    "the {name}",
+                    ("name",),
+                    {"name": "Example Mood Scale"},
+                ),
+                Slot(
+                    "items",
+                    "{items}, when every item has the same answers",
+                    "{subject} has {n_items} items, each answered from {scale}.",
+                    ("subject", "n_items", "scale"),
+                    {"subject": "The EMS", "n_items": "eight", "scale": "0 (Never) to 3 (Often)"},
+                ),
+                Slot(
+                    "items_plain",
+                    "{items}, otherwise",
+                    "{subject} has {n_items} items.",
+                    ("subject", "n_items"),
+                    {"subject": "The EMS", "n_items": "eight"},
+                ),
+                Slot(
+                    "subject",
+                    "{subject}, with an abbreviation",
+                    "The {abbreviation}",
+                    ("abbreviation",),
+                    {"abbreviation": "EMS"},
+                ),
+                Slot("subject_plain", "{subject}, without one", "The scale", ()),
+                Slot(
+                    "scale",
+                    "{scale}: the answers, lowest to highest",
+                    "{low} ({low_label}) to {high} ({high_label})",
+                    ("low", "low_label", "high", "high_label"),
+                    {"low": "0", "low_label": "Never", "high": "3", "high_label": "Often"},
+                ),
+                Slot(
+                    "reverse_one",
+                    "{reverse}, for one reversed item",
+                    "Item {items} is reverse-scored.",
+                    ("items",),
+                    {"items": "4"},
+                ),
+                Slot(
+                    "reverse_many",
+                    "{reverse}, for several",
+                    "Items {items} are reverse-scored.",
+                    ("items",),
+                    {"items": "2, 4, and 7"},
+                ),
+                Slot(
+                    "scoring",
+                    "{scoring}: how the scores are made",
+                    "Scores are {parts}.",
+                    ("parts",),
+                    {
+                        "parts": "the mean of the items for Total score (8 items) and Sadness (4 items)"
+                    },
+                ),
+                Slot(
+                    "scoring_method",
+                    "Scores that sum or average their items",
+                    "the {method} of the items for {scores}",
+                    ("method", "scores"),
+                    {"method": "mean", "scores": "Total score (8 items) and Sadness (4 items)"},
+                ),
+                Slot(
+                    "scoring_script",
+                    "Scores a script computes",
+                    "computed by the lab's scoring script for {scores}",
+                    ("scores",),
+                    {"scores": "Total score"},
+                ),
+                Slot(
+                    "score",
+                    "Each score of the items",
+                    "{score} ({n_items} items)",
+                    ("score", "n_items"),
+                    {"score": "Total score", "n_items": "8"},
+                ),
+                Slot(
+                    "reliability_one",
+                    "{alpha} and {omega}, for one score",
+                    "{statistic} was {value}.",
+                    ("statistic", "value"),
+                    {"statistic": "Cronbach's α", "value": ".88"},
+                ),
+                Slot(
+                    "reliability_many",
+                    "{alpha} and {omega}, for several",
+                    "{statistic} was {values}.",
+                    ("statistic", "values"),
+                    {
+                        "statistic": "Cronbach's α",
+                        "values": ".88 for Total score and .81 for Sadness",
+                    },
+                ),
+                Slot(
+                    "reliability_each",
+                    "Each score in that sentence",
+                    "{value} for {score}",
+                    ("value", "score"),
+                    {"value": ".88", "score": "Total score"},
                 ),
             ),
             "Each instrument's paragraph, on the Methods page and the instrument's page.",
@@ -1118,8 +1354,7 @@ class Wording:
     written: dict[str, str | dict[str, str]] = field(default_factory=dict)
 
     def text(self, key: str, slot: str = PARAGRAPH) -> str:
-        found = self.written.get(key)
-        own = found.get(slot) if isinstance(found, dict) else found
+        own = parts(self.written.get(key)).get(slot)
         return (own or TEMPLATES[key].slot(slot).default).strip()
 
     def say(self, key: str, slot: str, **values: object) -> str:
@@ -1130,6 +1365,18 @@ class Wording:
 
 def project_text(config: ProjectConfig, key: str, slot: str = PARAGRAPH) -> str:
     return Wording(config.templates).text(key, slot)
+
+
+def parts(written: str | dict[str, str] | None) -> dict[str, str]:
+    # One text stands for the paragraph part.
+    if written is None:
+        return {}
+    return {PARAGRAPH: written} if isinstance(written, str) else dict(written)
+
+
+def layered(config: ProjectConfig, key: str, own: str | dict[str, str] | None) -> Wording:
+    # A study's or instrument's own parts over the project's.
+    return Wording({key: parts(config.templates.get(key)) | parts(own)})
 
 
 def placeholder_problem(template: str, allowed: tuple[str, ...]) -> str | None:
@@ -1147,11 +1394,12 @@ def shape_problem(key: str, written: object) -> str | None:
     found = TEMPLATES.get(key)
     if found is None:
         return f"unknown template {key}; use one of {', '.join(TEMPLATES)}"
-    if found.single and not isinstance(written, str):
-        return f"{key} is one text"
-    if not found.single:
-        if not isinstance(written, dict):
-            return f"{key} names its parts: {', '.join(s.key for s in found.slots)}"
+    keys = [s.key for s in found.slots]
+    if isinstance(written, str):
+        if PARAGRAPH in keys:
+            return None
+        return f"{key} names its parts: {', '.join(keys)}"
+    if isinstance(written, dict):
         wrong = [s for s in written if s not in {slot.key for slot in found.slots}]
         if wrong:
             return (

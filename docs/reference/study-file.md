@@ -15,7 +15,7 @@ administrations:
 |---|---|---|
 | `study` | text | The study's ID. Required. |
 | `methods` | mapping | Each modality to a paragraph on how its data were collected and processed. A key can also be the name of one of the study's datasets, whose text then replaces its modality's for that dataset. |
-| `participants` | text | This study's own Participants template. |
+| `participants` | text or map | This study's own wording of the Participants template's parts, over the project's; one text is its paragraph. See [Templates](../app/templates.md). |
 | `administrations` | list | Which instruments were given in which datasets. |
 
 ## administrations

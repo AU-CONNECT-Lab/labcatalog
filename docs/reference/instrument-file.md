@@ -19,7 +19,7 @@ name: Example Mood Scale
 | `demographics` | true/false | `false` | A form about the people rather than a scale: not scored or charted, offered for Table 1 and groups. |
 | `construct_name` | text | | What it measures. |
 | `description` | text | | A sentence or two for the Measures paragraph. |
-| `measures` | text | | This instrument's own Measures template. |
+| `measures` | text or map | | This instrument's own wording of the Measures template's parts, over the project's; one text is its paragraph. See [Templates](../app/templates.md). |
 | `instructions` | text | | The instructions respondents saw. |
 | `response_sets` | list | | Named lists of response options. |
 | `default_response_set` | text | | The response set of items that do not name one. |

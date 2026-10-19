@@ -1,18 +1,22 @@
+from collections.abc import Callable
+
 from labcatalog.config import dataset_by_name
 from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.metadata.bibliography import in_text
 from labcatalog.project import Project
 from labcatalog.reports import templates
+from labcatalog.reports.templates import Wording
 from labcatalog.schema import SCRIPT, Instrument
 from labcatalog.stats.cfa import WLSMV, CfaFit
 from labcatalog.stats.summary import Summary
 
+KEY = "measures"
 # APA writes numbers below ten as words.
 WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine")
 
 
-def template_for(project: Project, instrument: Instrument) -> str:
-    return instrument.measures or templates.project_text(project.config, "measures")
+def wording_for(project: Project, instrument: Instrument) -> Wording:
+    return templates.layered(project.config, KEY, instrument.measures)
 
 
 def paragraph(
@@ -22,11 +26,11 @@ def paragraph(
     instrument: Instrument,
     dataset: str,
     fits: list[CfaFit],
-    template: str | None = None,
+    wording: Wording | None = None,
 ) -> str:
-    values = placeholder_values(project, catalog, summary, instrument, dataset, fits)
-    text = (template or template_for(project, instrument)).format_map(values)
-    return " ".join(text.split())
+    wording = wording or wording_for(project, instrument)
+    values = placeholder_values(project, catalog, summary, instrument, dataset, fits, wording)
+    return wording.say(KEY, templates.PARAGRAPH, **values)
 
 
 def paragraphs(
@@ -48,16 +52,23 @@ def placeholder_values(
     instrument: Instrument,
     dataset: str,
     fits: list[CfaFit],
+    wording: Wording,
 ) -> dict[str, str]:
+    def say(slot: str, **values: object) -> str:
+        return wording.say(KEY, slot, **values)
+
     cite = "; ".join(in_text(project.bibliography, r.key) for r in instrument.references)
     inside = "; ".join(p for p in (instrument.abbreviation, cite) if p)
     administered = {
         v.item_id for v in catalog.variables_for(dataset) if v.instrument_id == instrument.id
     }
     items = [item for item in instrument.items if item.id in administered]
-    scale = response_scale(instrument, items)
-    subject = f"The {instrument.abbreviation}" if instrument.abbreviation else "The scale"
-    counted = f"{subject} has {number(len(items))} items"
+    scale = response_scale(instrument, items, say)
+    if instrument.abbreviation:
+        subject = say("subject", abbreviation=instrument.abbreviation)
+    else:
+        subject = say("subject_plain")
+    n_items = number(len(items))
     scores = [s for s in catalog.scores if s.instrument_id == instrument.id]
     scores = [s for s in scores if s.dataset == dataset]
     alphas = {
@@ -69,34 +80,44 @@ def placeholder_values(
     omega = {score: value for f in fits for score, value in f.omega.items()}
     omegas = {s.label: omega[s.score_id] for s in scores if s.score_id in omega}
     ordinal = any(f.estimator == WLSMV for f in fits)
+    if inside:
+        named = say("named", name=instrument.name, details=inside)
+    else:
+        named = say("named_plain", name=instrument.name)
+    if scale:
+        counted = say("items", subject=subject, n_items=n_items, scale=scale)
+    else:
+        counted = say("items_plain", subject=subject, n_items=n_items)
     return {
         "name": instrument.name,
         "abbreviation": instrument.abbreviation or "",
         "cite": cite,
-        "named": f"the {instrument.name}" + (f" ({inside})" if inside else ""),
+        "named": named,
         "construct": instrument.construct_name or "",
         "reporter": dataset_by_name(project.config, dataset).reporter,
-        "n_items": number(len(items)),
+        "n_items": n_items,
         "scale": scale,
         "description": instrument.description or "",
-        "items": f"{counted}, each answered from {scale}." if scale else f"{counted}.",
-        "reverse": reversed_items(instrument, administered),
-        "scoring": scoring(scores),
-        "alpha": reliability("Cronbach's α", alphas),
-        "omega": reliability("Categorical ω" if ordinal else "McDonald's ω", omegas),
+        "items": counted,
+        "reverse": reversed_items(instrument, administered, say),
+        "scoring": scoring(scores, say),
+        "alpha": reliability("Cronbach's α", alphas, say),
+        "omega": reliability("Categorical ω" if ordinal else "McDonald's ω", omegas, say),
     }
 
 
-def response_scale(instrument: Instrument, items: list) -> str:
+def response_scale(instrument: Instrument, items: list, say: Callable[..., str]) -> str:
     sets = {item.response_set or instrument.default_response_set for item in items}
     if any(item.type != "choice" for item in items) or len(sets) != 1:
         return ""
     options = next(s for s in instrument.response_sets if s.id in sets).options
     first, last = options[0], options[-1]
-    return f"{first.value} ({first.label}) to {last.value} ({last.label})"
+    return say(
+        "scale", low=first.value, low_label=first.label, high=last.value, high_label=last.label
+    )
 
 
-def reversed_items(instrument: Instrument, administered: set[str]) -> str:
+def reversed_items(instrument: Instrument, administered: set[str], say: Callable[..., str]) -> str:
     found = [
         str(n)
         for n, item in enumerate(instrument.items, start=1)
@@ -105,33 +126,38 @@ def reversed_items(instrument: Instrument, administered: set[str]) -> str:
     if not found:
         return ""
     if len(found) == 1:
-        return f"Item {found[0]} is reverse-scored."
-    return f"Items {series(found)} are reverse-scored."
+        return say("reverse_one", items=found[0])
+    return say("reverse_many", items=series(found))
 
 
-def scoring(scores: list[ResolvedScore]) -> str:
+def scoring(scores: list[ResolvedScore], say: Callable[..., str]) -> str:
     by_method: dict[str, list[str]] = {}
     for s in scores:
-        named = s.label if s.method == SCRIPT else f"{s.label} ({number(len(s.columns))} items)"
+        if s.method == SCRIPT:
+            named = s.label
+        else:
+            named = say("score", score=s.label, n_items=number(len(s.columns)))
         by_method.setdefault(s.method, []).append(named)
     if not by_method:
         return ""
     parts = [
-        f"computed by the lab's scoring script for {series(named)}"
+        say("scoring_script", scores=series(named))
         if method == SCRIPT
-        else f"the {method} of the items for {series(named)}"
+        else say("scoring_method", method=method, scores=series(named))
         for method, named in by_method.items()
     ]
-    return f"Scores are {series(parts)}."
+    return say("scoring", parts=series(parts))
 
 
-def reliability(statistic: str, values: dict[str, float]) -> str:
+def reliability(statistic: str, values: dict[str, float], say: Callable[..., str]) -> str:
     if not values:
         return ""
     if len(values) == 1:
-        return f"{statistic} was {bounded(next(iter(values.values())))}."
-    found = [f"{bounded(v)} for {label}" for label, v in values.items()]
-    return f"{statistic} was {series(found)}."
+        return say(
+            "reliability_one", statistic=statistic, value=bounded(next(iter(values.values())))
+        )
+    found = [say("reliability_each", value=bounded(v), score=label) for label, v in values.items()]
+    return say("reliability_many", statistic=statistic, values=series(found))
 
 
 def bounded(value: float) -> str:

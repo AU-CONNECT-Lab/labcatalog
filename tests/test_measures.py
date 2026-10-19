@@ -51,7 +51,7 @@ def test_instrument_template_wins_over_the_project_one(mock_project):
     assert paragraph(result) == "Example Mood Scale by child."
     sleep = result.project.instruments["example_child_sleep"]
     sleep.measures = "{abbreviation}: {n_items} items{{1}}."
-    assert measures.template_for(result.project, sleep) == sleep.measures
+    assert measures.wording_for(result.project, sleep).text("measures") == sleep.measures
 
 
 def test_unknown_placeholders_and_stray_braces_are_errors(mock_project):

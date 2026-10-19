@@ -95,7 +95,7 @@ def test_study_template_wins_over_the_project_one(mock_project):
     assert text.startswith("Mock Family Study: three waves. At Wave 2,")
     content = next(iter(result.project.studies.values()))
     content.participants = "{counts}"
-    assert participants.template_for(result.project, "mock_study") == "{counts}"
+    assert participants.wording_for(result.project, "mock_study").text("participants") == "{counts}"
 
 
 def test_unknown_participants_placeholder_is_an_error(mock_project):

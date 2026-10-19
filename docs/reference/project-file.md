@@ -168,7 +168,7 @@ The analyses kept from the Custom tab of the Analysis page, each with a `name`, 
 
 ## templates
 
-The project's wording of the paragraphs labcatalog writes, by template: `participants` and `measures`, each one text with placeholders in braces, and the Results templates (`correlation`, `regression`, `missing`, `groups`, `agreement`, `cfa`, `invariance`, `multilevel`, `panel`, `mediation`), each a text for each sentence it changes. See [Templates](../app/templates.md).
+The project's wording of the paragraphs labcatalog writes, by template, each a text for each part it changes: `participants` and `measures` (or one text, their paragraph), and the Results templates (`correlation`, `regression`, `missing`, `groups`, `agreement`, `cfa`, `invariance`, `multilevel`, `panel`, `mediation`). See [Templates](../app/templates.md).
 
 ## schema_version
 

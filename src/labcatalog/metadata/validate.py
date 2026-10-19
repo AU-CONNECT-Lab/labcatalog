@@ -729,26 +729,27 @@ def same_file(project: Project, path: str) -> str:
 
 def check_templates(project: Project) -> list[Issue]:
     issues, texts = [], []
-    for key, written in project.config.templates.items():
-        if shape := templates.shape_problem(key, written):
-            issues.append(problem("invalid_value", f"templates: {shape}", CONFIG))
+    written = [
+        (key, found, CONFIG, "templates: ") for key, found in project.config.templates.items()
+    ]
+    written += [
+        ("measures", i.measures, project.instrument_files[n], "")
+        for n, i in project.instruments.items()
+        if i.measures
+    ]
+    written += [
+        ("participants", c.participants, project.study_files[n], "")
+        for n, c in project.studies.items()
+        if c.participants
+    ]
+    for key, found, location, prefix in written:
+        if shape := templates.shape_problem(key, found):
+            issues.append(problem("invalid_value", f"{prefix}{shape}", location))
             continue
-        parts = {templates.PARAGRAPH: written} if isinstance(written, str) else written
-        for slot, text in parts.items():
-            where = key if isinstance(written, str) else f"{key}.{slot}"
-            texts.append((where, text, CONFIG, templates.TEMPLATES[key].slot(slot).placeholders))
-    for key, owned in (
-        (
-            "measures",
-            {project.instrument_files[n]: i.measures for n, i in project.instruments.items()},
-        ),
-        (
-            "participants",
-            {project.study_files[n]: c.participants for n, c in project.studies.items()},
-        ),
-    ):
-        allowed = templates.TEMPLATES[key].slot(templates.PARAGRAPH).placeholders
-        texts += [(key, text, location, allowed) for location, text in owned.items()]
+        for slot, text in templates.parts(found).items():
+            where = key if isinstance(found, str) else f"{key}.{slot}"
+            allowed = templates.TEMPLATES[key].slot(slot).placeholders
+            texts.append((where, text, location, allowed))
     return issues + [
         problem("invalid_value", f"{where}: {wrong}", location)
         for where, text, location, allowed in texts

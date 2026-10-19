@@ -90,7 +90,8 @@ def editor(
 ) -> None:
     project = result.project
     current = wording(result, found, view.owner)
-    filled = methods_values(result, found, view.owner)
+    written = methods_text(result, found, view.owner, Wording({found.key: current}))
+    filled = written[1] if written else None
     boxes: dict[str, ui.textarea] = {}
     shown: dict[str, ui.label] = {}
 
@@ -115,7 +116,7 @@ def editor(
         if problems:
             whole.set_text("; ".join(f"{found.slot(k).label}: {p}" for k, p in problems.items()))
         elif filled is not None:
-            whole.set_text(flat(texts[PARAGRAPH].format_map(filled)) if filled else no_data(found))
+            whole.set_text(methods_text(result, found, view.owner, Wording({found.key: texts}))[0])
         else:
             whole.set_text(template_examples.EXAMPLES[found.key](Wording({found.key: texts})))
 
@@ -163,13 +164,14 @@ def editor(
                     .classes("lc-grow w-full")
                 )
                 boxes[slot.key] = box
-                stand_ins = slot.example if filled is None else filled
+                # The paragraph's placeholders hold whole sentences of the project's data.
+                stand_ins = filled if filled is not None and slot.key == PARAGRAPH else slot.example
                 with ui.row().classes("gap-1 items-center"):
                     for name in slot.placeholders:
                         ui.chip(f"{{{name}}}", on_click=partial(insert, box, f"{{{name}}}")).props(
                             "dense clickable outline"
                         ).classes("font-mono").tooltip(stand_ins.get(name) or "Empty here")
-                if not found.single:
+                if filled is None or slot.key != PARAGRAPH:
                     shown[slot.key] = ui.label()
             refused = ui.label().classes("text-negative")
             with ui.row().classes("lc-actions w-full"):
@@ -207,19 +209,21 @@ def owners(result: CatalogResult, found: Template) -> dict[str, str]:
 
 def wording(result: CatalogResult, found: Template, owner: str) -> dict[str, str]:
     project = result.project
-    if owner == PROJECT:
-        return {
-            s.key: templates.project_text(project.config, found.key, s.key) for s in found.slots
-        }
-    if found.own == STUDY:
-        return {PARAGRAPH: participants.template_for(project, owner).strip()}
-    return {PARAGRAPH: measures.template_for(project, project.instruments[owner]).strip()}
+    own = None
+    if owner and found.own == STUDY:
+        own = next((c.participants for c in project.studies.values() if c.study == owner), None)
+    elif owner and found.own == INSTRUMENT:
+        own = project.instruments[owner].measures
+    written = templates.layered(project.config, found.key, own)
+    return {s.key: written.text(found.key, s.key) for s in found.slots}
 
 
 def fallback(result: CatalogResult, found: Template, owner: str) -> dict[str, str]:
     if owner == PROJECT:
         return {s.key: s.default for s in found.slots}
-    return {PARAGRAPH: templates.project_text(result.project.config, found.key)}
+    return {
+        s.key: templates.project_text(result.project.config, found.key, s.key) for s in found.slots
+    }
 
 
 def source(result: CatalogResult, found: Template, owner: str) -> str:
@@ -229,23 +233,32 @@ def source(result: CatalogResult, found: Template, owner: str) -> str:
     return "The project's own wording." if owner == PROJECT else "Its own wording."
 
 
-def methods_values(result: CatalogResult, found: Template, owner: str) -> dict[str, str] | None:
-    # What each placeholder of a Methods template holds in the project's data; None for Results.
+def methods_subject(result: CatalogResult, found: Template, owner: str):
+    # The study, or the instrument and a dataset that gives it, a Methods template is written for.
     project = result.project
     if found.key == "participants":
-        study = owner or next(iter(project.config.studies), None)
-        return participants.placeholder_values(project, result.summary, study) if study else {}
-    if found.key == "measures":
-        given = [(v.instrument_id, v.dataset) for v in result.catalog.variables]
-        pairs = [p for p in given if p[0] == owner] if owner else given
-        if not pairs:
-            return {}
-        instrument_id, dataset = pairs[0]
-        instrument = project.instruments[instrument_id]
-        return measures.placeholder_values(
-            project, result.catalog, result.summary, instrument, dataset, []
+        return owner or next(iter(project.config.studies), None)
+    given = [(v.instrument_id, v.dataset) for v in result.catalog.variables]
+    pairs = [p for p in given if p[0] == owner] if owner else given
+    return pairs[0] if pairs else None
+
+
+def methods_text(result: CatalogResult, found: Template, owner: str, written: Wording):
+    # The paragraph and what each of its placeholders holds; None for a Results template.
+    if found.part != templates.METHODS:
+        return None
+    project = result.project
+    subject = methods_subject(result, found, owner)
+    if subject is None:
+        return no_data(found), {}
+    if found.key == "participants":
+        values = participants.placeholder_values(project, result.summary, subject, written)
+    else:
+        instrument, dataset = project.instruments[subject[0]], subject[1]
+        values = measures.placeholder_values(
+            project, result.catalog, result.summary, instrument, dataset, [], written
         )
-    return None
+    return written.say(found.key, PARAGRAPH, **values), values
 
 
 def no_data(found: Template) -> str:

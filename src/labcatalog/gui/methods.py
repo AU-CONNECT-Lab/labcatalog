@@ -147,11 +147,10 @@ def modality_table(result: CatalogResult, study: str) -> tuple[list[dict], list[
         for before, m in zip([None, *counted], counted, strict=False):
             i = waves.index(m.wave)
             total = totals[(m.wave, reporter)]
-            row[f"w{i}"] = f"{m.n}{participants.share(m.n, total)}"
+            row[f"w{i}"] = f"{m.n} {participants.share(m.n, total)}".strip()
             if before is not None and m.n_from_previous is not None:
-                row[f"back{i}"] = (
-                    f"{m.n_from_previous}{participants.share(m.n_from_previous, before.n)}"
-                )
+                shared = participants.share(m.n_from_previous, before.n)
+                row[f"back{i}"] = f"{m.n_from_previous} {shared}".strip()
         rows.append(row)
     return columns, rows
 

@@ -1,34 +1,47 @@
+from collections.abc import Callable
+
 from labcatalog.config import Vocab, WaveConfig
 from labcatalog.project import Project
 from labcatalog.reports import templates
 from labcatalog.reports.measures import number, series
+from labcatalog.reports.templates import Wording
 from labcatalog.stats.summary import ModalityCount, Summary, WaveRetention, wave_order
 
-BLANK = "[ ]"
+KEY = "participants"
 
 
-def template_for(project: Project, study: str) -> str:
-    own = [c.participants for c in project.studies.values() if c.study == study and c.participants]
-    return next(iter(own), None) or templates.project_text(project.config, "participants")
+def wording_for(project: Project, study: str) -> Wording:
+    own = next((c.participants for c in project.studies.values() if c.study == study), None)
+    return templates.layered(project.config, KEY, own)
 
 
-def paragraph(project: Project, summary: Summary, study: str, template: str | None = None) -> str:
-    values = placeholder_values(project, summary, study)
-    return " ".join((template or template_for(project, study)).format_map(values).split())
+def paragraph(
+    project: Project, summary: Summary, study: str, wording: Wording | None = None
+) -> str:
+    wording = wording or wording_for(project, study)
+    values = placeholder_values(project, summary, study, wording)
+    return wording.say(KEY, templates.PARAGRAPH, **values)
 
 
-def placeholder_values(project: Project, summary: Summary, study: str) -> dict[str, str]:
+def placeholder_values(
+    project: Project, summary: Summary, study: str, wording: Wording
+) -> dict[str, str]:
+    def say(slot: str, **values: object) -> str:
+        return wording.say(KEY, slot, **values)
+
     config = project.config.studies[study]
     rows = [r for r in summary.retention if r.study == study]
     waves = sorted({r.wave for r in rows}, key=wave_order)
     described = []
     for wave in waves:
         dates = wave_dates(config.waves.get(wave, WaveConfig()))
-        described.append(f"Wave {wave}" + (f" ({dates})" if dates else ""))
+        described.append(
+            say("wave_dated", wave=wave, dates=dates) if dates else say("wave", wave=wave)
+        )
     if len(waves) == 1:
-        collected = f"Data were collected in {described[0]}."
+        collected = say("waves_one", wave=described[0])
     else:
-        collected = f"Data were collected in {number(len(waves))} waves: {series(described)}."
+        collected = say("waves_many", n_waves=number(len(waves)), waves=series(described))
     groups = {g.wave: g for g in summary.groups if g.study == study}
     # With one reporter, naming it adds nothing ("30 self respondents").
     named = len({r.reporter for r in rows}) > 1
@@ -43,14 +56,18 @@ def placeholder_values(project: Project, summary: Summary, study: str) -> dict[s
                 groups.get(wave),
                 summary.group_name,
                 named,
+                say,
             )
             for wave in waves
         ),
-        "demographics": demographics(list(dict.fromkeys(r.reporter for r in rows)), named),
-        "retention": " ".join(
-            returned(waves[i - 1], wave, rows, named) for i, wave in enumerate(waves) if i
+        "demographics": " ".join(
+            say("demographics", respondents=respondents(reporter, named))
+            for reporter in dict.fromkeys(r.reporter for r in rows)
         ),
-        "modalities": modalities(summary, study, project.config.vocab, named),
+        "retention": " ".join(
+            returned(waves[i - 1], wave, rows, named, say) for i, wave in enumerate(waves) if i
+        ),
+        "modalities": modalities(summary, study, project.config.vocab, named, say),
     }
 
 
@@ -76,42 +93,44 @@ def wave_totals(summary: Summary, study: str) -> dict[tuple[str, str], int]:
     return {(r.wave, r.reporter): r.n for r in summary.retention if r.study == study}
 
 
-def modalities(summary: Summary, study: str, vocab: Vocab, named: bool) -> str:
+def modalities(
+    summary: Summary, study: str, vocab: Vocab, named: bool, say: Callable[..., str]
+) -> str:
     totals = wave_totals(summary, study)
     sentences = []
-    for modality, reporter, counted in modality_rows(summary, study):
+    for modality, reporter, found in modality_rows(summary, study):
         # A modality everyone has at every wave adds nothing to the counts.
-        if all(m.n == totals[(m.wave, reporter)] for m in counted):
+        if all(m.n == totals[(m.wave, reporter)] for m in found):
             continue
-        parts = []
-        for i, m in enumerate(counted):
-            total = totals[(m.wave, reporter)]
-            who = f" {respondents(reporter, named)}" if i == 0 else ""
-            parts.append(
-                f"{number(m.n)} of {number(total)}{who} at Wave {m.wave}{share(m.n, total)}"
+        parts = [
+            say(
+                "modality_each",
+                n=number(m.n),
+                total=number(totals[(m.wave, reporter)]),
+                respondents=respondents(reporter, named) if i == 0 else "",
+                wave=m.wave,
+                share=share(m.n, totals[(m.wave, reporter)]),
             )
+            for i, m in enumerate(found)
+        ]
         label = vocab.modality_label(modality)
-        sentences.append(f"Data from {label} were available for {series(parts)}.")
-        before = {m.wave: m.n for m in counted}
+        sentences.append(say("modality", modality=label, counts=series(parts)))
+        before = {m.wave: m.n for m in found}
         again = [
-            f"{number(m.n_from_previous)} of the {number(before[m.previous_wave])} from Wave "
-            f"{m.previous_wave} had them again at Wave {m.wave}"
-            f"{share(m.n_from_previous, before[m.previous_wave])}"
-            for m in counted
+            say(
+                "modality_again_each",
+                n=number(m.n_from_previous),
+                total=number(before[m.previous_wave]),
+                previous=m.previous_wave,
+                wave=m.wave,
+                share=share(m.n_from_previous, before[m.previous_wave]),
+            )
+            for m in found
             if m.previous_wave is not None
         ]
         if again:
-            sentences.append(f"Of these, {series(again)}.")
+            sentences.append(say("modality_again", again=series(again)))
     return " ".join(sentences)
-
-
-def demographics(reporters: list[str], named: bool) -> str:
-    # Blanks to fill in by hand: which people and which wave they describe is the author's call.
-    return " ".join(
-        f"Of the {respondents(reporter, named)}, {BLANK}% were women or girls/men or boys, and their mean age "
-        f"was {BLANK} years (SD = {BLANK})."
-        for reporter in reporters
-    )
 
 
 def respondents(reporter: str, named: bool) -> str:
@@ -123,37 +142,50 @@ def counted(n: int, reporter: str, named: bool) -> str:
 
 
 def counts(
-    wave: str, rows: list[WaveRetention], groups, group_name: str | None, named: bool
+    wave: str,
+    rows: list[WaveRetention],
+    groups,
+    group_name: str | None,
+    named: bool,
+    say: Callable[..., str],
 ) -> str:
-    text = f"At Wave {wave}, {series([counted(r.n, r.reporter, named) for r in rows])} respondents"
+    people = series([counted(r.n, r.reporter, named) for r in rows])
     if groups is not None and group_name:
-        text += (
-            f" from {number(groups.groups)} {group_name} groups "
-            f"({number(groups.with_every_reporter)} with every reporter)"
+        return say(
+            "count_groups",
+            wave=wave,
+            respondents=people,
+            n_groups=number(groups.groups),
+            group=group_name,
+            n_complete=number(groups.with_every_reporter),
         )
-    return f"{text} took part."
+    return say("count", wave=wave, respondents=people)
 
 
-def returned(previous: str, wave: str, rows: list[WaveRetention], named: bool) -> str:
+def returned(
+    previous: str, wave: str, rows: list[WaveRetention], named: bool, say: Callable[..., str]
+) -> str:
     before = {r.reporter: r.n for r in rows if r.wave == previous}
     now = [r for r in rows if r.wave == wave and before.get(r.reporter)]
     if not now:
         return ""
     again = [
-        f"{number(r.n_from_previous)} of {number(before[r.reporter])} {respondents(r.reporter, named)} "
-        f"({round(100 * r.n_from_previous / before[r.reporter])}%)"
+        say(
+            "returned_each",
+            n=number(r.n_from_previous),
+            total=number(before[r.reporter]),
+            respondents=respondents(r.reporter, named),
+            percent=f"{round(100 * r.n_from_previous / before[r.reporter])}%",
+        )
         for r in now
     ]
-    new = [counted(r.n_new, r.reporter, named) for r in now]
-    return (
-        f"At Wave {wave}, {series(again)} from Wave {previous} took part again; "
-        f"{series(new)} respondents were new."
-    )
+    new = series([counted(r.n_new, r.reporter, named) for r in now])
+    return say("returned", wave=wave, previous=previous, again=series(again), new=new)
 
 
 def share(n: int, total: int) -> str:
     # A wave whose files are still empty has no share to give.
-    return f" ({round(100 * n / total)}%)" if total else ""
+    return f"({round(100 * n / total)}%)" if total else ""
 
 
 def wave_dates(wave: WaveConfig) -> str:

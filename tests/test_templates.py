@@ -10,7 +10,9 @@ from labcatalog.reports import template_examples, templates
 def test_a_project_template_is_written_under_templates_and_the_default_removes_it(mock_project):
     project = load_project(mock_project)
     change = template_change(project, "measures", {"paragraph": "We gave {named}. {alpha}"})
-    assert "\ntemplates:\n  measures: |\n    We gave {named}. {alpha}\n" in change.text
+    assert "\ntemplates:\n  measures:\n    paragraph: |\n      We gave {named}. {alpha}\n" in (
+        change.text
+    )
     changes.write(project, [change])
     project = load_project(mock_project)
     assert templates.project_text(project.config, "measures") == "We gave {named}. {alpha}"
@@ -23,10 +25,11 @@ def test_a_study_and_an_instrument_keep_their_own_wording_unless_it_is_the_proje
     project = load_project(mock_project)
     change = template_change(project, "participants", {"paragraph": "{counts}"}, "mock_study")
     assert change.path == "studies/mock_study.yaml"
-    assert "\nparticipants: |\n  {counts}\nadministrations:" in change.text
-    change = template_change(project, "measures", {"paragraph": "{name}."}, "example_mood")
+    assert "\nparticipants:\n  paragraph: |\n    {counts}\nadministrations:" in change.text
+    texts = {"paragraph": "{name}.", "subject_plain": "This scale"}
+    change = template_change(project, "measures", texts, "example_mood")
     data = yaml.safe_load(change.text)
-    assert data["measures"] == "{name}.\n"
+    assert data["measures"] == {"paragraph": "{name}.\n", "subject_plain": "This scale\n"}
     assert list(data).index("measures") == list(data).index("description") + 1
     project_wording = templates.project_text(project.config, "participants")
     change = template_change(project, "participants", {"paragraph": project_wording}, "mock_study")
@@ -47,13 +50,15 @@ def test_unknown_templates_and_parts_are_errors(mock_project):
     data = yaml.safe_load(config.read_text(encoding="utf-8"))
     data["templates"] = {
         "discussion": "x",
-        "measures": {"paragraph": "x"},
+        "measures": {"paragraf": "x"},
+        "correlation": "x",
         "regression": {"outro": "x", "intro": "{nope}"},
     }
     config.write_text(yaml.safe_dump(data), encoding="utf-8")
     messages = [i.message for i in validate_project(load_project(mock_project))]
     assert any(m.startswith("templates: unknown template discussion") for m in messages)
-    assert "templates: measures is one text" in messages
+    assert any(m.startswith("templates: measures has no part paragraf") for m in messages)
+    assert any(m.startswith("templates: correlation names its parts") for m in messages)
     assert any(m.startswith("templates: regression has no part outro") for m in messages)
     data["templates"] = {"regression": {"intro": "{nope}"}}
     config.write_text(yaml.safe_dump(data), encoding="utf-8")
@@ -65,7 +70,8 @@ def test_each_built_in_part_uses_its_placeholders_and_its_example_fills_it():
     for found in templates.TEMPLATES.values():
         for slot in found.slots:
             assert templates.placeholder_problem(slot.default, slot.placeholders) is None
-            if found.part == templates.RESULTS:
+            # A Methods paragraph's placeholders are shown with the project's own sentences.
+            if not (found.part == templates.METHODS and slot.key == templates.PARAGRAPH):
                 assert set(slot.example) == set(slot.placeholders), (found.key, slot.key)
 
 

@@ -4,10 +4,10 @@ The Templates page holds the wording of the paragraphs labcatalog writes. Each p
 
 ## Editing a template
 
-- **For**: whose wording it is. **The project** is the wording every study or instrument uses. The Participants template can also be set for one study and the Measures template for one instrument, in place of the project's; the Results templates are the project's only. A line under it says whether the wording shown is the built-in one, the project's, or the study's or instrument's own.
-- The box holds the template. A Results template has a box for each sentence it can write, labelled with when that sentence is used, such as a correlation that is significant and one that is not. The placeholders it can use are listed under it; hover over one to see what it holds (from the project's data for the Methods templates, made up for the Results templates), and click it to put it where the cursor is. Write a literal brace as `{{` or `}}`.
+- **For**: whose wording it is. **The project** is the wording every study or instrument uses. The Participants template can also be set for one study and the Measures template for one instrument, part by part over the project's; the Results templates are the project's only. A line under it says whether the wording shown is the built-in one, the project's, or the study's or instrument's own.
+- Each template has a box for each sentence it can write, labelled with when that sentence is used, such as a correlation that is significant and one that is not. The Participants and Measures templates start with **The paragraph**, whose placeholders are their sentences in order, such as `{counts}` for the sentences of the box labelled `{counts}`; text written between them goes into the paragraph as it is. The placeholders it can use are listed under it; hover over one to see what it holds (from the project's data for the Methods templates, made up for the Results templates), and click it to put it where the cursor is. Write a literal brace as `{{` or `}}`.
 - **Save** writes the template. **Reset** puts back the wording it falls back to (the built-in one for the project, the project's for a study or instrument); press **Save** to keep it. Wording that is the same as what it falls back to is not written to any file.
-- **Paragraph**, on the right, writes the whole paragraph as you type. For the Methods templates it comes from the project's data: the Participants paragraph for the chosen study (or the first one), the Measures paragraph for the chosen instrument (or the first one given in a dataset), without ω, which needs the factor models. For the Results templates it is a made-up result written with the wording on the left; one result uses only some of the sentences, so under each box of a Results template a grey example shows that sentence alone. A placeholder a box cannot use shows as an error in red.
+- **Paragraph**, on the right, writes the whole paragraph as you type. For the Methods templates it comes from the project's data: the Participants paragraph for the chosen study (or the first one), the Measures paragraph for the chosen instrument (or the first one given in a dataset), without ω, which needs the factor models. For the Results templates it is a made-up result written with the wording on the left; one result uses only some of the sentences, so under each box a grey example shows that sentence alone, with made-up numbers. A placeholder a box cannot use shows as an error in red.
 
 Choosing another template, or another **For**, with unsaved changes asks first.
 
@@ -17,21 +17,25 @@ The project's templates are written under `templates` in `labcatalog.yaml`, a st
 
 ```yaml
 templates:
-  participants: |
-    {waves} {counts} {retention}
-  measures: |
-    We used {named}. {description} {items} {scoring} {alpha} {omega}
+  participants:
+    paragraph: |
+      {waves} {counts} {retention}
+    count: |
+      At Wave {wave}, we heard from {respondents} respondents.
+  measures:
+    paragraph: |
+      We used {named}. {description} {items} {scoring} {alpha} {omega}
   regression:
     predictor: |
       {predictor} predicted {outcome}, {statistics}.
 ```
 
-A Results template names each sentence it changes; the others keep the built-in wording.
+A template names each part it changes; the others keep the built-in wording. A study's `participants` and an instrument's `measures` name the parts they change in the same way, and the other parts keep the project's wording. A template with a paragraph written as one text, such as `participants: "{waves} {counts}"`, changes only its paragraph.
 
 | Template | Placeholders |
 |---|---|
-| `participants` | `study`, `n_waves`, `waves`, `counts`, `demographics`, `retention`, `modalities` |
-| `measures` | `name`, `abbreviation`, `cite`, `named`, `construct`, `reporter`, `n_items`, `scale`, `description`, `items`, `reverse`, `scoring`, `alpha`, `omega` |
+| `participants` | `paragraph`: `study`, `n_waves`, `waves`, `counts`, `demographics`, `retention`, `modalities`; `waves_many`: `n_waves`, `waves`; `waves_one`: `wave`; `wave_dated`: `wave`, `dates`; `wave`: `wave`; `count`: `wave`, `respondents`; `count_groups`: those and `n_groups`, `group`, `n_complete`; `demographics`: `respondents`; `returned`: `wave`, `previous`, `again`, `new`; `returned_each`: `n`, `total`, `respondents`, `percent`; `modality`: `modality`, `counts`; `modality_each`: `n`, `total`, `respondents`, `wave`, `share`; `modality_again`: `again`; `modality_again_each`: `n`, `total`, `previous`, `wave`, `share` |
+| `measures` | `paragraph`: `name`, `abbreviation`, `cite`, `named`, `construct`, `reporter`, `n_items`, `scale`, `description`, `items`, `reverse`, `scoring`, `alpha`, `omega`; `named`: `name`, `details`; `named_plain`: `name`; `items`: `subject`, `n_items`, `scale`; `items_plain`: `subject`, `n_items`; `subject`: `abbreviation`; `scale`: `low`, `low_label`, `high`, `high_label`; `reverse_one` and `reverse_many`: `items`; `scoring`: `parts`; `scoring_method`: `method`, `scores`; `scoring_script`: `scores`; `score`: `score`, `n_items`; `reliability_one`: `statistic`, `value`; `reliability_many`: `statistic`, `values`; `reliability_each`: `value`, `score`; `subject_plain`: none |
 | `correlation` | `pair`, `pair_ns` and `listed`: `a`, `b`, `direction`, `statistic`, `r`, `p`; `count`: `n_pairs`, `n_significant`, `verb`; `strongest`: `n_shown`, `pairs`; `between` and `between_one`: `pairs`; `within`: none |
 | `regression` | `predictor` and `predictor_ns`: `predictor`, `outcome`, `statistics`, `b`, `se`, `p`, `r2`, `n`; `intro`: none |
 | `missing` | `all`: `people`, `variables`; `complete`: `people`, `complete`, `percent`, `which`; `each`: `missing`, `percent`; `range`: `low`, `low_percent`, `low_label`, `high`, `high_percent`, `high_label` |

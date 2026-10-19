@@ -68,8 +68,8 @@ class Instrument(StrictModel):
     construct_name: str | None = None
     # A sentence or two for the Measures paragraph, written or checked by a person.
     description: str | None = None
-    # This instrument's own Measures template, in place of the project's.
-    measures: str | None = None
+    # This instrument's own wording of the Measures template's parts, over the project's.
+    measures: str | dict[str, str] | None = None
     instructions: Text | None = None
     response_sets: list[ResponseSet] = []
     default_response_set: str | None = None
@@ -104,8 +104,8 @@ class StudyContent(StrictModel):
     study: str
     # Modality to how its data were collected and processed in this study.
     methods: dict[str, str] = {}
-    # This study's own Participants template, in place of the project's.
-    participants: str | None = None
+    # This study's own wording of the Participants template's parts, over the project's.
+    participants: str | dict[str, str] | None = None
     administrations: list[Administration] = []
 
 
