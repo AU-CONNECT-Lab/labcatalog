@@ -101,7 +101,6 @@ def render(
                 ui.label(", ".join(row.shown.get(code, []))).classes("lc-note")
             if row.corrected:
                 ui.label(f"{row.corrected} corrected").classes("lc-pill lc-info")
-            ui.space()
             ui.button(
                 "Fix IDs",
                 icon="badge",
