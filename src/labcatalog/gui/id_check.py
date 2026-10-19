@@ -24,6 +24,7 @@ CODES = {
 class IdRow:
     dataset: str
     study: str
+    modality: str
     rows: int
     ids: int
     # Rows with each problem, by code.
@@ -42,7 +43,7 @@ def id_rows(result: CatalogResult) -> list[IdRow]:
     found = []
     for name, loaded in result.datasets.items():
         ids = loaded.frame[loaded.id_column]
-        row = IdRow(name, loaded.config.study, len(ids), ids.nunique())
+        row = IdRow(name, loaded.config.study, loaded.config.modality, len(ids), ids.nunique())
         typed = loaded.original_ids if loaded.original_ids is not None else ids
         for issue in by_dataset.get(name, []):
             rows = issue.details.get("rows", [])
@@ -67,6 +68,18 @@ def roster_issues(result: CatalogResult) -> list[Issue]:
     return [i for i in result.report.issues if i.code in CODES and "dataset" not in i.details]
 
 
+def grouped(result: CatalogResult, rows: list[IdRow]) -> dict[str, dict[str, list[IdRow]]]:
+    # The files with problems, by study, then by modality, each in the project's order.
+    config = result.project.config
+    order = {m: n for n, m in enumerate(config.vocab.modalities)}
+    found: dict[str, dict[str, list[IdRow]]] = {}
+    for study in config.studies:
+        mine = [r for r in rows if r.study == study and r.problems]
+        for row in sorted(mine, key=lambda r: order.get(r.modality, len(order))):
+            found.setdefault(study, {}).setdefault(row.modality, []).append(row)
+    return found
+
+
 def waiting(result: CatalogResult) -> int:
     return sum(bool(row.problems) for row in id_rows(result))
 
@@ -76,38 +89,46 @@ def render(
     on_saved: Callable[[], Awaitable[None]],
     open_problems: Callable[[], None],
 ) -> None:
+    config = result.project.config
     rows = id_rows(result)
-    with panel("Check IDs", "Each data file's IDs against the ID pattern and the study's roster"):
-        note(
-            "Fix IDs corrects IDs by rules, such as removing a prefix or a suffix, padding the "
-            "number with zeros or a find and replace, and by hand; it shows which IDs are still "
-            "not right after the rules. The corrections go to id_map.csv and the data files stay "
-            "as they are. Rows that are not responses at all, such as test runs, belong in the "
-            "cleaning step instead."
-        )
+
+    def line(row: IdRow) -> None:
+        with ui.row().classes("w-full items-center gap-3"):
+            ui.label(row.dataset).classes("font-medium")
+            ui.label(f"{row.rows} rows, {row.ids} IDs").classes("lc-note")
+            for code, count in row.problems.items():
+                ui.label(f"{count} {CODES[code]}").classes("lc-pill lc-warn")
+                ui.label(", ".join(row.shown.get(code, []))).classes("lc-note")
+            if row.corrected:
+                ui.label(f"{row.corrected} corrected").classes("lc-pill lc-info")
+            ui.space()
+            ui.button(
+                "Fix IDs",
+                icon="badge",
+                on_click=lambda: id_fix.open_dialog(result, row.dataset, on_saved),
+            ).props("flat dense no-caps")
+
+    with panel(
+        "Check IDs",
+        help_text="Fix IDs corrects IDs by rules or by hand. The corrections go to id_map.csv; "
+        "the data files stay as they are.",
+    ):
         if not rows:
             empty("No data files read yet.")
             return
-        for row in rows:
-            with ui.column().classes("w-full gap-0"):
-                with ui.row().classes("w-full items-center gap-3"):
-                    ui.label(row.dataset).classes("font-medium")
-                    ui.label(f"{row.study}, {row.rows} rows, {row.ids} IDs").classes("lc-note")
-                    for code, count in row.problems.items():
-                        ui.label(f"{count} {CODES[code]}").classes("lc-pill lc-warn")
-                        ui.label(", ".join(row.shown.get(code, []))).classes("lc-note")
-                    if not row.problems:
-                        ui.label("All right").classes("lc-pill lc-ok")
-                    if row.corrected:
-                        ui.label(f"{row.corrected} corrected").classes("lc-pill lc-info")
-                    ui.space()
-                    ui.button(
-                        "Fix IDs",
-                        icon="badge",
-                        on_click=lambda name=row.dataset: id_fix.open_dialog(
-                            result, name, on_saved
-                        ),
-                    ).props("flat dense no-caps")
+        for study, modalities in grouped(result, rows).items():
+            ui.label(config.studies[study].label or study).classes("lc-subhead")
+            for modality, found in modalities.items():
+                ui.label(config.vocab.modality_label(modality)).classes("lc-facet")
+                for row in found:
+                    line(row)
+        fine = [r for r in rows if not r.problems]
+        if len(fine) == len(rows):
+            ui.label(f"All {len(rows)} data files' IDs are right.").classes("lc-pill lc-ok w-fit")
+        elif fine:
+            with ui.expansion(f"{len(fine)} files with no ID problems").classes("w-full"):
+                for row in fine:
+                    line(row)
         if rosters := roster_issues(result):
             with ui.row().classes("w-full items-center gap-2"):
                 note(
