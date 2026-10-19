@@ -254,7 +254,7 @@ def contract(result: CatalogResult, script: Script) -> None:
         return
     for step in script.steps:
         ui.label(step.name).classes("font-medium")
-        ui.label(step.run).classes("lc-step-run")
+        ui.label(step.shown).classes("lc-step-run")
         ui.label(f"Reads {', '.join(step.inputs) or 'nothing it names'}.").classes("lc-note")
         ui.label(f"Writes {', '.join(step.outputs)}.").classes("lc-note")
     for dataset in dict.fromkeys(written(project, script.steps)):
@@ -316,9 +316,17 @@ def steps_part(
                     .classes("w-72")
                 )
             run = ui.input("Command", value=start_from.run).classes("w-full font-mono")
-            note(
-                "Runs in the project folder. A file the command reads is an input; one it writes is an output."
-            )
+            if start_from.table:
+                run.set_visibility(False)
+                note(
+                    f"{start_from.shown}. To change how, take the table again in Add data, From a "
+                    "pipeline's table."
+                )
+            else:
+                note(
+                    "Runs in the project folder. A file the command reads is an input; one it "
+                    "writes is an output."
+                )
             inputs = (
                 ui.textarea("Inputs, one per line", value="\n".join(start_from.inputs))
                 .props("outlined")
@@ -338,6 +346,7 @@ def steps_part(
                     found = PrepareStep(
                         name=(name.value or "").strip(),
                         run=(run.value or "").strip(),
+                        table=start_from.table,
                         inputs=lines(inputs),
                         outputs=lines(outputs),
                         stage=None if stage.value == NO_STAGE else stage.value,

@@ -27,7 +27,7 @@ Several values in one field are separated by spaces or commas. It writes `instru
 
 ## When the pipeline runs again
 
-When the pipeline writes the table again, choose it again in **From a pipeline's table** with the same fields and press **Write the files**. The data files and the column maps are rewritten, and the instruments' items follow the table's columns. Everything else you change in the instrument files stays: the name, the description, references, and your wording of an item.
+**Keep as a prepare step**, on by default, adds a prepare step named `table_` and the Name, such as `table_qc`, that takes the table in again with the same fields. It reads the table and its sidecars and writes the data files, so when the pipeline writes the table again the step shows as outdated, and **Run outdated** in the Add data step takes it in, as **Write the files** would. labcatalog runs this step itself rather than by a command, so with `prepare_with: datalad` it is not recorded by `datalad run`; save the data afterwards. Without the step, choose the table again in **From a pipeline's table** with the same fields and press **Write the files**. Either way, the data files and the column maps are rewritten, and the instruments' items follow the table's columns. Everything else you change in the instrument files stays: the name, the description, references, and your wording of an item.
 
 ## Measures your own script computes
 

@@ -1,14 +1,19 @@
 import json
+import os
+import time
 from pathlib import Path
 
 import pytest
 import yaml
 
-from labcatalog.codebook.derivatives import Request, run_derivatives
+from labcatalog.codebook.derivatives import Request, run_derivatives, table_step
 from labcatalog.data.check import check_values
+from labcatalog.data.prepare import Session, run_steps, step_states
 from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.exceptions import CodebookError
 from labcatalog.gui.pipeline_table import PipelineForm, missing, request_of
+from labcatalog.metadata import changes
+from labcatalog.metadata.scripts import step_change
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
 from labcatalog.sources import load_dataset
@@ -117,7 +122,7 @@ def test_rows_that_repeat_name_the_entity_to_split_by(demo_project):
 def test_a_table_without_sessions_needs_a_wave(demo_project):
     rows = ["participant_id\tage", "sub-01\t30", "sub-02\t41"]
     table = pipeline_table(demo_project, rows)
-    with pytest.raises(CodebookError, match="pass --wave"):
+    with pytest.raises(CodebookError, match="give the Wave"):
         run_derivatives(demo_project, request(table))
     run_derivatives(demo_project, request(table, wave="1"))
     assert (demo_project / "data" / "qc_w1.csv").read_text().splitlines() == [
@@ -210,3 +215,67 @@ def test_a_choice_from_levels_checks_its_values(demo_project):
     issues = check_values(project, Catalog(variables=mine, scores=[]), loaded)
     # Only the 2, which is no level, is reported.
     assert [(i.code, i.details["column"]) for i in issues] == [("unexpected_value", "rest_usable")]
+
+
+def registered(root: Path) -> Path:
+    # The project with the table's datasets added, as the printed lines say.
+    table = pipeline_table(root)
+    asked = request(table, split=["task"])
+    done = run_derivatives(root, asked)
+    config = root / "labcatalog.yaml"
+    data = yaml.safe_load(config.read_text())
+    steps = list(dict(done.steps).values())
+    data["studies"]["demo_study"]["waves"] |= yaml.safe_load(steps[0])
+    data["datasets"] += yaml.safe_load(steps[1])
+    data["vocab"]["modalities"].append("fnirs")
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+    study = next((root / "studies").glob("*.yaml"))
+    content = yaml.safe_load(study.read_text())
+    content["administrations"] += yaml.safe_load(steps[2])
+    study.write_text(yaml.safe_dump(content, sort_keys=False))
+    project = load_project(root)
+    changes.write(project, [step_change(project, None, table_step(asked, root, done))])
+    return table
+
+
+def test_a_kept_table_step_takes_the_table_in_again_when_it_is_rewritten(demo_project):
+    table = registered(demo_project)
+    project = load_project(demo_project)
+    [step] = [s for s in project.config.prepare if s.table is not None]
+    assert step.name == "table_qc" and step.run == "" and step.stage == "extract"
+    assert step.table.path == "derivatives/pipe/desc-qc.tsv"
+    assert step.inputs == ["derivatives/pipe/desc-qc.tsv", "derivatives/pipe/desc-qc.json"]
+    assert step.outputs == ["data/qc_w1.csv", "data/qc_w2.csv"]
+    assert "table:" in (demo_project / "labcatalog.yaml").read_text()
+    assert [s.status for s in step_states(project) if s.step.name == step.name] == ["up to date"]
+    later = time.time() + 5
+    table.write_text("\n".join([*ROWS, "sub-03_ses-01_task-rest_nirs\t0.6\t8\tC"]) + "\n")
+    os.utime(table, (later, later))
+    [state] = [s for s in step_states(project) if s.step.name == step.name]
+    assert state.status == "outdated"
+    [run] = run_steps(project, [step.name], Session(), outdated_only=True)
+    assert run.exit_code == 0 and "Wrote data/qc_w1.csv" in run.log
+    assert "sub-03" in (demo_project / "data" / "qc_w1.csv").read_text()
+    assert [i for i in validate_project(load_project(demo_project)) if i.level == "error"] == []
+
+
+def test_a_table_step_that_fails_says_why(demo_project):
+    table = registered(demo_project)
+    table.write_text("nothing\there\n")
+    project = load_project(demo_project)
+    [run] = run_steps(project, ["table_qc"], Session())
+    assert run.exit_code == 1 and "bids_name" in run.log[-1]
+
+
+def test_a_step_needs_a_command_or_a_table_but_not_both(demo_project):
+    registered(demo_project)
+    config = demo_project / "labcatalog.yaml"
+    data = yaml.safe_load(config.read_text())
+    data["prepare"][-1]["run"] = "python x.py"
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+    messages = [i.message for i in validate_project(load_project(demo_project))]
+    assert any("not both" in m for m in messages)
+    del data["prepare"][-1]["run"], data["prepare"][-1]["table"]
+    config.write_text(yaml.safe_dump(data, sort_keys=False))
+    messages = [i.message for i in validate_project(load_project(demo_project))]
+    assert any("the command is empty" in m for m in messages)

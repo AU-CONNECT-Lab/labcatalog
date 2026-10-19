@@ -143,11 +143,17 @@ def step_change(project: Project, old: str | None, step: PrepareStep) -> Change:
     taken = {str(s.get("name")) for s in steps} - {old}
     if step.name in taken:
         raise EditError(f"Another step is already named {step.name}")
-    entry = CommentedMap(step.model_dump(exclude_none=True))
+    entry = CommentedMap(step.model_dump(exclude_none=True, exclude={"table"}))
     entry.fa.set_flow_style()
     for key in ("inputs", "outputs"):
         entry[key] = CommentedSeq(entry[key])
         entry[key].fa.set_flow_style()
+    if step.table is not None:
+        del entry["run"]
+        entry["table"] = CommentedMap(
+            step.table.model_dump(exclude_none=True, exclude_defaults=True)
+        )
+        entry["table"].fa.set_flow_style()
     at = next((n for n, s in enumerate(steps) if s.get("name") == old), None)
     if at is None:
         steps.append(entry)
@@ -249,7 +255,7 @@ def script_index(project: Project, listed: list[Entry], statuses: dict[str, str]
         values[entry.key] = widened(config, found)
         parts = [path, *entry.datasets]
         for step in entry.steps if entry.kind == PREPARE else []:
-            parts += [step.name, step.run, *step.inputs, *step.outputs]
+            parts += [step.name, step.shown, *step.inputs, *step.outputs]
         if entry.script and entry.script.analysis:
             parts += [entry.script.analysis.name, entry.script.analysis.request]
         text[entry.key] = "\n".join(parts).lower()

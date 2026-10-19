@@ -160,7 +160,7 @@ The language model the lab uses, set on the Settings page. API keys are never ke
 
 ## prepare and prepare_with
 
-`prepare` is a list of steps, each with a `name`, the command to `run`, its `inputs`, its `outputs` and, optionally, its `stage` (`clean`, `process`, `extract` or `score`). `prepare_with: datalad` runs each step through `datalad run`. See [Register Prepare Steps](../how-to/prepare-steps.md).
+`prepare` is a list of steps, each with a `name`, the command to `run`, its `inputs`, its `outputs` and, optionally, its `stage` (`clean`, `process`, `extract` or `score`). A step that takes in a pipeline's table has a `table` instead of `run`: the table's `path`, the `name`, `study`, `modality` and `reporter` of what it makes and, optionally, `split`, `columns`, `wave` and `label`, as in **From a pipeline's table**, which writes it; labcatalog runs that step itself. `prepare_with: datalad` runs each step through `datalad run`. See [Register Prepare Steps](../how-to/prepare-steps.md).
 
 ## analyses
 

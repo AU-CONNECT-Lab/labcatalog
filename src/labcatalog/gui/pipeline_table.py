@@ -3,12 +3,14 @@ from pathlib import Path
 
 from nicegui import ui
 
-from labcatalog.codebook.derivatives import Derived, Request, derive
+from labcatalog.codebook.derivatives import Derived, Request, derive, table_step
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note, open_path, panel
 from labcatalog.gui.files import choose_path
+from labcatalog.metadata import changes
+from labcatalog.metadata.scripts import step_change
 from labcatalog.paths import portable_path
-from labcatalog.project import Project
+from labcatalog.project import Project, load_config
 
 
 @dataclass
@@ -22,6 +24,8 @@ class PipelineForm:
     columns: str = ""
     wave: str = ""
     label: str = ""
+    # Kept as a prepare step, so Run outdated takes the table in again when the pipeline rewrites it.
+    keep: bool = True
 
 
 def words(text: str) -> list[str]:
@@ -73,7 +77,8 @@ def render(project: Project, form: PipelineForm) -> None:
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
             return
-        written_dialog(project.root, done)
+        kept = await keep_step(project, request, done) if form.keep else None
+        written_dialog(project.root, done, kept)
 
     with panel(
         "From a pipeline's table",
@@ -104,6 +109,9 @@ def render(project: Project, form: PipelineForm) -> None:
                 "Only for a table without sessions"
             )
             field(ui.input("Instrument name", placeholder="the Name"), form, "label")
+        ui.checkbox("Keep as a prepare step").bind_value(form, "keep").tooltip(
+            "Run outdated then takes the table in again whenever the pipeline rewrites it"
+        )
         ui.button("Write the files", icon="upload", on_click=write).classes("w-fit")
 
 
@@ -112,7 +120,24 @@ def field(element: ui.input | ui.select, form: PipelineForm, name: str) -> ui.el
     return element.bind_value(form, name).props("dense outlined stack-label")
 
 
-def written_dialog(root: Path, done: Derived) -> None:
+async def keep_step(project: Project, request: Request, done: Derived) -> str:
+    step = table_step(request, project.root, done)
+    try:
+        taken = {s.name for s in load_config(project.root).prepare}
+        change = step_change(project, step.name if step.name in taken else None, step)
+        issues = await computed(changes.check, project, [change])
+        if issues:
+            raise LabCatalogError("; ".join(i.message for i in issues))
+        changes.write(project, [change])
+    except LabCatalogError as err:
+        return f"The prepare step {step.name} was not saved: {err}"
+    return (
+        f"The prepare step {step.name} takes the table in again: Run outdated in Add data runs it "
+        "whenever the pipeline has rewritten the table."
+    )
+
+
+def written_dialog(root: Path, done: Derived, kept: str | None = None) -> None:
     with ui.dialog() as dialog, ui.card().classes("w-[48rem] max-w-full"):
         ui.label("Written").classes("text-xl font-medium")
         with ui.column().classes("gap-1"):
@@ -133,8 +158,9 @@ def written_dialog(root: Path, done: Derived) -> None:
         else:
             ui.label("Press Refresh to read the new files.")
         note(
-            "When the pipeline writes the table again, choose it here again: the data files are "
-            "rewritten and your changes to the instruments stay."
+            kept
+            or "When the pipeline writes the table again, choose it here again: the data files "
+            "are rewritten and your changes to the instruments stay."
         )
         with ui.row().classes("w-full justify-end"):
             ui.button("Close", on_click=dialog.close)

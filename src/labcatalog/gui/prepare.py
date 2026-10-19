@@ -75,7 +75,7 @@ def render(
             for step in project.config.prepare:
                 with ui.row().classes("items-baseline gap-2 no-wrap"):
                     ui.label(step.name).classes("font-medium")
-                    ui.label(step.run).classes("font-mono lc-note")
+                    ui.label(step.shown).classes("font-mono lc-note")
 
             async def go() -> None:
                 dialog.close()
@@ -232,7 +232,7 @@ def step_row(
                     ui.label(step.stage).classes("lc-note")
                 if last:
                     ui.label(f"Last run: {last.outcome}").classes("lc-note")
-            ui.label(step.run).classes("lc-step-run")
+            ui.label(step.shown).classes("lc-step-run")
             with ui.grid(columns="auto 1fr").classes("lc-step-files gap-x-4 gap-y-0"):
                 for label, files in (("Inputs", state.inputs), ("Outputs", state.outputs)):
                     if files:

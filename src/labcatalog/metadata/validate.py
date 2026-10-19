@@ -657,7 +657,7 @@ def check_prepare_steps(project: Project) -> list[Issue]:
             CONFIG,
             value=name,
             places=[
-                place(["prepare", n, "name"], step.run)
+                place(["prepare", n, "name"], step.shown)
                 for n, step in enumerate(steps)
                 if step.name == name
             ],
@@ -667,7 +667,10 @@ def check_prepare_steps(project: Project) -> list[Issue]:
     ]
     for n, step in enumerate(steps, start=1):
         where = f"prepare[{n}] ({step.name})"
-        if not step.run.strip():
+        if step.table is not None and step.run.strip():
+            message = f"{where}: give a command in run or a pipeline's table, not both"
+            issues.append(problem("invalid_value", message, CONFIG))
+        elif step.table is None and not step.run.strip():
             issues.append(problem("invalid_value", f"{where}.run: the command is empty", CONFIG))
         if not step.outputs:
             message = f"{where}.outputs: list at least one file the step writes"

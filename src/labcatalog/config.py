@@ -208,13 +208,34 @@ class LlmConfig(StrictModel):
     raw_data: Literal["values", "rows"] = "values"
 
 
+class TableStep(StrictModel):
+    # A pipeline's table taken in by labcatalog itself, as From a pipeline's table does.
+    path: str
+    name: str
+    study: str
+    modality: str
+    reporter: str
+    split: list[str] = []
+    columns: list[str] = []
+    wave: str | None = None
+    label: str | None = None
+
+
 class PrepareStep(StrictModel):
     name: str
-    run: str
+    # A command, or a pipeline's table to take in.
+    run: str = ""
+    table: TableStep | None = None
     inputs: list[str] = []
     outputs: list[str]
     # What the step does: clean an export, process recordings, extract features, or score.
     stage: Literal["clean", "process", "extract", "score"] | None = None
+
+    @property
+    def shown(self) -> str:
+        if self.table is None:
+            return self.run
+        return f"labcatalog takes in {self.table.path} as {self.table.name}"
 
 
 class SavedAnalysis(StrictModel):

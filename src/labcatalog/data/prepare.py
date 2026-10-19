@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import Literal
 
 from labcatalog import defaults
+from labcatalog.codebook.derivatives import run_derivatives, table_request
 from labcatalog.config import PrepareStep
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.bridge import run_args
-from labcatalog.exceptions import DataladError, PrepareBusyError
+from labcatalog.exceptions import DataladError, LabCatalogError, PrepareBusyError
 from labcatalog.metadata.accepted import who
 from labcatalog.own_python import folder_for
-from labcatalog.paths import expand_path
+from labcatalog.paths import expand_path, portable_path
 from labcatalog.processes import NEW_GROUP, end_tree
 from labcatalog.project import Project
 
@@ -137,11 +138,11 @@ def run_steps(
                     outdated_only and step_state(project, step).status == "up to date"
                 ):
                     continue
-                run = StepRun(step.name, step.run)
+                run = StepRun(step.name, step.shown)
                 session.runs[step.name] = run
                 done.append(run)
                 if echo:
-                    echo(f"== {step.name}: {step.run}")
+                    echo(f"== {step.name}: {step.shown}")
                 execute(step, project.root, run, session, echo, rscript, datalad, python)
                 if run.exit_code != 0:
                     break
@@ -185,6 +186,9 @@ def execute(
     python: str | None = None,
 ) -> None:
     session.current = step.name
+    if step.table is not None:
+        take_table(step, root, run, echo, datalad is not None)
+        return
     process = subprocess.Popen(
         run_args(step, root, datalad) if datalad else step.run,
         shell=not datalad,
@@ -204,6 +208,37 @@ def execute(
     run.exit_code = process.wait()
     run.stopped = session.stopping
     session.process = None
+
+
+def take_table(
+    step: PrepareStep,
+    root: Path,
+    run: StepRun,
+    echo: Callable[[str], None] | None,
+    with_datalad: bool,
+) -> None:
+    # labcatalog does this itself, so no command and no datalad run record.
+    lines = []
+    if with_datalad:
+        lines.append("Run by labcatalog itself, not datalad run: save the data to keep it.")
+    try:
+        done = run_derivatives(root, table_request(step.table, root))
+    except LabCatalogError as err:
+        run.exit_code = 1
+        lines.append(str(err))
+    else:
+        run.exit_code = 0
+        lines += [f"Wrote {portable_path(p, root).as_posix()}" for p in done.written]
+        if done.left_out:
+            lines.append(
+                f"Neither numbers nor given Levels, so left out: {', '.join(done.left_out)}"
+            )
+        for instruction, text in done.steps:
+            lines += [instruction, *text.splitlines()]
+    for line in lines:
+        run.log.append(line)
+        if echo:
+            echo(line)
 
 
 def environment(rscript: str | None, python: str | None = None) -> dict[str, str] | None:

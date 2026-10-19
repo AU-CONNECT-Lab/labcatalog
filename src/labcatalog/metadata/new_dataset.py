@@ -215,6 +215,11 @@ def placement_for(project: Project, template: str, name: str, suffix: str) -> Pl
         if path == old.path:
             path = (Path(old.path).parent / f"{name}{suffix}").as_posix()
         return Placement(path, path)
+    if step.table is not None:
+        raise EditError(
+            f"{template} comes from a pipeline's table by the prepare step {step.name}; once the "
+            "table has the new rows, run that step again"
+        )
     new = PrepareStep(
         name=renamed(step.name, template, name),
         run=renamed(step.run, template, name),

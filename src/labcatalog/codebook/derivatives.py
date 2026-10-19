@@ -11,8 +11,9 @@ import yaml
 
 from labcatalog import defaults
 from labcatalog.codebook.core import MAP_COLUMNS, MODELINE, dump, flow, yaml_text
+from labcatalog.config import PrepareStep, TableStep
 from labcatalog.exceptions import CodebookError
-from labcatalog.paths import portable_path
+from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project, load_project
 
 ROW_NAME = "bids_name"
@@ -20,6 +21,8 @@ SUBJECT_COLUMN = "participant_id"
 SESSION_COLUMN = "session_id"
 KEY_COLUMNS = (ROW_NAME, SUBJECT_COLUMN, SESSION_COLUMN)
 NOT_AVAILABLE = ("n/a", "")
+# The prepare step that takes a table in again is named after it: table_fnirs_qc.
+TABLE_STEP = "table_"
 ENTITY = re.compile(r"^([A-Za-z]+)-([A-Za-z0-9]+)$")
 HEADER = (
     "# Written by labcatalog from {table}. Taking the table again rewrites the items; "
@@ -50,6 +53,45 @@ class Request:
 
 def run_derivatives(root: Path, request: Request) -> Derived:
     return derive(load_project(root), request)
+
+
+def table_request(table: TableStep, root: Path) -> Request:
+    return Request(
+        expand_path(table.path, root),
+        table.name,
+        table.study,
+        table.modality,
+        table.reporter,
+        table.split,
+        table.columns,
+        table.wave,
+        table.label,
+    )
+
+
+def table_step(request: Request, root: Path, done: Derived) -> PrepareStep:
+    # Reads the table and its sidecars and writes the data files, so Run outdated follows the table.
+    def stored(path: Path) -> str:
+        return portable_path(path, root).as_posix()
+
+    table = TableStep(
+        path=stored(request.table),
+        name=request.name,
+        study=request.study,
+        modality=request.modality,
+        reporter=request.reporter,
+        split=request.split,
+        columns=request.columns,
+        wave=request.wave,
+        label=request.label,
+    )
+    return PrepareStep(
+        name=f"{TABLE_STEP}{request.name}",
+        table=table,
+        inputs=[stored(p) for p in [request.table, *sidecars(request.table)]],
+        outputs=[stored(p) for p in done.written if p.parent.name == defaults.DATA_DIR],
+        stage="extract",
+    )
 
 
 def derive(project: Project, request: Request) -> Derived:
@@ -111,7 +153,7 @@ def row_keys(table: pd.DataFrame, request: Request) -> pd.DataFrame:
     elif request.wave is not None:
         keys["wave"] = request.wave
     else:
-        raise CodebookError(f"The rows of {request.table.name} name no session; pass --wave")
+        raise CodebookError(f"The rows of {request.table.name} name no session; give the Wave")
     keys = keys.fillna("")
     where = ["sub", "wave", *request.split]
     repeated = keys[keys.duplicated(where, keep=False)]
