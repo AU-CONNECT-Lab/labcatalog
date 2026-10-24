@@ -1,4 +1,6 @@
 import shutil
+import subprocess
+import sys
 import threading
 import time
 from glob import glob
@@ -60,3 +62,25 @@ def test_analyses_past_the_limit_wait_their_turn(monkeypatch):
         run.join(timeout=60)
     watcher.join()
     assert max(most) == 1
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows only")
+@pytest.mark.skipif(rscript() is None, reason="R is not installed")
+def test_killing_labcatalog_ends_the_r_it_started(tmp_path):
+    written = tmp_path / "written.txt"
+    late = f"Sys.sleep(3); writeLines('late', '{written.as_posix()}')"
+    starter = (
+        "import sys\n"
+        "from labcatalog.stats import rbridge\n"
+        "rbridge.run_process([sys.argv[1], '-e', sys.argv[2]], "
+        "started=lambda p: print(p.pid, flush=True))\n"
+    )
+    server = subprocess.Popen(
+        [sys.executable, "-c", starter, rscript(), late], stdout=subprocess.PIPE, text=True
+    )
+    assert server.stdout.readline().strip()
+    # /F without /T, as a crash or Task Manager ends only labcatalog itself.
+    subprocess.run(["taskkill", "/F", "/PID", str(server.pid)], capture_output=True, check=True)
+    server.wait(timeout=10)
+    time.sleep(6)
+    assert not written.exists()

@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from labcatalog.exceptions import RError
-from labcatalog.processes import NEW_GROUP, end_tree
+from labcatalog.processes import NEW_GROUP, end_tree, end_with_labcatalog
 
 CFA_PACKAGES = ("lavaan", "semTools")
 ANALYSIS_PACKAGES = ("psych", "effectsize", "MBESS")
@@ -111,6 +111,7 @@ def run_process(
         errors="replace",
         **NEW_GROUP,
     )
+    end_with_labcatalog(process)
     RUNNING.add(process)
     if started is not None:
         started(process)
