@@ -11,7 +11,7 @@ from labcatalog.data.check import check_values
 from labcatalog.data.prepare import Session, run_steps, step_states
 from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.exceptions import CodebookError
-from labcatalog.gui.pipeline_table import PipelineForm, missing, request_of
+from labcatalog.gui.pipeline_table import PipelineForm, changed, form_of, missing, request_of
 from labcatalog.metadata import changes
 from labcatalog.metadata.scripts import step_change
 from labcatalog.metadata.validate import validate_project
@@ -257,6 +257,16 @@ def test_a_kept_table_step_takes_the_table_in_again_when_it_is_rewritten(demo_pr
     assert run.exit_code == 0 and "Wrote data/qc_w1.csv" in run.log
     assert "sub-03" in (demo_project / "data" / "qc_w1.csv").read_text()
     assert [i for i in validate_project(load_project(demo_project)) if i.level == "error"] == []
+
+
+def test_a_table_steps_settings_open_as_the_form_and_a_change_is_seen(demo_project):
+    registered(demo_project)
+    [step] = [s for s in load_project(demo_project).config.prepare if s.table is not None]
+    form = form_of(step.table, demo_project)
+    assert form.split == "task" and form.reporter == "child"
+    assert not changed(form, step.table, demo_project)
+    form.columns = "sci"
+    assert changed(form, step.table, demo_project)
 
 
 def test_a_table_step_that_fails_says_why(demo_project):

@@ -4,11 +4,12 @@ from functools import partial
 
 from nicegui import ui
 
+from labcatalog.codebook.derivatives import TABLE_STEP
 from labcatalog.config import PrepareStep, dataset_by_name
 from labcatalog.data.prepare import step_state, step_states
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import new_script as script_dialog
-from labcatalog.gui import prepare
+from labcatalog.gui import pipeline_table, prepare
 from labcatalog.gui.common import (
     computed,
     empty,
@@ -279,7 +280,7 @@ def steps_part(
         running.shown = name
         redraw()
 
-    async def write(change, done: str) -> bool:
+    async def stored(change) -> bool:
         try:
             issues = await computed(changes.check, project, [change])
             if issues:
@@ -292,6 +293,11 @@ def steps_part(
             changes.write(project, [change])
         except LabCatalogError as err:
             ui.notify(str(err), type="negative", multi_line=True)
+            return False
+        return True
+
+    async def write(change, done: str) -> bool:
+        if not await stored(change):
             return False
         ui.notify(done)
         await on_saved()
@@ -306,57 +312,85 @@ def steps_part(
             inputs=[script.path] if script else [],
             outputs=[],
         )
+        # The page redraws once the step is saved, so what follows the dialog opens here.
+        opened_in = ui.context.slot
         with ui.dialog() as dialog, ui.card().classes("w-[44rem] max-w-full"):
             ui.label("Edit the step" if step else "Add a step").classes("text-lg font-medium")
             with ui.row().classes("w-full items-center no-wrap gap-3"):
-                name = ui.input("Name", value=start_from.name).classes("grow")
+                label = "Step name" if start_from.table else "Name"
+                name = ui.input(label, value=start_from.name).classes("grow")
                 stage = (
                     ui.select(stage_choices(), value=start_from.stage or NO_STAGE, label="Stage")
                     .props("dense outlined options-dense")
                     .classes("w-72")
                 )
-            run = ui.input("Command", value=start_from.run).classes("w-full font-mono")
-            if start_from.table:
-                run.set_visibility(False)
+            table = (
+                pipeline_table.form_of(start_from.table, project.root) if start_from.table else None
+            )
+            if table:
+                pipeline_table.table_fields(project, table)
                 note(
-                    f"{start_from.shown}. To change how, take the table again in Add data, From a "
-                    "pipeline's table."
+                    "Saving changed settings takes the table in again: its files are rewritten "
+                    "and the step's inputs and outputs follow."
                 )
             else:
+                run = ui.input("Command", value=start_from.run).classes("w-full font-mono")
                 note(
                     "Runs in the project folder. A file the command reads is an input; one it "
                     "writes is an output."
                 )
-            inputs = (
-                ui.textarea("Inputs, one per line", value="\n".join(start_from.inputs))
-                .props("outlined")
-                .classes("lc-grow w-full")
-            )
-            outputs = (
-                ui.textarea("Outputs, one per line", value="\n".join(start_from.outputs))
-                .props("outlined")
-                .classes("lc-grow w-full")
-            )
+                inputs = (
+                    ui.textarea("Inputs, one per line", value="\n".join(start_from.inputs))
+                    .props("outlined")
+                    .classes("lc-grow w-full")
+                )
+                outputs = (
+                    ui.textarea("Outputs, one per line", value="\n".join(start_from.outputs))
+                    .props("outlined")
+                    .classes("lc-grow w-full")
+                )
 
             async def save() -> None:
                 def lines(box: ui.textarea) -> list[str]:
                     return [line.strip() for line in (box.value or "").splitlines() if line.strip()]
 
+                named = (name.value or "").strip()
+                staged = None if stage.value == NO_STAGE else stage.value
+                done = None
                 try:
-                    found = PrepareStep(
-                        name=(name.value or "").strip(),
-                        run=(run.value or "").strip(),
-                        table=start_from.table,
-                        inputs=lines(inputs),
-                        outputs=lines(outputs),
-                        stage=None if stage.value == NO_STAGE else stage.value,
-                    )
+                    if not table:
+                        found = PrepareStep(
+                            name=named,
+                            run=(run.value or "").strip(),
+                            inputs=lines(inputs),
+                            outputs=lines(outputs),
+                            stage=staged,
+                        )
+                    elif pipeline_table.changed(table, start_from.table, project.root):
+                        done, taken = await pipeline_table.taken_again(project, table)
+                        # A step still named after its table follows the table's new name.
+                        if named == f"{TABLE_STEP}{start_from.table.name}":
+                            named = taken.name
+                        found = taken.model_copy(update={"name": named, "stage": staged})
+                    else:
+                        found = start_from.model_copy(update={"name": named, "stage": staged})
                     change = step_change(project, step.name if step else None, found)
                 except (LabCatalogError, ValueError) as err:
                     ui.notify(str(err), type="negative", multi_line=True)
                     return
-                if await write(change, f"Saved the step {found.name}"):
+                if done is None:
+                    if await write(change, f"Saved the step {found.name}"):
+                        dialog.close()
+                elif await stored(change):
                     dialog.close()
+                    with opened_in:
+                        pipeline_table.written_dialog(
+                            project.root,
+                            done,
+                            f"The step {found.name} takes the table in again whenever the "
+                            "pipeline rewrites it.",
+                            on_saved,
+                        )
 
             with ui.row().classes("w-full justify-end"):
                 ui.button("Cancel", on_click=dialog.close).props("flat no-caps")

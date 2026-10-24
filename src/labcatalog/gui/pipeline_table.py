@@ -1,15 +1,17 @@
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
 
 from nicegui import ui
 
-from labcatalog.codebook.derivatives import Derived, Request, derive, table_step
+from labcatalog.codebook.derivatives import Derived, Request, derive, table_request, table_step
+from labcatalog.config import PrepareStep, TableStep
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import computed, note, open_path, panel
 from labcatalog.gui.files import choose_path
 from labcatalog.metadata import changes
 from labcatalog.metadata.scripts import step_change
-from labcatalog.paths import portable_path
+from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project, load_config
 
 
@@ -46,6 +48,24 @@ def request_of(form: PipelineForm) -> Request:
     )
 
 
+def form_of(table: TableStep, root: Path) -> PipelineForm:
+    return PipelineForm(
+        table=str(expand_path(table.path, root)),
+        name=table.name,
+        study=table.study,
+        modality=table.modality,
+        reporter=table.reporter,
+        split=" ".join(table.split),
+        columns=" ".join(table.columns),
+        wave=table.wave or "",
+        label=table.label or "",
+    )
+
+
+def changed(form: PipelineForm, table: TableStep, root: Path) -> bool:
+    return request_of(form) != table_request(table, root)
+
+
 def missing(form: PipelineForm) -> list[str]:
     fields = {
         "a table": form.table,
@@ -60,12 +80,6 @@ def missing(form: PipelineForm) -> list[str]:
 def render(project: Project, form: PipelineForm) -> None:
     config = project.config
     form.study = form.study or next(iter(config.studies), None)
-
-    async def choose() -> None:
-        found = await choose_path(file_types=("Tables (*.tsv)",), start=project.root)
-        if found:
-            form.table = str(found)
-            chosen.set_text(portable_path(found, project.root).as_posix())
 
     async def write() -> None:
         if absent := missing(form):
@@ -85,34 +99,46 @@ def render(project: Project, form: PipelineForm) -> None:
         help_text="A pipeline's .tsv table and its .json sidecar become instruments, data files "
         "and column maps; running it again keeps your edits.",
     ):
-        with ui.row().classes("items-center gap-3"):
-            ui.button("Choose table", icon="table_view", on_click=choose).props(
-                "flat no-caps"
-            ).classes("lc-quiet-btn")
-            chosen = ui.label(
-                portable_path(Path(form.table), project.root).as_posix()
-                if form.table
-                else "No table chosen"
-            ).classes("lc-note")
-        with ui.element("div").classes("lc-form w-full"):
-            field(ui.input("Name", placeholder="fnirs_qc"), form, "name")
-            field(ui.select(list(config.studies), label="Study"), form, "study")
-            field(ui.select(config.vocab.modalities, label="Modality"), form, "modality")
-            field(ui.select(config.vocab.reporters, label="Reporter"), form, "reporter")
-            field(ui.input("Split by", placeholder="task"), form, "split").tooltip(
-                "Entities whose values become separate instruments"
-            )
-            field(ui.input("Columns", placeholder="raw_* motion_*"), form, "columns").tooltip(
-                "Patterns of the columns to take; every column of numbers or with Levels if empty"
-            )
-            field(ui.input("Wave", placeholder="from ses-"), form, "wave").tooltip(
-                "Only for a table without sessions"
-            )
-            field(ui.input("Instrument name", placeholder="the Name"), form, "label")
+        table_fields(project, form)
         ui.checkbox("Keep as a prepare step").bind_value(form, "keep").tooltip(
             "Run outdated then takes the table in again whenever the pipeline rewrites it"
         )
         ui.button("Write the files", icon="upload", on_click=write).classes("w-fit")
+
+
+def table_fields(project: Project, form: PipelineForm) -> None:
+    config = project.config
+
+    async def choose() -> None:
+        found = await choose_path(file_types=("Tables (*.tsv)",), start=project.root)
+        if found:
+            form.table = str(found)
+            chosen.set_text(portable_path(found, project.root).as_posix())
+
+    with ui.row().classes("items-center gap-3"):
+        ui.button("Choose table", icon="table_view", on_click=choose).props("flat no-caps").classes(
+            "lc-quiet-btn"
+        )
+        chosen = ui.label(
+            portable_path(Path(form.table), project.root).as_posix()
+            if form.table
+            else "No table chosen"
+        ).classes("lc-note")
+    with ui.element("div").classes("lc-form w-full"):
+        field(ui.input("Name", placeholder="fnirs_qc"), form, "name")
+        field(ui.select(list(config.studies), label="Study"), form, "study")
+        field(ui.select(config.vocab.modalities, label="Modality"), form, "modality")
+        field(ui.select(config.vocab.reporters, label="Reporter"), form, "reporter")
+        field(ui.input("Split by", placeholder="task"), form, "split").tooltip(
+            "Entities whose values become separate instruments"
+        )
+        field(ui.input("Columns", placeholder="raw_* motion_*"), form, "columns").tooltip(
+            "Patterns of the columns to take; every column of numbers or with Levels if empty"
+        )
+        field(ui.input("Wave", placeholder="from ses-"), form, "wave").tooltip(
+            "Only for a table without sessions"
+        )
+        field(ui.input("Instrument name", placeholder="the Name"), form, "label")
 
 
 def field(element: ui.input | ui.select, form: PipelineForm, name: str) -> ui.element:
@@ -137,7 +163,26 @@ async def keep_step(project: Project, request: Request, done: Derived) -> str:
     )
 
 
-def written_dialog(root: Path, done: Derived, kept: str | None = None) -> None:
+async def taken_again(project: Project, form: PipelineForm) -> tuple[Derived, PrepareStep]:
+    # The data files and the step's inputs and outputs follow the table's new settings.
+    if absent := missing(form):
+        raise LabCatalogError(f"Give {', '.join(absent)} first")
+    request = request_of(form)
+    done = await computed(derive, project, request)
+    return done, table_step(request, project.root, done)
+
+
+def written_dialog(
+    root: Path,
+    done: Derived,
+    kept: str | None = None,
+    on_close: Callable[[], Awaitable[None]] | None = None,
+) -> None:
+    async def close() -> None:
+        dialog.close()
+        if on_close is not None:
+            await on_close()
+
     with ui.dialog() as dialog, ui.card().classes("w-[48rem] max-w-full"):
         ui.label("Written").classes("text-xl font-medium")
         with ui.column().classes("gap-1"):
@@ -155,7 +200,7 @@ def written_dialog(root: Path, done: Derived, kept: str | None = None) -> None:
             for instruction, lines in done.steps:
                 ui.label(instruction)
                 ui.code(lines, language="yaml").classes("w-full")
-        else:
+        elif on_close is None:
             ui.label("Press Refresh to read the new files.")
         note(
             kept
@@ -163,5 +208,5 @@ def written_dialog(root: Path, done: Derived, kept: str | None = None) -> None:
             "are rewritten and your changes to the instruments stay."
         )
         with ui.row().classes("w-full justify-end"):
-            ui.button("Close", on_click=dialog.close)
+            ui.button("Close", on_click=close)
     dialog.open()

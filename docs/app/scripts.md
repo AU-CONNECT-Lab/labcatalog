@@ -18,7 +18,7 @@ The top shows the script's code with its syntax coloured. Beside it, **What it g
 
 For a script that steps run, **Steps that run it** lists them as on the Add data step, each with its status, command, inputs and outputs, **Run** and **Log**, and two more buttons:
 
-- **Edit** changes the step's name, stage, command, inputs and outputs. The command runs in the project folder; a file it reads is an input and a file it writes is an output, and every step writes at least one.
+- **Edit** changes the step's name, stage, command, inputs and outputs. The command runs in the project folder; a file it reads is an input and a file it writes is an output, and every step writes at least one. A step that takes in a pipeline's table shows the table's fields of **From a pipeline's table** instead of a command; saving changed fields takes the table in again, and the step's inputs and outputs follow, as does its name while it is still `table_` and the old Name.
 - **Remove** takes the step out of `labcatalog.yaml`. The script and the files stay.
 
 **Add a step** adds a step that runs the script, starting from a command such as `Rscript scripts/tidy.R INPUT OUTPUT` for you to fill in. A step is checked before it is written, and refused if it would cause a problem, such as a step that writes its own input. Below the steps, the **Log** shows what the last step printed.
