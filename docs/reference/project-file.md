@@ -102,6 +102,7 @@ A list with one entry per data file.
 | `wave_column` | text | In a file that holds several waves, the column naming each row's wave; the dataset reads only the rows of its own `wave`. |
 | `map` | text | The column map to read, as `maps/<map>.csv`, when the dataset shares one with others. Default: the dataset's name. |
 | `wave_value` | text | How the wave column writes this dataset's wave, such as `T1`, when not the same as `wave`. |
+| `occasion` | names and values | Which time this is when one questionnaire is given several times in a wave, such as `{time: before, interaction: peer}`. Lists of variables show it after the wave, and the multilevel model can take each name as a factor. |
 | `scores` | list of text | CSV files of scores scripts compute for this dataset, each with the ID column, then one column per score, named by the score's ID. They hold the values of the scores with `method: script`; a column for a summed or averaged score is checked against labcatalog's own. Usually the outputs of prepare steps, added by the instrument page's Scoring step. |
 | `snapshot_date` | date | The date the file was exported. |
 | `missing_codes` | list | Missing codes for this dataset only. |

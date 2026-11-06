@@ -142,6 +142,28 @@ def test_wave_groups_put_every_reporter_of_a_wave_together(result):
     assert set(measures["Wave 2"]) < set(analysis_script.measures(result, datasets))
 
 
+def test_datasets_of_one_wave_and_reporter_are_named_by_their_occasion(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    line = (
+        "  - {name: child_w3, modality: questionnaire, study: mock_study, wave: 3, "
+        "reporter: child, source: csv, path: data/child_w3.csv, date_column: visit_date, "
+        "snapshot_date: 2026-10-10}\n"
+    )
+    text = config.read_text(encoding="utf-8")
+    before = line.replace("snapshot_date: 2026-10-10", "occasion: {time: before}")
+    after = before.replace("name: child_w3,", "name: child_w3_after,").replace("before", "after")
+    plain = line.replace("name: child_w3,", "name: child_w3_more,")
+    config.write_text(text.replace(line, before + after + plain), encoding="utf-8")
+    result = run_catalog(mock_project)
+    names = views.series_names(result, ["child_w1", "child_w3", "child_w3_after", "child_w3_more"])
+    assert names == {
+        "child_w1": "Wave 1",
+        "child_w3": "Wave 3 · before",
+        "child_w3_after": "Wave 3 · after",
+        "child_w3_more": "Wave 3 · child_w3_more",
+    }
+
+
 def test_choices_come_in_modality_blocks_with_a_shortcut_each(result):
     datasets = ["eeg_w1", "child_w1", "fmri_w1", "eeg_w3", "child_w3"]
     keys = list(views.variable_choices(result, datasets))

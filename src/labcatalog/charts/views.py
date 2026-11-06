@@ -106,18 +106,25 @@ def dataset_order(result: CatalogResult, names: list[str]) -> list[str]:
 
 def series_names(result: CatalogResult, names: list[str]) -> dict[str, str]:
     config = result.project.config
-    plain = {
+
+    def occasion(n: str) -> str:
+        found = dataset_by_name(config, n).occasion
+        return " · ".join(found.values()) if found else n
+
+    labels = {
         n: wave_name(result, dataset_by_name(config, n).study, dataset_by_name(config, n).wave)
         for n in names
     }
-    repeated = {label for label in plain.values() if list(plain.values()).count(label) > 1}
-    named = {
-        n: f"{label} · {dataset_by_name(config, n).reporter}" if label in repeated else label
-        for n, label in plain.items()
-    }
-    # Datasets of one wave and reporter, such as a questionnaire given twice in a visit.
-    still = {label for label in named.values() if list(named.values()).count(label) > 1}
-    return {n: f"{label} · {n}" if label in still else label for n, label in named.items()}
+    # Within a wave the reporter tells datasets apart, then the occasion, then the name.
+    for part in (lambda n: dataset_by_name(config, n).reporter, occasion, lambda n: n):
+        groups: dict[str, list[str]] = {}
+        for n, label in labels.items():
+            groups.setdefault(label, []).append(n)
+        for members in groups.values():
+            if len(members) > 1 and len({part(n) for n in members}) > 1:
+                for n in members:
+                    labels[n] = f"{labels[n]} · {part(n)}"
+    return labels
 
 
 def series_color(result: CatalogResult, name: str) -> str:

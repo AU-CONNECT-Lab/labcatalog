@@ -17,7 +17,7 @@ from labcatalog import defaults
 from labcatalog.config import CustomFieldDef
 from labcatalog.exceptions import EditError
 
-Kind = Literal["text", "bool", "number", "list", "choice", "value", "date"]
+Kind = Literal["text", "bool", "number", "list", "choice", "value", "date", "mapping"]
 # Where each list's rows came from in the file; new rows have none.
 ORIGIN = "_row"
 # Joins the keys of a value nested in each entry, as custom:topics for custom: {topics: ...}.
@@ -134,6 +134,7 @@ DATASETS = Table(
         Column("files", "Files"),
         Column("wave_column", "Wave column"),
         Column("wave_value", "Wave in the file"),
+        Column("occasion", "Occasion", "mapping"),
         Column("map", "Column map"),
         Column("id_column", "ID column"),
         Column("respondent_column", "Respondent column"),
@@ -334,7 +335,7 @@ def cells(entry: CommentedMap, columns: Iterable[Column], key: str) -> dict[str,
     row = {}
     for column in columns:
         value = lookup(entry, column)
-        if isinstance(value, dict):
+        if isinstance(value, dict) and column.kind != "mapping":
             raise EditError(f"{key} has {column.key} written per language; edit this file as text")
         row[column.key] = shown(value, column)
     return row
@@ -489,6 +490,8 @@ def shown(value: Any, column: Column) -> Any:
         return bool(value) if value is not None else bool(column.default)
     if column.kind == "list":
         return ", ".join(str(v) for v in value or [])
+    if column.kind == "mapping":
+        return ", ".join(f"{k}: {v}" for k, v in (value or {}).items())
     if column.kind in ("value", "date"):
         return "" if value is None else str(value)
     if value is None:
@@ -511,6 +514,13 @@ def stored(cell: Any, column: Column) -> Any:
         return parts or None
     if not text:
         return None
+    if column.kind == "mapping":
+        pairs = [part.split(":", 1) for part in text.split(",") if part.strip()]
+        if any(len(pair) < 2 or not pair[0].strip() or not pair[1].strip() for pair in pairs):
+            raise EditError(
+                f"{column.label}: write each part as a name and a value, such as time: before"
+            )
+        return {name.strip(): value.strip() for name, value in pairs}
     if column.kind == "date":
         try:
             return date.fromisoformat(text)

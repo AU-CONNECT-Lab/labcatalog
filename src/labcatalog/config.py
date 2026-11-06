@@ -100,6 +100,9 @@ class DatasetConfig(StrictModel):
     wave_column: str | None = None
     # How the wave column writes this dataset's wave, when not as `wave`.
     wave_value: str | None = None
+    # Which time this is when one questionnaire is given several times in a wave, such as
+    # {time: before, interaction: peer}; the multilevel model takes each name as a factor.
+    occasion: dict[str, str] | None = None
     # The column map in maps/ this dataset reads, when it shares one with other datasets.
     map: str | None = None
     # Files scripts write: the ID column, then a column per score, named by the score's ID.

@@ -204,6 +204,22 @@ def test_a_date_field_is_written_as_a_date(mock_project):
         records.write_rows(text, "datasets", table, rows)
 
 
+def test_an_occasion_reads_and_writes_as_names_and_values(mock_project):
+    table = records.tables_for("labcatalog.yaml", editing.custom_fields(mock_project))["datasets"]
+    text = editing.open_file(mock_project, "labcatalog.yaml").text
+    rows = records.read_rows(text, "datasets", table)
+    assert rows[0]["occasion"] == ""
+    rows[0]["occasion"] = "time: before, interaction: peer"
+    written = records.write_rows(text, "datasets", table, rows)
+    assert "occasion: {time: before, interaction: peer}" in written
+    assert editing.check_text("labcatalog.yaml", written) == []
+    again = records.read_rows(written, "datasets", table)
+    assert again[0]["occasion"] == "time: before, interaction: peer"
+    rows[0]["occasion"] = "before"
+    with pytest.raises(EditError, match="a name and a value"):
+        records.write_rows(text, "datasets", table, rows)
+
+
 def test_overrides_point_to_their_administration(mock_project):
     text = editing.open_file(mock_project, STUDY).text
     table = records.with_entries(records.OVERRIDES, text)

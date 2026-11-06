@@ -44,6 +44,7 @@ datasets:
 | `date_column` | A column with the date each row was collected, for the "collected by month" chart. |
 | `wave_column` | In a file that holds several waves, the column naming each row's wave. |
 | `wave_value` | How that column writes this dataset's wave, when not as `wave`: `T1` for wave `1`. |
+| `occasion` | Which time this is when one questionnaire is given several times in a wave, such as `{time: before, interaction: peer}`. |
 | `snapshot_date` | The date the file was exported, shown as "data as of". |
 | `missing_codes` | Missing codes for this file only, in place of the project's. |
 
@@ -65,11 +66,13 @@ When a questionnaire is given more than once in the same wave, such as before an
 
 ```yaml
 datasets:
-  - {name: panas_before, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/visit_w1.csv}
-  - {name: panas_after, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/visit_w1.csv}
+  - {name: panas_before, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/visit_w1.csv, occasion: {time: before}}
+  - {name: panas_after, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/visit_w1.csv, occasion: {time: after}}
 ```
 
 `maps/panas_before.csv` links `panas_pre_1` and so on to the items, `maps/panas_after.csv` links `panas_post_1` and so on to the same items, and each time gets its own scores, such as `panas.pa@panas_before` and `panas.pa@panas_after`. A column that another dataset of the same file links counts as described, so `labcatalog check` warns with `column_unmapped` only about columns that no dataset of the file lists. One map cannot link two columns to the same item, which is why each time needs its own dataset.
+
+`occasion` says which time each dataset is, with names and values of your own: `{time: before}`, or `{time: before, interaction: peer}` when the times also differ in another way. Lists of variables name such datasets by wave and occasion, as "Wave 1 · before", and the [multilevel model](../app/analysis.md#multilevel-model) can take each name as a factor of the same people's scores. In the Datasets table of the editor, the **Occasion** column holds them as `time: before, interaction: peer`.
 
 ## Modalities
 
