@@ -1,6 +1,6 @@
 import pytest
-
 from conftest import rscript
+
 from labcatalog.ai.code import syntax_error
 
 needs_r = pytest.mark.skipif(rscript() is None, reason="R is not installed")

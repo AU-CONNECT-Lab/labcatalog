@@ -30,13 +30,15 @@ type text.
 
 Give each distinct set of response options one response set, with the values the scoring \
 uses. If the document prints labels but no values, number the options from the value its \
-scoring implies, or from 1 if it implies none, and say so in the notes. Set \
-default_response_set to the set most items use, and leave an item's response_set empty when \
-it uses that set or is not a choice item. Mark an item reverse only when the document says it \
-is reverse-scored.
+scoring implies, or from 1 if it implies none, and say so in the notes. Copy each option's \
+label as printed; when the document labels only some options, such as the two ends of a scale, \
+leave the other labels empty. Set default_response_set to the set most items use, and leave an \
+item's response_set empty when it uses that set or is not a choice item. Mark an item reverse \
+only when the document says it is reverse-scored.
 
 Add a score for every total and subscale the document defines, with its items and its method \
-(sum or mean). Set missing_rule to complete unless the document lets a score be computed with \
+(sum or mean), and no other: when the document defines no score, leave the scores empty and say \
+so in the notes. Set missing_rule to complete unless the document lets a score be computed with \
 answers missing: prorate when the missing answers take the mean of the answered ones, with \
 min_valid the fewest answered items it allows (7 for nine items with at most two missing); \
 zero when missing answers count as 0.

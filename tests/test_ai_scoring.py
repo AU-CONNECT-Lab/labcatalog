@@ -1,6 +1,6 @@
 import pytest
-
 from conftest import rscript
+
 from labcatalog import pipeline
 from labcatalog.ai import scoring as ai_scoring
 from labcatalog.llm import CallMetadata, LLMClient

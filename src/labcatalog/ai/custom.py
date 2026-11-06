@@ -45,9 +45,11 @@ in the notes that R or Python fits it better.
 
 Otherwise write what follows the start of the input: any further options of the VARIABLE \
 command, such as USEVARIABLES, CATEGORICAL, GROUPING or CLUSTER, then ANALYSIS, MODEL and \
-OUTPUT, with MODEL INDIRECT or MODEL CONSTRAINT where the analysis needs them. Do not repeat the \
-TITLE, DATA, NAMES or MISSING lines. Use the short names only, and keep each line under 80 \
-characters. Start each part with a comment line, beginning with !, saying what it does.
+OUTPUT, with MODEL INDIRECT or MODEL CONSTRAINT where the analysis needs them. The start ends \
+inside the VARIABLE command, so do not write VARIABLE: again, and do not repeat the TITLE, DATA, \
+NAMES or MISSING lines. Write Mplus statements only, without the <input> tags that mark the \
+start or any other markup. Use the short names only, and keep each line under 80 characters. \
+Start each part with a comment line, beginning with !, saying what it does.
 
 In the notes, list each choice the request did not settle, such as which estimator or how the \
 factors are scaled, and anything in the request the columns cannot give. Leave the notes empty \

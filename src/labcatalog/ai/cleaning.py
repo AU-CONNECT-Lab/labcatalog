@@ -48,6 +48,11 @@ FIX_SYSTEM = """You revise data cleaning scripts for research projects. You are 
 found in the clean file, with the rows it is about. Change the script so the clean file no longer \
 has the problem, and change nothing else.
 
+Fix the cause in the script, such as a condition that keeps or drops the wrong rows, or an answer \
+recoded to the wrong value. Do not drop real responses or blank out values only so that the \
+problem is no longer reported; when only the people who collected the data can say what a value \
+should be, leave the script as it is and say so in the notes.
+
 Return the whole revised script, keeping its arguments, the files it reads and writes, and its \
 style; it still uses only {libraries}. In the changes, say what you changed, one line each. In \
 the notes, list each decision the problem did not settle, such as which of two rows to keep, or \

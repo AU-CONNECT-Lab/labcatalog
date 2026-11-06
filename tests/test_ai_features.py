@@ -3,8 +3,8 @@ import sys
 
 import pandas as pd
 import pytest
-
 from conftest import rscript
+
 from labcatalog.ai import cleaning, features
 from labcatalog.exceptions import EditError
 from labcatalog.llm import CallMetadata, LLMClient
