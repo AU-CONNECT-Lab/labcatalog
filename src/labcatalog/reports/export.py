@@ -10,6 +10,7 @@ from labcatalog.data.scoring import scorable
 from labcatalog.exceptions import ExportError
 from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import CatalogResult
+from labcatalog.reports.codebook_doc import CODEBOOK, codebook_docx
 from labcatalog.reports.codegen import output_name
 from labcatalog.reports.outputs import write_output
 from labcatalog.stats.analysis import linkable
@@ -259,29 +260,42 @@ def layouts(result: CatalogResult, plan: dict[str, list[str]]) -> list[str]:
 
 
 def write_export(
-    result: CatalogResult, plan: dict[str, list[str]], layout: str, fits: Sequence[CfaFit] = ()
+    result: CatalogResult,
+    plan: dict[str, list[str]],
+    layout: str,
+    fits: Sequence[CfaFit] = (),
+    data: bool = True,
+    statistics: bool = True,
+    codebook: bool = True,
 ) -> Export:
     allowed = layouts(result, plan)
-    if layout not in allowed:
+    if data and layout not in allowed:
         raise ExportError(f"Cannot export by {layout}; these datasets allow {', '.join(allowed)}")
     variables = pd.DataFrame(variable_rows(result, plan), columns=COLUMNS)
-    statistics = {
-        SCORE_STATISTICS: pd.DataFrame(score_statistics(result, plan, fits)),
-        ITEM_STATISTICS: pd.DataFrame(item_statistics(result, plan)),
-    }
-    if layout == BY_DATASET:
+    scores = score_statistics(result, plan, fits) if statistics else None
+    tables = {}
+    if scores is not None:
+        tables[SCORE_STATISTICS] = pd.DataFrame(scores)
+        tables[ITEM_STATISTICS] = pd.DataFrame(item_statistics(result, plan))
+    frames, left_out, data_files = {}, {}, {}
+    if data and layout == BY_DATASET:
         frames = {f"{d}.csv": data_frame(result, d, ids) for d, ids in plan.items()}
-        left_out = {}
-    else:
+        data_files = {d: f"{d}.csv" for d in plan}
+    elif data:
         wide, left_out = wide_frame(result, plan, layout)
-        frames = {f"data_by_{key_name(result, layout)}.csv": wide}
-        for table in [variables, *statistics.values()]:
+        name = f"data_by_{key_name(result, layout)}.csv"
+        frames = {name: wide}
+        data_files = dict.fromkeys(plan, name)
+        for table in [variables, *tables.values()]:
             if not table.empty:
                 table["column"] = table["dataset"] + "_" + table["column"]
     # The byte-order mark makes Excel open the lists as UTF-8; data files stay plain for R.
     files = {VARIABLES: variables.to_csv(index=False).encode("utf-8-sig")}
-    files |= {name: t.to_csv(index=False).encode("utf-8-sig") for name, t in statistics.items()}
+    files |= {name: t.to_csv(index=False).encode("utf-8-sig") for name, t in tables.items()}
     files |= {name: frame.to_csv(index=False).encode("utf-8") for name, frame in frames.items()}
+    if codebook:
+        rows = variables.to_dict("records")
+        files[CODEBOOK] = codebook_docx(result, plan, rows, scores, data_files)
     folder = write_output(result.project.root, "export", files, result.manifest)
     return Export(folder, left_out)
 

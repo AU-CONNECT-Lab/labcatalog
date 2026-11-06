@@ -1,9 +1,11 @@
 import pandas as pd
 import pytest
+from docx import Document
 
 from labcatalog.exceptions import ExportError
 from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import run_catalog
+from labcatalog.reports.codebook_doc import CODEBOOK, Heading, Paragraph, Table, codebook_blocks
 from labcatalog.reports.export import (
     BY_DATASET,
     BY_GROUP,
@@ -16,6 +18,7 @@ from labcatalog.reports.export import (
     export_plan,
     layouts,
     named_plan,
+    score_statistics,
     variable_rows,
     write_export,
 )
@@ -92,6 +95,7 @@ def test_export_writes_a_new_folder_in_outputs(result):
     assert sorted(p.name for p in folder.iterdir()) == [
         "child_w1.csv",
         "child_w2.csv",
+        CODEBOOK,
         ITEM_STATISTICS,
         "manifest.json",
         SCORE_STATISTICS,
@@ -135,6 +139,7 @@ def test_named_instruments_are_exported_from_the_datasets_that_give_them(result)
     done = write_export(result, named_plan(result, ["example_mood"], ["child_w3"]), BY_DATASET)
     assert sorted(f.name for f in done.folder.iterdir()) == [
         "child_w3.csv",
+        CODEBOOK,
         ITEM_STATISTICS,
         "manifest.json",
         SCORE_STATISTICS,
@@ -177,3 +182,83 @@ def test_score_statistics_carry_the_omega_of_the_window_s_factor_models(result):
     ).set_index("score")
     assert scores.loc["ems_total", "omega"] == pytest.approx(0.87)
     assert scores.drop("ems_total")["omega"].isna().all()
+
+
+def blocks_for(result, plan, statistics=True, files=None):
+    rows = variable_rows(result, plan)
+    scores = score_statistics(result, plan) if statistics else None
+    return codebook_blocks(result, plan, rows, scores, files or {})
+
+
+def table_after(blocks, label):
+    start = next(n for n, b in enumerate(blocks) if getattr(b, "label", None) == label)
+    return next(b for b in blocks[start:] if isinstance(b, Table))
+
+
+def test_codebook_describes_datasets_instruments_and_every_column(result):
+    plan = {"parent_w1": ["example_demographics"], "child_w1": ["example_mood"]}
+    blocks = blocks_for(result, plan, files={"parent_w1": "parent_w1.csv", "child_w1": "c.csv"})
+    headings = [b.text for b in blocks if isinstance(b, Heading)]
+    assert headings == [
+        "Codebook: Mock Family Study Catalog",
+        "Datasets",
+        "Example Family Background (EFB)",
+        "Example Mood Scale (EMS)",
+        "Variables",
+        "parent_w1",
+        "child_w1",
+    ]
+    said = [b.label + b.text for b in blocks if isinstance(b, Paragraph)]
+    assert "Missing codes: -99 = refused; -98 = not applicable; -97 = don't know. " in "\n".join(
+        said
+    )
+    assert "Options frequency: 0 = Never, 1 = Sometimes, 2 = Often, 3 = Always" in said
+    datasets = next(b for b in blocks if isinstance(b, Table))
+    child = dict(zip(datasets.columns, datasets.rows[1], strict=True))
+    assert (child["Dataset"], child["Instruments"]) == ("child_w1", "EMS")
+    assert child["Made by"] == "clean_child_w1 (scripts/clean_export.R)"
+    assert child["Rows"] == str(len(result.datasets["child_w1"].frame))
+    efb, ems = [b for b in blocks if isinstance(b, Table) and b.columns[:2] == ["Item", "Text"]]
+    assert efb.columns == ["Item", "Text", "Answer"]
+    assert efb.rows[0][2] == "number 3 to 18" and efb.rows[-1][2].startswith("open answer")
+    assert ems.columns == ["Item", "Text", "Reverse"]
+    assert ems.rows[0] == ["ems_1", "I felt happy.", "yes"]
+    statistics = table_after(blocks, "Statistics")
+    total = statistics.rows[0]
+    summary = next(s for s in result.summary.scores if s.key == "example_mood.ems_total@child_w1")
+    assert total[:3] == ["child_w1", "Total score", str(summary.n_valid)]
+    assert total[5] == f"{summary.alpha:.2f}".replace("0.", ".")
+    index = blocks[-1]
+    assert ["ems_total_child_w1", "EMS", "ems_total", "score, sum"] in index.rows
+
+
+def test_codebook_alone_without_data_or_statistics(result):
+    plan = {"child_w1": ["example_mood"]}
+    done = write_export(result, plan, BY_DATASET, data=False, statistics=False)
+    assert sorted(p.name for p in done.folder.iterdir()) == [CODEBOOK, "manifest.json", VARIABLES]
+    text = "\n".join(p.text for p in Document(done.folder / CODEBOOK).paragraphs)
+    assert "Example Mood Scale (EMS)" in text
+    assert "Statistics" not in text and "file of its own name" not in text
+    wide = write_export(result, plan, BY_ID, codebook=False)
+    assert CODEBOOK not in {p.name for p in wide.folder.iterdir()}
+
+
+def test_codebook_tells_how_the_datasets_differ(mock_project):
+    study = mock_project / "studies" / "mock_study.yaml"
+    text = study.read_text(encoding="utf-8")
+    given = "  - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self}"
+    changed = (
+        "  - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self, "
+        "reversed_in_data: true, overrides: [{item: ems_9, dataset: child_w3, dropped: true}, "
+        "{item: ems_3, dataset: child_w2, text: I worried a lot.}]}"
+    )
+    study.write_text(text.replace(given, changed), encoding="utf-8")
+    result = run_catalog(mock_project)
+    plan = {d: ["example_mood"] for d in ("child_w1", "child_w2", "child_w3")}
+    differences = table_after(blocks_for(result, plan), "Differences between datasets")
+    reversed_ = "reversed items are already reversed in the data"
+    assert differences.rows == [
+        ["child_w1", reversed_],
+        ["child_w2", f'ems_3 reads "I worried a lot."; {reversed_}'],
+        ["child_w3", f"not in the data: ems_9; {reversed_}"],
+    ]

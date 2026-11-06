@@ -56,6 +56,7 @@ from labcatalog.pipeline import (
 )
 from labcatalog.project import Project, reference_pdf
 from labcatalog.reports import measures, results
+from labcatalog.reports.codebook_doc import CODEBOOK
 from labcatalog.reports.export import (
     BY_DATASET,
     BY_GROUP,
@@ -476,20 +477,40 @@ def export_dialog(
             for dataset, ids in plan.items():
                 ui.label(dataset).classes("font-medium")
                 ui.label(", ".join(names[i] for i in ids))
-        state["layout"] = ui.radio(
-            {key: labels[key] for key in layouts(result, plan)}, value=BY_DATASET
-        ).props("dense")
+        with ui.row().classes("gap-4"):
+            for key, label in (
+                ("data", "Data"),
+                ("statistics", "Statistics"),
+                ("codebook", "Codebook"),
+            ):
+                state[key] = ui.checkbox(label, value=True).props("dense")
+        state["layout"] = (
+            ui.radio({key: labels[key] for key in layouts(result, plan)}, value=BY_DATASET)
+            .props("dense")
+            .bind_visibility_from(state["data"], "value")
+        )
         note(
             f"Writes a new folder in outputs/ with {VARIABLES}, which describes every variable, "
-            "and the data: the ID and date columns, the chosen items as they are in the data and "
-            f"the scores labcatalog computes; and the statistics: {SCORE_STATISTICS} and "
-            f"{ITEM_STATISTICS} with each score's and item's n, mean, SD and range in each "
-            "dataset. Open answers are listed but not exported. In one table, each column starts "
-            "with its dataset's name."
+            "and what is ticked. Data: the ID and date columns, the chosen items as they are in "
+            "the data and the scores labcatalog computes; open answers are listed but not "
+            f"exported. Statistics: {SCORE_STATISTICS} and {ITEM_STATISTICS} with each score's "
+            f"and item's n, mean, SD and range in each dataset. Codebook: {CODEBOOK}, a Word "
+            "document of the datasets, each instrument's wording, options and scoring, how the "
+            "datasets differ, the scores' statistics when ticked and every column. In one table, "
+            "each column starts with its dataset's name."
         )
 
     async def go() -> None:
-        done = await computed(write_export, result, state["plan"], state["layout"].value, cfa.fits)
+        done = await computed(
+            write_export,
+            result,
+            state["plan"],
+            state["layout"].value,
+            cfa.fits,
+            state["data"].value,
+            state["statistics"].value,
+            state["codebook"].value,
+        )
         saved.clear()
         with saved:
             note(f"Saved to {portable_path(done.folder, root).as_posix()}")
