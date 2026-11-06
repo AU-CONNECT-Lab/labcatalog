@@ -40,4 +40,4 @@ When the project is in git, as every DataLad dataset is, **History** at the bott
 
 A script for a stage begins with what it reads and writes: the command its step runs, the dataset's file, ID column, the columns its column map names and its missing codes. Only the function, or the query, is left to write; the lines after it apply it to the files. Its step, with its stage, is added to `labcatalog.yaml` with it, after the same check as **Add a step**.
 
-**Draft a cleaning step**, at the bottom of the page, has a language model write a cleaning script for a dataset; see [Register Prepare Steps](../how-to/prepare-steps.md#draft-a-step-with-a-language-model).
+**Draft a cleaning step**, at the bottom of the page, has a language model write a cleaning script for a dataset; see [Register Prepare Steps](../how-to/prepare-steps.md#draft-a-step-with-a-language-model). **Draft a summary step**, below it, has a language model write the `features()` of an extract script over a folder dataset's files, such as a computer task's trials, and draft the instrument of its measures; see [Record a Computer Task](../how-to/computer-tasks.md#draft-the-measures-with-a-language-model).

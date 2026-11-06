@@ -9,7 +9,7 @@ from labcatalog.config import PrepareStep, dataset_by_name
 from labcatalog.data.prepare import step_state, step_states
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import new_script as script_dialog
-from labcatalog.gui import pipeline_table, prepare
+from labcatalog.gui import pipeline_table, prepare, summary
 from labcatalog.gui.common import (
     computed,
     empty,
@@ -138,6 +138,12 @@ def render(
             help_text="A language model writes a script that turns a raw export into a dataset's file",
         ):
             prepare.draft_panel(result, on_saved)
+        with folding_panel(
+            "Draft a summary step",
+            help_text="A language model writes the extract script that turns each person's file "
+            "into their row of measures, and drafts the instrument of those measures",
+        ):
+            summary.summary_panel(result, on_saved)
 
     with ui.column().classes("w-full gap-4") as frame:
         counted = f"{len(found.steps)} run by prepare steps, {len(found.analyses)} analyses"

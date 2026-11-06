@@ -11,6 +11,7 @@ from labcatalog.config import (
 )
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import folder_rules
+from labcatalog.metadata.editing import NEW_ID
 from labcatalog.metadata.new_dataset import folder_files
 from labcatalog.metadata.scripts import LANGUAGES, command
 from labcatalog.paths import expand_path
@@ -46,6 +47,21 @@ person_files <- function(folder) {
              path = file.path(folder, vapply(found, `[`, "", 1)))
 }
 """
+
+# The function an extract script leaves to fill in.
+FEATURES = {
+    "python": """\
+def features(path: Path) -> dict:
+    # One person's output: return their row, such as {"alpha_power": 1.2}.
+    return {}
+""",
+    "r": """\
+features <- function(path) {
+  # One person's output: return their row, such as list(alpha_power = 1.2).
+  list()
+}
+""",
+}
 
 # Each stage's script: the function a person fills in, and the lines that apply it to the files.
 BODIES = {
@@ -83,14 +99,9 @@ import pandas as pd
 
 """
     + PYTHON_FILES
-    + """
-
-def features(path: Path) -> dict:
-    # One person's output: return their row, such as {"alpha_power": 1.2}.
-    return {}
-
-
-"""
+    + "\n\n"
+    + FEATURES["python"]
+    + "\n\n"
     + PYTHON_PERSON_FILES
     + """
 
@@ -100,13 +111,9 @@ if __name__ == "__main__":
     pd.DataFrame(rows).to_csv(target, index=False)
 """,
     ("extract", "r"): R_FILES
-    + """
-features <- function(path) {
-  # One person's output: return their row, such as list(alpha_power = 1.2).
-  list()
-}
-
-"""
+    + "\n"
+    + FEATURES["r"]
+    + "\n"
     + R_PERSON_FILES
     + """
 args <- commandArgs(trailingOnly = TRUE)
@@ -249,15 +256,55 @@ def stage_script(
         files, line = person_rule(project, source, dataset)
         lines.append(line)
     lines.append(FUNCTIONS[stage])
-    header = "\n".join(
-        f"# {part}" for line in lines for part in textwrap.wrap(line, 96, subsequent_indent="  ")
-    )
     id_column = id_column_for(project.config, found) if dataset else ""
     body = BODIES[(stage, language)].replace("ID_COLUMN", id_column).replace("FILES_RULE", files)
     step = PrepareStep(
         name=name, run=run, inputs=inputs, outputs=[target], stage=STEP_STAGES.get(stage, stage)
     )
-    return NewScript(path, f"{header}\n\n{body}", step)
+    return NewScript(path, f"{comments(lines)}\n\n{body}", step)
+
+
+def summary_script(project: Project, files: str, name: str, language: str) -> NewScript:
+    # An extract script over a folder dataset's files; it writes the dataset called name, or
+    # data/<name>.csv when no such dataset is added yet.
+    config = project.config
+    folder = dataset_by_name(config, files)
+    if not NEW_ID.fullmatch(name):
+        raise EditError(
+            "Name: use lower-case letters, digits and underscores, starting with a letter"
+        )
+    known = next((d for d in config.datasets if d.name == name and d.source == "csv"), None)
+    target = known.path if known else f"{defaults.DATA_DIR}/{name}.csv"
+    path = f"{defaults.SCRIPTS_DIR}/extract_{name}{LANGUAGES[language].suffix}"
+    if (project.root / path).exists():
+        raise EditError(f"{path} already exists")
+    run = command(language, path, folder.path, target)
+    id_column = id_column_for(config, folder)
+    lines = [f"labcatalog runs: {run}"]
+    if known:
+        lines += dataset_lines(project, name)
+    else:
+        lines.append(f"It writes {target}: one row per person, with the ID in {id_column}.")
+    lines += [f"FILES below is the rule of the dataset {files}.", FUNCTIONS["extract"]]
+    body = (
+        BODIES[("extract", language)]
+        .replace("ID_COLUMN", id_column)
+        .replace("FILES_RULE", folder.files)
+    )
+    step = PrepareStep(
+        name=f"extract_{name}",
+        run=run,
+        inputs=[folder.path, path],
+        outputs=[target],
+        stage="extract",
+    )
+    return NewScript(path, f"{comments(lines)}\n\n{body}", step)
+
+
+def comments(lines: list[str]) -> str:
+    return "\n".join(
+        f"# {part}" for line in lines for part in textwrap.wrap(line, 96, subsequent_indent="  ")
+    )
 
 
 FUNCTIONS = {

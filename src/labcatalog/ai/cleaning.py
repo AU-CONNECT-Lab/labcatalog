@@ -83,6 +83,7 @@ VALUES = "values"
 ROWS = "rows"
 RAW_ROWS = 20
 SHOWN_VALUES = 30
+SNIFFED = (".tsv", ".txt")
 
 
 @dataclass
@@ -184,18 +185,21 @@ def values_of(v: ResolvedVariable) -> str:
     return v.type
 
 
-def raw_lines(root: Path, raw: str, shown: str) -> list[str]:
+def raw_lines(root: Path, raw: str, shown: str, label: str = "Raw file") -> list[str]:
     path = root / raw
     try:
+        encoding = text_encoding(path)
         if shown == ROWS:
-            with path.open(encoding="utf-8-sig", errors="replace") as file:
+            with path.open(encoding=encoding, errors="replace") as file:
                 head = [line.rstrip("\r\n") for line in itertools.islice(file, RAW_ROWS + 1)]
-            return [f"Raw file: {raw}, its first lines:", "<raw>", *head, "</raw>"]
-        frame = pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
-    except (OSError, UnicodeDecodeError, pd.errors.ParserError) as err:
+            return [f"{label}: {raw}, its first lines:", "<raw>", *head, "</raw>"]
+        # A .tsv or .txt file, such as E-Prime's export, may be tab-delimited.
+        sniffed = {"sep": None, "engine": "python"} if path.suffix.lower() in SNIFFED else {}
+        frame = pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding, **sniffed)
+    except (OSError, UnicodeError, pd.errors.ParserError) as err:
         raise DataSourceError(f"{raw}: cannot read it as a CSV file: {err}") from err
     lines = [
-        f"Raw file: {raw}, {len(frame)} rows under its header.",
+        f"{label}: {raw}, {len(frame)} rows under its header.",
         "Each column and the different values in it, in the order they first appear:",
     ]
     for column in frame.columns:
@@ -204,6 +208,12 @@ def raw_lines(root: Path, raw: str, shown: str) -> list[str]:
         more = len(values) - SHOWN_VALUES
         lines.append(f"{column}: {listed}" + (f" and {more} more" if more > 0 else ""))
     return lines
+
+
+def text_encoding(path: Path) -> str:
+    # Windows programs such as E-DataAid often save text as UTF-16 with a byte order mark.
+    with path.open("rb") as file:
+        return "utf-16" if file.read(2) in (b"\xff\xfe", b"\xfe\xff") else "utf-8-sig"
 
 
 def draft_request(project: Project, catalog: Catalog, dataset: str, raw: str, shown: str) -> str:
