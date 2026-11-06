@@ -105,6 +105,27 @@ MORE_NS_EXAMPLE = MORE_EXAMPLE | {
     "p": "p = .335",
     "effect": "η² = .01, 95% CI [.00, .05]",
 }
+PAIRED = ("first", "second", "n", "statistics", "test", "p", "difference", "effect")
+PAIRED_EXAMPLE = {
+    "first": "Positive affect before the interaction (M = 3.20, SD = 0.90)",
+    "second": "Positive affect after the interaction (M = 3.45, SD = 0.85)",
+    "n": "64",
+    "statistics": "t(63) = -2.41, p = .019, M difference = -0.25, 95% CI [-0.46, -0.04], "
+    "d = -0.30, 95% CI [-0.55, -0.05]",
+    "test": "t(63) = -2.41",
+    "p": "p = .019",
+    "difference": "M difference = -0.25, 95% CI [-0.46, -0.04]",
+    "effect": "d = -0.30, 95% CI [-0.55, -0.05]",
+}
+PAIRED_NS_EXAMPLE = PAIRED_EXAMPLE | {
+    "second": "Positive affect after the interaction (M = 3.25, SD = 0.88)",
+    "statistics": "t(63) = -0.52, p = .605, M difference = -0.05, 95% CI [-0.24, 0.14], "
+    "d = -0.07, 95% CI [-0.31, 0.18]",
+    "test": "t(63) = -0.52",
+    "p": "p = .605",
+    "difference": "M difference = -0.05, 95% CI [-0.24, 0.14]",
+    "effect": "d = -0.07, 95% CI [-0.31, 0.18]",
+}
 KAPPA_EXAMPLE = {
     "among": "between the two raters",
     "n": "60",
@@ -635,6 +656,42 @@ TEMPLATES: dict[str, Template] = {
                 ),
             ),
             "The Results paragraph of the Group comparison tab.",
+        ),
+        Template(
+            "paired",
+            "Paired comparison",
+            RESULTS,
+            (
+                Slot(
+                    "paired",
+                    "Two measures of the same people that differ significantly",
+                    "{first} and {second} differed significantly in the {n} people with both, "
+                    "{statistics}.",
+                    PAIRED,
+                    PAIRED_EXAMPLE,
+                ),
+                Slot(
+                    "paired_ns",
+                    "Two measures of the same people that do not differ significantly",
+                    "{first} and {second} did not differ significantly in the {n} people with "
+                    "both, {statistics}.",
+                    PAIRED,
+                    PAIRED_NS_EXAMPLE,
+                ),
+                Slot(
+                    "variable",
+                    "Each of the two measures",
+                    "{label} ({statistics})",
+                    ("label", "statistics", "m", "sd"),
+                    {
+                        "label": "Positive affect before the interaction",
+                        "statistics": "M = 3.20, SD = 0.90",
+                        "m": "M = 3.20",
+                        "sd": "SD = 0.90",
+                    },
+                ),
+            ),
+            "The Results paragraph of the Paired comparison tab.",
         ),
         Template(
             "agreement",

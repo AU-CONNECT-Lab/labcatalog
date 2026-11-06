@@ -1,7 +1,7 @@
 from labcatalog.reports import results
 from labcatalog.reports.templates import Wording
 from labcatalog.stats.analysis import Correlation, Fit
-from labcatalog.stats.analysis_script import ANOVA, WELCH, Comparison, GroupStats
+from labcatalog.stats.analysis_script import ANOVA, WELCH, Comparison, GroupStats, Paired
 from labcatalog.stats.cfa import (
     GENERAL,
     IMPROPER,
@@ -111,6 +111,19 @@ def test_comparison_names_the_test_the_means_and_the_effect():
     text = results.comparison_text(three, "Mood")
     assert text.startswith("Mood did not differ significantly among a (M = 3.00, SD = 1.00), b")
     assert text.endswith("F(2, 117) = 0.50, p = .610, η² = .01.")
+
+
+def test_a_paired_comparison_names_both_measures_the_difference_and_d():
+    before = GroupStats("Positive affect before", 64, 3.2, 0.9)
+    after = GroupStats("Positive affect after", 64, 3.452, 0.85)
+    found = Paired(before, after, 64, -0.252, -0.46, -0.04, -2.414, 63, 0.0187, -0.3, -0.55, -0.05)
+    assert results.paired_text(found) == (
+        "Positive affect before (M = 3.20, SD = 0.90) and Positive affect after (M = 3.45, "
+        "SD = 0.85) differed significantly in the 64 people with both, t(63) = -2.41, p = .019, "
+        "M difference = -0.25, 95% CI [-0.46, -0.04], d = -0.30, 95% CI [-0.55, -0.05]."
+    )
+    same = Paired(before, before, 64, 0.01, -0.2, 0.22, 0.1, 63, 0.92, 0.01, -0.23, 0.26)
+    assert "did not differ significantly" in results.paired_text(same)
 
 
 LABELS = {"total": "Total score", "sad": "Sadness", "worry": "Worry"}

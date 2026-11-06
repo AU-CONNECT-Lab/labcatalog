@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from dataclasses import replace
 
 import pandas as pd
 from nicegui import ui
@@ -353,6 +354,160 @@ def group_section(
                 ),
             )
         body()
+
+
+PAIRED_NOTE = (
+    "On the people with both values. The difference is the first minus the second, with its "
+    "95% confidence interval; d is the mean difference over the SD of the differences (d_z), "
+    "with JASP's 95% confidence interval (noncentral t)."
+)
+
+
+def paired_keys(result: CatalogResult, view, choices: dict[str, str]) -> tuple[str, str]:
+    # The same measure in another dataset is the likely partner, such as before and after.
+    keys = list(choices)
+    first = view.first
+    if first not in choices:
+        first = next(iter(page.default_totals(result, view, choices) or keys))
+    if view.second in choices and view.second != first:
+        return first, view.second
+    rest = [k for k in keys if k != first]
+    same = [k for k in rest if k.rsplit("@", 1)[0] == first.rsplit("@", 1)[0]]
+    return first, (same or rest)[0]
+
+
+def paired_section(
+    result: CatalogResult, sample: analysis.Sample, view, choices: dict[str, str]
+) -> None:
+    if analysis.pooling(result, sample.datasets):
+        with panel("Paired comparison"):
+            note(
+                "A paired comparison takes two measures of the same people; pick datasets of "
+                "one study."
+            )
+        return
+    view.first, view.second = paired_keys(result, view, choices)
+
+    @ui.refreshable
+    def body() -> None:
+        if view.first == view.second:
+            note("Pick two different measures.")
+            return
+
+        async def fill() -> Callable:
+            data = AnalysisData(result, sample)
+            # Named as in the lists, which tell the same score in two datasets apart.
+            first, second = (
+                replace(data.variable(key), label=choices[key]) for key in (view.first, view.second)
+            )
+            frame = data.frame()
+            if not script.pairs_ready(frame, first, second):
+                return lambda: note(
+                    "Needs at least two people with both values whose differences vary."
+                )
+            code = script.paired_code(first, second)
+            found, engine = await compute(result, sample, frame, code)
+            paired = script.read_paired(found)
+            figure = plot_code.paired(first.label, second.label)
+            texts = section_files(result, sample, frame, code, figure)
+            fig = paired_figure(frame, first, second, script.link_name(result))
+            papers = {
+                "pairs": PaperTable(f"{first.label} and {second.label}", *pairs_table(paired), ""),
+                "paired_test": PaperTable("Paired t test", *paired_test_table(paired), PAIRED_NOTE),
+            }
+
+            def content() -> None:
+                drawn = paper.Chart(charts.show(fig), fig)
+                for shown in papers.values():
+                    paper.paper_table(shown)
+                paper.results_text(
+                    results.paired_text(
+                        paired, common.decimals(), Wording(result.project.config.templates)
+                    ),
+                    list(papers.values()),
+                    "paired",
+                )
+                paper.result_actions(result, "paired", papers, drawn, texts, engine)
+                code_view(texts, figure=True)
+
+            return content
+
+        later(fill)
+
+    def choose(which: str, value: str) -> None:
+        setattr(view, which, value)
+        body.refresh()
+
+    with panel(
+        "Paired comparison",
+        help_text="Two measures of the same people, such as before and after a task",
+    ):
+        with ui.row().classes("w-full items-center gap-4"):
+            for which, label in (("first", "First"), ("second", "Second")):
+                ui.select(
+                    choices,
+                    value=getattr(view, which),
+                    label=label,
+                    with_input=True,
+                    on_change=lambda e, w=which: choose(w, e.value),
+                ).props("dense outlined").classes("min-w-80 grow")
+        body()
+
+
+def paired_figure(frame, first, second, link: str):
+    both = frame[[link, first.column, second.column]].dropna(subset=[first.column, second.column])
+    people = [
+        (str(row[0]), [0.0, 1.0], [float(row[1]), float(row[2])])
+        for row in both.itertuples(index=False)
+    ]
+    means = [(0.0, float(both[first.column].mean()), len(both))]
+    means.append((1.0, float(both[second.column].mean()), len(both)))
+    same = analysis.without_suffix(first.label) == analysis.without_suffix(second.label)
+    return plots.trajectories(
+        people,
+        means,
+        [(t, m) for t, m, _ in means],
+        [(0.0, first.label), (1.0, second.label)],
+        "",
+        analysis.without_suffix(first.label) if same else "",
+        style.wave_color(0),
+        "Mean change",
+    )
+
+
+def pairs_table(paired: script.Paired) -> tuple[list[dict], list[dict]]:
+    columns = [
+        col("variable", "Measure", sortable=False),
+        col("n", "n", numeric=True),
+        col("m", "M", numeric=True),
+        col("sd", "SD", numeric=True),
+    ]
+    rows = [
+        {"variable": v.label, "n": v.n, "m": decimal(v.mean), "sd": decimal(v.sd)}
+        for v in (paired.first, paired.second)
+    ]
+    return columns, rows
+
+
+def paired_test_table(paired: script.Paired) -> tuple[list[dict], list[dict]]:
+    columns = [
+        col("ci", "Difference [95% CI]", numeric=True, sortable=False),
+        col("statistic", "t", numeric=True),
+        col("df", "df", numeric=True),
+        col("p", "p", numeric=True),
+        col("effect", "d [95% CI]", numeric=True, sortable=False),
+    ]
+    effect = decimal(paired.effect)
+    if paired.effect_low is not None and paired.effect_high is not None:
+        effect += f" [{decimal(paired.effect_low)}, {decimal(paired.effect_high)}]"
+    row = {
+        "ci": f"{decimal(paired.difference)} [{decimal(paired.low)}, {decimal(paired.high)}]",
+        "statistic": decimal(paired.statistic),
+        "df": f"{paired.df:g}",
+        "p": p_value(paired.p),
+        "effect": effect,
+    }
+    return columns, [row]
 
 
 def group_figure(frame, group, outcome, comparison: Comparison, link: str):

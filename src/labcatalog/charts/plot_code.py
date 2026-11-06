@@ -138,6 +138,30 @@ ax.set_xlabel({group_label})
 ax.set_ylabel({outcome_label})
 """
 
+R_PAIRED_LINES = """\
+points <- data.frame(id = rep(seq_len(nrow(pair)), 2), side = rep(1:2, each = nrow(pair)),
+                     y = c(pair$first, pair$second))
+means <- data.frame(side = 1:2, y = c(mean(pair$first), mean(pair$second)))
+figure <- ggplot(points, aes(side, y)) +
+  geom_line(aes(group = id), colour = "grey60", alpha = 0.35, linewidth = 0.3) +
+  geom_line(data = means, colour = "{colour}", linewidth = 1.2) +
+  geom_point(data = means, shape = 21, size = 3, fill = "white", colour = "{colour}",
+             stroke = 1.2) +
+  scale_x_continuous(breaks = 1:2, labels = c({first_label}, {second_label}),
+                     expand = expansion(add = 0.3)) +
+  labs(x = NULL, y = NULL) +
+  theme_minimal()
+"""
+PYTHON_PAIRED_LINES = """\
+fig, ax = plt.subplots(figsize=({width}, {height}))
+for a, b in zip(pair["first"], pair["second"]):
+    ax.plot([1, 2], [a, b], color="0.6", alpha=0.35, linewidth=0.5)
+means = [pair["first"].mean(), pair["second"].mean()]
+ax.plot([1, 2], means, color="{colour}", linewidth=2.5)
+ax.scatter([1, 2], means, s=50, color="white", edgecolor="{colour}", linewidth=2, zorder=3)
+ax.set_xticks([1, 2], [{first_label}, {second_label}])
+ax.set_xlim(0.7, 2.3)
+"""
 R_TRAJECTORIES = """\
 points <- data.frame(id = d[[{person}]], wave = d[[{wave}]], time = d[[{time}]],
                      y = d[[{y}]], fixed = predict(fit, re.form = NA))
@@ -239,6 +263,26 @@ def groups(group_label: str, outcome_label: str, count: int) -> tuple[str, str]:
         R_BOXES.format(**fields),
         PYTHON_BOXES.format(**fields),
         width,
+        4,
+    )
+
+
+def paired(first_label: str, second_label: str) -> tuple[str, str]:
+    # Reads pair, which the paired comparison code sets, in both languages.
+    fields = dict(
+        colour=style.wave_color(0),
+        first_label=text(first_label),
+        second_label=text(second_label),
+        width="5",
+        height="4",
+    )
+    what = f"each person's line from {first_label} to {second_label}, and the means"
+    return framed(
+        what,
+        "paired_comparison.png",
+        R_PAIRED_LINES.format(**fields),
+        PYTHON_PAIRED_LINES.format(**fields),
+        5,
         4,
     )
 

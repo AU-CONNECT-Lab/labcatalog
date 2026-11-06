@@ -190,11 +190,60 @@ def test_r_and_python_give_the_same_numbers(result, sample):
             assert in_r.omega_low <= in_r.omega <= in_r.effect
 
 
+EMS_W2 = "example_mood.ems_total@child_w2"
+
+
+def paired(result, rscript_path=None):
+    sample = analysis.build_sample(result, ["child_w1", "child_w2"], True)
+    data = script.AnalysisData(result, sample)
+    first, second = data.score(EMS), data.score(EMS_W2)
+    frame = data.frame()
+    assert script.pairs_ready(frame, first, second)
+    code = script.paired_code(first, second)
+    found, engine = script.run_code(result, sample, frame, code, rscript_path)
+    return script.read_paired(found), frame[[first.column, second.column]].dropna(), engine
+
+
+def test_a_paired_t_test_matches_scipy_and_d_is_over_the_sd_of_the_differences(result):
+    found, both, engine = paired(result)
+    assert engine == script.PYTHON
+    first, second = both.iloc[:, 0], both.iloc[:, 1]
+    test = stats.ttest_rel(first, second)
+    assert (found.n, found.df) == (len(both), len(both) - 1)
+    assert (found.statistic, found.p) == pytest.approx((test.statistic, test.pvalue))
+    assert found.difference == pytest.approx((first - second).mean())
+    assert found.effect == pytest.approx((first - second).mean() / (first - second).std())
+    assert found.effect_low < found.effect < found.effect_high
+    assert (found.first.mean, found.second.sd) == pytest.approx((first.mean(), second.std()))
+
+
+@needs_r
+def test_a_paired_t_test_agrees_in_r_and_python(result):
+    in_python, _, _ = paired(result)
+    in_r, _, engine = paired(result, rscript())
+    assert engine == script.R
+    for field in ("n", "difference", "low", "high", "statistic", "df", "p", "effect"):
+        assert getattr(in_r, field) == pytest.approx(getattr(in_python, field), rel=1e-9)
+    # effectsize in R and the scipy solver here both give JASP's noncentral t interval.
+    assert (in_r.effect_low, in_r.effect_high) == pytest.approx(
+        (in_python.effect_low, in_python.effect_high), abs=1e-6
+    )
+
+
+def test_two_measures_whose_differences_do_not_vary_are_not_paired(result):
+    sample = analysis.build_sample(result, ["child_w1"], True)
+    data = script.AnalysisData(result, sample)
+    ems = data.score(EMS)
+    frame = data.frame().assign(copy=lambda f: f[ems.column] + 1)
+    assert not script.pairs_ready(frame, ems, replace(ems, column="copy"))
+
+
 FIGURES = {
     "heatmap": "correlations.png",
     "dots": "correlations.png",
     "regression": "regression.png",
     "groups": "group_comparison.png",
+    "paired": "paired_comparison.png",
 }
 
 
@@ -213,6 +262,7 @@ def section_scripts(result, sample) -> dict[str, dict[str, str]]:
             plot_code.regression({eps.column: "EPS"}, "EMS"),
         ),
         "groups": (plan.code, plot_code.groups("Gender", "EMS", 3)),
+        "paired": (script.paired_code(ems, eps), plot_code.paired("EMS", "EPS")),
     }
     return {
         name: analysis_tables.section_files(result, sample, frame, code, figure)

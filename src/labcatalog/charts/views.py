@@ -111,10 +111,13 @@ def series_names(result: CatalogResult, names: list[str]) -> dict[str, str]:
         for n in names
     }
     repeated = {label for label in plain.values() if list(plain.values()).count(label) > 1}
-    return {
+    named = {
         n: f"{label} · {dataset_by_name(config, n).reporter}" if label in repeated else label
         for n, label in plain.items()
     }
+    # Datasets of one wave and reporter, such as a questionnaire given twice in a visit.
+    still = {label for label in named.values() if list(named.values()).count(label) > 1}
+    return {n: f"{label} · {n}" if label in still else label for n, label in named.items()}
 
 
 def series_color(result: CatalogResult, name: str) -> str:

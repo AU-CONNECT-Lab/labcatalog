@@ -4,7 +4,14 @@ from labcatalog.reports import results
 from labcatalog.reports.templates import Wording
 from labcatalog.stats.agreement import ICC, Agreement, IccRow
 from labcatalog.stats.analysis import Correlation, Fit
-from labcatalog.stats.analysis_script import WELCH, Comparison, GroupStats, MissingData, Variable
+from labcatalog.stats.analysis_script import (
+    WELCH,
+    Comparison,
+    GroupStats,
+    MissingData,
+    Paired,
+    Variable,
+)
 from labcatalog.stats.cfa import SUBSCALES, CfaFit
 from labcatalog.stats.invariance import InvarianceStep, InvarianceTest
 from labcatalog.stats.mediation import Effect, MediationFit, MediationModel
@@ -70,6 +77,24 @@ def groups(wording: Wording) -> str:
         effect_high=0.78,
     )
     return results.comparison_text(found, "Mood", 2, wording)
+
+
+def paired(wording: Wording) -> str:
+    found = Paired(
+        GroupStats("Positive affect before the interaction", 64, 3.2, 0.9),
+        GroupStats("Positive affect after the interaction", 64, 3.45, 0.85),
+        64,
+        -0.25,
+        -0.46,
+        -0.04,
+        -2.41,
+        63,
+        0.019,
+        -0.3,
+        -0.55,
+        -0.05,
+    )
+    return results.paired_text(found, 2, wording)
 
 
 def agreement(wording: Wording) -> str:
@@ -187,6 +212,7 @@ EXAMPLES: dict[str, Callable[[Wording], str]] = {
     "regression": regression,
     "missing": missing,
     "groups": groups,
+    "paired": paired,
     "agreement": agreement,
     "cfa": cfa,
     "invariance": invariance,

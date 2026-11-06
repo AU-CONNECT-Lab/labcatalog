@@ -159,6 +159,44 @@ out <- list(t = test$statistic, df = test$parameter, p = test$p.value,
 
 
 @pytest.mark.parametrize("engine", engines())
+def test_a_paired_t_test_and_its_d_match_jasp(result, tmp_path, engine):
+    sample = analysis.build_sample(result, ["child_w1", "child_w2"], True)
+    data = script.AnalysisData(result, sample)
+    first, second = data.score(EMS), data.score("example_mood.ems_total@child_w2")
+    frame = data.frame()
+    found, _ = script.run_code(result, sample, frame, script.paired_code(first, second), engine)
+    found = script.read_paired(found)
+    # jaspTTests' paired row: t.test(paired = TRUE), d over the SD of the differences, and its
+    # interval from JASP's own noncentral t limits.
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspTTests"],
+        f"""
+pair <- na.omit(data.frame(a = d[["{first.column}"]], b = d[["{second.column}"]]))
+n <- nrow(pair)
+test <- t.test(pair$a, pair$b, paired = TRUE)
+dz <- mean(pair$a - pair$b) / sd(pair$a - pair$b)
+limits <- unlist(jaspTTests:::.confidenceLimitsEffectSizes(
+  ncp = dz * sqrt(n), df = unname(test$parameter), alpha.lower = 0.025, alpha.upper = 0.025
+)[c(1, 3)]) / sqrt(n)
+out <- list(t = test$statistic, df = test$parameter, p = test$p.value, md = test$estimate,
+            low = test$conf.int[1], high = test$conf.int[2], d = dz,
+            d_low = limits[1], d_high = limits[2])
+""",
+        frame,
+    )
+    assert (found.statistic, found.df, found.p) == pytest.approx(
+        (jasp["t"], jasp["df"], jasp["p"]), rel=1e-6
+    )
+    assert (found.difference, found.low, found.high) == pytest.approx(
+        (jasp["md"], jasp["low"], jasp["high"]), rel=1e-6
+    )
+    assert (found.effect, found.effect_low, found.effect_high) == pytest.approx(
+        (jasp["d"], jasp["d_low"], jasp["d_high"]), rel=1e-5
+    )
+
+
+@pytest.mark.parametrize("engine", engines())
 def test_anova_and_its_effect_sizes_match_jasp(result, sample, tmp_path, engine):
     found, frame, group, outcome = comparison(result, sample, EDUCATION, script.ANOVA, engine)
     # jaspAnova: type III sums of squares; eta and omega squared from effectsize, two-sided.

@@ -1,6 +1,6 @@
 # Statistics
 
-labcatalog computes the statistics most papers report: reliability (Cronbach's α, McDonald's ω, item-rest correlations), confirmatory factor analysis and measurement invariance across waves, reporters and groups, correlations, regression, *t* tests and ANOVA, multilevel models, and attrition analyses. It uses established packages rather than its own formulas, and its defaults follow [JASP](https://jasp-stats.org/), so its numbers match what JASP gives with its default options.
+labcatalog computes the statistics most papers report: reliability (Cronbach's α, McDonald's ω, item-rest correlations), confirmatory factor analysis and measurement invariance across waves, reporters and groups, correlations, regression, *t* tests (between groups and paired) and ANOVA, multilevel models, and attrition analyses. It uses established packages rather than its own formulas, and its defaults follow [JASP](https://jasp-stats.org/), so its numbers match what JASP gives with its default options.
 
 ## R first, Python second
 

@@ -8,6 +8,7 @@ from labcatalog.stats.analysis_script import (
     Comparison,
     GroupStats,
     MissingData,
+    Paired,
 )
 from labcatalog.stats.cfa import (
     GENERAL_KINDS,
@@ -367,6 +368,37 @@ def comparison_text(
         slot if comparison.p < SIGNIFICANT else f"{slot}_ns",
         outcome=outcome,
         groups=groups,
+        statistics=", ".join(values.values()),
+        **values,
+    )
+
+
+def paired_text(paired: Paired, digits: int = 2, wording: Wording = BUILT_IN) -> str:
+    def variable(stats: GroupStats) -> str:
+        m = f"M = {number(stats.mean, digits)}"
+        sd = f"SD = {number(stats.sd, digits)}"
+        return wording.say(
+            "paired", "variable", label=stats.label, statistics=f"{m}, {sd}", m=m, sd=sd
+        )
+
+    difference = (
+        f"M difference = {number(paired.difference, digits)}, 95% CI "
+        f"[{number(paired.low, digits)}, {number(paired.high, digits)}]"
+    )
+    values = {
+        "test": f"t({paired.df:g}) = {number(paired.statistic, digits)}",
+        "p": p_text(paired.p),
+        "difference": difference,
+        "effect": interval(
+            "d", paired.effect, paired.effect_low, paired.effect_high, digits, number
+        ),
+    }
+    return wording.say(
+        "paired",
+        "paired" if paired.p < SIGNIFICANT else "paired_ns",
+        first=variable(paired.first),
+        second=variable(paired.second),
+        n=str(paired.n),
         statistics=", ".join(values.values()),
         **values,
     )

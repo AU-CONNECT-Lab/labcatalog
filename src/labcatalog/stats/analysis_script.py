@@ -442,12 +442,53 @@ def limit(gap, step):
     return optimize.brentq(gap, min(ncp, end), max(ncp, end), xtol=1e-12)
 
 
-scale = np.sqrt(len(first) * len(second) / (len(first) + len(second)))
+scale = {scale}
 ncp, df = cohens_d * scale, test.df
 d_low = limit(lambda x: stats.nct.sf(ncp, df, x) - 0.025, -1) / scale
 d_high = limit(lambda x: stats.nct.cdf(ncp, df, x) - 0.025, 1) / scale
 print("Cohen's d:", cohens_d, "95% CI:", d_low, d_high)
 """
+TWO_SCALE = "np.sqrt(len(first) * len(second) / (len(first) + len(second)))"
+PAIRED_SCALE = "np.sqrt(len(pair))"
+R_PAIRED = """\
+# Paired t test: {first_label} against {second_label}, on the people with both values.
+pair <- na.omit(data.frame(first = d[[{first}]], second = d[[{second}]]))
+pairs <- data.frame(variable = c({first_name}, {second_name}), n = nrow(pair),
+                    mean = c(mean(pair$first), mean(pair$second)),
+                    sd = c(sd(pair$first), sd(pair$second)))
+print(pairs)
+test <- t.test(pair$first, pair$second, paired = TRUE)
+print(test)
+# Cohen's d of the differences (d_z) with its 95% CI from the noncentral t, as JASP gives
+# it (effectsize).
+effect <- suppressMessages(effectsize::cohens_d(pair$first, pair$second, paired = TRUE))
+print(effect)
+"""
+PYTHON_PAIRED = """\
+# Paired t test: {first_label} against {second_label}, on the people with both values
+# (scipy), and Cohen's d of the differences (d_z), as JASP gives it.
+pair = pd.DataFrame(dict(first=d[{first}], second=d[{second}])).dropna()
+pairs = pd.DataFrame(dict(variable=[{first_name}, {second_name}], n=len(pair),
+                          mean=[pair["first"].mean(), pair["second"].mean()],
+                          sd=[pair["first"].std(), pair["second"].std()]))
+print(pairs)
+test = stats.ttest_rel(pair["first"], pair["second"])
+print(test)
+low, high = test.confidence_interval()
+difference = pair["first"] - pair["second"]
+cohens_d = difference.mean() / difference.std()
+"""
+R_PAIRED_OUT = (
+    "paired_result <- data.frame(n = nrow(pair), difference = unname(test$estimate), "
+    "low = test$conf.int[1], high = test$conf.int[2], statistic = unname(test$statistic), "
+    "df = unname(test$parameter), p = test$p.value, effect = effect$Cohens_d, "
+    "effect_low = effect$CI_low, effect_high = effect$CI_high)"
+)
+PYTHON_PAIRED_OUT = (
+    "paired_result = pd.DataFrame([dict(n=len(pair), difference=difference.mean(), low=low, "
+    "high=high, statistic=test.statistic, df=test.df, p=test.pvalue, effect=cohens_d, "
+    "effect_low=d_low, effect_high=d_high)])"
+)
 PYTHON_ANOVA = """\
 # One-way analysis of variance (statsmodels) and eta squared, the groups' share of the sums
 # of squares; omega squared is computed only in R.
@@ -536,6 +577,23 @@ class Comparison:
     omega_low: float | None = None
     omega_high: float | None = None
     left_out: list[tuple[str, int]] = field(default_factory=list)
+
+
+@dataclass
+class Paired:
+    first: GroupStats
+    second: GroupStats
+    n: int
+    # The mean of first minus second, with its 95% CI.
+    difference: float
+    low: float
+    high: float
+    statistic: float
+    df: float
+    p: float
+    effect: float
+    effect_low: float | None = None
+    effect_high: float | None = None
 
 
 class AnalysisData:
@@ -909,9 +967,10 @@ def comparison_plan(
     python = PYTHON_GROUPS.format(
         mapping=", ".join(f"{number(v)}: {r_string(t)}" for v, t in kept), **fields
     )
+    interval = PYTHON_D_INTERVAL.format(scale=TWO_SCALE)
     tests = {
-        WELCH: (R_WELCH + R_D_INTERVAL, PYTHON_WELCH + PYTHON_D_INTERVAL),
-        STUDENT: (R_STUDENT + R_D_INTERVAL, PYTHON_STUDENT + PYTHON_D_INTERVAL),
+        WELCH: (R_WELCH + R_D_INTERVAL, PYTHON_WELCH + interval),
+        STUDENT: (R_STUDENT + R_D_INTERVAL, PYTHON_STUDENT + interval),
         ANOVA: (R_ANOVA, PYTHON_ANOVA),
     }
     out = ANOVA if kind == ANOVA else TWO
@@ -925,6 +984,54 @@ def comparison_plan(
         packages=("effectsize",) if kind == ANOVA else ("effectsize", "MBESS"),
     )
     return ComparisonPlan(kind, code, left)
+
+
+def pairs_ready(frame: pd.DataFrame, first: Variable, second: Variable) -> bool:
+    # A t test needs two people with both values whose differences vary.
+    both = frame[[first.column, second.column]].dropna()
+    return len(both) >= 2 and (both[first.column] - both[second.column]).nunique() > 1
+
+
+def paired_code(first: Variable, second: Variable) -> Code:
+    fields = dict(
+        first=r_string(first.column),
+        second=r_string(second.column),
+        first_label=first.label,
+        second_label=second.label,
+        first_name=r_string(first.label),
+        second_name=r_string(second.label),
+    )
+    return Code(
+        title="Paired comparison",
+        r=R_PAIRED.format(**fields),
+        python=PYTHON_PAIRED.format(**fields) + PYTHON_D_INTERVAL.format(scale=PAIRED_SCALE),
+        outputs=("pairs", "paired_result"),
+        r_footer=R_PAIRED_OUT,
+        python_footer=PYTHON_PAIRED_OUT,
+        packages=("effectsize",),
+    )
+
+
+def read_paired(found: dict[str, pd.DataFrame]) -> Paired:
+    first, second = (
+        GroupStats(str(row.variable), int(row.n), none(row.mean), none(row.sd))
+        for row in found["pairs"].itertuples()
+    )
+    test = found["paired_result"].iloc[0]
+    return Paired(
+        first=first,
+        second=second,
+        n=int(test["n"]),
+        difference=float(test["difference"]),
+        low=float(test["low"]),
+        high=float(test["high"]),
+        statistic=float(test["statistic"]),
+        df=float(test["df"]),
+        p=float(test["p"]),
+        effect=float(test["effect"]),
+        effect_low=none(test["effect_low"]),
+        effect_high=none(test["effect_high"]),
+    )
 
 
 def script(result: CatalogResult, sample: analysis.Sample, codes: list[Code]) -> tuple[str, str]:

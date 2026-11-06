@@ -757,6 +757,7 @@ def trajectories(
     x_title: str,
     y_title: str,
     color: str,
+    line_name: str = "Fixed effects",
 ) -> go.Figure:
     # All people in one trace, split by gaps, so hundreds of lines stay quick to draw.
     xs, ys, ids = [], [], []
@@ -782,9 +783,11 @@ def trajectories(
             x=[t for t, _ in line],
             y=[v for _, v in line],
             mode="lines",
-            name="Fixed effects",
+            name=line_name,
             line=dict(color=color, width=3),
-            hovertemplate="predicted %{y:.2f}<extra></extra>",
+            hovertemplate="predicted %{y:.2f}<extra></extra>"
+            if line_name == "Fixed effects"
+            else "%{y:.2f}<extra></extra>",
         )
     )
     fig.add_trace(

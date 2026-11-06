@@ -42,6 +42,7 @@ PARTS = {
     "correlation": "Correlation table",
     "regression": "Regression",
     "groups": "Group comparison",
+    "paired": "Paired comparison",
     "agreement": "Rater agreement",
     "measurement": "Measurement model",
     "invariance": "Invariance",
@@ -55,6 +56,7 @@ TAB_LABELS = PARTS | {
     "missing": "Missing",
     "correlation": "Correlation",
     "groups": "Groups",
+    "paired": "Paired",
     "agreement": "Agreement",
     "measurement": "CFA",
     "multilevel": "MLM",
@@ -72,6 +74,9 @@ class AnalysisView:
     y: str | None = None
     group: str | None = None
     outcome: str | None = None
+    # The two measures of the same people the paired comparison sets side by side.
+    first: str | None = None
+    second: str | None = None
     multilevel: ml.Model | None = None
     invariance_measure: str | None = None
     invariance_group: str | None = None
@@ -148,12 +153,9 @@ def render(
             panel_view.render(result, view)
             return
         choices = variables(view)(result, view.datasets)
-        if view.part in ("correlation", "regression") and len(choices) < 2:
+        if view.part in ("correlation", "regression", "paired") and len(choices) < 2:
             with panel(PARTS[view.part]):
-                note(
-                    "Pick datasets and measures with at least two scores or numbers between "
-                    "them for correlations."
-                )
+                note("Pick datasets and measures with at least two scores or numbers between them.")
         elif view.part == "missing":
             missing.render(result, sample, view, choices)
         elif view.part == "agreement":
@@ -166,6 +168,8 @@ def render(
             pair_section(result, sample, view, choices)
         elif view.part == "groups":
             analysis_tables.group_section(result, sample, view, choices)
+        elif view.part == "paired":
+            analysis_tables.paired_section(result, sample, view, choices)
         elif view.part == "measurement":
             totals = default_totals(result, view, choices)
             measurement.render(result, sample, view.measurement, choices, totals)
