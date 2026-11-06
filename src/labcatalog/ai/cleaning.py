@@ -84,6 +84,7 @@ ROWS = "rows"
 RAW_ROWS = 20
 SHOWN_VALUES = 30
 SNIFFED = (".tsv", ".txt")
+TABLES = (".csv", *SNIFFED)
 
 
 @dataclass
@@ -128,6 +129,15 @@ def script_of(step: PrepareStep) -> str | None:
 
 def raw_of(step: PrepareStep) -> str | None:
     return next((p for p in step.inputs if not language_of(p)), None)
+
+
+def revisable(project: Project, dataset: str) -> bool:
+    # A fix shows the model the table the script reads, so not a folder or a database.
+    step = cleaning_step(project, dataset)
+    if step is None:
+        return False
+    raw = raw_of(step)
+    return raw is None or Path(raw).suffix.lower() in TABLES
 
 
 def usage(language: str) -> str:

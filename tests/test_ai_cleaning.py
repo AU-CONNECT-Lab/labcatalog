@@ -78,6 +78,13 @@ def test_a_drafted_script_becomes_a_step_that_writes_a_new_file(result):
     assert not [i for i in validate_project(project) if i.location == "labcatalog.yaml"]
 
 
+def test_only_a_script_that_reads_a_table_is_offered_a_fix(result):
+    assert cleaning.revisable(result.project, "parent_w1")
+    # Its step reads a folder of trial files, which a fix request cannot show.
+    assert cleaning.cleaning_step(result.project, "nback_w2") is not None
+    assert not cleaning.revisable(result.project, "nback_w2")
+
+
 def test_a_fix_revises_the_script_that_writes_the_file_with_the_problem(result):
     [issue] = [i for i in result.report.issues if i.code == "id_whitespace"]
     rows = [{"row": "31", "id": "' 1031P'"}]

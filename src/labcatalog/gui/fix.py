@@ -4,7 +4,7 @@ from pathlib import Path
 
 from nicegui import ui
 
-from labcatalog.ai.cleaning import cleaning_step
+from labcatalog.ai.cleaning import revisable
 from labcatalog.codebook.core import holds
 from labcatalog.config import dataset_by_name, map_sharers
 from labcatalog.data.prepare import Session, run_steps
@@ -340,7 +340,7 @@ def scripted(project: Project | None, result: CatalogResult, issue: Issue, who: 
         return False
     if who != SCRIPTS and issue.code not in ID_CODES:
         return False
-    return cleaning_step(project, dataset) is not None
+    return revisable(project, dataset)
 
 
 def loaded(root: Path) -> Project | None:

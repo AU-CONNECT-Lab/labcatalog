@@ -63,7 +63,7 @@ The model is given the raw file's column names and, as the project sets on the S
 
 The script and the model's notes open in a window, and nothing is written until you press **Save**. Saving writes `scripts/clean_<dataset>.R` or `.py` and adds the step `clean_<dataset>` to `labcatalog.yaml`, with the raw file and the script as inputs and the dataset's file as output, in place of a step of the same name. Run the step and check the data as with any other.
 
-When the Problems page reports a problem in a file a registered script writes, such as an ID with a space or a value outside the options, its panel has **Draft a fix to the script**: the model is given the script, the raw file, the dataset's columns and the problem with its rows, and returns the script changed. The window shows the change line by line, with what the model changed and what it left open, and **Save** writes the script. Then run the step again.
+When the Problems page reports a problem in a file a registered script writes from a CSV, TSV or text file, such as an ID with a space or a value outside the options, its panel has **Draft a fix to the script**: the model is given the script, the raw file, the dataset's columns and the problem with its rows, and returns the script changed. The window shows the change line by line, with what the model changed and what it left open, and **Save** writes the script. Then run the step again.
 
 ## Run in R
 
