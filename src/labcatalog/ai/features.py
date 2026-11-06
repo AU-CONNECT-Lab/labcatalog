@@ -3,8 +3,10 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+import pandas as pd
+
 from labcatalog import defaults
-from labcatalog.ai.cleaning import raw_lines
+from labcatalog.ai.cleaning import ROWS, raw_lines, read_text_table, value_lines
 from labcatalog.ai.code import unfenced
 from labcatalog.ai.instrument import OPTIONAL, STRING, array, given, strict
 from labcatalog.codebook.core import yaml_text
@@ -92,36 +94,54 @@ class SummaryDraft:
     step: PrepareStep
     instrument_path: str
     instrument: str
-    # The person's file the model was shown.
-    sample: str
+    # What the model was shown: one person's file, or every file.
+    shown: str
     meta: CallMetadata
     notes: list[str]
 
 
-def sample_file(project: Project, files: str) -> str:
-    # The largest file on this computer, likely a full session rather than one cut short.
+def here_files(project: Project, files: str) -> list[str]:
+    # Largest first: likely a full session rather than one cut short.
     found = [
         f for f in folder_files(dataset_by_name(project.config, files), project.root) if f.here
     ]
     if not found:
         raise DataSourceError(f"{files}: none of its files is on this computer")
-    largest = max(found, key=lambda f: f.size)
-    return posix_str(portable_path(largest.path, project.root))
+    found.sort(key=lambda f: -f.size)
+    return [posix_str(portable_path(f.path, project.root)) for f in found]
 
 
-def summary_request(project: Project, files: str, sample: str, wanted: str) -> str:
+def file_lines(project: Project, files: str) -> tuple[list[str], str]:
+    # Every file's values, so rare ones such as a missed response show; or one file's first lines.
+    paths = here_files(project, files)
+    root = project.root
+    if project.config.llm.raw_data == ROWS:
+        return raw_lines(root, paths[0], ROWS, "One person's file"), paths[0]
+    frames = [read_text_table(root / p, p) for p in paths]
+    rows = sorted(len(f) for f in frames)
+    lines = [
+        f"Its {len(frames)} files, read together: each has {rows[0]} to {rows[-1]} rows under "
+        "its header.",
+        *value_lines(pd.concat(frames, ignore_index=True).fillna("")),
+    ]
+    return lines, f"the {len(frames)} files of {files}"
+
+
+def summary_request(project: Project, files: str, wanted: str) -> tuple[str, str]:
     folder = dataset_by_name(project.config, files)
-    return "\n".join(
+    lines, shown = file_lines(project, files)
+    text = "\n".join(
         [
             f"The files: one per person in {folder.path}, found by the rule {folder.files}, "
             f"where {{id}} is the person's ID ({folder.modality}, study {folder.study}, wave "
             f"{folder.wave}, {folder.reporter}).",
-            *raw_lines(project.root, sample, project.config.llm.raw_data, "One person's file"),
+            *lines,
             "",
             "The measures wanted:",
             wanted.strip(),
         ]
     )
+    return text, shown
 
 
 def draft_summary(
@@ -138,18 +158,16 @@ def draft_summary(
     root = project.root
     free_instrument_path(root, instrument_id)
     made = summary_script(project, files, name, language)
-    sample = sample_file(project, files)
+    request, shown = summary_request(project, files, wanted)
     lang = LANGUAGES[language]
     system = SYSTEM.format(language=lang.name, libraries=lang.libraries, **FUNCTIONS[language])
     output, meta = client.complete_structured(
-        system=system,
-        user_message=summary_request(project, files, sample, wanted),
-        tool_schema=SCHEMA,
+        system=system, user_message=request, tool_schema=SCHEMA
     )
     notes = [" ".join(line.split()) for line in output["notes"]]
     header = [
         f"# features() was drafted by {meta.provider} {meta.model} on {date.today().isoformat()} "
-        f"from {sample}; check it before running the step.",
+        f"from {shown}; check it before running the step.",
         *(["# Notes from the model:"] if notes else []),
         *[f"# - {line}" for line in notes],
     ]
@@ -165,7 +183,7 @@ def draft_summary(
         text.split("\n", 1)[1].rstrip("\n"),
     ]
     return SummaryDraft(
-        made.path, script, made.step, instrument, "\n".join(lines) + "\n", sample, meta, notes
+        made.path, script, made.step, instrument, "\n".join(lines) + "\n", shown, meta, notes
     )
 
 

@@ -29,16 +29,16 @@ def summary_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable
         )
         return
     what = (
-        f"its first {RAW_ROWS} lines"
+        f"the first {RAW_ROWS} lines of its largest file"
         if project.config.llm.raw_data == ROWS
-        else "each column's values"
+        else "each column's values across its files"
     )
     note(
         "For a folder dataset with one file per person, such as a computer task's trials: a "
         "language model writes the features() of an extract script, which turns each person's "
         "file into their row of measures, and drafts the instrument those measures make up. "
-        f"Sends the largest file's column names and {what}, as the Settings page sets, with the "
-        "measures you ask for. Nothing is saved until you have read the draft."
+        f"Sends the column names and {what}, as the Settings page sets, with the measures you "
+        "ask for. Nothing is saved until you have read the draft."
     )
     with ui.row().classes("w-full items-start gap-2"):
         files = (
@@ -102,7 +102,7 @@ def review(draft: SummaryDraft, root: Path, on_saved: Callable[[], Awaitable[Non
         ui.label(draft.script_path).classes("text-lg")
         note(
             f"A draft by {meta.model} in {meta.latency_ms / 1000:.0f} s, {meta.input_tokens} "
-            f"tokens in and {meta.output_tokens} out, from {draft.sample}. Read it before saving; "
+            f"tokens in and {meta.output_tokens} out, from {draft.shown}. Read it before saving; "
             "nothing is written until you do."
         )
         if draft.notes:

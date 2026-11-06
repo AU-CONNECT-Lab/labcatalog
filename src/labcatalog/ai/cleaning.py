@@ -187,24 +187,38 @@ def values_of(v: ResolvedVariable) -> str:
 
 def raw_lines(root: Path, raw: str, shown: str, label: str = "Raw file") -> list[str]:
     path = root / raw
-    try:
-        encoding = text_encoding(path)
-        if shown == ROWS:
-            with path.open(encoding=encoding, errors="replace") as file:
+    if shown == ROWS:
+        try:
+            with path.open(encoding=text_encoding(path), errors="replace") as file:
                 head = [line.rstrip("\r\n") for line in itertools.islice(file, RAW_ROWS + 1)]
-            return [f"{label}: {raw}, its first lines:", "<raw>", *head, "</raw>"]
+        except OSError as err:
+            raise DataSourceError(f"{raw}: cannot read it: {err}") from err
+        return [f"{label}: {raw}, its first lines:", "<raw>", *head, "</raw>"]
+    frame = read_text_table(path, raw)
+    return [f"{label}: {raw}, {len(frame)} rows under its header.", *value_lines(frame)]
+
+
+def read_text_table(path: Path, raw: str) -> pd.DataFrame:
+    try:
         # A .tsv or .txt file, such as E-Prime's export, may be tab-delimited.
         sniffed = {"sep": None, "engine": "python"} if path.suffix.lower() in SNIFFED else {}
-        frame = pd.read_csv(path, dtype=str, keep_default_na=False, encoding=encoding, **sniffed)
+        return pd.read_csv(
+            path, dtype=str, keep_default_na=False, encoding=text_encoding(path), **sniffed
+        )
     except (OSError, UnicodeError, pd.errors.ParserError) as err:
         raise DataSourceError(f"{raw}: cannot read it as a CSV file: {err}") from err
+
+
+def value_lines(frame: pd.DataFrame) -> list[str]:
     lines = [
-        f"{label}: {raw}, {len(frame)} rows under its header.",
-        "Each column and the different values in it, in the order they first appear:",
+        "Each column and the different values in it, in the order they first appear; a column "
+        "of numbers and blanks shows its numbers without quotes:"
     ]
     for column in frame.columns:
         values = list(dict.fromkeys(frame[column]))
-        listed = ", ".join(repr(v) for v in values[:SHOWN_VALUES])
+        numbers = pd.to_numeric(pd.Series([v for v in values if v]), errors="coerce").notna()
+        plain = len(numbers) > 0 and numbers.all()
+        listed = ", ".join(v if plain and v else repr(v) for v in values[:SHOWN_VALUES])
         more = len(values) - SHOWN_VALUES
         lines.append(f"{column}: {listed}" + (f" and {more} more" if more > 0 else ""))
     return lines

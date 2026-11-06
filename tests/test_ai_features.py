@@ -54,15 +54,26 @@ def output(function: str) -> dict:
     }
 
 
-def test_the_model_sees_one_full_file_the_rule_and_the_measures_wanted(mock_project):
+def test_the_model_sees_every_files_values_the_rule_and_the_measures_wanted(mock_project):
     project = load_project(mock_project)
-    sample = features.sample_file(project, FILES)
-    assert sample.startswith("raw/nback/ses-2/") and "1306C" not in sample
-    request = features.summary_request(project, FILES, sample, "Accuracy and d' per block")
+    request, shown = features.summary_request(project, FILES, "Accuracy and d' per block")
+    assert shown == "the 15 files of nback_trials_w2"
     assert "found by the rule {id}_nback_*_*.csv" in request
-    assert f"One person's file: {sample}, 86 rows under its header." in request
-    assert "key_resp.keys: 'f', 'j'" in request
+    assert "Its 15 files, read together: each has 60 to 86 rows under its header." in request
+    # A missed response is rare, so one person's file may not show how it is written.
+    keys = next(line for line in request.splitlines() if line.startswith("key_resp.keys: "))
+    assert set(keys.split(": ")[1].split(", ")) == {"'f'", "'j'", "'None'"}
+    # Numbers are not quoted, so the model compares them as numbers.
+    assert "\nload: '', 1, 2\n" in request
     assert request.endswith("The measures wanted:\nAccuracy and d' per block")
+
+
+def test_with_rows_set_the_model_sees_the_first_lines_of_the_largest_file(mock_project):
+    project = load_project(mock_project)
+    project.config.llm.raw_data = cleaning.ROWS
+    request, shown = features.summary_request(project, FILES, "d'")
+    assert shown.startswith("raw/nback/ses-2/") and "1306C" not in shown
+    assert f"One person's file: {shown}, its first lines:\n<raw>\nload,condsFile," in request
 
 
 def test_a_drafted_summary_runs_and_its_instrument_is_a_draft(mock_project):
@@ -121,4 +132,4 @@ def test_a_tab_delimited_utf16_export_is_read(tmp_path):
     )
     lines = cleaning.raw_lines(tmp_path, "nback-1001-1.txt", cleaning.VALUES)
     assert lines[0] == "Raw file: nback-1001-1.txt, 2 rows under its header."
-    assert "Stim.ACC: '1', '0'" in lines
+    assert "Stim.ACC: 1, 0" in lines
