@@ -110,7 +110,7 @@ def test_selections_must_hold_within_one_administration(mock_project):
 def test_counts_keep_the_facets_own_values_open(mock_project):
     index = index_for(mock_project)
     found = counts(index, {"wave": {WAVE_1}})
-    assert found["wave"] == {WAVE_1: 9, WAVE_2: 10, WAVE_3: 10}
+    assert found["wave"] == {WAVE_1: 9, WAVE_2: 11, WAVE_3: 10}
     assert found["reporter"] == {"parent": 4, "child": 6}
     assert found["domain"] == {"emotion": 2, "family": 2, "health": 1, "media": 0}
 

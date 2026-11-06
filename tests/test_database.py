@@ -70,9 +70,10 @@ def test_each_file_of_a_folder_dataset_has_a_row_to_join_with_the_data(mock_proj
     )
     path = run_database(mock_project)
     with duckdb.connect(str(path), read_only=True) as con:
-        files = con.execute("SELECT * FROM folder_files").df()
+        files = con.execute("SELECT * FROM folder_files WHERE dataset = 'scans_w1'").df()
         joined = con.execute(
-            'SELECT f.path FROM folder_files f JOIN data."child_w1" c USING (pid)'
+            'SELECT f.path FROM folder_files f JOIN data."child_w1" c USING (pid) '
+            "WHERE f.dataset = 'scans_w1'"
         ).fetchall()
     assert files.columns.tolist() == ["dataset", "study", "wave", "pid", "path", "size", "here"]
     func = "bids/sub-{0}/ses-1/func/sub-{0}_ses-1_task-rest{1}_bold.nii.gz"

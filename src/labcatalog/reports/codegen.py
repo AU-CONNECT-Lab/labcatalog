@@ -203,7 +203,8 @@ def label_code_python(plan: LabelPlan) -> str:
 
 def label_snippets(config: ProjectConfig, catalog: Catalog) -> dict[str, dict[str, str]]:
     snippets = {}
-    for dataset in config.datasets:
+    # A folder dataset has no columns to label, only a count of files.
+    for dataset in (d for d in config.datasets if d.source != "folder"):
         plan = label_plan(config, catalog, dataset.name)
         snippets[dataset.name] = {"r": label_code_r(plan), "python": label_code_python(plan)}
     return snippets

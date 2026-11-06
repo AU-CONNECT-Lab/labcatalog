@@ -230,7 +230,7 @@ def test_a_step_cannot_overwrite_what_it_reads_or_what_another_step_writes(proje
 @pytest.mark.skipif(rscript() is None, reason="R is not installed")
 def test_example_steps_rebuild_the_example_data(mock_project, tmp_path):
     steps = load_project(mock_project).config.prepare
-    assert len(steps) == 21
+    assert len(steps) == 22
     for step in steps:
         command, script, export, clean = step.run.split()
         out = tmp_path / Path(clean).name

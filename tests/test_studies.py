@@ -189,9 +189,9 @@ def test_deleting_a_study_takes_its_datasets_and_maps(mock_project):
     found = studies.delete_study(project, "mock_study")
     removed = [c.path for c in found if c.removed]
     assert "maps/parent_w1.csv" in removed and removed[-1] == "studies/mock_study.yaml"
-    # Each dataset's map, the roster's map and the study file.
+    # Each dataset's map (a folder dataset has none), the roster's map and the study file.
     assert "maps/roster_mock_study.csv" in removed
-    assert len(removed) == len(project.config.datasets) + 2
+    assert len(removed) == sum(d.source == "csv" for d in project.config.datasets) + 2
     assert "\nstudies: {}\n\n# One entry per data file" in found[0].text
     assert changes.check(project, found) == []
     changes.write(project, found)

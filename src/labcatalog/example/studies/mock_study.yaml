@@ -20,6 +20,8 @@ methods:
     Heart activity was recorded for five minutes of seated rest with a three-lead ECG. R peaks were detected automatically and checked by hand; recordings shorter than three minutes or with fewer than 80% clean beats were left out.
   saliva: |
     Families collected saliva by passive drool at waking, 30 minutes after waking and at bedtime on one school day, and froze the tubes until the visit. Samples were assayed in duplicate; results below the detection limit counted as half the limit, and duplicates differing by more than 20% were not used.
+  task: |
+    A subset of children did a letter N-back task on a laptop at the wave 2 visit, built in PsychoPy: six practice trials, then a 1-back and a 2-back block of 40 letters each, answered with one key for a match and another for no match within two seconds. A block counted when the child answered at least 30 of its trials; d' used the log-linear correction for hit and false-alarm rates of 0 or 1.
 administrations:
   - {instrument: example_parent_stress, datasets: [parent_w1, parent_w2, parent_w3], target: self}
   - {instrument: example_child_sleep, datasets: [parent_w1, parent_w2, parent_w3], target: child}
@@ -35,3 +37,4 @@ administrations:
   - {instrument: video_play, datasets: [video_w2], target: child}
   - {instrument: ecg_resting, datasets: [ecg_w2, ecg_w3], target: self}
   - {instrument: saliva_cortisol, datasets: [saliva_w1, saliva_w3], target: self}
+  - {instrument: nback, datasets: [nback_w2], target: self}

@@ -1,0 +1,10 @@
+column,instrument,item
+pid,,
+visit_date,,
+acc_1back,nback,acc_1back
+rt_1back,nback,rt_1back
+dprime_1back,nback,dprime_1back
+acc_2back,nback,acc_2back
+rt_2back,nback,rt_2back
+dprime_2back,nback,dprime_2back
+no_response,nback,no_response

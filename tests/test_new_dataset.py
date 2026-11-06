@@ -37,11 +37,31 @@ def export(project_root, tmp_path):
     return path
 
 
+def test_a_script_named_after_its_dataset_cleans_the_next_wave_too(project_root):
+    # A drafted cleaning script is named after the dataset it was drafted for.
+    (project_root / "scripts" / "clean_export.R").rename(project_root / "scripts/clean_child_w3.R")
+    config = project_root / "labcatalog.yaml"
+    config.write_text(
+        config.read_text(encoding="utf-8").replace(
+            "scripts/clean_export.R", "scripts/clean_child_w3.R"
+        ),
+        encoding="utf-8",
+    )
+    project = load_project(project_root)
+    placement = new_dataset.placement_for(project, "child_w3", "child_w4", ".csv")
+    assert placement.copy_to == "raw/child_w4_export.csv"
+    assert placement.step.run == (
+        "Rscript scripts/clean_child_w3.R raw/child_w4_export.csv data/child_w4.csv"
+    )
+    assert placement.step.inputs == ["raw/child_w4_export.csv", "scripts/clean_child_w3.R"]
+
+
 def test_a_new_wave_follows_its_template_into_every_file(project_root, export):
     project = load_project(project_root)
-    # Datasets cut from a pipeline's folder are left out.
+    # Datasets cut from a pipeline's folder are left out; a folder dataset is not.
     usable = new_dataset.templates(project)
-    assert usable[-1] == "parent_child_w3" and "child_w3" in usable and "eeg_w3" not in usable
+    assert usable[-1] == "nback_trials_w2" and "child_w3" in usable
+    assert "eeg_w3" not in usable and "nback_w2" not in usable
     draft = new_dataset.suggest(project, "child_w3")
     assert (draft.name, draft.wave) == ("child_w4", "4")
     new_dataset.check_draft(project, draft)

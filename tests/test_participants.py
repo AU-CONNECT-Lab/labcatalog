@@ -25,7 +25,8 @@ def test_default_paragraph_gives_waves_counts_and_retention(mock_project):
     assert text.endswith(
         "Data from salivary cortisol were available for 131 of 217 child respondents at Wave 1 "
         "(60%) and 101 of 174 at Wave 3 (58%). Of these, 69 of the 131 from Wave 1 had them "
-        "again at Wave 3 (53%)."
+        "again at Wave 3 (53%). Data from computer tasks were available for 15 of 182 child "
+        "respondents at Wave 2 (8%)."
     )
     ids = {
         d.config.wave: set(d.frame[d.id_column])

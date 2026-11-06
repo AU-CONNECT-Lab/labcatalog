@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=../schemas/instrument.schema.json
+id: nback
+name: Letter N-back task
+abbreviation: NB
+modality: task
+construct_name: Working memory
+description: Letters appear one at a time on a laptop; the child presses j when a letter is the same as the one 1 back (first block) or 2 back (second block) and f when it is not, over 40 trials a block after six practice trials. PsychoPy saves one file of trials per child.
+items:
+  - {id: acc_1back, label: "1-back accuracy", text: "Share of 1-back trials answered correctly", type: number, min: 0, max: 1}
+  - {id: rt_1back, label: "1-back response time", text: "Mean response time of correct 1-back trials (ms)", type: number, min: 0, max: 2000}
+  - {id: dprime_1back, label: "1-back d′", text: "Sensitivity d′ in the 1-back block, from hits and false alarms", type: number, min: -5, max: 5}
+  - {id: acc_2back, label: "2-back accuracy", text: "Share of 2-back trials answered correctly", type: number, min: 0, max: 1}
+  - {id: rt_2back, label: "2-back response time", text: "Mean response time of correct 2-back trials (ms)", type: number, min: 0, max: 2000}
+  - {id: dprime_2back, label: "2-back d′", text: "Sensitivity d′ in the 2-back block, from hits and false alarms", type: number, min: -5, max: 5}
+  - {id: no_response, label: "Trials with no answer", text: "Trials with no key press in time, out of 80", type: number, min: 0, max: 80}
+license: Fictional example measures

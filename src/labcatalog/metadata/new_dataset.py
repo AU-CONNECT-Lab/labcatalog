@@ -17,6 +17,7 @@ from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
 from labcatalog.metadata.changes import Change
 from labcatalog.metadata.fixes import append_word
+from labcatalog.metadata.scripts import language_of
 from labcatalog.metadata.varmap import MAP_COLUMNS
 from labcatalog.paths import portable_path
 from labcatalog.project import Project
@@ -220,10 +221,12 @@ def placement_for(project: Project, template: str, name: str, suffix: str) -> Pl
             f"{template} comes from a pipeline's table by the prepare step {step.name}; once the "
             "table has the new rows, run that step again"
         )
+    # The step's script serves every wave, even one named after the dataset, as drafts are.
+    scripts = [p for p in step.inputs if language_of(p)]
     new = PrepareStep(
         name=renamed(step.name, template, name),
-        run=renamed(step.run, template, name),
-        inputs=[renamed(p, template, name) for p in step.inputs],
+        run=renamed_but(step.run, template, name, scripts),
+        inputs=[p if p in scripts else renamed(p, template, name) for p in step.inputs],
         outputs=[renamed(p, template, name) for p in step.outputs],
         stage=step.stage,
     )
@@ -240,6 +243,16 @@ def placement_for(project: Project, template: str, name: str, suffix: str) -> Pl
 
 def renamed(text: str, old: str, new: str) -> str:
     return re.sub(rf"(?<![A-Za-z0-9]){re.escape(old)}(?![A-Za-z0-9])", new, text)
+
+
+def renamed_but(text: str, old: str, new: str, kept: list[str]) -> str:
+    marked = text
+    for i, path in enumerate(kept):
+        marked = marked.replace(path, f"\0{i}\0")
+    marked = renamed(marked, old, new)
+    for i, path in enumerate(kept):
+        marked = marked.replace(f"\0{i}\0", path)
+    return marked
 
 
 def bring_in(

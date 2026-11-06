@@ -249,7 +249,12 @@ def import_instruments(project: Project) -> ImportResult:
 
 
 def unmapped_datasets(project: Project) -> list[str]:
-    return [d.name for d in project.config.datasets if d.map_name() not in project.maps]
+    # A folder dataset's only column counts files, so it needs no map.
+    return [
+        d.name
+        for d in project.config.datasets
+        if d.source != "folder" and d.map_name() not in project.maps
+    ]
 
 
 def require_unmapped(project: Project, dataset: str) -> None:

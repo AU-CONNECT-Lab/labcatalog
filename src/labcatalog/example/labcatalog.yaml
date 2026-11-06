@@ -7,9 +7,9 @@ project:
 
 # Allowed words for each dataset's modality and reporter, and for each administration's target.
 vocab:
-  modalities: [questionnaire, eeg, fmri, fnirs, eyetracking, video, ecg, saliva, actigraphy]
+  modalities: [questionnaire, eeg, fmri, fnirs, eyetracking, video, ecg, saliva, actigraphy, task]
   # How each modality reads in tables and in the Methods text; the plain word when left out.
-  modality_labels: {questionnaire: questionnaires, eeg: EEG, fmri: fMRI, fnirs: fNIRS, eyetracking: eye tracking, video: video coding, ecg: ECG, saliva: salivary cortisol}
+  modality_labels: {questionnaire: questionnaires, eeg: EEG, fmri: fMRI, fnirs: fNIRS, eyetracking: eye tracking, video: video coding, ecg: ECG, saliva: salivary cortisol, task: computer tasks}
   reporters: [parent, child]
   targets: [self, child]
 
@@ -96,6 +96,9 @@ datasets:
   - {name: ecg_w3, modality: ecg, study: mock_study, wave: 3, reporter: child, source: csv, path: data/ecg_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: saliva_w1, modality: saliva, study: mock_study, wave: 1, reporter: child, source: csv, path: data/saliva_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: saliva_w3, modality: saliva, study: mock_study, wave: 3, reporter: child, source: csv, path: data/saliva_w3.csv, date_column: visit_date, snapshot_date: 2026-10-10}
+  # A folder dataset: PsychoPy's trial file for each child who did the N-back task, counted by path; extract_nback_w2 turns them into nback_w2.
+  - {name: nback_trials_w2, modality: task, study: mock_study, wave: 2, reporter: child, source: folder, path: raw/nback/ses-2, files: '{id}_nback_*_*.csv', snapshot_date: 2026-10-10}
+  - {name: nback_w2, modality: task, study: mock_study, wave: 2, reporter: child, source: csv, path: data/nback_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: s2_parent_baseline, modality: questionnaire, study: mock_study_2, wave: baseline, reporter: parent, source: csv, path: data/s2_parent_baseline.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: s2_parent_followup, modality: questionnaire, study: mock_study_2, wave: followup, reporter: parent, source: csv, path: data/s2_parent_followup.csv, date_column: visit_date, snapshot_date: 2026-10-10}
   - {name: s2_child_baseline, modality: questionnaire, study: mock_study_2, wave: baseline, reporter: child, source: csv, path: data/s2_child_baseline.csv, date_column: visit_date, snapshot_date: 2026-10-10}
@@ -124,7 +127,7 @@ browse:
 references:
   root: references
 
-# Your own cleaning scripts, run in order from the Scripts page or the Add data step. Here one script turns each survey-platform export in raw/ into the clean file the catalog reads, and one script per modality turns the per-child results its pipeline left in derivatives/ into one row per child; listing the script among the inputs marks the step outdated when the script changes.
+# Your own cleaning scripts, run in order from the Scripts page or the Add data step. Here one script turns each survey-platform export in raw/ into the clean file the catalog reads, and one script per modality turns the per-child results its pipeline left in derivatives/, or the task's trial files in raw/nback/, into one row per child; listing the script among the inputs marks the step outdated when the script changes.
 prepare:
   - {name: clean_parent_w1, run: Rscript scripts/clean_export.R raw/parent_w1_export.csv data/parent_w1.csv, inputs: [raw/parent_w1_export.csv, scripts/clean_export.R], outputs: [data/parent_w1.csv], stage: clean}
   - {name: clean_parent_w2, run: Rscript scripts/clean_export.R raw/parent_w2_export.csv data/parent_w2.csv, inputs: [raw/parent_w2_export.csv, scripts/clean_export.R], outputs: [data/parent_w2.csv], stage: clean}
@@ -147,3 +150,4 @@ prepare:
   - {name: extract_ecg_w3, run: python scripts/extract_ecg.py derivatives/ecg/ses-3 data/ecg_w3.csv, inputs: [derivatives/ecg/ses-3/sessions.csv, scripts/extract_ecg.py], outputs: [data/ecg_w3.csv], stage: extract}
   - {name: extract_saliva_w1, run: Rscript scripts/extract_saliva.R derivatives/saliva/ses-1/assay_report.csv data/saliva_w1.csv, inputs: [derivatives/saliva/ses-1/assay_report.csv, scripts/extract_saliva.R], outputs: [data/saliva_w1.csv], stage: extract}
   - {name: extract_saliva_w3, run: Rscript scripts/extract_saliva.R derivatives/saliva/ses-3/assay_report.csv data/saliva_w3.csv, inputs: [derivatives/saliva/ses-3/assay_report.csv, scripts/extract_saliva.R], outputs: [data/saliva_w3.csv], stage: extract}
+  - {name: extract_nback_w2, run: python scripts/extract_nback_w2.py raw/nback/ses-2 data/nback_w2.csv, inputs: [raw/nback/ses-2, scripts/extract_nback_w2.py], outputs: [data/nback_w2.csv], stage: extract}

@@ -244,7 +244,8 @@ def main_panels(
         else:
             empty("No problems found.", "check_circle")
 
-    label_code(result.label_snippets[summary.dataset])
+    if summary.dataset in result.label_snippets:
+        label_code(result.label_snippets[summary.dataset])
 
 
 def label_code(snippets: dict[str, str]) -> None:
