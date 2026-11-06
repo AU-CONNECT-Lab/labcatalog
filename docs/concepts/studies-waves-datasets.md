@@ -59,6 +59,18 @@ datasets:
 
 Each dataset reads only the rows whose `wave` column matches its own `wave`, written the same way (`1` matches `1`, not `01` or `T1`). When the column writes the waves another way, give each dataset its `wave_value`, such as `wave_value: T1` on wave `1`; the dataset then reads the rows with `T1`, and the rest of labcatalog still calls it wave 1. Everything else treats it as a file of its own: each dataset has its own column map in `maps/`, where the wave column is listed like the ID column, with no instrument. When the waves have the same columns, they can share one map (see [One map for several datasets](variable-maps.md#one-map-for-several-datasets)). If the file has rows for a wave that no dataset reads, `labcatalog check` warns with `wave_unclaimed`. Problems point to the row's line in the shared file. When the file gains a wave, **Repeat a dataset** on the [Datasets](../app/datasets.md#add-a-dataset) page adds the next dataset for it, and the Datasets table in the editor in the **Codebook** step of the Set up page has **Wave column** and **Wave in the file** columns.
 
+### One questionnaire given several times in a wave
+
+When a questionnaire is given more than once in the same wave, such as before and after a task, or once about a parent and once about a friend, each time is a dataset of its own: the same study, wave and reporter, the same instrument in its administration, and a column map that links only that time's columns. In a survey export with one row per person, the datasets all point at the same file:
+
+```yaml
+datasets:
+  - {name: panas_before, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/visit_w1.csv}
+  - {name: panas_after, modality: questionnaire, study: mock_study, wave: 1, reporter: child, source: csv, path: data/visit_w1.csv}
+```
+
+`maps/panas_before.csv` links `panas_pre_1` and so on to the items, `maps/panas_after.csv` links `panas_post_1` and so on to the same items, and each time gets its own scores, such as `panas.pa@panas_before` and `panas.pa@panas_after`. A column that another dataset of the same file links counts as described, so `labcatalog check` warns with `column_unmapped` only about columns that no dataset of the file lists. One map cannot link two columns to the same item, which is why each time needs its own dataset.
+
 ## Modalities
 
 `vocab.modalities` lists the kinds of data in the project, such as `questionnaire`, `eeg` or `fmri`. The words are yours to choose. `vocab.modality_labels` says how each one reads in tables and in the Methods text:

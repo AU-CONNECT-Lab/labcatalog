@@ -48,6 +48,24 @@ def test_columns_missing_from_data_and_undescribed_columns(mock_project):
     assert "notes" in issues["column_unmapped"].message
 
 
+def test_a_column_another_dataset_of_the_same_file_maps_is_described(mock_project):
+    # Each administration of one wide file is a dataset of its own with its own map.
+    assert any("notes" in m for m in found(run_check(mock_project))["column_unmapped"])
+    line = (
+        "  - {name: child_w3, modality: questionnaire, study: mock_study, wave: 3, "
+        "reporter: child, source: csv, path: data/child_w3.csv, date_column: visit_date, "
+        "snapshot_date: 2026-10-10}\n"
+    )
+    extra = line.replace("name: child_w3,", "name: child_w3_notes,")
+    edit(mock_project / "labcatalog.yaml", line, line + extra)
+    (mock_project / "maps" / "child_w3_notes.csv").write_text(
+        "column,instrument,item\npid,,\nnotes,,\n", encoding="utf-8"
+    )
+    report = run_check(mock_project)
+    columns = [i for i in report.issues if i.code in ("column_unmapped", "column_missing")]
+    assert not any(i.details.get("dataset") in ("child_w3", "child_w3_notes") for i in columns)
+
+
 def test_duplicate_and_malformed_ids(mock_project):
     def change(frame):
         frame.loc[1, "pid"] = frame.loc[0, "pid"]

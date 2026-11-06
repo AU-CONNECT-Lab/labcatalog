@@ -1,4 +1,6 @@
+import os
 import re
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
@@ -59,8 +61,19 @@ def check_project(
     )
 
 
+def same_source(path: Path) -> str:
+    return os.path.normcase(str(path.resolve()))
+
+
 def check_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issue]:
     issues = []
+    # One file may hold several administrations, each read by its own dataset and map.
+    mapped: dict[str, set[str]] = {}
+    for loaded in datasets.values():
+        if loaded.source_path is not None:
+            entries = project.maps.get(loaded.config.map_name(), [])
+            columns = mapped.setdefault(same_source(loaded.source_path), set())
+            columns.update(entry.column for entry in entries)
     for name, loaded in datasets.items():
         entries = project.maps.get(loaded.config.map_name())
         if entries is None:
@@ -81,6 +94,8 @@ def check_columns(project: Project, datasets: dict[str, LoadedDataset]) -> list[
                     )
                 )
         described = {entry.column for entry in entries}
+        if loaded.source_path is not None:
+            described |= mapped[same_source(loaded.source_path)]
         undescribed = [column for column in loaded.frame if column not in described]
         if undescribed:
             message = f"{len(undescribed)} column(s) not in {map_file}: {examples(undescribed)}"
