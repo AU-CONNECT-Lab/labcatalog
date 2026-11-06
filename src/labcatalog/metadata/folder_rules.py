@@ -11,6 +11,10 @@ FIELD = re.compile(r"([A-Za-z]+)-([A-Za-z0-9]+)")
 BY_PATTERN = ""
 # Fields that vary, such as run-*, which some names have and others leave out.
 OPTIONAL = re.compile(r"(_[A-Za-z]+-\*)+(?=[_.])")
+# A file name's extension, such as .csv or .nii.gz.
+EXTENSION = re.compile(r"(\.[A-Za-z][A-Za-z0-9]*)+$")
+# A word that differs in most files of the same kind, such as a date or a time, matches anything.
+FREE_SHARE = 0.5
 SHOWN = 5
 # Only the most common kinds of file are counted, as each count reads every path.
 COUNTED = 20
@@ -43,8 +47,14 @@ class FolderCount:
 
 def tokens(part: str, last: bool) -> tuple[list[str], str]:
     # A file name's extension stays out of its tokens.
-    stem, dot, extension = part.partition(".") if last else (part, "", "")
-    return stem.split("_"), dot + extension
+    stem, extension = split_extension(part) if last else (part, "")
+    return stem.split("_"), extension
+
+
+def split_extension(name: str) -> tuple[str, str]:
+    # Only the dotted parts that start with a letter: .nii.gz, but .csv of 10h15.32.123.csv.
+    found = EXTENSION.search(name)
+    return (name[: found.start()], found[0]) if found else (name, "")
 
 
 def path_fields(paths: list[str]) -> list[Field]:
@@ -120,7 +130,7 @@ def suggest(paths: list[str], key: str, wave: str, pattern: str | None = None) -
         if by_wave is None
         or not any(m[1] == by_wave and not same_wave(m[2], wave) for m in FIELD.finditer(p))
     ]
-    made = Counter(t for p in kept if (t := template(p, key, compiled, varying)))
+    made = free_words(Counter(t for p in kept if (t := template(p, key, compiled, varying))))
     # The same rule with its optional fields as *, so names with and without them both count.
     made.update({OPTIONAL.sub("*", t): n for t, n in made.items() if OPTIONAL.search(t)})
     # Of rules that count the same files, the one with the fewest wildcards.
@@ -134,6 +144,33 @@ def suggest(paths: list[str], key: str, wave: str, pattern: str | None = None) -
             rules.append(Rule(files, seen.people, seen.files))
     rules.sort(key=lambda r: (-r.people, -r.count, r.files.count("*"), r.files))
     return rules[:SHOWN]
+
+
+def free_words(made: Counter[str]) -> Counter[str]:
+    # Rules alike but for a date, a time or another word that changes from file to file merge.
+    kinds: dict[tuple, list[tuple[list[str], int]]] = {}
+    for files, n in made.items():
+        stem, extension = split_extension(files)
+        words = re.split(r"([_/])", stem)
+        shape = (extension, tuple(words[1::2]), tuple(i for i, w in enumerate(words) if ID in w))
+        kinds.setdefault(shape, []).append((words, n))
+    merged: Counter[str] = Counter()
+    for (extension, *_), rules in kinds.items():
+        total = sum(n for _, n in rules)
+        free = set()
+        for i in range(0, len(rules[0][0]), 2):
+            seen = {w[i] for w, _ in rules}
+            if all(map(numeric, seen)) or len(seen) > max(1, FREE_SHARE * total):
+                free.add(i)
+        for words, n in rules:
+            merged["".join("*" if i in free else w for i, w in enumerate(words)) + extension] += n
+    return merged
+
+
+def numeric(word: str) -> bool:
+    # Mostly digits, as a date (2025-03-01) or a time (10h15.32.123) is.
+    digits = sum(c.isdigit() for c in word)
+    return digits > sum(c.isalpha() for c in word)
 
 
 def count_folder(

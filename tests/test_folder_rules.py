@@ -63,6 +63,23 @@ def test_without_fields_the_id_is_the_part_that_matches_the_pattern():
     ]
 
 
+def test_a_date_and_time_in_each_name_match_anything():
+    # PsychoPy names each file after the participant, the experiment and when it started.
+    paths = [
+        "1001C_nback_2025-03-01_10h15.32.123.csv",
+        "1002C_nback_2025-03-01_14h02.07.950.csv",
+        "1003C_nback_2025-03-04_09h40.51.004.csv",
+        "1003C_nback_2025-03-04_09h40.51.004.log",
+        "1001C_flanker_2025-03-01_10h31.12.500.csv",
+    ]
+    rules = suggest(paths, BY_PATTERN, "1", r"\d{4}C")
+    assert [(r.files, r.people) for r in rules] == [
+        ("{id}_nback_*_*.csv", 3),
+        ("{id}_flanker_*_*.csv", 1),
+        ("{id}_nback_*_*.log", 1),
+    ]
+
+
 def test_the_count_shows_repeats_and_ids_the_roster_does_not_know():
     rule = "sub-{id}/ses-1/eeg/*_eeg.edf"
     seen = count_folder(BIDS, rule, roster={"01", "04", "05"}, pattern=r"0[0-3]")
