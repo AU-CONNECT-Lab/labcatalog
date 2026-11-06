@@ -1,5 +1,8 @@
+import io
+
 import pytest
 
+from labcatalog.ai import documents
 from labcatalog.ai import instrument as ai_instrument
 from labcatalog.exceptions import EditError
 from labcatalog.issues import Issue
@@ -71,6 +74,7 @@ OUTPUT = {
 class FakeClient(LLMClient):
     def __init__(self) -> None:
         self.request = ""
+        self.images = []
 
     @property
     def provider_name(self) -> str:
@@ -80,8 +84,8 @@ class FakeClient(LLMClient):
     def model_name(self) -> str:
         return "fake-model"
 
-    def complete_structured(self, *, system, user_message, tool_schema):
-        self.request = user_message
+    def complete_structured(self, *, system, user_message, tool_schema, images=()):
+        self.request, self.images = user_message, list(images)
         return OUTPUT, CallMetadata("fake", "fake-model", 100, 20, 1500)
 
 
@@ -134,3 +138,48 @@ def test_an_id_already_in_instruments_is_refused_before_asking_the_model(mock_pr
     with pytest.raises(EditError, match="already exists"):
         ai_instrument.draft_instrument(mock_project, "example_mood", pdf, client)
     assert client.request == ""
+
+
+def word_file(path):
+    # A heading, a table of boxes to tick and the same picture twice, as a survey packet has.
+    docx = pytest.importorskip("docx")
+    image = pytest.importorskip("PIL.Image")
+    picture = io.BytesIO()
+    image.new("RGB", (8, 8), "white").save(picture, "PNG")
+    document = docx.Document()
+    document.add_heading("Mood Form", level=1)
+    document.add_paragraph("Mark one box for each feeling.")
+    table = document.add_table(rows=2, cols=3)
+    shown = [["Feeling", "1 Never", "2 Often"], ["Happy", "☐", "☐"]]
+    for row, cells in zip(table.rows, shown, strict=True):
+        for cell, text in zip(row.cells, cells, strict=True):
+            cell.text = text
+    document.add_paragraph("How close are you? Circle one.")
+    document.add_picture(io.BytesIO(picture.getvalue()))
+    document.add_picture(io.BytesIO(picture.getvalue()))
+    document.save(path)
+    return path
+
+
+def test_a_word_file_reads_in_order_with_its_tables_and_numbered_pictures(tmp_path):
+    found = documents.read_document(word_file(tmp_path / "packet.docx"))
+    assert found.text.splitlines()[:2] == ["# Mood Form", "Mark one box for each feeling."]
+    table = ["| Feeling | 1 Never | 2 Often |", "| --- | --- | --- |", "| Happy | ☐ | ☐ |"]
+    assert "\n".join(table) in found.text
+    # The same picture used twice is one picture.
+    assert found.text.count("[picture 1]") == 2 and "[picture 2]" not in found.text
+    assert [(n, image.media_type) for n, image in found.pictures] == [(1, "image/png")]
+    assert found.unsent == []
+
+
+def test_a_word_files_pictures_go_to_the_model_unless_turned_off(mock_project, tmp_path):
+    path = word_file(tmp_path / "packet.docx")
+    client = FakeClient()
+    draft = ai_instrument.draft_instrument(mock_project, "mood", path, client, "the mood form")
+    assert "Pictures attached, in order: 1." in client.request
+    assert len(client.images) == 1 and client.images[0].media_type == "image/png"
+    text = draft.path.read_text(encoding="utf-8")
+    assert "on " in text and "from packet.docx." in text
+    assert text.rstrip().endswith("#   - {key: <its key in references.bib>}")
+    ai_instrument.draft_instrument(mock_project, "mood", path, client, pictures=False)
+    assert client.images == [] and "Pictures you are not shown: 1." in client.request

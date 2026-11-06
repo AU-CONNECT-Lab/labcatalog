@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -20,11 +21,22 @@ class CallMetadata:
     latency_ms: int = 0
 
 
+@dataclass
+class Image:
+    media_type: str
+    data: bytes
+
+
 class LLMClient(ABC):
     # Providers must enforce the schema at the API, never parse free-text JSON.
     @abstractmethod
     def complete_structured(
-        self, *, system: str, user_message: str, tool_schema: ToolSchema
+        self,
+        *,
+        system: str,
+        user_message: str,
+        tool_schema: ToolSchema,
+        images: Sequence[Image] = (),
     ) -> tuple[dict[str, Any], CallMetadata]: ...
 
     @property

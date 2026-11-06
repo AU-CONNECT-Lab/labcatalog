@@ -1,9 +1,11 @@
+import base64
 import json
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from labcatalog.exceptions import LLMError
-from labcatalog.llm.base import CallMetadata, LLMClient, ToolSchema
+from labcatalog.llm.base import CallMetadata, Image, LLMClient, ToolSchema
 from labcatalog.llm.retry import with_retries
 
 # Local servers want some key in the header but do not check it.
@@ -41,11 +43,31 @@ class OpenAIClient(LLMClient):
         return self._model
 
     def complete_structured(
-        self, *, system: str, user_message: str, tool_schema: ToolSchema
+        self,
+        *,
+        system: str,
+        user_message: str,
+        tool_schema: ToolSchema,
+        images: Sequence[Image] = (),
     ) -> tuple[dict[str, Any], CallMetadata]:
         openai = self._openai
         local = self._provider == "local"
         capped = {"max_tokens": LOCAL_MAX_TOKENS} if local else {}
+        content: str | list[dict] = user_message
+        if images:
+            content = [
+                {"type": "text", "text": user_message},
+                *(
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{image.media_type};base64,"
+                            + base64.b64encode(image.data).decode()
+                        },
+                    }
+                    for image in images
+                ),
+            ]
 
         # A JSON schema response format, which local servers enforce for any model,
         # where tool calling depends on each model's template.
@@ -54,7 +76,7 @@ class OpenAIClient(LLMClient):
                 model=self._model,
                 messages=[
                     {"role": "system", "content": system},
-                    {"role": "user", "content": user_message},
+                    {"role": "user", "content": content},
                 ],
                 response_format={
                     "type": "json_schema",

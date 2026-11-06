@@ -1,55 +1,30 @@
+import json
 import os
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from labcatalog.exceptions import LLMError
-from labcatalog.llm.base import CallMetadata, LLMClient, ToolSchema
+from labcatalog.llm.base import CallMetadata, Image, LLMClient, ToolSchema
 from labcatalog.llm.retry import with_retries
 
 KEY_ENV = "GEMINI_API_KEY"
-# Errors that fail the same way on every attempt, such as a wrong key or a rejected schema.
-PERMANENT_MARKERS = (
-    "api key",
-    "api_key",
-    "unauthenticated",
-    "permission",
-    "invalid argument",
-    "invalid_argument",
-    "bad request",
-)
-
-
-def is_retryable(e: Exception) -> bool:
-    # google-generativeai has no stable exception classes, so this reads the status or the message.
-    code = getattr(e, "code", None)
-    if isinstance(code, int):
-        return code in (408, 429) or code >= 500
-    message = str(e).lower()
-    return not any(marker in message for marker in PERMANENT_MARKERS)
-
-
-def plain(obj: Any) -> Any:
-    # Gemini returns proto maps and lists; the rest of labcatalog wants plain Python.
-    if obj is None or isinstance(obj, str | bytes | bool | int | float):
-        return obj
-    if hasattr(obj, "items"):
-        return {k: plain(v) for k, v in obj.items()}
-    if hasattr(obj, "__iter__"):
-        return [plain(v) for v in obj]
-    return obj
+MAX_TOKENS = 16000
 
 
 class GeminiClient(LLMClient):
-    # Untested against a live key, as in the package it was ported from.
+    # The Google Gen AI SDK, with the schema as a structured output (response_json_schema).
     def __init__(self, *, model: str, max_retries: int = 3) -> None:
         try:
-            import google.generativeai as genai
+            from google import genai
+            from google.genai import errors, types
         except ImportError as e:
-            raise LLMError(
-                "The google-generativeai package is missing: pip install labcatalog[ai]"
-            ) from e
-        self._genai = genai
-        genai.configure(api_key=os.environ.get(KEY_ENV))
+            raise LLMError("The google-genai package is missing: pip install labcatalog[ai]") from e
+        self._errors, self._types = errors, types
+        try:
+            self._client = genai.Client(api_key=os.environ.get(KEY_ENV))
+        except ValueError as e:
+            raise LLMError(f"Gemini: {e}") from e
         self._model = model
         self._max_retries = max_retries
 
@@ -62,57 +37,64 @@ class GeminiClient(LLMClient):
         return self._model
 
     def complete_structured(
-        self, *, system: str, user_message: str, tool_schema: ToolSchema
+        self,
+        *,
+        system: str,
+        user_message: str,
+        tool_schema: ToolSchema,
+        images: Sequence[Image] = (),
     ) -> tuple[dict[str, Any], CallMetadata]:
-        tool = {
-            "function_declarations": [
-                {
-                    "name": tool_schema.name,
-                    "description": tool_schema.description,
-                    # Gemini's schema has no additionalProperties field.
-                    "parameters": {
-                        k: v
-                        for k, v in tool_schema.input_schema.items()
-                        if k != "additionalProperties"
-                    },
-                }
-            ]
-        }
-        model = self._genai.GenerativeModel(self._model, system_instruction=system, tools=[tool])
+        errors, types = self._errors, self._types
+        contents = [
+            *(
+                types.Part.from_bytes(data=image.data, mime_type=image.media_type)
+                for image in images
+            ),
+            user_message,
+        ]
+        config = types.GenerateContentConfig(
+            system_instruction=system,
+            max_output_tokens=MAX_TOKENS,
+            response_mime_type="application/json",
+            response_json_schema=tool_schema.input_schema,
+        )
 
         def call():
-            return model.generate_content(
-                user_message,
-                tool_config={
-                    "function_calling_config": {
-                        "mode": "ANY",
-                        "allowed_function_names": [tool_schema.name],
-                    }
-                },
+            return self._client.models.generate_content(
+                model=self._model, contents=contents, config=config
             )
+
+        def is_retryable(e: Exception) -> bool:
+            return isinstance(e, errors.APIError) and (e.code in (408, 429) or e.code >= 500)
 
         t0 = time.monotonic()
         try:
             response = with_retries(call, is_retryable=is_retryable, max_retries=self._max_retries)
+        except errors.ClientError as e:
+            raise LLMError(f"Gemini rejected the request: {e}") from e
         except Exception as e:
             raise LLMError(f"Gemini call failed: {e}") from e
         latency_ms = int((time.monotonic() - t0) * 1000)
 
-        output = None
-        for part in response.candidates[0].content.parts:
-            found = getattr(part, "function_call", None)
-            if found is not None and found.name == tool_schema.name:
-                output = plain(found.args)
-                break
-        if output is None:
-            raise LLMError(f"Gemini did not call {tool_schema.name}.")
+        candidate = response.candidates[0] if response.candidates else None
+        reason = getattr(getattr(candidate, "finish_reason", None), "name", "")
+        if reason == "MAX_TOKENS":
+            raise LLMError(f"The answer was cut off at {MAX_TOKENS} tokens.")
+        if candidate is None or reason in ("SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST"):
+            raise LLMError(f"Gemini declined to answer ({reason or 'no answer'}).")
+        try:
+            output = json.loads(response.text)
+        except (ValueError, TypeError) as e:
+            raise LLMError(f"Gemini did not return valid JSON: {e}") from e
 
         usage = response.usage_metadata
         meta = CallMetadata(
             provider="gemini",
             model=self._model,
             input_tokens=getattr(usage, "prompt_token_count", 0) or 0,
-            output_tokens=getattr(usage, "candidates_token_count", 0) or 0,
+            # Thinking models count their reasoning apart from the answer.
+            output_tokens=(getattr(usage, "candidates_token_count", 0) or 0)
+            + (getattr(usage, "thoughts_token_count", 0) or 0),
             latency_ms=latency_ms,
         )
-        return dict(output), meta
+        return output, meta

@@ -4,7 +4,7 @@
 
 ## Instruments and the editor
 
-The step holds **From a codebook** (below), folded until a codebook is under way, and under it [the editor](edit.md) lists and edits every project file, the instruments and drafts first; its **New instrument** and **New instrument from a PDF** make an empty instrument file to fill in, or a draft a language model writes from the instrument's PDF (see [Add an Instrument](../how-to/add-instrument.md)). Drafts in `drafts/` waiting to be checked are counted on the step bar.
+The step holds **From a codebook** (below), folded until a codebook is under way, and under it [the editor](edit.md) lists and edits every project file, the instruments and drafts first; its **New instrument** and **New instrument from a document** make an empty instrument file to fill in, or a draft a language model writes from the instrument's PDF or Word file (see [Add an Instrument](../how-to/add-instrument.md)). Drafts in `drafts/` waiting to be checked are counted on the step bar.
 
 ## From a codebook
 

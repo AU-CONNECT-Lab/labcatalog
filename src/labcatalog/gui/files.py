@@ -8,6 +8,7 @@ from labcatalog.gui import common
 FILE = "file"
 FOLDER = "folder"
 PDF_FILES = "PDF files (*.pdf)"
+DOCUMENT_FILES = "PDF or Word files (*.pdf;*.docx)"
 
 
 async def choose_path(

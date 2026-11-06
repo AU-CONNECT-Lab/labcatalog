@@ -37,7 +37,7 @@ A file whose YAML cannot be read opens only as text; fix it there first.
 ## New instruments
 
 - **New instrument** creates `instruments/<id>.yaml` with the required keys.
-- **New instrument from a PDF** drafts a whole instrument with the language model set on the Settings page. The draft goes to `drafts/`, outside the catalog. Check it against the PDF, then press **Move to instruments**. See [Add an Instrument](../how-to/add-instrument.md).
+- **New instrument from a document** drafts a whole instrument from a PDF or Word file with the language model set on the Settings page, sending a Word file's pictures to a model that reads images. The draft goes to `drafts/`, outside the catalog. Check it against the file, then press **Move to instruments**. See [Add an Instrument](../how-to/add-instrument.md).
 
 (editor-references)=
 ## References

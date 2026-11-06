@@ -217,9 +217,10 @@ def run_instrument_draft(
     model: str,
     url: str,
     which: str = "",
+    pictures: bool = True,
 ) -> InstrumentDraft:
     client = make_llm_client(provider, model, url)
-    return draft_instrument(root, instrument_id, pdf, client, which)
+    return draft_instrument(root, instrument_id, pdf, client, which, pictures)
 
 
 def run_search(result: CatalogResult, query: str, provider: str, model: str, url: str) -> Search:

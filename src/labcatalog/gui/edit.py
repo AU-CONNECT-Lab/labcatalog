@@ -6,11 +6,12 @@ from pathlib import Path
 from nicegui import ui
 
 from labcatalog import defaults
+from labcatalog.ai.documents import read_document
 from labcatalog.charts import mindmap
 from labcatalog.exceptions import EditError, LabCatalogError, MetadataError
 from labcatalog.gui import common, edit_form, references, theme
 from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
-from labcatalog.gui.files import PDF_FILES, choose_path
+from labcatalog.gui.files import DOCUMENT_FILES, choose_path
 from labcatalog.issues import Issue
 from labcatalog.metadata import editing, records
 from labcatalog.metadata import fields as field_values
@@ -31,7 +32,7 @@ class EditView:
     line: int | None = None
     # Set by the page, so other pages can open a file in it.
     open: Callable[[str, int | None], None] | None = None
-    # Also set by the page: its New instrument and New instrument from a PDF dialogs.
+    # Also set by the page: its New instrument and New instrument from a document dialogs.
     create: Callable[[], None] | None = None
     draft: Callable[[], None] | None = None
     # Whether the instrument's structure above the editor is open.
@@ -304,9 +305,12 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
 
     def draft() -> None:
         with ui.dialog() as dialog, ui.card().classes("w-[32rem]"):
-            ui.label("New instrument from a PDF")
+            ui.label("New instrument from a document")
             if not common.model_set():
-                note("Set a language model on the Settings page to draft an instrument from a PDF.")
+                note(
+                    "Set a language model on the Settings page to draft an instrument from a "
+                    "document."
+                )
                 ui.button("Close", on_click=dialog.close).props("flat")
                 dialog.open()
                 return
@@ -314,17 +318,36 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
             chosen: list[Path] = []
 
             async def pick() -> None:
-                found = await choose_path(file_types=(PDF_FILES,), start=root)
-                if found:
-                    chosen[:] = [found]
-                    picked.set_text(found.name)
+                found = await choose_path(file_types=(DOCUMENT_FILES,), start=root)
+                if not found:
+                    return
+                chosen[:] = [found]
+                picked.set_text(found.name)
+                try:
+                    document = await computed(read_document, found)
+                except LabCatalogError as err:
+                    status.set_text(str(err))
+                    return
+                status.set_text("")
+                pictures.set_visibility(bool(document.pictures))
+                pictures.text = (
+                    f"Send its {len(document.pictures)} picture"
+                    f"{'s' if len(document.pictures) > 1 else ''} to the model, which then needs "
+                    "to read images"
+                )
+                unsent.set_text(
+                    f"{len(document.unsent)} picture(s) are in a format no model reads, such as "
+                    "EMF; the draft names the items that need them."
+                    if document.unsent
+                    else ""
+                )
 
             async def make() -> None:
                 if not chosen:
-                    ui.notify("Choose the PDF first")
+                    ui.notify("Choose the file first")
                     return
                 button.disable()
-                status.set_text("Reading the PDF and drafting the instrument.")
+                status.set_text("Reading the file and drafting the instrument.")
                 try:
                     drafted = await computed(
                         run_instrument_draft,
@@ -333,9 +356,14 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         chosen[0],
                         *common.llm_choice(),
                         which.value or "",
+                        bool(pictures.value),
                     )
                 except LabCatalogError as err:
-                    status.set_text(str(err))
+                    sent = pictures.visible and pictures.value
+                    hint = (
+                        " A model that reads text only needs the pictures left out." if sent else ""
+                    )
+                    status.set_text(f"{err}{hint}")
                     button.enable()
                     return
                 dialog.close()
@@ -347,18 +375,22 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 leave(partial(go, drafted.path.relative_to(root).as_posix(), FORM))
 
             with ui.row().classes("items-center gap-3"):
-                ui.button("Choose the PDF", icon="picture_as_pdf", on_click=pick).props(
+                ui.button("Choose the file", icon="description", on_click=pick).props(
                     "flat no-caps"
                 )
                 picked = ui.label()
             which = ui.input(
-                "Which instrument, if the PDF has several (optional)",
+                "Which instrument, if the file has several (optional)",
                 placeholder="for example the short form",
             ).classes("w-full")
+            pictures = ui.checkbox(value=True).props("dense")
+            pictures.set_visibility(False)
+            unsent = ui.label().classes("lc-note")
             note(
-                f"The draft goes into {defaults.DRAFTS_DIR}/, replacing a draft with the "
-                "same ID, and stays out of the catalog until you move it to instruments/. The "
-                "PDF's text, including the item wording, is sent to the model's provider."
+                f"A PDF or a Word file (.docx). The draft goes into {defaults.DRAFTS_DIR}/, "
+                "replacing a draft with the same ID, and stays out of the catalog until you move "
+                "it to instruments/. The file's text, including the item wording, and the "
+                "pictures you send go to the model's provider."
             )
             with ui.row():
                 button = ui.button("Draft", on_click=make)
@@ -477,9 +509,9 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                 ui.button("New instrument", icon="add", on_click=lambda: leave(create)).props(
                     "flat dense no-caps"
                 ).classes("mt-2")
-                ui.button("New instrument from a PDF", icon="picture_as_pdf", on_click=draft).props(
-                    "flat dense no-caps"
-                )
+                ui.button(
+                    "New instrument from a document", icon="description", on_click=draft
+                ).props("flat dense no-caps")
                 ui.button("Add references", icon="library_add", on_click=add_references).props(
                     "flat dense no-caps"
                 )
@@ -507,8 +539,8 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                             ).props("flat dense no-caps")
                 if editing.is_draft(view.path):
                     ui.label(
-                        "A draft from a PDF, kept out of the catalog. Check it against the PDF "
-                        "and add its reference, then move it to instruments/."
+                        "A draft from a document, kept out of the catalog. Check it against the "
+                        "document and add its reference, then move it to instruments/."
                     ).classes("lc-status lc-warn")
                 if editing.is_instrument_file(view.path):
                     structure_panel()

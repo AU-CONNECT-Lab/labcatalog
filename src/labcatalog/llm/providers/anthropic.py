@@ -1,9 +1,11 @@
+import base64
 import json
 import time
+from collections.abc import Sequence
 from typing import Any
 
 from labcatalog.exceptions import LLMError
-from labcatalog.llm.base import CallMetadata, LLMClient, ToolSchema
+from labcatalog.llm.base import CallMetadata, Image, LLMClient, ToolSchema
 from labcatalog.llm.retry import with_retries
 
 MAX_TOKENS = 16000
@@ -30,9 +32,31 @@ class AnthropicClient(LLMClient):
         return self._model
 
     def complete_structured(
-        self, *, system: str, user_message: str, tool_schema: ToolSchema
+        self,
+        *,
+        system: str,
+        user_message: str,
+        tool_schema: ToolSchema,
+        images: Sequence[Image] = (),
     ) -> tuple[dict[str, Any], CallMetadata]:
         anthropic = self._anthropic
+        # Pictures go before the text that refers to them, as Anthropic advises.
+        content: str | list[dict] = user_message
+        if images:
+            content = [
+                *(
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": image.media_type,
+                            "data": base64.b64encode(image.data).decode(),
+                        },
+                    }
+                    for image in images
+                ),
+                {"type": "text", "text": user_message},
+            ]
 
         # Current models reject forced tool calls, so the schema goes in as a structured output.
         def call():
@@ -40,7 +64,7 @@ class AnthropicClient(LLMClient):
                 model=self._model,
                 max_tokens=MAX_TOKENS,
                 system=system,
-                messages=[{"role": "user", "content": user_message}],
+                messages=[{"role": "user", "content": content}],
                 output_config={
                     "format": {"type": "json_schema", "schema": tool_schema.input_schema}
                 },

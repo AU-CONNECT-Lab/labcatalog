@@ -4,16 +4,17 @@ from pathlib import Path
 from typing import Any
 
 from labcatalog import defaults
-from labcatalog.ai.scoring import pdf_text
+from labcatalog.ai.documents import read_document
 from labcatalog.codebook.core import ITEM_TYPES, METHODS, MISSING_RULES, number_or_text, yaml_text
 from labcatalog.exceptions import LLMError
-from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
+from labcatalog.llm import CallMetadata, Image, LLMClient, ToolSchema
 from labcatalog.metadata.editing import free_instrument_path
 
 SYSTEM = """You enter questionnaires into a research lab's catalog. You are given an \
-instrument's paper or manual, converted from PDF, and the ID the lab chose for the instrument. \
-Draft the instrument's entry from the document: its name, abbreviation, the construct it \
-measures, the instructions to respondents, the response options, every item and every score.
+instrument's paper, manual or form, converted from a PDF or Word file, and the ID the lab chose \
+for the instrument. Draft the instrument's entry from the document: its name, abbreviation, \
+the construct it measures, the instructions to respondents, the response options, every item \
+and every score.
 
 Take everything from the document, and copy the item wording and the instructions word for \
 word. Where the document does not say, leave the field empty; do not fill it in from what you \
@@ -39,6 +40,10 @@ Add a score for every total and subscale the document defines, with its items an
 answers missing: prorate when the missing answers take the mean of the answered ones, with \
 min_valid the fewest answered items it allows (7 for nine items with at most two missing); \
 zero when missing answers count as 0.
+
+Pictures in the document are marked [picture N] where they appear. Read the questions and \
+answer options printed in the pictures you are shown as you read the text; for a picture you \
+are not shown, say in the notes which items depend on it.
 
 In the notes, list each decision the document did not settle, anything you were unsure of, \
 and anything in the document that seems inconsistent, such as a scoring key that names items \
@@ -120,24 +125,37 @@ def draft_path(root: Path, instrument_id: str) -> Path:
     return root / defaults.DRAFTS_DIR / f"{instrument_id}.yaml"
 
 
-def instrument_request(instrument_id: str, pdf: Path, which: str = "") -> str:
-    text = pdf_text(pdf)
-    if not text.strip():
-        raise LLMError(f"{pdf.name} has no text to read; a scanned PDF needs OCR first")
+def instrument_request(
+    instrument_id: str, path: Path, which: str = "", pictures: bool = True
+) -> tuple[str, list[Image]]:
+    # The text, and the pictures to send with it unless the model cannot read images.
+    document = read_document(path)
+    if not document.text.strip():
+        raise LLMError(f"{path.name} has no text to read; a scanned PDF needs OCR first")
     named = [f"Instrument to draft: {which}"] if which else []
-    return "\n".join(
-        [f"Instrument ID: {instrument_id}", *named, "", "<document>", text, "</document>"]
+    shown = [n for n, _ in document.pictures] if pictures else []
+    hidden = [n for n in range(1, document.marked + 1) if n not in shown]
+    told = [f"Pictures attached, in order: {', '.join(map(str, shown))}."] if shown else []
+    told += [f"Pictures you are not shown: {', '.join(map(str, hidden))}."] if hidden else []
+    text = "\n".join(
+        [f"Instrument ID: {instrument_id}", *named, *told, "", "<document>", document.text]
+        + ["</document>"]
     )
+    return text, [image for _, image in document.pictures] if pictures else []
 
 
 def draft_instrument(
-    root: Path, instrument_id: str, pdf: Path, client: LLMClient, which: str = ""
+    root: Path,
+    instrument_id: str,
+    path: Path,
+    client: LLMClient,
+    which: str = "",
+    pictures: bool = True,
 ) -> InstrumentDraft:
     free_instrument_path(root, instrument_id)
+    request, images = instrument_request(instrument_id, path, which.strip(), pictures)
     output, meta = client.complete_structured(
-        system=SYSTEM,
-        user_message=instrument_request(instrument_id, pdf, which.strip()),
-        tool_schema=SCHEMA,
+        system=SYSTEM, user_message=request, tool_schema=SCHEMA, images=images
     )
     notes = [" ".join(line.split()) for line in output["notes"]]
     modeline, body = yaml_text(instrument_document(instrument_id, output), "instrument").split(
@@ -145,13 +163,15 @@ def draft_instrument(
     )
     lines = [
         modeline,
-        f"# Drafted by {meta.provider} {meta.model} on {date.today().isoformat()} from {pdf.name}.",
-        "# Check it against the PDF, add the reference at the end, then move it to instruments/.",
+        f"# Drafted by {meta.provider} {meta.model} on {date.today().isoformat()} from {path.name}.",
+        f"# Check it against {path.name}, add the reference at the end, then move it to "
+        "instruments/.",
         *(["# Notes from the model:"] if notes else []),
         *[f"# - {line}" for line in notes],
         body.rstrip("\n"),
         "# references:",
-        f"#   - {{key: <its key in references.bib>, pdf: {pdf.name}}}",
+        "#   - {key: <its key in references.bib>"
+        + (f", pdf: {path.name}}}" if path.suffix.lower() == ".pdf" else "}"),
     ]
     path = draft_path(root, instrument_id)
     path.parent.mkdir(exist_ok=True)
