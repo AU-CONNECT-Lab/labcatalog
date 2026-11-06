@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
 from pydantic_core import core_schema
 
@@ -21,7 +21,7 @@ class ResponseOption(StrictModel):
 
 class ResponseSet(StrictModel):
     id: str
-    options: list[ResponseOption]
+    options: list[ResponseOption] = Field(min_length=1)
 
 
 ItemType = Literal["choice", "number", "text"]

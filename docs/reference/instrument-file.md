@@ -34,7 +34,7 @@ name: Example Mood Scale
 | Key | Meaning |
 |---|---|
 | `id` | The response set's ID. |
-| `options` | A list of options, each with the `value` stored in the data (number or text) and the `label` respondents saw. |
+| `options` | A list of at least one option, each with the `value` stored in the data (number or text) and the `label` respondents saw. |
 
 ## items
 

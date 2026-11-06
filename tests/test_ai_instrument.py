@@ -4,6 +4,7 @@ import pytest
 
 from labcatalog.ai import documents
 from labcatalog.ai import instrument as ai_instrument
+from labcatalog.codebook.core import yaml_text
 from labcatalog.exceptions import EditError
 from labcatalog.issues import Issue
 from labcatalog.llm import CallMetadata, LLMClient
@@ -123,6 +124,15 @@ def test_an_item_left_on_the_default_set_names_no_set():
     first, second = document["items"]
     assert "response_set" not in first
     assert second["response_set"] == "agree"
+
+
+def test_a_set_the_model_left_without_options_is_written_empty_and_told():
+    sets = [dict(OUTPUT["response_sets"][0], options=[]), OUTPUT["response_sets"][1]]
+    document = ai_instrument.instrument_document("mood", dict(OUTPUT, response_sets=sets))
+    text = yaml_text(document, "instrument")
+    assert "  - id: frequency\n    options: []\n" in text
+    [issue] = editing.check_text("drafts/mood.yaml", text)
+    assert "response_sets[1].options: List should have at least 1 item" in issue.message
 
 
 def test_the_lab_can_name_which_instrument_of_the_pdf_to_draft(mock_project, pdf):

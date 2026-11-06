@@ -929,7 +929,8 @@ def yaml_text(document: dict[str, Any], schema: str) -> str:
         for element in value:
             if "options" in element:
                 lines.append(f"  - {dump({'id': element['id']})}")
-                lines.append("    options:")
+                # A drafted set can come back empty, which reads as null unless written as [].
+                lines.append("    options:" if element["options"] else "    options: []")
                 lines.extend(f"      - {flow(option)}" for option in element["options"])
             else:
                 lines.append(f"  - {flow(element)}")
