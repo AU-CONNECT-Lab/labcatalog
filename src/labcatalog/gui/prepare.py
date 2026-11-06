@@ -318,79 +318,75 @@ def log_panel(view: PrepareView) -> None:
 
 
 def draft_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable[None]]) -> None:
-    with panel(
-        "Draft a cleaning step",
-        help_text="A language model writes a script that turns a raw export into a dataset's file",
-    ):
-        if result is None or result.project is None:
-            note("Open a project that reads without errors to draft a step.")
-            return
-        if not common.model_set():
-            note("Set a language model on the Settings page to draft a cleaning script.")
-            return
-        project = result.project
-        names = [d.name for d in project.config.datasets if d.source == "csv" and d.path]
-        if not names:
-            note("No dataset reads a CSV file yet; add one first.")
-            return
-        root = project.root
-        steps = {n: cleaning_step(project, n) for n in names}
-        first = next((n for n in names if steps[n] is None), names[0])
+    if result is None or result.project is None:
+        note("Open a project that reads without errors to draft a step.")
+        return
+    if not common.model_set():
+        note("Set a language model on the Settings page to draft a cleaning script.")
+        return
+    project = result.project
+    names = [d.name for d in project.config.datasets if d.source == "csv" and d.path]
+    if not names:
+        note("No dataset reads a CSV file yet; add one first.")
+        return
+    root = project.root
+    steps = {n: cleaning_step(project, n) for n in names}
+    first = next((n for n in names if steps[n] is None), names[0])
 
-        def raw_for(name: str) -> str:
-            step = steps[name]
-            return (raw_of(step) if step else None) or ""
+    def raw_for(name: str) -> str:
+        step = steps[name]
+        return (raw_of(step) if step else None) or ""
 
-        note(
-            "Choose the dataset and the raw export it comes from. Nothing is saved until you have "
-            "read the script; it then joins the steps above as clean_<dataset>, writing the "
-            "dataset's file and never the export. " + sent_text(project.config.llm.raw_data)
-        )
-        with ui.row().classes("w-full items-start gap-2"):
-            dataset = (
-                ui.select(
-                    names,
-                    value=first,
-                    label="Dataset",
-                    with_input=True,
-                    on_change=lambda e: raw.set_value(raw_for(e.value)),
-                )
-                .props("outlined dense")
-                .classes("w-72")
+    note(
+        "Choose the dataset and the raw export it comes from. Nothing is saved until you have "
+        "read the script; it then joins the steps above as clean_<dataset>, writing the "
+        "dataset's file and never the export. " + sent_text(project.config.llm.raw_data)
+    )
+    with ui.row().classes("w-full items-start gap-2"):
+        dataset = (
+            ui.select(
+                names,
+                value=first,
+                label="Dataset",
+                with_input=True,
+                on_change=lambda e: raw.set_value(raw_for(e.value)),
             )
-            raw = path_input("Raw export", raw_for(first), "In the project folder, such as raw/")
+            .props("outlined dense")
+            .classes("w-72")
+        )
+        raw = path_input("Raw export", raw_for(first), "In the project folder, such as raw/")
 
-            async def choose() -> None:
-                found = await choose_path(file_types=("CSV files (*.csv;*.tsv;*.txt)",), start=root)
-                if found:
-                    raw.set_value(posix_str(portable_path(found, root)))
+        async def choose() -> None:
+            found = await choose_path(file_types=("CSV files (*.csv;*.tsv;*.txt)",), start=root)
+            if found:
+                raw.set_value(posix_str(portable_path(found, root)))
 
-            ui.button("Choose", on_click=choose).props("flat no-caps")
-            language = ui.toggle(LANGUAGE_NAMES, value="r").props("dense no-caps")
-            button = ui.button("Draft", icon="edit_note", on_click=lambda: draft())
-        status = ui.label().classes("lc-note")
+        ui.button("Choose", on_click=choose).props("flat no-caps")
+        language = ui.toggle(LANGUAGE_NAMES, value="r").props("dense no-caps")
+        button = ui.button("Draft", icon="edit_note", on_click=lambda: draft())
+    status = ui.label().classes("lc-note")
 
-        async def draft() -> None:
-            chosen = (raw.value or "").strip().strip('"')
-            if not chosen or not (root / chosen).is_file():
-                status.set_text("Choose a raw export inside the project folder.")
-                return
-            button.disable()
-            status.set_text("Reading the export and drafting the script.")
-            try:
-                found = await computed(
-                    run_cleaning_draft,
-                    result,
-                    dataset.value,
-                    chosen,
-                    language.value,
-                    *common.llm_choice(),
-                    preferences.load().get(preferences.RSCRIPT),
-                )
-            except LabCatalogError as err:
-                status.set_text(str(err))
-                return
-            finally:
-                button.enable()
-            status.set_text("")
-            review(found, root, on_saved)
+    async def draft() -> None:
+        chosen = (raw.value or "").strip().strip('"')
+        if not chosen or not (root / chosen).is_file():
+            status.set_text("Choose a raw export inside the project folder.")
+            return
+        button.disable()
+        status.set_text("Reading the export and drafting the script.")
+        try:
+            found = await computed(
+                run_cleaning_draft,
+                result,
+                dataset.value,
+                chosen,
+                language.value,
+                *common.llm_choice(),
+                preferences.load().get(preferences.RSCRIPT),
+            )
+        except LabCatalogError as err:
+            status.set_text(str(err))
+            return
+        finally:
+            button.enable()
+        status.set_text("")
+        review(found, root, on_saved)
