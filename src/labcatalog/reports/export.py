@@ -4,8 +4,17 @@ from pathlib import Path
 
 import pandas as pd
 
-from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
-from labcatalog.data.resolve import ResolvedScore
+from labcatalog.config import (
+    DatasetConfig,
+    ProjectConfig,
+    dataset_by_name,
+    id_column_for,
+    missing_codes_for,
+    roster_dataset,
+    roster_name,
+    rosters,
+)
+from labcatalog.data.resolve import ResolvedScore, ResolvedVariable
 from labcatalog.data.scoring import scorable
 from labcatalog.exceptions import ExportError
 from labcatalog.metadata.browse import build_index, matches
@@ -15,6 +24,7 @@ from labcatalog.reports.codegen import output_name
 from labcatalog.reports.outputs import write_output
 from labcatalog.stats.analysis import linkable
 from labcatalog.stats.cfa import CfaFit
+from labcatalog.stats.summary import VariableSummary
 
 VARIABLES = "variables.csv"
 SCORE_STATISTICS = "score_statistics.csv"
@@ -72,36 +82,12 @@ def variable_rows(result: CatalogResult, plan: dict[str, list[str]]) -> list[dic
     config = result.project.config
     rows = []
     for dataset, instrument_ids in plan.items():
-        missing = "; ".join(
-            f"{c.code}={c.label}"
-            for c in missing_codes_for(config, dataset_by_name(config, dataset))
-        )
-        for variable in result.catalog.variables_for(dataset):
-            if variable.instrument_id not in instrument_ids:
-                continue
-            instrument = result.project.instruments[variable.instrument_id]
-            rows.append(
-                {
-                    "dataset": dataset,
-                    "study": variable.study,
-                    "wave": variable.wave,
-                    "reporter": variable.reporter,
-                    "target": variable.target or "",
-                    "column": variable.column,
-                    "instrument": variable.instrument_id,
-                    "abbreviation": instrument.abbreviation or "",
-                    "kind": "item",
-                    "item": variable.item_id,
-                    "text": " / ".join(variable.text.values()),
-                    "type": variable.type,
-                    "options": "; ".join(f"{o.value}={o.label}" for o in variable.response_options),
-                    "reverse": "yes" if variable.reverse else "",
-                    "min": number_text(variable.allowed_min),
-                    "max": number_text(variable.allowed_max),
-                    "missing_codes": missing,
-                    "in_data": "no" if variable.type == "text" else "yes",
-                }
-            )
+        missing = missing_text(config, dataset_by_name(config, dataset))
+        rows += [
+            item_row(result, variable, missing)
+            for variable in result.catalog.variables_for(dataset)
+            if variable.instrument_id in instrument_ids
+        ]
         for score in exported_scores(result, dataset, instrument_ids):
             instrument = result.project.instruments[score.instrument_id]
             definition = next(s for s in instrument.scores if s.id == score.score_id)
@@ -125,6 +111,65 @@ def variable_rows(result: CatalogResult, plan: dict[str, list[str]]) -> list[dic
                 }
             )
     return [{column: row.get(column, "") for column in COLUMNS} for row in rows]
+
+
+def roster_variable_rows(result: CatalogResult, studies: Sequence[str]) -> list[dict[str, str]]:
+    config = result.project.config
+    rows = []
+    for study in studies:
+        missing = missing_text(config, roster_dataset(config, study))
+        rows += [item_row(result, v, missing) for v in roster_variables(result, study)]
+    return [{column: row.get(column, "") for column in COLUMNS} for row in rows]
+
+
+def item_row(result: CatalogResult, variable: ResolvedVariable, missing: str) -> dict[str, str]:
+    instrument = result.project.instruments[variable.instrument_id]
+    return {
+        "dataset": variable.dataset,
+        "study": variable.study,
+        "wave": variable.wave,
+        "reporter": variable.reporter,
+        "target": variable.target or "",
+        "column": variable.column,
+        "instrument": variable.instrument_id,
+        "abbreviation": instrument.abbreviation or "",
+        "kind": "item",
+        "item": variable.item_id,
+        "text": " / ".join(variable.text.values()),
+        "type": variable.type,
+        "options": "; ".join(f"{o.value}={o.label}" for o in variable.response_options),
+        "reverse": "yes" if variable.reverse else "",
+        "min": number_text(variable.allowed_min),
+        "max": number_text(variable.allowed_max),
+        "missing_codes": missing,
+        "in_data": "no" if variable.type == "text" else "yes",
+    }
+
+
+def missing_text(config: ProjectConfig, dataset: DatasetConfig) -> str:
+    return "; ".join(f"{c.code}={c.label}" for c in missing_codes_for(config, dataset))
+
+
+def roster_studies(result: CatalogResult, instrument_ids: Sequence[str]) -> list[str]:
+    # The studies whose participant roster one of these instruments describes.
+    return [
+        study
+        for study, roster in rosters(result.project.config).items()
+        if roster.instrument in instrument_ids and study in result.rosters
+    ]
+
+
+def roster_variables(result: CatalogResult, study: str) -> list[ResolvedVariable]:
+    return [v for v in result.catalog.roster_variables if v.dataset == roster_name(study)]
+
+
+def roster_frame(result: CatalogResult, study: str) -> pd.DataFrame:
+    loaded = result.rosters[study]
+    roster = result.project.config.studies[study].roster
+    keys = [loaded.id_column, roster.group_column, roster.role_column]
+    # Open answers stay out, as in the datasets' files.
+    items = [v.column for v in roster_variables(result, study) if v.type != "text"]
+    return loaded.frame[[c for c in dict.fromkeys(keys) if c] + items]
 
 
 def score_statistics(
@@ -166,35 +211,51 @@ def score_statistics(
 
 
 def item_statistics(result: CatalogResult, plan: dict[str, list[str]]) -> list[dict]:
-    found = {(v.dataset, v.column): v for v in result.summary.variables}
+    given = [
+        v
+        for dataset, instrument_ids in plan.items()
+        for v in result.catalog.variables_for(dataset)
+        if v.instrument_id in instrument_ids
+    ]
+    return item_statistics_of(given, result.summary.variables)
+
+
+def roster_item_statistics(result: CatalogResult, studies: Sequence[str]) -> list[dict]:
+    given = [v for study in studies for v in roster_variables(result, study)]
+    return item_statistics_of(given, result.summary.roster)
+
+
+def item_statistics_of(
+    variables: list[ResolvedVariable], summaries: list[VariableSummary]
+) -> list[dict]:
+    found = {(v.dataset, v.column): v for v in summaries}
     rows = []
-    for dataset, instrument_ids in plan.items():
-        for variable in result.catalog.variables_for(dataset):
-            stats = found.get((dataset, variable.column))
-            # Open answers stay out, as in the data files.
-            if variable.instrument_id not in instrument_ids or variable.type == "text" or not stats:
-                continue
-            rows.append(
-                {
-                    "dataset": dataset,
-                    "study": variable.study,
-                    "wave": variable.wave,
-                    "reporter": variable.reporter,
-                    "column": variable.column,
-                    "instrument": variable.instrument_id,
-                    "item": variable.item_id,
-                    "type": variable.type,
-                    "n": stats.n_valid,
-                    "missing": "; ".join(f"{k}={n}" for k, n in stats.missing.items() if n),
-                    "not_an_option": stats.n_unexpected,
-                    "mean": stats.mean,
-                    "sd": stats.sd,
-                    "median": stats.median,
-                    "min": stats.minimum,
-                    "max": stats.maximum,
-                    "counts": "; ".join(f"{k}={n}" for k, n in stats.value_counts.items()),
-                }
-            )
+    for variable in variables:
+        stats = found.get((variable.dataset, variable.column))
+        # Open answers stay out, as in the data files.
+        if variable.type == "text" or not stats:
+            continue
+        rows.append(
+            {
+                "dataset": variable.dataset,
+                "study": variable.study,
+                "wave": variable.wave,
+                "reporter": variable.reporter,
+                "column": variable.column,
+                "instrument": variable.instrument_id,
+                "item": variable.item_id,
+                "type": variable.type,
+                "n": stats.n_valid,
+                "missing": "; ".join(f"{k}={n}" for k, n in stats.missing.items() if n),
+                "not_an_option": stats.n_unexpected,
+                "mean": stats.mean,
+                "sd": stats.sd,
+                "median": stats.median,
+                "min": stats.minimum,
+                "max": stats.maximum,
+                "counts": "; ".join(f"{k}={n}" for k, n in stats.value_counts.items()),
+            }
+        )
     return rows
 
 
@@ -249,8 +310,11 @@ def named_plan(
         raise ExportError(f"Not an instrument or dataset in this project: {', '.join(unknown)}")
     plan = export_plan(result, matches(build_index(project), {}), set(instrument_ids))
     plan = {d: ids for d, ids in plan.items() if not datasets or d in datasets}
-    if not plan:
+    if not plan and datasets:
         raise ExportError("None of these instruments is in these datasets")
+    # An instrument of the participant roster is in no dataset but is still exported.
+    if not plan and not roster_studies(result, instrument_ids):
+        raise ExportError("None of these instruments is given in a dataset or a participant roster")
     return plan
 
 
@@ -267,35 +331,41 @@ def write_export(
     data: bool = True,
     statistics: bool = True,
     codebook: bool = True,
+    studies: Sequence[str] = (),
 ) -> Export:
+    # studies are those whose participant roster goes into a file of its own.
     allowed = layouts(result, plan)
-    if data and layout not in allowed:
+    if data and plan and layout not in allowed:
         raise ExportError(f"Cannot export by {layout}; these datasets allow {', '.join(allowed)}")
-    variables = pd.DataFrame(variable_rows(result, plan), columns=COLUMNS)
+    variables = variable_rows(result, plan)
     scores = score_statistics(result, plan, fits) if statistics else None
-    tables = {}
-    if scores is not None:
-        tables[SCORE_STATISTICS] = pd.DataFrame(scores)
-        tables[ITEM_STATISTICS] = pd.DataFrame(item_statistics(result, plan))
+    items = item_statistics(result, plan) if statistics else []
     frames, left_out, data_files = {}, {}, {}
-    if data and layout == BY_DATASET:
+    if data and plan and layout == BY_DATASET:
         frames = {f"{d}.csv": data_frame(result, d, ids) for d, ids in plan.items()}
         data_files = {d: f"{d}.csv" for d in plan}
-    elif data:
+    elif data and plan:
         wide, left_out = wide_frame(result, plan, layout)
         name = f"data_by_{key_name(result, layout)}.csv"
         frames = {name: wide}
         data_files = dict.fromkeys(plan, name)
-        for table in [variables, *tables.values()]:
-            if not table.empty:
-                table["column"] = table["dataset"] + "_" + table["column"]
+        for row in [*variables, *(scores or []), *items]:
+            row["column"] = f"{row['dataset']}_{row['column']}"
+    # A roster keeps its own file and column names, whatever the layout.
+    variables += roster_variable_rows(result, studies)
+    items += roster_item_statistics(result, studies) if statistics else []
+    for study in studies if data else []:
+        name = f"{roster_name(study)}.csv"
+        frames[name] = roster_frame(result, study)
+        data_files[roster_name(study)] = name
+    tables = {VARIABLES: pd.DataFrame(variables, columns=COLUMNS)}
+    if scores is not None:
+        tables |= {SCORE_STATISTICS: pd.DataFrame(scores), ITEM_STATISTICS: pd.DataFrame(items)}
     # The byte-order mark makes Excel open the lists as UTF-8; data files stay plain for R.
-    files = {VARIABLES: variables.to_csv(index=False).encode("utf-8-sig")}
-    files |= {name: t.to_csv(index=False).encode("utf-8-sig") for name, t in tables.items()}
+    files = {name: t.to_csv(index=False).encode("utf-8-sig") for name, t in tables.items()}
     files |= {name: frame.to_csv(index=False).encode("utf-8") for name, frame in frames.items()}
     if codebook:
-        rows = variables.to_dict("records")
-        files[CODEBOOK] = codebook_docx(result, plan, rows, scores, data_files)
+        files[CODEBOOK] = codebook_docx(result, plan, variables, scores, data_files, studies)
     folder = write_output(result.project.root, "export", files, result.manifest)
     return Export(folder, left_out)
 

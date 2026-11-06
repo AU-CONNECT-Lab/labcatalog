@@ -18,6 +18,8 @@ from labcatalog.reports.export import (
     export_plan,
     layouts,
     named_plan,
+    roster_studies,
+    roster_variable_rows,
     score_statistics,
     variable_rows,
     write_export,
@@ -184,10 +186,10 @@ def test_score_statistics_carry_the_omega_of_the_window_s_factor_models(result):
     assert scores.drop("ems_total")["omega"].isna().all()
 
 
-def blocks_for(result, plan, statistics=True, files=None):
-    rows = variable_rows(result, plan)
+def blocks_for(result, plan, statistics=True, files=None, studies=()):
+    rows = variable_rows(result, plan) + roster_variable_rows(result, studies)
     scores = score_statistics(result, plan) if statistics else None
-    return codebook_blocks(result, plan, rows, scores, files or {})
+    return codebook_blocks(result, plan, rows, scores, files or {}, studies)
 
 
 def table_after(blocks, label):
@@ -197,7 +199,7 @@ def table_after(blocks, label):
 
 def test_codebook_describes_datasets_instruments_and_every_column(result):
     plan = {"parent_w1": ["example_demographics"], "child_w1": ["example_mood"]}
-    blocks = blocks_for(result, plan, files={"parent_w1": "parent_w1.csv", "child_w1": "c.csv"})
+    blocks = blocks_for(result, plan, files={d: f"{d}.csv" for d in plan})
     headings = [b.text for b in blocks if isinstance(b, Heading)]
     assert headings == [
         "Codebook: Mock Family Study Catalog",
@@ -213,6 +215,7 @@ def test_codebook_describes_datasets_instruments_and_every_column(result):
         said
     )
     assert "Options frequency: 0 = Never, 1 = Sometimes, 2 = Often, 3 = Always" in said
+    assert "Each dataset is in a file of its own name, such as parent_w1.csv." in said
     datasets = next(b for b in blocks if isinstance(b, Table))
     child = dict(zip(datasets.columns, datasets.rows[1], strict=True))
     assert (child["Dataset"], child["Instruments"]) == ("child_w1", "EMS")
@@ -262,3 +265,60 @@ def test_codebook_tells_how_the_datasets_differ(mock_project):
         ["child_w2", f'ems_3 reads "I worried a lot."; {reversed_}'],
         ["child_w3", f"not in the data: ems_9; {reversed_}"],
     ]
+
+
+def test_a_participant_roster_goes_into_a_file_of_its_own(result):
+    assert named_plan(result, ["example_participants"], []) == {}
+    studies = roster_studies(result, ["example_mood", "example_participants"])
+    assert studies == ["mock_study"]
+    done = write_export(result, {"child_w1": ["example_mood"]}, BY_ID, studies=studies)
+    assert {"data_by_id.csv", "roster_mock_study.csv"} <= {p.name for p in done.folder.iterdir()}
+    roster = pd.read_csv(done.folder / "roster_mock_study.csv", dtype=str, keep_default_na=False)
+    assert list(roster.columns) == ["pid", "family_id", "role", "birth_year", "gender"]
+    assert len(roster) == len(result.rosters["mock_study"].frame)
+    variables = pd.read_csv(done.folder / VARIABLES, dtype=str, keep_default_na=False)
+    by_column = variables.set_index("column")
+    assert by_column.loc["gender", "dataset"] == "roster_mock_study"
+    assert "child_w1_ems_1_w1" in by_column.index
+    items = pd.read_csv(done.folder / ITEM_STATISTICS, encoding="utf-8-sig")
+    assert "gender" in set(items[items["dataset"] == "roster_mock_study"]["column"])
+    alone = write_export(result, {}, BY_DATASET, studies=studies)
+    assert "roster_mock_study.csv" in {p.name for p in alone.folder.iterdir()}
+
+
+def test_the_codebook_describes_the_participant_roster(result):
+    studies = ["mock_study"]
+    files = {"roster_mock_study": "roster_mock_study.csv"}
+    blocks = blocks_for(result, {}, files=files, studies=studies)
+    headings = [b.text for b in blocks if isinstance(b, Heading)]
+    assert headings[1:] == [
+        "Datasets",
+        "Example Participant Roster (Roster)",
+        "Variables",
+        "roster_mock_study",
+    ]
+    said = [b.label + b.text for b in blocks if isinstance(b, Paragraph)]
+    assert "Given in: the participant roster (roster_mock_study)" in said
+    assert said[0].endswith(": 1 participant roster and 1 instrument.")
+    rosters = table_after(blocks, "Participant rosters")
+    assert rosters.rows == [
+        [
+            "roster_mock_study",
+            "Mock Family Study",
+            str(len(result.rosters["mock_study"].frame)),
+            str(result.rosters["mock_study"].frame["pid"].nunique()),
+            "ID pid, group family_id, role role",
+            "Roster",
+        ]
+    ]
+    assert ["gender", "Roster", "gender", "choice"] in blocks[-1].rows
+
+
+def test_an_instrument_given_nowhere_cannot_be_exported(mock_project):
+    instruments = mock_project / "instruments"
+    text = (instruments / "example_mood.yaml").read_text(encoding="utf-8")
+    text = text.replace("id: example_mood", "id: unused").replace("abbreviation: EMS", "")
+    (instruments / "unused.yaml").write_text(text, encoding="utf-8")
+    result = run_catalog(mock_project)
+    with pytest.raises(ExportError, match="is given in a dataset or a participant roster"):
+        named_plan(result, ["unused"], [])

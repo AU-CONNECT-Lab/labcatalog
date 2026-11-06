@@ -9,7 +9,7 @@ from labcatalog import defaults
 from labcatalog.ai import scoring as ai_scoring
 from labcatalog.ai.search import Search
 from labcatalog.charts import network, views
-from labcatalog.config import dataset_by_name, missing_codes_for
+from labcatalog.config import dataset_by_name, missing_codes_for, roster_name
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
@@ -67,6 +67,7 @@ from labcatalog.reports.export import (
     export_plan,
     layouts,
     named_plan,
+    roster_studies,
     write_export,
 )
 from labcatalog.reports.tables import PaperTable
@@ -382,7 +383,7 @@ def export_dialog(
     names = {i: s.abbreviation or s.name for i, s in result.project.instruments.items()}
     # The datasets the filters show start ticked.
     shown = set(export_plan(result, found, view.chosen))
-    state: dict = {"ticked": set(), "plan": {}}
+    state: dict = {"ticked": set(), "plan": {}, "rosters": set()}
     root = result.project.root
     group = config.ids.group
     labels = {
@@ -398,8 +399,13 @@ def export_dialog(
         if not chosen_ids():
             ui.notify("Choose at least one instrument")
             return
-        given = named_plan(result, chosen_ids(), [])
+        try:
+            given = named_plan(result, chosen_ids(), [])
+        except LabCatalogError as err:
+            ui.notify(str(err))
+            return
         state["ticked"] = {d for d in given if d in shown} or set(given)
+        state["rosters"] = set(roster_studies(result, chosen_ids()))
         datasets_step.refresh()
         stepper.next()
 
@@ -407,11 +413,19 @@ def export_dialog(
         state["ticked"] = state["ticked"] | set(names_) if on else state["ticked"] - set(names_)
         datasets_step.refresh()
 
+    def tick_roster(study: str, on: bool) -> None:
+        state["rosters"] = state["rosters"] | {study} if on else state["rosters"] - {study}
+        datasets_step.refresh()
+
     @ui.refreshable
     def datasets_step() -> None:
         if not chosen_ids():
             return
-        given = named_plan(result, chosen_ids(), [])
+        try:
+            given = named_plan(result, chosen_ids(), [])
+        except LabCatalogError as err:
+            note(str(err))
+            return
         ordered = views.dataset_order(result, list(given))
         waves = unique(
             (dataset_by_name(config, d).study, dataset_by_name(config, d).wave) for d in ordered
@@ -422,9 +436,11 @@ def export_dialog(
             c = dataset_by_name(config, d)
             cells.setdefault((c.study, c.wave, c.reporter), []).append(d)
         ticked = state["ticked"]
-        with ui.grid(columns=f"auto repeat({len(reporters)}, minmax(8rem, 1fr))").classes(
+        grid = ui.grid(columns=f"auto repeat({len(reporters)}, minmax(8rem, 1fr))").classes(
             "gap-x-6 gap-y-1 items-start"
-        ):
+        )
+        grid.set_visibility(bool(ordered))
+        with grid:
             ui.label()
             for reporter in reporters:
                 column = [d for d in ordered if dataset_by_name(config, d).reporter == reporter]
@@ -453,15 +469,28 @@ def export_dialog(
                                 value=d in ticked,
                                 on_change=lambda e, d=d: tick([d], e.value),
                             ).props("dense").tooltip(", ".join(names[i] for i in given[d]))
-        missing = [names[i] for i in chosen_ids() if not any(i in given[d] for d in ticked)]
+        for study in roster_studies(result, chosen_ids()):
+            roster = config.studies[study].roster
+            ui.checkbox(
+                f"Participant roster ({roster_name(study)})",
+                value=study in state["rosters"],
+                on_change=lambda e, s=study: tick_roster(s, e.value),
+            ).props("dense").classes("font-medium").tooltip(names[roster.instrument])
+        rostered = {config.studies[s].roster.instrument for s in state["rosters"]}
+        missing = [
+            names[i]
+            for i in chosen_ids()
+            if not any(i in given[d] for d in ticked) and i not in rostered
+        ]
         if missing:
             note(f"No ticked dataset has {', '.join(missing)}.")
 
     def datasets_next() -> None:
-        if not state["ticked"]:
+        if not state["ticked"] and not state["rosters"]:
             ui.notify("Tick at least one dataset")
             return
-        state["plan"] = named_plan(result, chosen_ids(), sorted(state["ticked"]))
+        ticked = sorted(state["ticked"])
+        state["plan"] = named_plan(result, chosen_ids(), ticked) if ticked else {}
         format_step.refresh()
         saved.clear()
         export.set_visibility(True)
@@ -471,12 +500,15 @@ def export_dialog(
     @ui.refreshable
     def format_step() -> None:
         plan = state["plan"]
-        if not plan:
+        if not plan and not state["rosters"]:
             return
         with ui.grid(columns="auto 1fr").classes("gap-x-4 gap-y-0"):
             for dataset, ids in plan.items():
                 ui.label(dataset).classes("font-medium")
                 ui.label(", ".join(names[i] for i in ids))
+            for study in sorted(state["rosters"]):
+                ui.label(roster_name(study)).classes("font-medium")
+                ui.label(names[config.studies[study].roster.instrument])
         with ui.row().classes("gap-4"):
             for key, label in (
                 ("data", "Data"),
@@ -487,7 +519,7 @@ def export_dialog(
         state["layout"] = (
             ui.radio({key: labels[key] for key in layouts(result, plan)}, value=BY_DATASET)
             .props("dense")
-            .bind_visibility_from(state["data"], "value")
+            .bind_visibility_from(state["data"], "value", backward=lambda on: on and bool(plan))
         )
         note(
             f"Writes a new folder in outputs/ with {VARIABLES}, which describes every variable, "
@@ -497,7 +529,8 @@ def export_dialog(
             f"and item's n, mean, SD and range in each dataset. Codebook: {CODEBOOK}, a Word "
             "document of the datasets, each instrument's wording, options and scoring, how the "
             "datasets differ, the scores' statistics when ticked and every column. In one table, "
-            "each column starts with its dataset's name."
+            "each column starts with its dataset's name. A participant roster goes into a file of "
+            "its own."
         )
 
     async def go() -> None:
@@ -510,6 +543,7 @@ def export_dialog(
             state["data"].value,
             state["statistics"].value,
             state["codebook"].value,
+            sorted(state["rosters"]),
         )
         saved.clear()
         with saved:

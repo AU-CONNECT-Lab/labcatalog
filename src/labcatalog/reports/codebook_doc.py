@@ -1,5 +1,6 @@
 import io
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 
@@ -8,7 +9,15 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
-from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
+from labcatalog.config import (
+    DatasetConfig,
+    ProjectConfig,
+    dataset_by_name,
+    id_column_for,
+    missing_codes_for,
+    roster_dataset,
+    roster_name,
+)
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.metadata.bibliography import citation
 from labcatalog.metadata.scripts import language_of
@@ -54,8 +63,9 @@ def codebook_docx(
     variables: list[dict],
     statistics: list[dict] | None,
     files: dict[str, str],
+    studies: Sequence[str] = (),
 ) -> bytes:
-    return rendered(codebook_blocks(result, plan, variables, statistics, files))
+    return rendered(codebook_blocks(result, plan, variables, statistics, files, studies))
 
 
 def codebook_blocks(
@@ -64,31 +74,44 @@ def codebook_blocks(
     variables: list[dict],
     statistics: list[dict] | None,
     files: dict[str, str],
+    studies: Sequence[str] = (),
 ) -> list[Block]:
-    # variables and statistics are the export's rows; files maps each dataset to its data file.
-    chosen = [i for i in result.project.instruments if any(i in ids for ids in plan.values())]
-    blocks = front(result, plan, chosen)
-    blocks += datasets_part(result, plan, files)
+    # The export's rows and files; studies are those whose participant roster is exported.
+    config = result.project.config
+    rostered = {s: config.studies[s].roster.instrument for s in studies}
+    chosen = [
+        i
+        for i in result.project.instruments
+        if any(i in ids for ids in plan.values()) or i in rostered.values()
+    ]
+    blocks = front(result, plan, studies, chosen)
+    blocks += datasets_part(result, plan, studies, files)
     for instrument_id in chosen:
         given = [d for d, ids in plan.items() if instrument_id in ids]
-        blocks += instrument_part(result, result.project.instruments[instrument_id], given)
+        rosters = [s for s, i in rostered.items() if i == instrument_id]
+        instrument = result.project.instruments[instrument_id]
+        blocks += instrument_part(result, instrument, given, rosters)
         if statistics is not None:
             rows = [r for r in statistics if r["instrument"] == instrument_id]
-            blocks += statistics_part(rows, result.project.config.stats.decimals)
-    blocks += index_part(plan, variables)
+            blocks += statistics_part(rows, config.stats.decimals)
+    blocks += index_part([*plan, *(roster_name(s) for s in studies)], variables)
     return blocks
 
 
-def front(result: CatalogResult, plan: dict[str, list[str]], chosen: list[str]) -> list[Block]:
+def front(
+    result: CatalogResult, plan: dict[str, list[str]], rosters: Sequence[str], chosen: list[str]
+) -> list[Block]:
     config = result.project.config
+    counts = [count(len(plan), "dataset")] if plan else []
+    counts += [count(len(rosters), "participant roster")] if rosters else []
     blocks: list[Block] = [
         Heading(f"Codebook: {config.project.name}", 0),
         Paragraph(
             f"Written by labcatalog {__version__} on {date.today().isoformat()}: "
-            f"{count(len(plan), 'dataset')} and {count(len(chosen), 'instrument')}."
+            f"{', '.join(counts)} and {count(len(chosen), 'instrument')}."
         ),
     ]
-    studies = dict.fromkeys(dataset_by_name(config, d).study for d in plan)
+    studies = dict.fromkeys([*(dataset_by_name(config, d).study for d in plan), *rosters])
     for study in studies:
         info = config.studies[study]
         blocks.append(Paragraph(info.description or "", label=f"{info.label or study}. "))
@@ -96,7 +119,7 @@ def front(result: CatalogResult, plan: dict[str, list[str]], chosen: list[str]) 
             blocks.append(
                 Paragraph(citation(result.project.bibliography, info.reference), "Cite as: ")
             )
-    codes = shared_missing_codes(result, plan)
+    codes = shared_missing_codes(result, plan, rosters)
     if codes is not None:
         said = f"{codes}. Blank cells are missing too." if codes else "Only blank cells."
         blocks.append(Paragraph(said, "Missing codes: "))
@@ -115,13 +138,31 @@ def front(result: CatalogResult, plan: dict[str, list[str]], chosen: list[str]) 
 
 
 def datasets_part(
-    result: CatalogResult, plan: dict[str, list[str]], files: dict[str, str]
+    result: CatalogResult,
+    plan: dict[str, list[str]],
+    rosters: Sequence[str],
+    files: dict[str, str],
 ) -> list[Block]:
+    blocks: list[Block] = [Heading("Datasets", 1)]
+    if plan:
+        blocks += files_part({d: files[d] for d in plan if d in files})
+        blocks.append(datasets_table(result, plan, rosters))
+    if rosters:
+        blocks.append(Paragraph("", "Participant rosters"))
+        if files:
+            blocks.append(Paragraph("Each roster is in a file of its own name."))
+        blocks.append(rosters_table(result, rosters))
+    return blocks
+
+
+def datasets_table(
+    result: CatalogResult, plan: dict[str, list[str]], rosters: Sequence[str]
+) -> Table:
     config = result.project.config
-    names = {i: s.abbreviation or i for i, s in result.project.instruments.items()}
+    names = abbreviations(result)
     summaries = {s.dataset: s for s in result.summary.datasets}
     studies = {dataset_by_name(config, d).study for d in plan}
-    by_dataset = shared_missing_codes(result, plan) is None
+    by_dataset = shared_missing_codes(result, plan, rosters) is None
     steps = {name: made_by(result.project, name) for name in plan}
     stepped = any(steps.values())
     columns = ["Dataset", "Wave", "Reporter", "Collected", "Rows", "People", "Key columns"]
@@ -150,25 +191,50 @@ def datasets_part(
                 str(summary.n_ids),
                 ", ".join(keys),
                 ", ".join(names[i] for i in instrument_ids),
-                *([missing_text(result, name)] if by_dataset else []),
+                *([missing_text(config, dataset)] if by_dataset else []),
                 *([steps[name]] if stepped else []),
             ]
         )
-    return [Heading("Datasets", 1), *files_part(files), Table(columns, rows)]
+    return Table(columns, rows)
+
+
+def rosters_table(result: CatalogResult, rosters: Sequence[str]) -> Table:
+    config = result.project.config
+    rows = []
+    for study in rosters:
+        roster = config.studies[study].roster
+        loaded = result.rosters[study]
+        keys = [
+            f"ID {loaded.id_column}",
+            *([f"group {roster.group_column}"] if roster.group_column else []),
+            *([f"role {roster.role_column}"] if roster.role_column else []),
+        ]
+        rows.append(
+            [
+                roster_name(study),
+                config.studies[study].label or study,
+                str(len(loaded.frame)),
+                str(loaded.frame[loaded.id_column].nunique()),
+                ", ".join(keys),
+                abbreviations(result)[roster.instrument],
+            ]
+        )
+    return Table(["Roster", "Study", "Rows", "People", "Key columns", "Instrument"], rows)
 
 
 def files_part(files: dict[str, str]) -> list[Block]:
     if not files:
         return []
-    written = list(dict.fromkeys(files.values()))
-    if len(written) == len(files):
-        return [Paragraph(f"Each dataset is in a file of its own name, such as {written[0]}.")]
-    return [
-        Paragraph(f"All of them are in {written[0]}; each column starts with its dataset's name.")
-    ]
+    if all(name == f"{dataset}.csv" for dataset, name in files.items()):
+        first = next(iter(files.values()))
+        return [Paragraph(f"Each dataset is in a file of its own name, such as {first}.")]
+    table = next(iter(files.values()))
+    return [Paragraph(f"The data are in {table}; each column starts with its dataset's name.")]
 
 
-def instrument_part(result: CatalogResult, instrument: Instrument, given: list[str]) -> list[Block]:
+def instrument_part(
+    result: CatalogResult, instrument: Instrument, given: list[str], rosters: list[str]
+) -> list[Block]:
     config = result.project.config
     title = instrument.name
     if instrument.abbreviation:
@@ -186,7 +252,7 @@ def instrument_part(result: CatalogResult, instrument: Instrument, given: list[s
             for r in instrument.references
         ],
         ("License: ", instrument.license),
-        ("Given in: ", given_text(result, instrument, given)),
+        ("Given in: ", given_text(result, instrument, given, rosters)),
     ]
     blocks += [Paragraph(text, label) for label, text in facts if text]
     for response_set in instrument.response_sets:
@@ -297,12 +363,12 @@ def statistics_part(rows: list[dict], digits: int) -> list[Block]:
     return [Paragraph("", "Statistics"), Table(columns, table)]
 
 
-def index_part(plan: dict[str, list[str]], variables: list[dict]) -> list[Block]:
+def index_part(datasets: list[str], variables: list[dict]) -> list[Block]:
     blocks: list[Block] = [
         Heading("Variables", 1),
         Paragraph("Every column of the data files by dataset, as variables.csv lists them."),
     ]
-    for dataset in plan:
+    for dataset in datasets:
         rows = [
             [
                 r["column"],
@@ -322,15 +388,19 @@ def index_part(plan: dict[str, list[str]], variables: list[dict]) -> list[Block]
     return blocks
 
 
-def shared_missing_codes(result: CatalogResult, plan: dict[str, list[str]]) -> str | None:
-    # One sentence when every dataset has the same codes; None sends them to the datasets table.
-    found = {missing_text(result, d) for d in plan}
+def shared_missing_codes(
+    result: CatalogResult, plan: dict[str, list[str]], rosters: Sequence[str]
+) -> str | None:
+    # One sentence when every file has the same codes; None sends them to the datasets table.
+    config = result.project.config
+    datasets = [dataset_by_name(config, d) for d in plan]
+    datasets += [roster_dataset(config, s) for s in rosters]
+    found = {missing_text(config, d) for d in datasets}
     return found.pop() if len(found) == 1 else None
 
 
-def missing_text(result: CatalogResult, dataset: str) -> str:
-    config = result.project.config
-    codes = missing_codes_for(config, dataset_by_name(config, dataset))
+def missing_text(config: ProjectConfig, dataset: DatasetConfig) -> str:
+    codes = missing_codes_for(config, dataset)
     # Blank cells are always missing, so a code for them is said once on its own.
     return "; ".join(f"{c.code} = {c.label}" for c in codes if str(c.code) != "")
 
@@ -348,7 +418,9 @@ def made_by(project: Project, dataset: str) -> str:
     return ", ".join(steps)
 
 
-def given_text(result: CatalogResult, instrument: Instrument, given: list[str]) -> str:
+def given_text(
+    result: CatalogResult, instrument: Instrument, given: list[str], rosters: list[str]
+) -> str:
     targets: dict[str, list[str]] = {}
     for dataset in given:
         target = next(
@@ -360,10 +432,16 @@ def given_text(result: CatalogResult, instrument: Instrument, given: list[str]) 
             None,
         )
         targets.setdefault(target or "", []).append(dataset)
-    return "; ".join(
+    parts = [
         ", ".join(names) + (f" (about: {target})" if target else "")
         for target, names in targets.items()
-    )
+    ]
+    parts += [f"the participant roster ({roster_name(s)})" for s in rosters]
+    return "; ".join(parts)
+
+
+def abbreviations(result: CatalogResult) -> dict[str, str]:
+    return {i: s.abbreviation or i for i, s in result.project.instruments.items()}
 
 
 def joined(text: str | dict[str, str]) -> str:
