@@ -216,6 +216,7 @@ def test_codebook_describes_datasets_instruments_and_every_column(result):
     )
     assert "Options frequency: 0 = Never, 1 = Sometimes, 2 = Often, 3 = Always" in said
     assert "Each dataset is in a file of its own name, such as parent_w1.csv." in said
+    assert "Domain: emotion" in said
     datasets = next(b for b in blocks if isinstance(b, Table))
     child = dict(zip(datasets.columns, datasets.rows[1], strict=True))
     assert (child["Dataset"], child["Instruments"]) == ("child_w1", "EMS")
@@ -322,3 +323,54 @@ def test_an_instrument_given_nowhere_cannot_be_exported(mock_project):
     result = run_catalog(mock_project)
     with pytest.raises(ExportError, match="is given in a dataset or a participant roster"):
         named_plan(result, ["unused"], [])
+
+
+def test_the_codebook_gives_the_lab_s_own_fields_where_they_belong(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    declared = "".join(
+        f"  - {{name: {name}, applies_to: {owner}, type: text}}\n"
+        for name, owner in [
+            ("site", "dataset"),
+            ("funder", "study"),
+            ("form", "administration"),
+            ("source", "item"),
+        ]
+    )
+    text = text.replace("custom_fields:\n", "custom_fields:\n" + declared, 1)
+    text = text.replace(
+        "path: data/child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10}",
+        "path: data/child_w1.csv, date_column: visit_date, snapshot_date: 2026-10-10, "
+        "custom: {site: clinic}}",
+    )
+    text = text.replace(
+        "    label: Mock Family Study\n",
+        "    label: Mock Family Study\n    custom: {funder: NIH}\n",
+    )
+    config.write_text(text, encoding="utf-8")
+    study = mock_project / "studies" / "mock_study.yaml"
+    given = "datasets: [child_w1, child_w2, child_w3], target: self}"
+    study.write_text(
+        study.read_text(encoding="utf-8").replace(given, given[:-1] + ", custom: {form: paper}}"),
+        encoding="utf-8",
+    )
+    mood = mock_project / "instruments" / "example_mood.yaml"
+    mood.write_text(
+        mood.read_text(encoding="utf-8").replace(
+            "{id: ems_2, text: I felt sad.}",
+            "{id: ems_2, text: I felt sad., custom: {source: CDI}}",
+        ),
+        encoding="utf-8",
+    )
+    result = run_catalog(mock_project)
+    assert result.project is not None, result.report
+    plan = {"child_w1": ["example_mood"], "child_w2": ["example_mood"]}
+    blocks = blocks_for(result, plan)
+    said = [b.label + b.text for b in blocks if isinstance(b, Paragraph)]
+    assert "funder: NIH" in said and "form (child_w1, child_w2): paper" in said
+    datasets = next(b for b in blocks if isinstance(b, Table))
+    assert datasets.columns[-1] == "site"
+    assert [row[-1] for row in datasets.rows] == ["clinic", ""]
+    items = next(b for b in blocks if isinstance(b, Table) and b.columns[:2] == ["Item", "Text"])
+    assert items.columns[-1] == "source"
+    assert [row[-1] for row in items.rows[:2]] == ["", "CDI"]

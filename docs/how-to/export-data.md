@@ -42,3 +42,5 @@ Open answers (`text` items) are listed in `variables.csv` but never exported, si
 - **One section per instrument**: its description, construct, instructions, references and license, the datasets that give it, its response options, its items with their wording, and its scores with their items and how missing items are handled. Where the datasets differ (an item dropped or not mapped, an item reworded or given other options, reversed items already reversed in the data) a table says how. With **Statistics** ticked, each score's n, mean, SD and α in each dataset follow, and ω when the window has fitted the factor models.
 
 - **Variables**: every column of the data files, by dataset, with its instrument and item or score, named as in the exported files.
+
+The project's own fields (see [Custom fields and tags](../concepts/instruments.md#custom-fields-and-tags)) appear where they belong: a study's under its description, a dataset's, item's or score's as a column of its table, an instrument's or administration's beside the instrument's other details. A field shows only when something in the export fills it in.

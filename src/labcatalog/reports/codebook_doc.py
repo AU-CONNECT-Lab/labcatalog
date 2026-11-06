@@ -119,6 +119,9 @@ def front(
             blocks.append(
                 Paragraph(citation(result.project.bibliography, info.reference), "Cite as: ")
             )
+        blocks += [
+            Paragraph(value, f"{label}: ") for label, value in lab_fields(config, "study", info)
+        ]
     codes = shared_missing_codes(result, plan, rosters)
     if codes is not None:
         said = f"{codes}. Blank cells are missing too." if codes else "Only blank cells."
@@ -168,8 +171,10 @@ def datasets_table(
     columns = ["Dataset", "Wave", "Reporter", "Collected", "Rows", "People", "Key columns"]
     columns += ["Instruments", *(["Missing codes"] if by_dataset else [])]
     columns += ["Made by"] if stepped else []
+    labels, values = lab_columns(config, "dataset", [dataset_by_name(config, d) for d in plan])
+    columns += labels
     rows = []
-    for name, instrument_ids in plan.items():
+    for (name, instrument_ids), own in zip(plan.items(), values, strict=True):
         dataset = dataset_by_name(config, name)
         summary = summaries[name]
         wave = f"Wave {dataset.wave}"
@@ -193,6 +198,7 @@ def datasets_table(
                 ", ".join(names[i] for i in instrument_ids),
                 *([missing_text(config, dataset)] if by_dataset else []),
                 *([steps[name]] if stepped else []),
+                *own,
             ]
         )
     return Table(columns, rows)
@@ -253,27 +259,36 @@ def instrument_part(
         ],
         ("License: ", instrument.license),
         ("Given in: ", given_text(result, instrument, given, rosters)),
+        *[(f"{label}: ", value) for label, value in lab_fields(config, "instrument", instrument)],
     ]
+    for content in result.project.studies.values():
+        for administration in content.administrations:
+            datasets = [d for d in administration.datasets if d in given]
+            if administration.instrument != instrument.id or not datasets:
+                continue
+            for label, value in lab_fields(config, "administration", administration):
+                facts.append((f"{label} ({', '.join(datasets)}): ", value))
     blocks += [Paragraph(text, label) for label, text in facts if text]
     for response_set in instrument.response_sets:
         options = ", ".join(
             f"{o.value} = {o.label}" if o.label else str(o.value) for o in response_set.options
         )
         blocks.append(Paragraph(options, f"Options {response_set.id}: "))
-    blocks += items_part(instrument)
-    blocks += scores_part(instrument)
+    blocks += items_part(config, instrument)
+    blocks += scores_part(config, instrument)
     blocks += differences_part(result, instrument, given)
     return blocks
 
 
-def items_part(instrument: Instrument) -> list[Block]:
+def items_part(config: ProjectConfig, instrument: Instrument) -> list[Block]:
     if not instrument.items:
         return []
     answer = len(instrument.response_sets) > 1 or any(i.type != "choice" for i in instrument.items)
     reverse = any(i.reverse for i in instrument.items)
     columns = ["Item", "Text", *(["Answer"] if answer else []), *(["Reverse"] if reverse else [])]
+    labels, values = lab_columns(config, "item", instrument.items)
     rows = []
-    for item in instrument.items:
+    for item, own in zip(instrument.items, values, strict=True):
         if item.type == "choice":
             kind = item.response_set or instrument.default_response_set or ""
         elif item.type == "number":
@@ -287,24 +302,26 @@ def items_part(instrument: Instrument) -> list[Block]:
                 joined(item.text),
                 *([kind] if answer else []),
                 *(["yes" if item.reverse else ""] if reverse else []),
+                *own,
             ]
         )
-    return [Table(columns, rows)]
+    return [Table(columns + labels, rows)]
 
 
-def scores_part(instrument: Instrument) -> list[Block]:
+def scores_part(config: ProjectConfig, instrument: Instrument) -> list[Block]:
+    if not instrument.scores:
+        return []
+    labels, values = lab_columns(config, "score", instrument.scores)
     rows = []
-    for score in instrument.scores:
+    for score, own in zip(instrument.scores, values, strict=True):
         if score.method == SCRIPT:
-            rows.append([score.id, score.label, "computed by a script", "", ""])
+            rows.append([score.id, score.label, "computed by a script", "", "", *own])
             continue
         missing = MISSING_RULES[score.missing_rule]
         if score.min_valid is not None:
             missing += f", at least {score.min_valid} answered"
-        rows.append([score.id, score.label, score.method, ", ".join(score.items), missing])
-    if not rows:
-        return []
-    return [Table(["Score", "Label", "Method", "Items", "Scored"], rows)]
+        rows.append([score.id, score.label, score.method, ", ".join(score.items), missing, *own])
+    return [Table(["Score", "Label", "Method", "Items", "Scored", *labels], rows)]
 
 
 def differences_part(
@@ -438,6 +455,39 @@ def given_text(
     ]
     parts += [f"the participant roster ({roster_name(s)})" for s in rosters]
     return "; ".join(parts)
+
+
+def lab_fields(config: ProjectConfig, applies_to: str, owner) -> list[tuple[str, str]]:
+    # The lab's own declared fields this study, instrument or administration fills in.
+    return [
+        (field.label or field.name, field_text(owner.custom[field.name]))
+        for field in config.custom_fields
+        if field.applies_to == applies_to and field.name in owner.custom
+    ]
+
+
+def lab_columns(
+    config: ProjectConfig, applies_to: str, owners: Sequence
+) -> tuple[list[str], list[list[str]]]:
+    # A column for each of the lab's own fields that any of these rows fills in.
+    fields = [
+        field
+        for field in config.custom_fields
+        if field.applies_to == applies_to and any(field.name in o.custom for o in owners)
+    ]
+    labels = [field.label or field.name for field in fields]
+    values = [[field_text(o.custom.get(field.name)) for field in fields] for o in owners]
+    return labels, values
+
+
+def field_text(value) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value)
+    if isinstance(value, dict):
+        return "; ".join(f"{k}: {v}" for k, v in value.items())
+    return str(value)
 
 
 def abbreviations(result: CatalogResult) -> dict[str, str]:
