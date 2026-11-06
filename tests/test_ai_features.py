@@ -4,10 +4,12 @@ import sys
 import pandas as pd
 import pytest
 
+from conftest import rscript
 from labcatalog.ai import cleaning, features
 from labcatalog.exceptions import EditError
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.metadata.validate import validate_project
+from labcatalog.pipeline import parsed
 from labcatalog.project import load_project
 
 FILES = "nback_trials_w2"
@@ -95,6 +97,7 @@ def test_a_drafted_summary_runs_and_its_instrument_is_a_draft(mock_project):
     assert "  - {id: acc_1back, label: 1-back accuracy," in draft.instrument
     assert "type: number, min: 0, max: 1}" in draft.instrument
     assert "description" not in draft.instrument
+    assert parsed(draft, None).syntax == ""
 
     features.save_summary(mock_project, draft)
     project = load_project(mock_project)
@@ -133,3 +136,21 @@ def test_a_tab_delimited_utf16_export_is_read(tmp_path):
     lines = cleaning.raw_lines(tmp_path, "nback-1001-1.txt", cleaning.VALUES)
     assert lines[0] == "Raw file: nback-1001-1.txt, 2 rows under its header."
     assert "Stim.ACC: 1, 0" in lines
+
+
+def test_a_drafted_summary_that_does_not_parse_says_where(mock_project):
+    project = load_project(mock_project)
+    broken = "def features(path: Path) -> dict:\n    keep = 1 &\n        2\n    return {}\n"
+    client = FakeClient(output(broken))
+    draft = features.draft_summary(project, FILES, "nback_w3", "nback_task", "d'", "python", client)
+    line = draft.script.splitlines().index("    keep = 1 &") + 1
+    assert parsed(draft, None).syntax == f'Line {line}: invalid syntax (in "keep = 1 &")'
+
+
+@pytest.mark.skipif(rscript() is None, reason="R is not installed")
+def test_the_r_summary_around_the_function_parses(mock_project):
+    project = load_project(mock_project)
+    function = "features <- function(path) {\n  list(trials = nrow(read.csv(path)))\n}\n"
+    client = FakeClient({**output(function), "function": function})
+    draft = features.draft_summary(project, FILES, "nback_w3", "nback_task", "d'", "r", client)
+    assert parsed(draft, rscript()).syntax == ""

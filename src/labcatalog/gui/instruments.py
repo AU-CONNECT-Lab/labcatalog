@@ -13,7 +13,7 @@ from labcatalog.config import dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import as_text_dict
 from labcatalog.datalad.annex import is_placeholder
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import charts, common, new_instrument, scoring_step
+from labcatalog.gui import charts, common, new_instrument, preferences, scoring_step
 from labcatalog.gui import invariance as invariance_view
 from labcatalog.gui.common import (
     as_text,
@@ -1037,12 +1037,13 @@ def written_scripts(
         button.disable()
         status.set_text("Reading the reference and writing the scripts.")
         try:
-            meta = await computed(
+            meta, unparsed = await computed(
                 run_scoring_script,
                 result,
                 instrument.id,
                 dataset,
                 *common.llm_choice(),
+                preferences.load().get(preferences.RSCRIPT),
             )
         except LabCatalogError as err:
             status.set_text(str(err))
@@ -1050,6 +1051,10 @@ def written_scripts(
             status.set_text(
                 f"Written by {meta.model} in {meta.latency_ms / 1000:.0f} s, "
                 f"{meta.input_tokens} tokens in and {meta.output_tokens} out."
+                + "".join(
+                    f" The {name} script does not parse: {problem}."
+                    for name, problem in unparsed.items()
+                )
             )
             saved.refresh()
         finally:

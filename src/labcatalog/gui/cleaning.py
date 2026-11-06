@@ -45,6 +45,7 @@ def review(draft: CleaningDraft, root: Path, on_saved: Callable[[], Awaitable[No
             f"tokens in and {meta.output_tokens} out. Read it before saving; nothing is written "
             "until you do."
         )
+        unparsed(draft.syntax)
         if draft.changes:
             caption("What changed")
             for line in draft.changes:
@@ -63,6 +64,13 @@ def review(draft: CleaningDraft, root: Path, on_saved: Callable[[], Awaitable[No
             ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
             ui.button(action, icon="save", on_click=save).props("no-caps")
     dialog.open()
+
+
+def unparsed(syntax: str) -> None:
+    if syntax:
+        caption("Does not parse")
+        ui.label(syntax).classes("lc-bad-text")
+        note("Correct that line on the Scripts page after saving, or ask the model again.")
 
 
 LANGUAGE_NAMES = {key: lang.name for key, lang in LANGUAGES.items()}

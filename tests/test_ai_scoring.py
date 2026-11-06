@@ -1,5 +1,7 @@
 import pytest
 
+from conftest import rscript
+from labcatalog import pipeline
 from labcatalog.ai import scoring as ai_scoring
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.pipeline import run_catalog
@@ -59,3 +61,19 @@ def test_the_scripts_are_saved_with_who_wrote_them_and_the_notes(result):
         "data/child_w1_example_mood_scores.csv" in paths["python"].read_text(encoding="utf-8")
     )
     assert paths["r"].parent.name == "scoring"
+
+
+class UnclosedClient(FakeClient):
+    def complete_structured(self, **kwargs):
+        output, meta = super().complete_structured(**kwargs)
+        return {**output, "python": "total = (1,"}, meta
+
+
+def test_a_written_script_that_does_not_parse_is_reported(result, monkeypatch):
+    monkeypatch.setattr(pipeline, "make_llm_client", lambda *_: UnclosedClient())
+    meta, unparsed = pipeline.run_scoring_script(
+        result, "example_mood", "child_w1", "fake", "", "", rscript()
+    )
+    assert meta.output_tokens == 20
+    assert list(unparsed) == ["Python"]
+    assert "'(' was never closed" in unparsed["Python"]

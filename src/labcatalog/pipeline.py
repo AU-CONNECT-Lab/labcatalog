@@ -1,17 +1,19 @@
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TypeVar
 
 import pandas as pd
 
 from labcatalog import defaults
 from labcatalog.ai.cleaning import CleaningDraft, draft_script, fix_script
+from labcatalog.ai.code import syntax_error
 from labcatalog.ai.custom import AnalysisDraft, draft_analysis, fix_analysis
 from labcatalog.ai.features import SummaryDraft, draft_summary
 from labcatalog.ai.instrument import InstrumentDraft, draft_instrument
 from labcatalog.ai.interpret import Interpretation, interpret
 from labcatalog.ai.measures import Draft, draft_description
-from labcatalog.ai.scoring import write_scoring_scripts
+from labcatalog.ai.scoring import script_paths, write_scoring_scripts
 from labcatalog.ai.search import Search, search_catalog
 from labcatalog.data.check import CheckReport, check_project
 from labcatalog.data.manifest import Manifest, build_manifest, metadata_paths, used_paths
@@ -44,6 +46,7 @@ from labcatalog.exceptions import FreezeError, MetadataError, ProjectNotFoundErr
 from labcatalog.issues import Issue, has_errors
 from labcatalog.llm import CallMetadata, make_llm_client
 from labcatalog.metadata import accepted
+from labcatalog.metadata.scripts import LANGUAGES, language_of
 from labcatalog.metadata.validate import validate_project
 from labcatalog.paths import expand_path
 from labcatalog.project import Project, load_config, load_project, references_root, write_schemas
@@ -54,6 +57,8 @@ from labcatalog.stats import invariance
 from labcatalog.stats.cfa import CfaFit, build_models, fit_models
 from labcatalog.stats.invariance import InvarianceTest
 from labcatalog.stats.summary import Summary, summarize, summarize_variable
+
+Drafted = TypeVar("Drafted", CleaningDraft, SummaryDraft)
 
 
 @dataclass
@@ -143,10 +148,23 @@ def run_invariance(result: CatalogResult, rscript: str, estimator: str) -> list[
 
 
 def run_scoring_script(
-    result: CatalogResult, instrument_id: str, dataset: str, provider: str, model: str, url: str
-) -> CallMetadata:
+    result: CatalogResult,
+    instrument_id: str,
+    dataset: str,
+    provider: str,
+    model: str,
+    url: str,
+    rscript: str | None,
+) -> tuple[CallMetadata, dict[str, str]]:
+    # The call, and where each language's script does not parse.
     client = make_llm_client(provider, model, url)
-    return write_scoring_scripts(result.project, result.catalog, instrument_id, dataset, client)
+    project = result.project
+    meta = write_scoring_scripts(project, result.catalog, instrument_id, dataset, client)
+    found = {
+        LANGUAGES[language].name: syntax_error(path.read_text("utf-8"), language, rscript)
+        for language, path in script_paths(project, instrument_id, dataset).items()
+    }
+    return meta, {name: problem for name, problem in found.items() if problem}
 
 
 def run_cleaning_draft(
@@ -157,9 +175,11 @@ def run_cleaning_draft(
     provider: str,
     model: str,
     url: str,
+    rscript: str | None,
 ) -> CleaningDraft:
     client = make_llm_client(provider, model, url)
-    return draft_script(result.project, result.catalog, dataset, raw, language, client)
+    draft = draft_script(result.project, result.catalog, dataset, raw, language, client)
+    return parsed(draft, rscript)
 
 
 def run_cleaning_fix(
@@ -169,9 +189,10 @@ def run_cleaning_fix(
     provider: str,
     model: str,
     url: str,
+    rscript: str | None,
 ) -> CleaningDraft:
     client = make_llm_client(provider, model, url)
-    return fix_script(result.project, result.catalog, issue, rows, client)
+    return parsed(fix_script(result.project, result.catalog, issue, rows, client), rscript)
 
 
 def run_summary_draft(
@@ -184,9 +205,16 @@ def run_summary_draft(
     provider: str,
     model: str,
     url: str,
+    rscript: str | None,
 ) -> SummaryDraft:
     client = make_llm_client(provider, model, url)
-    return draft_summary(result.project, files, name, instrument_id, wanted, language, client)
+    draft = draft_summary(result.project, files, name, instrument_id, wanted, language, client)
+    return parsed(draft, rscript)
+
+
+def parsed(draft: Drafted, rscript: str | None) -> Drafted:
+    draft.syntax = syntax_error(draft.script, language_of(draft.script_path), rscript)
+    return draft
 
 
 def run_analysis_draft(

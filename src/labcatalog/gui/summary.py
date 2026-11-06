@@ -6,8 +6,8 @@ from nicegui import run, ui
 from labcatalog.ai.cleaning import RAW_ROWS, ROWS
 from labcatalog.ai.features import SummaryDraft, save_summary
 from labcatalog.exceptions import LabCatalogError
-from labcatalog.gui import common
-from labcatalog.gui.cleaning import LANGUAGE_NAMES
+from labcatalog.gui import common, preferences
+from labcatalog.gui.cleaning import LANGUAGE_NAMES, unparsed
 from labcatalog.gui.common import caption, computed, note
 from labcatalog.metadata.scripts import language_of
 from labcatalog.pipeline import CatalogResult, run_summary_draft
@@ -63,7 +63,7 @@ def summary_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable
 
     async def draft() -> None:
         button.disable()
-        status.set_text("Reading one person's file and drafting the script.")
+        status.set_text("Reading the files and drafting the script.")
         try:
             found = await computed(
                 run_summary_draft,
@@ -74,6 +74,7 @@ def summary_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable
                 wanted.value or "",
                 language.value,
                 *common.llm_choice(),
+                preferences.load().get(preferences.RSCRIPT),
             )
         except LabCatalogError as err:
             status.set_text(str(err))
@@ -105,6 +106,7 @@ def review(draft: SummaryDraft, root: Path, on_saved: Callable[[], Awaitable[Non
             f"tokens in and {meta.output_tokens} out, from {draft.shown}. Read it before saving; "
             "nothing is written until you do."
         )
+        unparsed(draft.syntax)
         if draft.notes:
             caption("To check")
             for line in draft.notes:

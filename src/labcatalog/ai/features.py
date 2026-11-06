@@ -98,6 +98,8 @@ class SummaryDraft:
     shown: str
     meta: CallMetadata
     notes: list[str]
+    # Where the script does not parse, if it does not.
+    syntax: str = ""
 
 
 def here_files(project: Project, files: str) -> list[str]:

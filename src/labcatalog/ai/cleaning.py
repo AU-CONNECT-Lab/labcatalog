@@ -99,6 +99,8 @@ class CleaningDraft:
     meta: CallMetadata
     changes: list[str] = field(default_factory=list)
     notes: list[str] = field(default_factory=list)
+    # Where the script does not parse, if it does not.
+    syntax: str = ""
 
     def diff(self) -> str:
         lines = difflib.unified_diff(

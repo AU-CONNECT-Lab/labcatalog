@@ -271,7 +271,14 @@ def open_fix(result: CatalogResult, issue: Issue, actions: FixActions) -> None:
             return
         status.set_text("Asking the language model for a fix to the script.")
         try:
-            draft = await computed(run_cleaning_fix, result, issue, rows, *common.llm_choice())
+            draft = await computed(
+                run_cleaning_fix,
+                result,
+                issue,
+                rows,
+                *common.llm_choice(),
+                preferences.load().get(preferences.RSCRIPT),
+            )
         except LabCatalogError as err:
             status.set_text(str(err))
             return

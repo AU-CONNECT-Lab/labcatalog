@@ -385,6 +385,7 @@ def draft_panel(result: CatalogResult | None, on_saved: Callable[[], Awaitable[N
                     chosen,
                     language.value,
                     *common.llm_choice(),
+                    preferences.load().get(preferences.RSCRIPT),
                 )
             except LabCatalogError as err:
                 status.set_text(str(err))
