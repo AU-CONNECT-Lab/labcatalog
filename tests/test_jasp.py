@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from conftest import VISIT
 
 from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import run_catalog
@@ -422,6 +423,47 @@ out <- list(b0 = table[1, "Estimate"], se0 = table[1, "Std. Error"], df0 = table
     )
     assert (time.estimate, time.se, time.df, time.p) == pytest.approx(
         (jasp["b1"], jasp["se1"], jasp["df1"], jasp["p1"]), rel=1e-4
+    )
+
+
+@pytest.mark.skipif(not ready(MULTILEVEL_PACKAGES + ("emmeans",)), reason="R lacks emmeans")
+def test_occasions_model_matches_jasp_mixed_models(visit_project, tmp_path):
+    result = run_catalog(visit_project)
+    names = [name for name, _, _ in VISIT]
+    model = ml.Model(EMS.split("@")[0], names, time=ml.OCCASIONS)
+    long = ml.long_frame(result, model)
+    fitted = ml.run(result, model, long, "EMS", rscript())
+    # jaspMixedModels: afex::mixed with Satterthwaite's df and type III tests over sum-to-zero
+    # contrasts, and emmeans for the marginal means and their comparisons.
+    jasp = in_jasp(
+        tmp_path,
+        ["jaspMixedModels"],
+        f"""
+d$time <- factor(d$time, levels = c("before", "after"))
+d$interaction <- factor(d$interaction, levels = c("parent", "peer"))
+d <- d[!is.na(d[["{long.outcome}"]]), ]
+fit <- afex::mixed({long.outcome} ~ time * interaction + (1 | {ml.PERSON}), data = d,
+                   type = "3", method = "S")
+tests <- fit$anova_table
+cells <- as.data.frame(emmeans::emmeans(fit, ~ time | interaction, lmer.df = "satterthwaite"))
+compared <- as.data.frame(pairs(emmeans::emmeans(fit, ~ time | interaction,
+                                                 lmer.df = "satterthwaite"), adjust = "holm"))
+out <- list(f_time = tests["time", "F"], df_time = tests["time", "den Df"],
+            f_both = tests["time:interaction", "F"], p_both = tests["time:interaction", "Pr(>F)"],
+            m1 = cells$emmean[1], m4 = cells$emmean[4], se1 = cells$SE[1],
+            diff1 = compared$estimate[1], p1 = compared$p.value[1])
+""",
+        long.frame,
+    )
+    time, _, both = fitted.tests
+    assert (time.statistic, time.df2) == pytest.approx((jasp["f_time"], jasp["df_time"]), rel=1e-4)
+    assert (both.statistic, both.p) == pytest.approx((jasp["f_both"], jasp["p_both"]), rel=1e-4)
+    first, last = fitted.means[0], fitted.means[-1]
+    assert (first.mean, last.mean, first.se) == pytest.approx(
+        (jasp["m1"], jasp["m4"], jasp["se1"]), rel=1e-4
+    )
+    assert (fitted.differences[0].estimate, fitted.differences[0].p) == pytest.approx(
+        (jasp["diff1"], jasp["p1"]), rel=1e-4
     )
 
 

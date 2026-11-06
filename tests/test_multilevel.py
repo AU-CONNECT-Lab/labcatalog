@@ -9,10 +9,12 @@ from types import SimpleNamespace
 import numpy as np
 import pandas as pd
 import pytest
+from conftest import VISIT
 
 from labcatalog.charts import views
 from labcatalog.gui import multilevel as multilevel_view
 from labcatalog.pipeline import run_catalog
+from labcatalog.reports import results
 from labcatalog.stats import multilevel as ml
 from labcatalog.stats.rbridge import MULTILEVEL_PACKAGES, r_status
 
@@ -518,3 +520,111 @@ def test_saved_imputed_r_script_runs_on_its_data(result, tmp_path):
     assert done.returncode == 0, done.stderr
     assert "Estimate" in done.stdout
     assert list(tmp_path.glob("imputation_*.rds"))
+
+
+@pytest.fixture
+def visit(visit_project):
+    return run_catalog(visit_project)
+
+
+def occasions_model(**changes) -> ml.Model:
+    datasets = [name for name, _, _ in VISIT]
+    return ml.Model(**({"outcome": EMS, "datasets": datasets, "time": ml.OCCASIONS} | changes))
+
+
+def test_occasions_are_crossed_factors_of_the_same_people(visit):
+    model = occasions_model()
+    assert ml.problem(visit, model) is None
+    long = ml.long_frame(visit, model)
+    assert [(f.name, f.levels) for f in long.factors] == [
+        ("time", ["before", "after"]),
+        ("interaction", ["parent", "peer"]),
+    ]
+    assert list(long.frame.groupby([f.column for f in long.factors], sort=False).size().index) == [
+        ("before", "parent"),
+        ("after", "parent"),
+        ("before", "peer"),
+        ("after", "peer"),
+    ]
+    parts = ml.structure(model, long)
+    assert parts["fixed"] == "time * interaction"
+    assert parts["python_fixed"] == "C(time, Sum) * C(interaction, Sum)"
+    assert parts["random"] == "(1 | id)"
+    assert ml.occasion_datasets(visit, EMS) == [name for name, _, _ in VISIT]
+
+
+def test_occasions_need_an_occasion_on_each_dataset(visit):
+    model = occasions_model(datasets=["child_w2", "mood_pre_parent"])
+    assert ml.problem(visit, model).startswith("child_w2 has no occasion")
+    assert ml.problem(visit, occasions_model(datasets=["mood_pre_parent"])).startswith(
+        "Choose two or more"
+    )
+    assert ml.problem(visit, occasions_model(by_person=False, by_group=True)).startswith(
+        "Occasions measure the same people"
+    )
+
+
+def test_python_fits_the_occasions_effects_means_and_comparisons(visit):
+    model = occasions_model()
+    fitted = ml.run(visit, model, ml.long_frame(visit, model), "EMS Total score", None)
+    assert [t.term for t in fitted.tests] == ["time", "interaction", "time × interaction"]
+    assert all(t.df2 is None and t.df1 == 1 for t in fitted.tests)
+    assert [m.levels for m in fitted.means] == [
+        ["before", "parent"],
+        ["after", "parent"],
+        ["before", "peer"],
+        ["after", "peer"],
+    ]
+    assert [(d.contrast, d.within) for d in fitted.differences] == [
+        ("before - after", "interaction: parent"),
+        ("before - after", "interaction: peer"),
+    ]
+    first, second = fitted.means[0], fitted.means[1]
+    assert fitted.differences[0].estimate == pytest.approx(first.mean - second.mean)
+    labels = [t.label for t in fitted.fixed]
+    assert labels[:4] == [
+        "Intercept",
+        "time: before",
+        "interaction: parent",
+        "time: before × interaction: parent",
+    ]
+
+
+@needs_r
+def test_r_and_python_agree_on_occasions(visit):
+    model = occasions_model()
+    long = ml.long_frame(visit, model)
+    in_r = ml.run(visit, model, long, "EMS Total score", rscript())
+    in_python = ml.run(visit, model, long, "EMS Total score", None)
+    assert [t.term for t in in_r.tests] == [t.term for t in in_python.tests]
+    assert all(t.df2 is not None for t in in_r.tests)
+    for a, b in zip(in_r.tests, in_python.tests, strict=True):
+        # F with one df is the Wald chi-square over the same covariance, near enough.
+        assert a.statistic * a.df1 == pytest.approx(b.statistic, rel=0.05)
+    for a, b in zip(in_r.means, in_python.means, strict=True):
+        assert a.levels == b.levels
+        assert a.mean == pytest.approx(b.mean, abs=0.01 * a.se)
+        assert a.se == pytest.approx(b.se, rel=0.05)
+    for a, b in zip(in_r.differences, in_python.differences, strict=True):
+        assert (a.contrast, a.within) == (b.contrast, b.within)
+        assert a.estimate == pytest.approx(b.estimate, abs=0.01 * a.se)
+    assert [t.label for t in in_r.fixed] == [t.label for t in in_python.fixed]
+
+
+def test_saved_python_script_draws_the_occasions_means(visit, tmp_path):
+    run_with_figure(visit, tmp_path, occasions_model(), [sys.executable], "multilevel.py")
+
+
+@needs_r
+def test_saved_r_script_draws_the_occasions_means(visit, tmp_path):
+    run_with_figure(visit, tmp_path, occasions_model(), [rscript()], "multilevel.R")
+
+
+def test_the_results_paragraph_gives_the_occasions_tests_and_comparisons(visit):
+    model = occasions_model()
+    fitted = ml.run(visit, model, ml.long_frame(visit, model), "EMS Total score", None)
+    text = results.multilevel_text(fitted, "EMS Total score")
+    assert "Tests of the occasions gave time, χ²(1) = " in text
+    assert "; time × interaction, χ²(1) = " in text
+    assert "Compared with Holm's adjustment, before - after (interaction: parent): " in text
+    assert "Fixed effects:" not in text

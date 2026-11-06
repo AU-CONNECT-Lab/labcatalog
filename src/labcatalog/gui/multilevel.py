@@ -23,6 +23,7 @@ TIME_UNITS = {
     ml.WAVES: "Waves since the first",
     "month": "Months, from the dates",
     "year": "Years, from the dates",
+    ml.OCCASIONS: "Occasions, as categories",
 }
 R_FILE = "multilevel.R"
 PYTHON_FILE = "multilevel.py"
@@ -67,7 +68,9 @@ def render(result: CatalogResult, view) -> None:
             long = ml.long_frame(result, model)
             label = outcomes[model.outcome]
             imputing = None
-            if missing.imputing(result, view):
+            if long.factors and missing.imputing(result, view):
+                note("Occasions are fitted on the rows with every value; nothing is imputed here.")
+            elif missing.imputing(result, view):
                 rows = ml.imputed_rows(model, long)
                 if rows:
                     imputing = ml.Imputing(*missing.settings(result, view))
@@ -86,7 +89,8 @@ def render(result: CatalogResult, view) -> None:
                     R_FILE: r_text,
                     PYTHON_FILE: python_text,
                 }
-                papers = {
+                papers = occasion_papers(fitted, long, label) if long.factors else {}
+                papers |= {
                     "multilevel_fixed": PaperTable(
                         f"Fixed Effects for {label}", *fixed_table(fitted), fixed_note(fitted, long)
                     ),
@@ -119,9 +123,14 @@ def render(result: CatalogResult, view) -> None:
                         list(papers.values()),
                         "multilevel",
                     )
-                    fig = views.trajectories(long, fitted, label)
-                    drawn = paper.Chart(charts.show(fig), fig)
-                    note(trajectory_note(long))
+                    if long.factors:
+                        fig = views.occasion_means(long, fitted, label)
+                        drawn = paper.Chart(charts.show(fig), fig)
+                        note("Each occasion's estimated marginal mean with its 95% CI.")
+                    else:
+                        fig = views.trajectories(long, fitted, label)
+                        drawn = paper.Chart(charts.show(fig), fig)
+                        note(trajectory_note(long))
                     paper.result_actions(result, "multilevel", papers, drawn, texts, engine)
                     with ui.expansion("Code", icon="code").props("dense").classes("w-full"):
                         note(
@@ -148,10 +157,22 @@ def render(result: CatalogResult, view) -> None:
             covariate_select.set_options(options, value=model.covariates)
 
         def choose_outcome(value: str) -> None:
-            choose_waves(ml.wave_datasets(result, value), outcome=value)
+            occasional = model.time == ml.OCCASIONS and ml.occasion_datasets(result, value)
+            choose_waves(occasional or ml.wave_datasets(result, value), outcome=value)
             waves.set_options(
                 {n: labels[n] for n in ml.occasions(result, value)}, value=model.datasets
             )
+
+        def choose_time(value: str) -> None:
+            # Occasions start from one wave's datasets that have one, waves from one per wave.
+            if value == ml.OCCASIONS:
+                datasets = ml.occasion_datasets(result, model.outcome) or model.datasets
+            elif model.time == ml.OCCASIONS:
+                datasets = ml.wave_datasets(result, model.outcome)
+            else:
+                datasets = model.datasets
+            choose_waves(datasets, time=value)
+            waves.set_value(model.datasets)
 
         with ui.row().classes("w-full items-center gap-4"):
             ui.select(
@@ -166,7 +187,7 @@ def render(result: CatalogResult, view) -> None:
                     {n: labels[n] for n in ml.occasions(result, model.outcome)},
                     multiple=True,
                     value=model.datasets,
-                    label="Waves",
+                    label="Waves, or the occasions",
                     on_change=lambda e: choose_waves(e.value or []),
                 )
                 .props("dense outlined use-chips")
@@ -189,7 +210,7 @@ def render(result: CatalogResult, view) -> None:
                 TIME_UNITS,
                 value=model.time,
                 label="Time counts",
-                on_change=lambda e: change(time=e.value),
+                on_change=lambda e: choose_time(e.value),
             ).props("dense outlined").classes("w-56")
             ui.switch(
                 "Waves within people",
@@ -223,8 +244,14 @@ def script_texts(
     label: str,
     imputing: ml.Imputing | None = None,
 ) -> tuple[str, str]:
-    # The model's R and Python scripts, each followed by the trajectory figure.
+    # The model's R and Python scripts, each followed by its figure.
     r_text, python_text = ml.scripts(result, model, long, label, imputing)
+    if long.factors:
+        first, *others = long.factors
+        r_plot, python_plot = plot_code.occasion_means(
+            first.column, [(f.column, f.name) for f in others], label
+        )
+        return f"{r_text}\n{r_plot}", f"{python_text}\n{python_plot}"
     by_wave = long.time_label == ml.TIME_LABEL
     columns = {"person": ml.PERSON, "wave": ml.WAVE, "time": ml.TIME, "y": long.outcome}
     r_plot, python_plot = plot_code.trajectories(
@@ -243,6 +270,105 @@ def trajectory_note(long: ml.Long) -> str:
             ", with number covariates at their mean and answer covariates at the reference option"
         )
     return text + "."
+
+
+def occasion_papers(fitted: ml.Fitted, long: ml.Long, label: str) -> dict[str, PaperTable]:
+    in_r = fitted.engine == ml.R
+    tested = (
+        "Type III F tests with Satterthwaite's df (lmerTest), the occasions as factors with "
+        "sum-to-zero contrasts, as in JASP's linear mixed models."
+        if in_r
+        else "Wald χ² tests, since statsmodels has no Satterthwaite df; set Rscript on the "
+        "Settings page for JASP's F tests."
+    )
+    first, *others = long.factors
+    within = " within each level of the others" if others else ""
+    compared = (
+        f"The levels of {first.name} compared{within}, the first minus the second, with p "
+        f"adjusted by Holm's method {'(emmeans)' if in_r else ''}".rstrip()
+        + "."
+    )
+    return {
+        "multilevel_tests": PaperTable(
+            f"Tests of the Occasions for {label}", *tests_table(fitted), tested
+        ),
+        "multilevel_means": PaperTable(
+            "Estimated Marginal Means",
+            *means_table(fitted, long),
+            "Numbers in the model at their mean and answer options weighted equally, as "
+            "emmeans gives them.",
+        ),
+        "multilevel_differences": PaperTable(
+            "Comparisons of the Occasions", *differences_table(fitted, long), compared
+        ),
+    }
+
+
+def tests_table(fitted: ml.Fitted) -> tuple[list[dict], list[dict]]:
+    in_r = fitted.engine == ml.R
+    columns = [
+        col("term", "Effect", sortable=False),
+        col("statistic", "F" if in_r else "χ²", numeric=True),
+        col("df1", "df1" if in_r else "df", numeric=True),
+        *([col("df2", "df2", numeric=True)] if in_r else []),
+        col("p", "p", numeric=True),
+    ]
+    rows = [
+        {
+            "term": t.term,
+            "statistic": decimal(t.statistic),
+            "df1": f"{t.df1:g}",
+            "df2": "" if t.df2 is None else f"{t.df2:.1f}",
+            "p": p_value(t.p),
+        }
+        for t in fitted.tests
+    ]
+    return columns, rows
+
+
+def means_table(fitted: ml.Fitted, long: ml.Long) -> tuple[list[dict], list[dict]]:
+    columns = [col(f"f{n}", f.name, sortable=False) for n, f in enumerate(long.factors)]
+    columns += [
+        col("m", "M", numeric=True),
+        col("se", "SE", numeric=True),
+        col("ci", "95% CI", numeric=True, sortable=False),
+    ]
+    rows = [
+        {f"f{n}": level for n, level in enumerate(cell.levels)}
+        | {
+            "m": decimal(cell.mean),
+            "se": decimal(cell.se),
+            "ci": f"[{decimal(cell.low)}, {decimal(cell.high)}]",
+        }
+        for cell in fitted.means
+    ]
+    return columns, rows
+
+
+def differences_table(fitted: ml.Fitted, long: ml.Long) -> tuple[list[dict], list[dict]]:
+    in_r = fitted.engine == ml.R
+    columns = [
+        col("contrast", "Comparison", sortable=False),
+        *([col("within", "Within", sortable=False)] if len(long.factors) > 1 else []),
+        col("estimate", "Difference", numeric=True),
+        col("se", "SE", numeric=True),
+        *([col("df", "df", numeric=True)] if in_r else []),
+        col("statistic", "t" if in_r else "z", numeric=True),
+        col("p", "p (Holm)", numeric=True),
+    ]
+    rows = [
+        {
+            "contrast": d.contrast,
+            "within": d.within,
+            "estimate": decimal(d.estimate),
+            "se": decimal(d.se),
+            "df": "" if d.df is None else f"{d.df:.1f}",
+            "statistic": decimal(d.statistic),
+            "p": p_value(d.p),
+        }
+        for d in fitted.differences
+    ]
+    return columns, rows
 
 
 def random_note(model: ml.Model, long: ml.Long) -> str:

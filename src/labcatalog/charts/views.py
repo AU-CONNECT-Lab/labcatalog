@@ -1341,3 +1341,13 @@ def trajectories(long: ml.Long, fitted: ml.Fitted, label: str) -> go.Figure:
         label,
         wave_color(0),
     )
+
+
+def occasion_means(long: ml.Long, fitted: ml.Fitted, label: str) -> go.Figure:
+    first, *others = long.factors
+    series: dict[str, list[tuple[float, float, float]]] = {}
+    for cell in fitted.means:
+        name = ", ".join(f"{f.name}: {v}" for f, v in zip(others, cell.levels[1:], strict=True))
+        series.setdefault(name or label, []).append((cell.mean, cell.low, cell.high))
+    colors = [wave_color(n) for n in range(len(series))]
+    return plots.occasion_means(first.levels, list(series.items()), colors, label)

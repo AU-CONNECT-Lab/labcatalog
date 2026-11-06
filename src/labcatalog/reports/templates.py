@@ -1045,6 +1045,53 @@ TEMPLATES: dict[str, Template] = {
                     },
                 ),
                 Slot(
+                    "effects",
+                    "The tests of the occasions, in place of the fixed effects",
+                    "Tests of the occasions gave {effects}.",
+                    ("effects",),
+                    {
+                        "effects": "time, F(1, 189.0) = 6.40, p = .012; interaction, F(1, 189.0) "
+                        "= 0.31, p = .578; time × interaction, F(1, 189.0) = 4.10, p = .044"
+                    },
+                ),
+                Slot(
+                    "effect",
+                    "Each test in that list, separated by semicolons",
+                    "{term}, {statistics}",
+                    ("term", "statistics", "test", "p"),
+                    {
+                        "term": "time × interaction",
+                        "statistics": "F(1, 189.0) = 4.10, p = .044",
+                        "test": "F(1, 189.0) = 4.10",
+                        "p": "p = .044",
+                    },
+                ),
+                Slot(
+                    "comparisons",
+                    "The occasions compared within each level of the others",
+                    "Compared with Holm's adjustment, {comparisons}.",
+                    ("comparisons",),
+                    {
+                        "comparisons": "before - after (interaction: parent): M difference = "
+                        "-0.62, t(189.0) = -3.05, p = .005; before - after (interaction: peer): "
+                        "M difference = -0.04, t(189.0) = -0.20, p = .842"
+                    },
+                ),
+                Slot(
+                    "comparison",
+                    "Each comparison in that list, separated by semicolons",
+                    "{contrast}{within}: {statistics}",
+                    ("contrast", "within", "statistics", "difference", "test", "p"),
+                    {
+                        "contrast": "before - after",
+                        "within": " (interaction: parent)",
+                        "statistics": "M difference = -0.62, t(189.0) = -3.05, p = .005",
+                        "difference": "M difference = -0.62",
+                        "test": "t(189.0) = -3.05",
+                        "p": "p = .005",
+                    },
+                ),
+                Slot(
                     "random",
                     "The random effects",
                     "Random effects: {variances}.",

@@ -12,12 +12,15 @@ from labcatalog.processes import NEW_GROUP, end_tree, end_with_labcatalog
 CFA_PACKAGES = ("lavaan", "semTools")
 ANALYSIS_PACKAGES = ("psych", "effectsize", "MBESS")
 MULTILEVEL_PACKAGES = ("lme4", "lmerTest", "performance")
+# The multilevel model of occasions also compares their estimated marginal means.
+OCCASION_PACKAGES = ("emmeans",)
 MEDIATION_PACKAGES = ("modsem",)
 IMPUTATION_PACKAGES = ("mice", "miceadds")
 ALL_PACKAGES = (
     CFA_PACKAGES
     + ANALYSIS_PACKAGES
     + MULTILEVEL_PACKAGES
+    + OCCASION_PACKAGES
     + MEDIATION_PACKAGES
     + IMPUTATION_PACKAGES
 )

@@ -35,7 +35,14 @@ from labcatalog.stats.mediation import (
     intervals_text,
     method_text,
 )
-from labcatalog.stats.multilevel import RESIDUAL, Fitted, Term, Variance
+from labcatalog.stats.multilevel import (
+    RESIDUAL,
+    Difference,
+    FactorTest,
+    Fitted,
+    Term,
+    Variance,
+)
 from labcatalog.stats.multilevel import R as LME4
 from labcatalog.stats.panel import EQUAL, EQUAL_STUDIES, RICLPM, PanelFit, PanelModel
 
@@ -701,7 +708,13 @@ def multilevel_text(
         ]
         sentences.append(wording.say("multilevel", "icc", iccs=series(found)))
     terms = [t for t in fitted.fixed if t.label != "Intercept"]
-    if terms:
+    if fitted.tests:
+        found = "; ".join(effect_text(t, digits, wording) for t in fitted.tests)
+        sentences.append(wording.say("multilevel", "effects", effects=found))
+        if fitted.differences:
+            found = "; ".join(difference_text(d, digits, wording) for d in fitted.differences)
+            sentences.append(wording.say("multilevel", "comparisons", comparisons=found))
+    elif terms:
         found = "; ".join(term_text(t, digits, wording) for t in terms)
         sentences.append(wording.say("multilevel", "fixed", terms=found))
     if fitted.random:
@@ -710,6 +723,32 @@ def multilevel_text(
     if fitted.singular:
         sentences.append(wording.say("multilevel", "singular"))
     return " ".join(sentences)
+
+
+def effect_text(test: FactorTest, digits: int, wording: Wording) -> str:
+    # F with Satterthwaite's df from R, a Wald chi-square from Python.
+    shown = f"F({test.df1:g}, {test.df2:.1f})" if test.df2 is not None else f"χ²({test.df1:g})"
+    values = {"test": f"{shown} = {number(test.statistic, digits)}", "p": p_text(test.p)}
+    return wording.say(
+        "multilevel", "effect", term=test.term, statistics=", ".join(values.values()), **values
+    )
+
+
+def difference_text(difference: Difference, digits: int, wording: Wording) -> str:
+    test = "z" if difference.df is None else f"t({difference.df:.1f})"
+    values = {
+        "difference": f"M difference = {number(difference.estimate, digits)}",
+        "test": f"{test} = {number(difference.statistic, digits)}",
+        "p": p_text(difference.p),
+    }
+    return wording.say(
+        "multilevel",
+        "comparison",
+        contrast=difference.contrast,
+        within=f" ({difference.within})" if difference.within else "",
+        statistics=", ".join(values.values()),
+        **values,
+    )
 
 
 def term_text(term: Term, digits: int, wording: Wording) -> str:

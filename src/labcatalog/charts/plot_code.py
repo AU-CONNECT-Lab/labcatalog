@@ -308,3 +308,52 @@ def trajectories(
     python = PYTHON_TRAJECTORIES.format(x_ticks=x_ticks, width="7", height="4.2", **fields)
     what = f"each person's {label} over time, the observed mean and the fixed effects"
     return framed(what, "multilevel.png", r, python, 7, 4.2)
+
+
+R_OCCASION_MEANS = """\
+means$group <- {group}
+figure <- ggplot(means, aes({first}, mean, colour = group, group = group)) +
+  geom_line(position = position_dodge(0.15)) +
+  geom_pointrange(aes(ymin = low, ymax = high), position = position_dodge(0.15)) +
+  labs(x = NULL, y = {label}, colour = NULL) +
+  theme_minimal(){legend}
+"""
+PYTHON_OCCASION_MEANS = """\
+names = {names}
+group = {group}
+fig, ax = plt.subplots(figsize=({width}, {height}))
+for k, (name, rows) in enumerate(means.groupby(group, sort=False)):
+    x = np.arange(len(rows)) + 0.08 * (k - (group.nunique() - 1) / 2)
+    ax.errorbar(x, rows["mean"], yerr=[rows["mean"] - rows["low"], rows["high"] - rows["mean"]],
+                marker="o", capsize=3, label=name)
+ax.set_xticks(range(len(levels[{first_name}])), levels[{first_name}])
+ax.set_ylabel({label})
+if group.nunique() > 1:
+    ax.legend(frameon=False)
+"""
+
+
+def occasion_means(first: str, others: list[tuple[str, str]], label: str) -> tuple[str, str]:
+    # Reads means and, in Python, levels, which the occasions' code sets; others as (column, name).
+    if others:
+        r_group = (
+            "paste("
+            + ", ".join(f"paste0({text(name + ': ')}, means[[{text(c)}]])" for c, name in others)
+            + ', sep = ", ")'
+        )
+        columns = ", ".join(text(c) for c, _ in others)
+        joined = 'lambda r: ", ".join(f"{names[c]}: {v}" for c, v in r.items())'
+        python_group = f"means[[{columns}]].apply({joined}, axis=1)"
+        legend = ""
+    else:
+        r_group = text(label)
+        python_group = f"pd.Series({text(label)}, index=means.index)"
+        legend = ' +\n  theme(legend.position = "none")'
+    fields = dict(label=text(label), width="6", height="4")
+    r = R_OCCASION_MEANS.format(group=r_group, first=first, legend=legend, **fields)
+    names = "{" + python_named(dict(others)) + "}"
+    python = PYTHON_OCCASION_MEANS.format(
+        names=names, group=python_group, first_name=text(first), **fields
+    )
+    what = f"the estimated marginal means of {label} with their 95% CIs"
+    return framed(what, "multilevel.png", r, python, 6, 4)

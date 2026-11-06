@@ -815,3 +815,53 @@ def trajectories(
         margin=dict(l=64, r=16, t=40, b=40),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, x=1, xanchor="right"),
     )
+
+
+def occasion_means(
+    levels: list[str],
+    series: list[tuple[str, list[tuple[float, float, float]]]],
+    colors: list[str],
+    y_title: str,
+) -> go.Figure:
+    # Each line is one combination of the other occasions, across the first's levels.
+    fig = go.Figure()
+    shift = 0.06
+    for k, ((name, cells), color) in enumerate(zip(series, colors, strict=True)):
+        offset = shift * (k - (len(series) - 1) / 2)
+        means = [m for m, _, _ in cells]
+        fig.add_trace(
+            go.Scatter(
+                x=[n + offset for n in range(len(levels))],
+                y=means,
+                mode="lines+markers",
+                name=name,
+                line=dict(color=color, width=2),
+                marker=dict(size=8, color="white", line=dict(color=color, width=2)),
+                error_y=dict(
+                    type="data",
+                    symmetric=False,
+                    array=[high - m for m, _, high in cells],
+                    arrayminus=[m - low for m, low, _ in cells],
+                    color=color,
+                    thickness=1.2,
+                    width=4,
+                ),
+                customdata=levels,
+                hovertemplate="%{customdata}: %{y:.2f}<extra>" + name + "</extra>",
+            )
+        )
+    fig.update_xaxes(
+        tickvals=list(range(len(levels))),
+        ticktext=levels,
+        range=[-0.4, len(levels) - 0.6],
+        showgrid=False,
+        zeroline=False,
+    )
+    fig.update_yaxes(title_text=y_title, gridcolor=GRID, zeroline=False)
+    return base_layout(
+        fig,
+        380,
+        margin=dict(l=64, r=16, t=40, b=40),
+        showlegend=len(series) > 1,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=1, xanchor="right"),
+    )

@@ -2,6 +2,8 @@ import shutil
 from glob import glob
 from pathlib import Path
 
+import numpy as np
+import pandas as pd
 import pytest
 
 from labcatalog.metadata import changes, studies
@@ -80,4 +82,52 @@ def pilot_project(mock_project: Path) -> Path:
         "reporter: child, source: csv, path: data/child_w1.csv, map: child_w1}\n",
     )
     config.write_text(text, encoding="utf-8")
+    return root
+
+
+# Four times of the mood scale in wave 2: before and after each of two interactions.
+VISIT = [
+    ("mood_pre_parent", "before", "parent"),
+    ("mood_post_parent", "after", "parent"),
+    ("mood_pre_peer", "before", "peer"),
+    ("mood_post_peer", "after", "peer"),
+]
+CHILD_W2 = (
+    "  - {name: child_w2, modality: questionnaire, study: mock_study, wave: 2, reporter: child, "
+    "source: csv, path: data/child_w2.csv, date_column: visit_date, snapshot_date: 2026-10-10}\n"
+)
+MOOD = "  - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self}"
+
+
+@pytest.fixture
+def visit_project(mock_project: Path) -> Path:
+    root = mock_project
+    child = pd.read_csv(root / "data" / "child_w2.csv", dtype=str, keep_default_na=False)
+    rng = np.random.default_rng(5)
+    frame = pd.DataFrame({"pid": child["pid"]})
+    lines = []
+    for name, time, interaction in VISIT:
+        worse = name == "mood_post_parent"
+        for i in range(1, 10):
+            base = pd.to_numeric(child[f"ems_{i}_w2"], errors="coerce")
+            base = base.where(base >= 0)
+            moved = base + rng.integers(-1, 2, len(child)) + worse * (rng.random(len(child)) < 0.6)
+            frame[f"ems_{i}_{name}"] = moved.clip(0, 3).astype("Int64")
+        rows = [f"ems_{i}_{name},example_mood,ems_{i}" for i in range(1, 10)]
+        (root / "maps" / f"{name}.csv").write_text(
+            "column,instrument,item\npid,,\n" + "\n".join(rows) + "\n", encoding="utf-8"
+        )
+        lines.append(
+            f"  - {{name: {name}, modality: questionnaire, study: mock_study, wave: 2, "
+            f"reporter: child, source: csv, path: data/mood_visit_w2.csv, "
+            f"occasion: {{time: {time}, interaction: {interaction}}}}}\n"
+        )
+    frame.to_csv(root / "data" / "mood_visit_w2.csv", index=False)
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    config.write_text(text.replace(CHILD_W2, CHILD_W2 + "".join(lines)), encoding="utf-8")
+    study = root / "studies" / "mock_study.yaml"
+    names = ", ".join(name for name, _, _ in VISIT)
+    text = study.read_text(encoding="utf-8")
+    study.write_text(text.replace(MOOD, MOOD.replace("child_w3]", f"child_w3, {names}]")))
     return root

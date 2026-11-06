@@ -4,6 +4,7 @@ import re
 import tempfile
 import textwrap
 from dataclasses import dataclass, field, replace
+from itertools import combinations
 from pathlib import Path
 
 import numpy as np
@@ -25,7 +26,7 @@ from labcatalog.stats.analysis_script import (
 )
 from labcatalog.stats.cfa import is_total
 from labcatalog.stats.rbridge import MULTILEVEL_PACKAGES as PACKAGES
-from labcatalog.stats.rbridge import install_command, package_check, run_r
+from labcatalog.stats.rbridge import OCCASION_PACKAGES, install_command, package_check, run_r
 from labcatalog.stats.summary import wave_order
 
 DATA_FILE = "multilevel_data.csv"
@@ -35,6 +36,9 @@ WAVE = "wave"
 INTERCEPT = "(Intercept)"
 TIME_LABEL = "Time (waves since the first)"
 WAVES = "wave"
+OCCASIONS = "occasion"
+OCCASION_LABEL = "Occasion"
+OCCASION_OUTPUTS = ("tests", "means", "differences")
 # Days in each unit time can count besides waves.
 DAYS = {"month": 365.25 / 12, "year": 365.25}
 RESIDUAL = "Residual"
@@ -74,10 +78,102 @@ d <- droplevels(d[complete.cases(d[, used]), ])
 null_model <- lmerTest::lmer({y} ~ 1 + {null_random}, data = d, REML = TRUE)
 icc <- performance::icc(null_model, by_group = TRUE)
 print(icc)
-fit <- lmerTest::lmer({y} ~ {fixed} + {random}, data = d, REML = TRUE)
+fit <- lmerTest::lmer({y} ~ {fixed} + {random}, data = d, REML = TRUE{contrasts})
 print(summary(fit))
 bounds <- confint(fit, parm = "beta_", method = "Wald")
 print(bounds)
+"""
+R_OCCASIONS = """\
+# The occasions' effects as type III F tests with Satterthwaite df (lmerTest), each
+# combination's estimated marginal mean, and {compared}, adjusted by Holm's method
+# (emmeans), as JASP's linear mixed models give them.
+tests <- anova(fit, type = 3)
+print(tests)
+cells <- emmeans::emmeans(fit, {spec}, lmer.df = "satterthwaite")
+print(cells)
+compared <- pairs(cells, adjust = "holm")
+print(compared)
+tests <- data.frame(term = rownames(tests), statistic = tests[["F value"]],
+                    df1 = tests[["NumDF"]], df2 = tests[["DenDF"]], p = tests[["Pr(>F)"]])
+means <- as.data.frame(cells)
+means <- data.frame(means[c({columns})], mean = means$emmean, se = means$SE,
+                    low = means$lower.CL, high = means$upper.CL)
+found <- as.data.frame(compared)
+others <- c({others})
+within <- if (length(others)) {{
+  apply(found[others], 1, function(x) paste(paste0(others, ": ", x), collapse = ", "))
+}} else ""
+differences <- data.frame(contrast = as.character(found$contrast), within = within,
+                          estimate = found$estimate, se = found$SE, df = found$df,
+                          statistic = found$t.ratio, p = found$p.value)
+"""
+PYTHON_OCCASIONS = """\
+# The occasions' effects as Wald chi-square tests, each combination's estimated marginal
+# mean, with numbers at their mean and answer options weighted equally as emmeans does, and
+# {compared}, adjusted by Holm's method; statsmodels has no Satterthwaite df, so these use z.
+from itertools import combinations, product
+
+from patsy import build_design_matrices, dmatrix
+from statsmodels.stats.multitest import multipletests
+
+fe_names = list(fit.fe_params.index)
+# The fixed effects' design, rebuilt from the formula on the same rows, in the model's order.
+design = dmatrix({rhs}, d).design_info
+
+
+def padded(rows):
+    # Wald tests take every parameter, so the random effects' get zeros; t tests take the fixed alone.
+    found = np.zeros((len(rows), len(fit.params)))
+    found[:, : len(fe_names)] = rows
+    return found
+
+
+factor_terms = {terms}
+tests = []
+for name, columns in design.term_name_slices.items():
+    if name in factor_terms:
+        test = fit.wald_test(padded(np.eye(len(fe_names))[columns]), scalar=True)
+        tests.append(dict(term=factor_terms[name], statistic=float(test.statistic),
+                          df1=columns.stop - columns.start, df2=np.nan, p=float(test.pvalue)))
+tests = pd.DataFrame(tests)
+print(tests)
+levels = {levels}
+spread = {{c: list(d[c].cat.categories) for c in [{options}]}}
+# Each combination of the occasions, the first varying fastest as in emmeans, crossed with
+# every answer of the answer-option covariates.
+names = list(levels)
+cells = pd.DataFrame([tuple(reversed(c)) for c in product(*[levels[n] for n in names[::-1]])],
+                     columns=names)
+grid = cells.copy()
+if spread:
+    others_grid = pd.DataFrame(list(product(*spread.values())), columns=list(spread))
+    grid = cells.merge(others_grid, how="cross")
+for c in [{numbers}]:
+    grid[c] = d[c].mean()
+for c, found_levels in {{**levels, **spread}}.items():
+    grid[c] = pd.Categorical(grid[c], categories=found_levels)
+rows = np.asarray(build_design_matrices([design], grid)[0])
+cell_of = grid.groupby(names, observed=True, sort=False).ngroup().to_numpy()
+weights = np.vstack([rows[cell_of == g].mean(axis=0) for g in range(len(cells))])
+found = fit.t_test(weights).summary_frame()
+means = cells.assign(mean=found["coef"].to_numpy(), se=found["std err"].to_numpy(),
+                     low=found["Conf. Int. Low"].to_numpy(),
+                     high=found["Conf. Int. Upp."].to_numpy())
+print(means)
+first, others = list(levels)[0], list(levels)[1:]
+differences = []
+for _, block in cells.groupby(others, sort=False) if others else [((), cells)]:
+    found = []
+    for a, b in combinations(block.index, 2):
+        test = fit.t_test(weights[[a]] - weights[[b]]).summary_frame().iloc[0]
+        found.append(dict(contrast=f"{{cells.at[a, first]}} - {{cells.at[b, first]}}",
+                          within=", ".join(f"{{o}}: {{cells.at[a, o]}}" for o in others),
+                          estimate=test["coef"], se=test["std err"], df=np.nan,
+                          statistic=test["z"], p=test["P>|z|"]))
+    adjusted = multipletests([f["p"] for f in found], method="holm")[1]
+    differences += [dict(f, p=p) for f, p in zip(found, adjusted)]
+differences = pd.DataFrame(differences)
+print(differences)
 """
 R_RANDOM = """\
 random_of <- function(fit) {
@@ -298,8 +394,16 @@ class Model:
     slope: bool = True
     # Each-wave number covariates as each person's mean and the wave's deviation from it.
     split: bool = False
-    # Waves, or months or years from the dates.
+    # Waves, or months or years from the dates, or the datasets' occasions as categories.
     time: str = WAVES
+
+
+@dataclass
+class Factor:
+    # An occasion name the chosen datasets differ on, as a column of the long data.
+    name: str
+    column: str
+    levels: list[str]
 
 
 @dataclass
@@ -353,6 +457,7 @@ class Long:
     left_out: int
     time_label: str = TIME_LABEL
     splits: list[Split] = field(default_factory=list)
+    factors: list[Factor] = field(default_factory=list)
 
 
 @dataclass
@@ -383,6 +488,39 @@ class Variance:
 
 
 @dataclass
+class FactorTest:
+    term: str
+    # F with both df in R; a Wald chi-square with df1 alone in Python.
+    statistic: float
+    df1: float
+    df2: float | None
+    p: float
+
+
+@dataclass
+class CellMean:
+    # One level of each factor, in the factors' order.
+    levels: list[str]
+    mean: float
+    se: float
+    low: float
+    high: float
+
+
+@dataclass
+class Difference:
+    contrast: str
+    # The levels of the other factors it is compared within, or empty.
+    within: str
+    estimate: float
+    se: float
+    df: float | None
+    statistic: float
+    # Adjusted by Holm's method within each level of the other factors.
+    p: float
+
+
+@dataclass
 class Fitted:
     engine: str
     icc: list[tuple[str, float]]
@@ -400,6 +538,9 @@ class Fitted:
     singular: bool
     notes: list[str]
     imputations: int | None = None
+    tests: list[FactorTest] = field(default_factory=list)
+    means: list[CellMean] = field(default_factory=list)
+    differences: list[Difference] = field(default_factory=list)
 
 
 def group_name(result: CatalogResult) -> str | None:
@@ -553,20 +694,24 @@ def problem(result: CatalogResult, model: Model) -> str | None:
     if not model.datasets:
         return "Choose at least one wave."
     studies = analysis.studies_of(result, model.datasets)
-    if len(studies) > 1:
+    if model.time == OCCASIONS:
+        found = occasion_problem(configs, model, studies)
+        if found:
+            return found
+    elif len(studies) > 1:
         for study in studies:
             found = problem(result, study_model(result, model, study))
             if found:
                 return f"{result.project.config.studies[study].label or study}: {found}"
         return None
-    if len({configs[n].wave for n in model.datasets}) < len(model.datasets):
+    elif len({configs[n].wave for n in model.datasets}) < len(model.datasets):
         return "Choose one dataset per wave."
     if not (model.by_person or model.by_group):
         return "Choose at least one level: people or groups."
     if model.by_person and len(model.datasets) < 2:
         return "People need two or more waves; choose more waves, or groups only."
     undated = [n for n in model.datasets if not configs[n].date_column]
-    if model.time != WAVES and undated:
+    if model.time not in (WAVES, OCCASIONS) and undated:
         return f"{', '.join(undated)} has no date_column, so time cannot count {model.time}s."
     if model.by_group:
         if group_name(result) is None:
@@ -588,21 +733,80 @@ def problem(result: CatalogResult, model: Model) -> str | None:
     return None
 
 
+def occasion_problem(configs: dict, model: Model, studies: list[str]) -> str | None:
+    if len(studies) > 1:
+        return "Occasions are compared within one study; choose datasets of one study."
+    if len(model.datasets) < 2:
+        return "Choose two or more datasets, one for each occasion."
+    lacking = [n for n in model.datasets if not configs[n].occasion]
+    if lacking:
+        return (
+            f"{', '.join(lacking)} {'has' if len(lacking) == 1 else 'have'} no occasion; give "
+            "each chosen dataset one in "
+            "labcatalog.yaml, such as occasion: {time: before}."
+        )
+    names = sorted({tuple(configs[n].occasion) for n in model.datasets})
+    if len(names) > 1:
+        shown = "; ".join(", ".join(n) for n in names)
+        return f"The chosen datasets name their occasions differently ({shown})."
+    seen: dict[tuple, str] = {}
+    for n in model.datasets:
+        key = (configs[n].wave, tuple(configs[n].occasion.values()))
+        if key in seen:
+            return f"{seen[key]} and {n} are the same occasion of the same wave."
+        seen[key] = n
+    if not model.by_person:
+        return "Occasions measure the same people again; turn on the person level."
+    return None
+
+
+def occasion_factors(configs: dict, ordered: list[str], taken: set[str]) -> list[Factor]:
+    # Each occasion name whose value differs among the datasets, then the wave when that does.
+    found = []
+    for name in configs[ordered[0]].occasion:
+        levels = list(dict.fromkeys(configs[n].occasion[name] for n in ordered))
+        if len(levels) > 1:
+            column = identifier(name, taken)
+            taken.add(column)
+            found.append(Factor(name, column, levels))
+    waves = list(dict.fromkeys(str(configs[n].wave) for n in ordered))
+    if len(waves) > 1:
+        found.append(Factor(WAVE, WAVE, waves))
+    return found
+
+
+def occasion_datasets(result: CatalogResult, outcome: str) -> list[str]:
+    # The first wave whose datasets with an occasion hold the outcome twice or more.
+    holding = set(occasions(result, outcome))
+    found: dict[tuple[str, str], list[str]] = {}
+    # In the order the project lists them, as the model takes them.
+    for d in result.project.config.datasets:
+        if d.name in holding and d.occasion:
+            found.setdefault((d.study, d.wave), []).append(d.name)
+    return next((names for names in found.values() if len(names) > 1), [])
+
+
 def long_frame(result: CatalogResult, model: Model) -> Long:
     studies = analysis.studies_of(result, model.datasets)
     if len(studies) > 1:
         return pooled_frame(result, model, studies)
     configs = {d.name: d for d in result.project.config.datasets}
-    ordered = sorted(model.datasets, key=lambda n: wave_order(configs[n].wave))
+    occasional = model.time == OCCASIONS
+    # Occasions of one wave keep the order the project lists them in.
+    order = list(configs)
+    ordered = sorted(model.datasets, key=lambda n: (wave_order(configs[n].wave), order.index(n)))
     outcome = identifier(model.outcome.split(".", 1)[1], {PERSON, TIME, WAVE})
     group = group_name(result) if model.by_group else None
-    taken = {PERSON, TIME, WAVE, outcome, *([group] if group else [])}
+    # Occasions take no time column, so an occasion named time keeps its name.
+    taken = {PERSON, WAVE, outcome, *([group] if group else []), *([] if occasional else [TIME])}
+    factors = occasion_factors(configs, ordered, taken) if occasional else []
     study = configs[ordered[0]].study
     covariates = [covariate(result, key, taken, study) for key in model.covariates]
     # Time counts the study's waves, so a skipped wave leaves a gap.
     waves = sorted({d.wave for d in configs.values() if d.study == study}, key=wave_order)
     first = waves.index(configs[ordered[0]].wave)
-    origin = None if model.time == WAVES else visit_dates(result, ordered[0]).min()
+    dated = model.time not in (WAVES, OCCASIONS)
+    origin = visit_dates(result, ordered[0]).min() if dated else None
     parts, left_out = [], 0
     for name in ordered:
         loaded = result.datasets[name]
@@ -610,13 +814,15 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
         keep = analysis.linkable(ids)
         left_out += int((~keep).sum())
         people = ids.to_numpy()[keep]
-        if origin is None:
-            time = waves.index(configs[name].wave) - first
-        else:
-            time = ((visit_dates(result, name) - origin).dt.days / DAYS[model.time]).to_numpy()[
-                keep
-            ]
-        part = pd.DataFrame({PERSON: people, WAVE: configs[name].wave, TIME: time})
+        part = pd.DataFrame({PERSON: people, WAVE: configs[name].wave})
+        if origin is not None:
+            days = (visit_dates(result, name) - origin).dt.days
+            part[TIME] = (days / DAYS[model.time]).to_numpy()[keep]
+        elif not occasional:
+            part[TIME] = waves.index(configs[name].wave) - first
+        for f in factors:
+            if f.column != WAVE:
+                part[f.column] = configs[name].occasion[f.name]
         if group:
             part[group] = loaded.group.astype("string").to_numpy()[keep]
         part[outcome] = analysis.row_values(result, f"{model.outcome}@{name}")[keep]
@@ -628,10 +834,10 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
     splits = []
     if model.split:
         frame, covariates, splits = split_within(frame, covariates, taken)
-    label = TIME_LABEL
+    label = OCCASION_LABEL if occasional else TIME_LABEL
     if origin is not None:
         label = f"Time ({model.time}s since wave {configs[ordered[0]].wave} began)"
-    return Long(frame, outcome, group, covariates, left_out, label, splits)
+    return Long(frame, outcome, group, covariates, left_out, label, splits, factors)
 
 
 def pooled_frame(result: CatalogResult, model: Model, studies: list[str]) -> Long:
@@ -770,10 +976,14 @@ def identifier(name: str, taken: set[str]) -> str:
 
 
 def structure(model: Model, long: Long) -> dict[str, str]:
-    timed = len(model.datasets) > 1
+    # Occasions are crossed factors in place of time, with no slope to vary between people.
+    timed = len(model.datasets) > 1 and not long.factors
     slope = model.by_person and model.slope and timed
+    factors = [f.column for f in long.factors]
     fixed = [TIME] if timed else []
     fixed += [c.column for c in long.covariates]
+    crossed = [" * ".join(factors)] if factors else []
+    python_crossed = [" * ".join(f"C({f}, Sum)" for f in factors)] if factors else []
     if model.by_person and long.group:
         null_random = f"(1 | {long.group}) + (1 | {PERSON})"
         random = null_random + (f" + (0 + {TIME} | {PERSON})" if slope else "")
@@ -788,7 +998,8 @@ def structure(model: Model, long: Long) -> dict[str, str]:
         null_random = random = f"(1 | {long.group})"
         top, re_formula, null_vc, vc = long.group, "~1", {}, {}
     return {
-        "fixed": " + ".join(fixed) or "1",
+        "fixed": " + ".join(crossed + fixed) or "1",
+        "python_fixed": " + ".join(python_crossed + fixed) or "1",
         "random": random,
         "null_random": null_random,
         "top": top,
@@ -797,6 +1008,7 @@ def structure(model: Model, long: Long) -> dict[str, str]:
         "null_vc": python_dict(null_vc),
         "used": [
             long.outcome,
+            *factors,
             *fixed,
             *([PERSON] if model.by_person else []),
             *([long.group] if long.group else []),
@@ -813,10 +1025,17 @@ def python_dict(found: dict[str, str]) -> str:
 
 
 def title(model: Model, long: Long, label: str) -> str:
+    within = "occasions within people" if long.factors else "waves within people"
     levels = [
-        *(["waves within people"] if model.by_person else []),
+        *([within] if model.by_person else []),
         *([f"people within each {long.group}"] if long.group else []),
     ]
+    if long.factors:
+        named = "; ".join(f"{f.name} ({', '.join(f.levels)})" for f in long.factors)
+        return (
+            f"Multilevel model of {label}: {' and '.join(levels)}. The occasions are crossed "
+            f"factors with sum-to-zero contrasts: {named}."
+        )
     slope = model.by_person and model.slope and len(model.datasets) > 1
     random = " with a random slope of time for each person" if slope else ""
     heading = f"Multilevel model of {label}: {' and '.join(levels)}{random}."
@@ -831,13 +1050,62 @@ def title(model: Model, long: Long, label: str) -> str:
 
 
 def r_factors(long: Long) -> str:
-    return "".join(
+    covariates = "".join(
         f"d[[{r_string(c.column)}]] <- factor(d[[{r_string(c.column)}]], "
         f"levels = c({', '.join(number(v) for v, _ in c.levels)}), "
         f"labels = c({', '.join(r_string(t) for _, t in c.levels)}))\n"
         for c in long.covariates
         if c.levels
     )
+    occasions = "".join(
+        f"d[[{r_string(f.column)}]] <- factor(d[[{r_string(f.column)}]], "
+        f"levels = c({', '.join(r_string(v) for v in f.levels)}))\n"
+        for f in long.factors
+    )
+    return covariates + occasions
+
+
+def factor_terms(long: Long) -> list[tuple[str, ...]]:
+    # Each main effect and interaction of the occasions, as their columns.
+    columns = [f.column for f in long.factors]
+    return [t for size in range(1, len(columns) + 1) for t in combinations(columns, size)]
+
+
+def compared_text(long: Long) -> str:
+    first, *others = long.factors
+    if not others:
+        return f"every two levels of {first.name} compared"
+    return f"the levels of {first.name} compared within each level of the others"
+
+
+def occasion_code(long: Long, rhs: str) -> tuple[str, str]:
+    columns = [f.column for f in long.factors]
+    first, *others = columns
+    spec = f"~ {first}" + (f" | {' * '.join(others)}" if others else "")
+    compared = compared_text(long)
+    r = R_OCCASIONS.format(
+        compared=compared,
+        spec=spec,
+        columns=", ".join(r_string(c) for c in columns),
+        others=", ".join(r_string(c) for c in others),
+    )
+    patsy = {":".join(f"C({c}, Sum)" for c in term): ":".join(term) for term in factor_terms(long)}
+    options = [c.column for c in long.covariates if c.levels]
+    numbers = [c.column for c in long.covariates if not c.levels]
+    python = PYTHON_OCCASIONS.format(
+        compared=compared,
+        rhs=r_string(rhs),
+        terms=python_dict(patsy),
+        levels="{"
+        + ", ".join(
+            f"{r_string(f.column)}: [{', '.join(r_string(v) for v in f.levels)}]"
+            for f in long.factors
+        )
+        + "}",
+        options=", ".join(r_string(c) for c in options),
+        numbers=", ".join(r_string(c) for c in numbers),
+    )
+    return r, python
 
 
 def code(model: Model, long: Long, label: str) -> tuple[str, str]:
@@ -850,9 +1118,19 @@ def code(model: Model, long: Long, label: str) -> tuple[str, str]:
         f"categories=[{', '.join(r_string(t) for _, t in c.levels)}])\n"
         for c in factors
     )
+    python_factors += "".join(
+        f"d[{r_string(f.column)}] = pd.Categorical(d[{r_string(f.column)}].astype(str), "
+        f"categories=[{', '.join(r_string(v) for v in f.levels)}])\n"
+        for f in long.factors
+    )
     unused = "".join(
         f"d[{r_string(c.column)}] = d[{r_string(c.column)}].cat.remove_unused_categories()\n"
         for c in factors
+    )
+    contrasts = (
+        ", contrasts = list(" + ", ".join(f'{f.column} = "contr.sum"' for f in long.factors) + ")"
+        if long.factors
+        else ""
     )
     heading = title(model, long, label)
     r = R_MODEL.format(
@@ -863,6 +1141,7 @@ def code(model: Model, long: Long, label: str) -> tuple[str, str]:
         fixed=parts["fixed"],
         random=parts["random"],
         null_random=parts["null_random"],
+        contrasts=contrasts,
     )
     terms = {PERSON: INTERCEPT, f"{PERSON}_{TIME}": TIME}
     python = PYTHON_MODEL.format(
@@ -871,7 +1150,7 @@ def code(model: Model, long: Long, label: str) -> tuple[str, str]:
         used=used,
         unused=unused,
         y=long.outcome,
-        fixed=parts["fixed"],
+        fixed=parts["python_fixed"],
         re=parts["re"],
         vc=parts["vc"],
         null_vc=parts["null_vc"],
@@ -880,6 +1159,9 @@ def code(model: Model, long: Long, label: str) -> tuple[str, str]:
         intercept=r_string(INTERCEPT),
         vc_terms=python_dict(terms),
     )
+    if long.factors:
+        r_occasions, python_occasions = occasion_code(long, parts["python_fixed"])
+        r, python = r + r_occasions, python + python_occasions
     return r, python
 
 
@@ -983,17 +1265,21 @@ def footers(long: Long, imputing: bool = False) -> tuple[str, str]:
     return r, python
 
 
-def packages(imputing: Imputing | None) -> tuple[str, ...]:
-    return (*PACKAGES, "mice", "mitml") if imputing else PACKAGES
+def packages(imputing: Imputing | None, long: Long | None = None) -> tuple[str, ...]:
+    occasional = OCCASION_PACKAGES if long is not None and long.factors else ()
+    return (*PACKAGES, *occasional, *(("mice", "mitml") if imputing else ()))
 
 
-def headers(result: CatalogResult, path: str, imputing: Imputing | None = None) -> tuple[str, str]:
+def headers(
+    result: CatalogResult, path: str, imputing: Imputing | None = None, long: Long | None = None
+) -> tuple[str, str]:
     project = result.project.config.project.name
+    needed = packages(imputing, long)
     return (
         R_HEADER.format(
             project=project,
-            names=", ".join(packages(imputing)),
-            install=install_command(packages(imputing)),
+            names=", ".join(needed),
+            install=install_command(needed),
             path=r_string(path),
         ),
         PYTHON_HEADER.format(project=project, path=r_string(path)),
@@ -1003,7 +1289,7 @@ def headers(result: CatalogResult, path: str, imputing: Imputing | None = None) 
 def scripts(
     result: CatalogResult, model: Model, long: Long, label: str, imputing: Imputing | None = None
 ) -> tuple[str, str]:
-    r_head, py_head = headers(result, DATA_FILE, imputing)
+    r_head, py_head = headers(result, DATA_FILE, imputing, long)
     r, python = code(model, long, label)
     if imputing:
         file = imputation.file_name(data_frame(long, True), imputation_plan(long, imputing))
@@ -1027,27 +1313,28 @@ def run(
     if imputing:
         file = imputation.cache_path(frame, imputation_plan(long, imputing)).as_posix()
         r = imputed_code(model, long, label, imputing, file)
+    outputs = OUTPUTS + (OCCASION_OUTPUTS if long.factors else ())
     with tempfile.TemporaryDirectory() as temp:
         folder = Path(temp)
         frame.to_csv(folder / DATA_FILE, index=False)
-        r_head, py_head = headers(result, (folder / DATA_FILE).as_posix(), imputing)
+        r_head, py_head = headers(result, (folder / DATA_FILE).as_posix(), imputing, long)
         if rscript:
             writes = [
                 f"write.csv({name}, {r_string((folder / f'{name}.csv').as_posix())}, "
                 "row.names = FALSE)"
-                for name in OUTPUTS
+                for name in outputs
             ]
             path = folder / "multilevel.R"
-            check = package_check(packages(imputing))
+            check = package_check(packages(imputing, long))
             text = "\n".join([check, r_head, r, r_footer, *writes])
             path.write_text(text, encoding="utf-8")
             run_r(rscript, [str(path)])
-            found = {n: pd.read_csv(folder / f"{n}.csv") for n in OUTPUTS}
+            found = {n: pd.read_csv(folder / f"{n}.csv") for n in outputs}
             return read(found, long, R)
         names: dict = {}
         with contextlib.redirect_stdout(io.StringIO()):
             exec("\n".join([py_head, python, python_footer]), names)
-        return read({n: names[n] for n in OUTPUTS}, long, PYTHON)
+        return read({n: names[n] for n in outputs}, long, PYTHON)
 
 
 def read(found: dict[str, pd.DataFrame], long: Long, engine: str) -> Fitted:
@@ -1100,15 +1387,66 @@ def read(found: dict[str, pd.DataFrame], long: Long, engine: str) -> Fitted:
         singular=SINGULAR in notes,
         notes=[n for n in notes if n != SINGULAR],
         imputations=int(stats["imputations"]) if "imputations" in stats.index else None,
+        **(read_occasions(found, long) if long.factors else {}),
     )
 
 
-def term_order(label: str, long: Long) -> int:
-    # Formula order: intercept, time, then the covariates as chosen.
+def read_occasions(found: dict[str, pd.DataFrame], long: Long) -> dict[str, list]:
+    named = {":".join(term): occasion_term(term, long) for term in factor_terms(long)}
+    tests = [
+        FactorTest(
+            named[str(row.term)], float(row.statistic), float(row.df1), none(row.df2), float(row.p)
+        )
+        for row in found["tests"].itertuples()
+        if str(row.term) in named
+    ]
+    tests.sort(key=lambda t: list(named.values()).index(t.term))
+    means = [
+        CellMean(
+            [str(getattr(row, f.column)) for f in long.factors],
+            float(row.mean),
+            float(row.se),
+            float(row.low),
+            float(row.high),
+        )
+        for row in found["means"].itertuples()
+    ]
+    differences = [
+        Difference(
+            str(row.contrast),
+            within_text(str(row.within) if pd.notna(row.within) else "", long),
+            float(row.estimate),
+            float(row.se),
+            none(row.df),
+            float(row.statistic),
+            float(row.p),
+        )
+        for row in found["differences"].itertuples()
+    ]
+    return {"tests": tests, "means": means, "differences": differences}
+
+
+def occasion_term(term: tuple[str, ...], long: Long) -> str:
+    names = {f.column: f.name for f in long.factors}
+    return " × ".join(names[c] for c in term)
+
+
+def within_text(text: str, long: Long) -> str:
+    # Each factor by the name the project gives it, not its column.
+    for f in long.factors:
+        text = re.sub(rf"(^|, ){re.escape(f.column)}: ", rf"\g<1>{f.name}: ", text)
+    return text
+
+
+def term_order(label: str, long: Long) -> tuple[int, int]:
+    # Formula order: intercept, time or the occasions (main effects, then interactions), then
+    # the covariates as chosen.
+    if label != "Intercept" and any(label.startswith(f"{f.name}: ") for f in long.factors):
+        return 1, label.count(" × ")
     labels = ["Intercept", long.time_label, *(c.label for c in long.covariates)]
     return next(
-        (n for n, name in enumerate(labels) if label == name or label.startswith(f"{name}: ")),
-        len(labels),
+        ((n, 0) for n, name in enumerate(labels) if label == name or label.startswith(f"{name}: ")),
+        (len(labels), 0),
     )
 
 
@@ -1130,6 +1468,8 @@ def term_label(term: str, long: Long) -> str:
         return "Intercept"
     if term == TIME:
         return long.time_label
+    if long.factors and (found := factor_label(term, long)):
+        return found
     for c in long.covariates:
         if term == c.column:
             return c.label
@@ -1137,6 +1477,24 @@ def term_label(term: str, long: Long) -> str:
             if term in (f"{c.column}{level}", f"{c.column}[T.{level}]"):
                 return f"{c.label}: {level}"
     return term
+
+
+def factor_label(term: str, long: Long) -> str | None:
+    # A sum-coded level's term: time1 in R, C(time, Sum)[S.before] in Python.
+    parts = []
+    for piece in term.split(":"):
+        for f in long.factors:
+            python = re.fullmatch(rf"C\({re.escape(f.column)}, Sum\)\[S\.(.+)\]", piece)
+            number = piece[len(f.column) :] if piece.startswith(f.column) else ""
+            if python:
+                parts.append(f"{f.name}: {python.group(1)}")
+                break
+            if number.isdigit() and 0 < int(number) <= len(f.levels):
+                parts.append(f"{f.name}: {f.levels[int(number) - 1]}")
+                break
+        else:
+            return None
+    return " × ".join(parts)
 
 
 def prediction(long: Long, fitted: Fitted) -> dict[float, float]:
