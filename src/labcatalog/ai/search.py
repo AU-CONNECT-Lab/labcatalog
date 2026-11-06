@@ -55,7 +55,7 @@ class Match:
 class Search:
     query: str
     matches: list[Match]
-    # Matches naming an instrument or item the catalog does not have.
+    # Matches naming an instrument the catalog does not have, or a made-up item of one found already.
     dropped: int
     meta: CallMetadata
 
@@ -90,13 +90,25 @@ def search_catalog(project: Project, query: str, client: LLMClient) -> Search:
         user_message=f"Request: {query}\n\nCatalog:\n{catalog_text(project)}",
         tool_schema=SCHEMA,
     )
-    matches = []
+    matches, guessed = [], []
     dropped = 0
     for found in output["matches"]:
         instrument = project.instruments.get(found["instrument"])
-        item_id = found["item"] or None
-        if instrument is None or (item_id and item_id not in {i.id for i in instrument.items}):
+        if instrument is None:
             dropped += 1
             continue
-        matches.append(Match(instrument.id, item_id, " ".join(found["reason"].split())))
+        item_id = found["item"] or None
+        match = Match(instrument.id, item_id, " ".join(found["reason"].split()))
+        if item_id and item_id not in {i.id for i in instrument.items}:
+            guessed.append(match)
+        else:
+            matches.append(match)
+    # A made-up item still points at a real instrument, unless that instrument is found already.
+    shown = {m.instrument_id for m in matches}
+    for match in guessed:
+        if match.instrument_id in shown:
+            dropped += 1
+            continue
+        shown.add(match.instrument_id)
+        matches.append(Match(match.instrument_id, None, match.reason))
     return Search(query, matches, dropped, meta)

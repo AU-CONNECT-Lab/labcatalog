@@ -7,6 +7,7 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog import defaults
+from labcatalog.ai.code import unfenced
 from labcatalog.config import (
     PrepareStep,
     dataset_by_name,
@@ -157,7 +158,10 @@ def clean_file_lines(project: Project, catalog: Catalog, dataset: str) -> list[s
     lines.append(f"Missing codes: {listed}")
     pattern, _ = id_pattern(config, found.study)
     if pattern:
-        lines.append(f"IDs match the regular expression {pattern}")
+        lines.append(
+            f"The project checks that IDs match the regular expression {pattern}; keep rows "
+            "whose IDs do not, so the check can report them"
+        )
     return lines
 
 
@@ -261,7 +265,7 @@ def draft_script(
         outputs=[clean],
         stage="clean",
     )
-    text = "\n".join(header) + "\n\n" + output["script"].strip() + "\n"
+    text = "\n".join(header) + "\n\n" + unfenced(output["script"]).strip() + "\n"
     return CleaningDraft(dataset, script, text, None, step, meta, [], output["notes"])
 
 
@@ -280,7 +284,7 @@ def fix_script(
         system=system, user_message=request, tool_schema=SCHEMA
     )
     previous = (project.root / script).read_text("utf-8")
-    text = output["script"].strip() + "\n"
+    text = unfenced(output["script"]).strip() + "\n"
     return CleaningDraft(
         issue.details["dataset"],
         script,

@@ -51,6 +51,21 @@ def test_matches_naming_unknown_items_are_dropped(mock_project):
     assert found.instruments == {"example_mood", "example_child_sleep"}
 
 
+def test_a_made_up_item_of_an_instrument_found_nowhere_else_keeps_the_instrument(mock_project):
+    project = load_project(mock_project)
+    client = FakeClient(
+        [
+            {"instrument": "example_child_sleep", "item": "ecs_99", "reason": "Bedtime."},
+            {"instrument": "example_child_sleep", "item": "ecs_98", "reason": "Waking."},
+        ]
+    )
+    found = ai_search.search_catalog(project, "sleep", client)
+    assert [(m.instrument_id, m.item_id, m.reason) for m in found.matches] == [
+        ("example_child_sleep", None, "Bedtime.")
+    ]
+    assert found.dropped == 1
+
+
 def test_the_found_instruments_narrow_the_list_and_the_counts(mock_project):
     index = build_index(load_project(mock_project))
     only = {"example_mood"}

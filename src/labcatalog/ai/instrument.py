@@ -188,7 +188,7 @@ def item_fields(item: dict[str, Any], default: str) -> dict[str, Any]:
     fields = {"id": item["id"], "text": item["text"]}
     if item["type"] != "choice":
         fields["type"] = item["type"]
-    elif item["response_set"].strip() != default:
+    elif item["response_set"].strip() not in ("", default):
         fields["response_set"] = item["response_set"].strip()
     fields |= given({"min": item["min"], "max": item["max"]}, number=True)
     if item["reverse"]:

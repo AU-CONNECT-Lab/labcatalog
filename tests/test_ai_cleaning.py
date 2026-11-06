@@ -50,6 +50,14 @@ def test_the_model_sees_each_raw_columns_values_or_the_first_rows_and_the_clean_
     assert len(lines) == cleaning.RAW_ROWS + 1 and lines[0].startswith("StartDate,EndDate")
 
 
+def test_a_script_sent_inside_a_code_fence_is_kept_without_it(result):
+    fenced = "```r\nd <- read.csv(args[1])\n```\n"
+    client = FakeClient({"script": fenced, "changes": [], "notes": []})
+    draft = cleaning.draft_script(result.project, result.catalog, "parent_w1", RAW, "r", client)
+    assert draft.script.endswith("\n\nd <- read.csv(args[1])\n")
+    assert "```" not in draft.script
+
+
 def test_a_drafted_script_becomes_a_step_that_writes_a_new_file(result):
     client = FakeClient({"script": "d <- read.csv(args[1])", "changes": [], "notes": ["Kept"]})
     draft = cleaning.draft_script(result.project, result.catalog, "parent_w1", RAW, "r", client)

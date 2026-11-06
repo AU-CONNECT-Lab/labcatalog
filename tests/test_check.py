@@ -144,7 +144,7 @@ def test_a_study_can_write_its_ids_its_own_way(pilot_project):
         "studies.pilot.id_pattern",
     )
     lines = clean_file_lines(result.project, result.catalog, "pilot_w1")
-    assert "IDs match the regular expression ^\\d{4}[PC]$" in lines
+    assert any("IDs match the regular expression ^\\d{4}[PC]$; keep rows" in line for line in lines)
 
 
 def test_a_studys_pattern_must_be_a_regular_expression(pilot_project):

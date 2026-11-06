@@ -8,6 +8,8 @@ from labcatalog.llm.retry import with_retries
 
 # Local servers want some key in the header but do not check it.
 LOCAL_KEY = "local"
+# Without a cap a local model that repeats itself runs until the client's 10-minute timeout.
+LOCAL_MAX_TOKENS = 16000
 
 
 class OpenAIClient(LLMClient):
@@ -42,6 +44,8 @@ class OpenAIClient(LLMClient):
         self, *, system: str, user_message: str, tool_schema: ToolSchema
     ) -> tuple[dict[str, Any], CallMetadata]:
         openai = self._openai
+        local = self._provider == "local"
+        capped = {"max_tokens": LOCAL_MAX_TOKENS} if local else {}
 
         # A JSON schema response format, which local servers enforce for any model,
         # where tool calling depends on each model's template.
@@ -61,9 +65,13 @@ class OpenAIClient(LLMClient):
                         "strict": True,
                     },
                 },
+                **capped,
             )
 
         def is_retryable(e: Exception) -> bool:
+            # A local server that timed out was still writing; asking again only doubles the wait.
+            if local and isinstance(e, openai.APITimeoutError):
+                return False
             if isinstance(
                 e,
                 openai.RateLimitError
@@ -74,7 +82,7 @@ class OpenAIClient(LLMClient):
                 return True
             return isinstance(e, openai.APIStatusError) and e.status_code >= 500
 
-        name = "Local model" if self._provider == "local" else "OpenAI"
+        name = "Local model" if local else "OpenAI"
         t0 = time.monotonic()
         try:
             response = with_retries(call, is_retryable=is_retryable, max_retries=self._max_retries)
@@ -87,6 +95,11 @@ class OpenAIClient(LLMClient):
         latency_ms = int((time.monotonic() - t0) * 1000)
 
         choice = response.choices[0]
+        if choice.finish_reason == "length" and local:
+            raise LLMError(
+                f"{name} stopped after {LOCAL_MAX_TOKENS} tokens before the answer was complete; "
+                "small models sometimes repeat themselves, so try again or use a larger model."
+            )
         if choice.finish_reason == "length":
             raise LLMError(f"{name} cut the answer off before it was complete.")
         if choice.message.refusal:

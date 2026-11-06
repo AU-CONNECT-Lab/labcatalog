@@ -384,7 +384,8 @@ def models_section(on_model: Callable[[], None]) -> None:
             return
         note(
             "A local model runs on an OpenAI-compatible server such as Ollama or LM Studio; "
-            "give its address, for example http://localhost:11434/v1."
+            "give its address, for example http://127.0.0.1:11434/v1 (on Windows, localhost "
+            "makes every request wait about two seconds)."
         )
         with ui.row().classes("w-full items-start gap-2 mt-1"):
             url = (

@@ -113,6 +113,14 @@ def test_the_draft_is_a_valid_instrument_with_the_notes_on_top(mock_project, pdf
     assert instrument.scores[0].missing_rule == "prorate" and instrument.scores[0].min_valid == 1
 
 
+def test_an_item_left_on_the_default_set_names_no_set():
+    items = [dict(OUTPUT["items"][0], response_set=""), OUTPUT["items"][1]]
+    document = ai_instrument.instrument_document("mood", dict(OUTPUT, items=items))
+    first, second = document["items"]
+    assert "response_set" not in first
+    assert second["response_set"] == "agree"
+
+
 def test_the_lab_can_name_which_instrument_of_the_pdf_to_draft(mock_project, pdf):
     client = FakeClient()
     ai_instrument.draft_instrument(mock_project, "mood", pdf, client)

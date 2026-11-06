@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 from labcatalog import defaults
+from labcatalog.ai.code import unfenced
 from labcatalog.config import dataset_by_name, id_column_for, missing_codes_for
 from labcatalog.data.resolve import Catalog, as_text_dict
 from labcatalog.datalad.annex import is_placeholder
@@ -153,6 +154,7 @@ def write_scoring_scripts(
         ]
         path.parent.mkdir(exist_ok=True)
         path.write_text(
-            "\n".join(header) + "\n\n" + output[language].strip() + "\n", encoding="utf-8"
+            "\n".join(header) + "\n\n" + unfenced(output[language]).strip() + "\n",
+            encoding="utf-8",
         )
     return meta

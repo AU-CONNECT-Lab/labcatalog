@@ -32,6 +32,6 @@ What it writes is always a draft for you to check, and the references, license a
 On the **Settings** page, under **This project**, choose the provider and the model, and press **Save**. They are saved in the project, so the whole lab uses the same model. What each person needs is set on their own computer:
 
 - **Anthropic, OpenAI or Gemini**: labcatalog reads the API key from an environment variable, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` or `GEMINI_API_KEY`, and never stores it. Set it yourself and restart labcatalog. On Windows: `setx ANTHROPIC_API_KEY your-key` in a terminal. On macOS or Linux, add `export ANTHROPIC_API_KEY=your-key` to your shell profile. The page says whether the variable is set.
-- **Local (OpenAI-compatible server)**: a model running on your own computer or server, for example with Ollama or LM Studio. Give the server's address, for example `http://localhost:11434/v1`. Nothing leaves your network.
+- **Local (OpenAI-compatible server)**: a model running on your own computer or server, for example with Ollama or LM Studio. Give the server's address, for example `http://127.0.0.1:11434/v1`; on Windows, `localhost` in the address makes every request wait about two seconds. Nothing leaves your network. A local model writes at most 16,000 tokens per answer, so one that starts repeating itself stops with a message instead of running on.
 
 With a cloud provider, the text you send (a PDF's text, item wording) goes to that provider. Do not send anything your data agreements do not allow.

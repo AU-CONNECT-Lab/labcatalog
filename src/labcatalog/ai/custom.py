@@ -1,6 +1,7 @@
 import difflib
 from dataclasses import dataclass, field
 
+from labcatalog.ai.code import unfenced
 from labcatalog.llm import CallMetadata, LLMClient, ToolSchema
 
 DRAFT_SYSTEM = """You write analysis scripts for researchers. You are given the columns of one \
@@ -180,7 +181,7 @@ def draft_analysis(
         user_message=draft_request(columns, wanted, start),
         tool_schema=SCHEMA,
     )
-    written = output["script"].strip()
+    written = unfenced(output["script"]).strip()
     if not written:
         script = ""
     elif start:
@@ -206,7 +207,7 @@ def fix_analysis(
     )
     return AnalysisDraft(
         language,
-        output["script"].strip() + "\n",
+        unfenced(output["script"]).strip() + "\n",
         meta,
         script,
         output["changes"],
