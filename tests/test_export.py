@@ -1,11 +1,20 @@
 import pandas as pd
 import pytest
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from labcatalog.exceptions import ExportError
 from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import run_catalog
-from labcatalog.reports.codebook_doc import CODEBOOK, Heading, Paragraph, Table, codebook_blocks
+from labcatalog.reports.codebook_doc import (
+    CODEBOOK,
+    Caption,
+    Facts,
+    Heading,
+    Paragraph,
+    Table,
+    codebook_blocks,
+)
 from labcatalog.reports.export import (
     BY_DATASET,
     BY_GROUP,
@@ -192,9 +201,15 @@ def blocks_for(result, plan, statistics=True, files=None, studies=()):
     return codebook_blocks(result, plan, rows, scores, files or {}, studies)
 
 
-def table_after(blocks, label):
-    start = next(n for n, b in enumerate(blocks) if getattr(b, "label", None) == label)
+def table_after(blocks, caption):
+    start = blocks.index(Caption(caption))
     return next(b for b in blocks[start:] if isinstance(b, Table))
+
+
+def said(blocks):
+    # Paragraphs, and each detail as it reads: its label, a colon and its value.
+    found = [b.text for b in blocks if isinstance(b, Paragraph)]
+    return found + [f"{k}: {v}" for b in blocks if isinstance(b, Facts) for k, v in b.rows]
 
 
 def test_codebook_describes_datasets_instruments_and_every_column(result):
@@ -210,13 +225,14 @@ def test_codebook_describes_datasets_instruments_and_every_column(result):
         "parent_w1",
         "child_w1",
     ]
-    said = [b.label + b.text for b in blocks if isinstance(b, Paragraph)]
+    told = said(blocks)
     assert "Missing codes: -99 = refused; -98 = not applicable; -97 = don't know. " in "\n".join(
-        said
+        told
     )
-    assert "Options frequency: 0 = Never, 1 = Sometimes, 2 = Often, 3 = Always" in said
-    assert "Each dataset is in a file of its own name, such as parent_w1.csv." in said
-    assert "Domain: emotion" in said
+    assert "Options (frequency): 0 = Never, 1 = Sometimes, 2 = Often, 3 = Always" in told
+    assert "Each dataset is in a file of its own name, such as parent_w1.csv." in told
+    assert "Domain: emotion" in told
+    assert "Contents: 2 datasets and 2 instruments" in told
     datasets = next(b for b in blocks if isinstance(b, Table))
     child = dict(zip(datasets.columns, datasets.rows[1], strict=True))
     assert (child["Dataset"], child["Instruments"]) == ("child_w1", "EMS")
@@ -298,9 +314,9 @@ def test_the_codebook_describes_the_participant_roster(result):
         "Variables",
         "roster_mock_study",
     ]
-    said = [b.label + b.text for b in blocks if isinstance(b, Paragraph)]
-    assert "Given in: the participant roster (roster_mock_study)" in said
-    assert said[0].endswith(": 1 participant roster and 1 instrument.")
+    told = said(blocks)
+    assert "Given in: the participant roster (roster_mock_study)" in told
+    assert "Contents: 1 participant roster and 1 instrument" in told
     rosters = table_after(blocks, "Participant rosters")
     assert rosters.rows == [
         [
@@ -366,11 +382,27 @@ def test_the_codebook_gives_the_lab_s_own_fields_where_they_belong(mock_project)
     assert result.project is not None, result.report
     plan = {"child_w1": ["example_mood"], "child_w2": ["example_mood"]}
     blocks = blocks_for(result, plan)
-    said = [b.label + b.text for b in blocks if isinstance(b, Paragraph)]
-    assert "funder: NIH" in said and "form (child_w1, child_w2): paper" in said
+    told = said(blocks)
+    assert "funder: NIH" in told and "form (child_w1, child_w2): paper" in told
     datasets = next(b for b in blocks if isinstance(b, Table))
     assert datasets.columns[-1] == "site"
     assert [row[-1] for row in datasets.rows] == ["clinic", ""]
     items = next(b for b in blocks if isinstance(b, Table) and b.columns[:2] == ["Item", "Text"])
     assert items.columns[-1] == "source"
     assert [row[-1] for row in items.rows[:2]] == ["", "CDI"]
+
+
+def test_the_codebook_is_set_as_a_plain_document(result):
+    plan = {"child_w1": ["example_mood"]}
+    document = Document(write_export(result, plan, BY_DATASET).folder / CODEBOOK)
+    assert str(document.styles["Heading 1"].font.color.rgb) == "1F1F21"
+    facts = document.tables[0]
+    assert [c.text for c in facts.rows[0].cells] == ["Contents", "1 dataset and 1 instrument"]
+    heads = {tuple(c.text for c in t.rows[0].cells): t for t in document.tables}
+    items = heads[("Item", "Text", "Reverse")]
+    head = items.rows[0]._tr.xml
+    assert "w:tblHeader" in head and 'w:color="1F1F21"' in head
+    assert "w:left " not in items._tbl.xml and "w:right " not in items._tbl.xml
+    statistics = heads[("Dataset", "Score", "n", "M", "SD", "α")]
+    assert statistics.rows[1].cells[2].paragraphs[0].alignment == WD_ALIGN_PARAGRAPH.RIGHT
+    assert "PAGE" in document.sections[0].footer._element.xml

@@ -5,9 +5,10 @@ from dataclasses import dataclass
 from datetime import date
 
 from docx import Document
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_TAB_ALIGNMENT
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Pt
+from docx.shared import Cm, Pt, RGBColor
 
 from labcatalog.config import (
     DatasetConfig,
@@ -29,6 +30,32 @@ from labcatalog.schema import SCRIPT, Instrument
 from labcatalog.version import __version__
 
 CODEBOOK = "codebook.docx"
+# The app's ink and muted grey; rules are a hex colour and a width in eighths of a point.
+INK = RGBColor(0x1F, 0x1F, 0x21)
+MUTED = RGBColor(0x6E, 0x6E, 0x73)
+DARK_RULE = ("1F1F21", 8)
+LIGHT_RULE = ("D8D8DA", 4)
+NUMERIC = {"Rows", "People", "n", "M", "SD", "α", "ω"}
+MARGIN = Cm(2.2)
+LABEL_WIDTH = Cm(3.6)
+THEME_FONTS = {
+    "w:asciiTheme": "minorHAnsi",
+    "w:hAnsiTheme": "minorHAnsi",
+    "w:eastAsiaTheme": "minorEastAsia",
+    "w:cstheme": "minorBidi",
+}
+# The elements Word expects after a paragraph's or a cell's borders, in schema order.
+AFTER_BORDER = (
+    "w:shd w:tabs w:suppressAutoHyphens w:kinsoku w:wordWrap w:overflowPunct "
+    "w:topLinePunct w:autoSpaceDE w:autoSpaceDN w:bidi w:adjustRightInd w:snapToGrid "
+    "w:spacing w:ind w:contextualSpacing w:mirrorIndents w:suppressOverlap w:jc "
+    "w:textDirection w:textAlignment w:textboxTightWrap w:outlineLvl w:divId w:cnfStyle "
+    "w:rPr w:sectPr w:pPrChange"
+).split()
+AFTER_CELL_BORDERS = (
+    "w:shd w:noWrap w:tcMar w:textDirection w:tcFitText w:vAlign w:hideMark w:headers "
+    "w:cellIns w:cellDel w:cellMerge w:tcPrChange"
+).split()
 MISSING_RULES = {
     "complete": "only when every item is answered",
     "prorate": "from the answered items",
@@ -45,7 +72,16 @@ class Heading:
 @dataclass
 class Paragraph:
     text: str
-    label: str = ""
+
+
+@dataclass
+class Caption:
+    text: str
+
+
+@dataclass
+class Facts:
+    rows: list[tuple[str, str]]
 
 
 @dataclass
@@ -54,7 +90,7 @@ class Table:
     rows: list[list[str]]
 
 
-Block = Heading | Paragraph | Table
+Block = Heading | Paragraph | Caption | Facts | Table
 
 
 def codebook_docx(
@@ -104,28 +140,22 @@ def front(
     config = result.project.config
     counts = [count(len(plan), "dataset")] if plan else []
     counts += [count(len(rosters), "participant roster")] if rosters else []
-    blocks: list[Block] = [
-        Heading(f"Codebook: {config.project.name}", 0),
-        Paragraph(
-            f"Written by labcatalog {__version__} on {date.today().isoformat()}: "
-            f"{', '.join(counts)} and {count(len(chosen), 'instrument')}."
-        ),
+    facts = [
+        ("Contents", f"{', '.join(counts)} and {count(len(chosen), 'instrument')}"),
+        ("Written", f"{date.today().isoformat()} by labcatalog {__version__}"),
     ]
     studies = dict.fromkeys([*(dataset_by_name(config, d).study for d in plan), *rosters])
     for study in studies:
         info = config.studies[study]
-        blocks.append(Paragraph(info.description or "", label=f"{info.label or study}. "))
+        facts.append((info.label or study, info.description or ""))
         if info.reference:
-            blocks.append(
-                Paragraph(citation(result.project.bibliography, info.reference), "Cite as: ")
-            )
-        blocks += [
-            Paragraph(value, f"{label}: ") for label, value in lab_fields(config, "study", info)
-        ]
+            facts.append(("Cite as", citation(result.project.bibliography, info.reference)))
+        facts += lab_fields(config, "study", info)
     codes = shared_missing_codes(result, plan, rosters)
     if codes is not None:
-        said = f"{codes}. Blank cells are missing too." if codes else "Only blank cells."
-        blocks.append(Paragraph(said, "Missing codes: "))
+        facts.append(
+            ("Missing codes", f"{codes}. Blank cells are missing too." if codes else "Blank cells")
+        )
     group = config.ids.group
     for study in studies:
         roster = config.studies[study].roster
@@ -136,8 +166,8 @@ def front(
         else:
             continue
         where = f" in {config.studies[study].label or study}" if len(studies) > 1 else ""
-        blocks.append(Paragraph(f"Each person's {group.name}{where} comes from {source}."))
-    return blocks
+        facts.append(("Groups", f"Each person's {group.name}{where} comes from {source}."))
+    return [Heading(f"Codebook: {config.project.name}", 0), Facts(facts)]
 
 
 def datasets_part(
@@ -151,7 +181,7 @@ def datasets_part(
         blocks += files_part({d: files[d] for d in plan if d in files})
         blocks.append(datasets_table(result, plan, rosters))
     if rosters:
-        blocks.append(Paragraph("", "Participant rosters"))
+        blocks.append(Caption("Participant rosters"))
         if files:
             blocks.append(Paragraph("Each roster is in a file of its own name."))
         blocks.append(rosters_table(result, rosters))
@@ -250,16 +280,16 @@ def instrument_part(
         blocks.append(Paragraph(instrument.description))
     modality = config.vocab.modality_labels.get(instrument.modality, instrument.modality)
     facts = [
-        ("Construct: ", instrument.construct_name),
-        ("Modality: ", modality),
-        ("Instructions: ", joined(instrument.instructions) if instrument.instructions else None),
+        ("Construct", instrument.construct_name),
+        ("Modality", modality),
+        ("Instructions", joined(instrument.instructions) if instrument.instructions else None),
         *[
-            ("Reference: ", citation(result.project.bibliography, r.key))
+            ("Reference", citation(result.project.bibliography, r.key))
             for r in instrument.references
         ],
-        ("License: ", instrument.license),
-        ("Given in: ", given_text(result, instrument, given, rosters)),
-        *[(f"{label}: ", value) for label, value in lab_fields(config, "instrument", instrument)],
+        ("License", instrument.license),
+        ("Given in", given_text(result, instrument, given, rosters)),
+        *lab_fields(config, "instrument", instrument),
     ]
     for content in result.project.studies.values():
         for administration in content.administrations:
@@ -267,13 +297,13 @@ def instrument_part(
             if administration.instrument != instrument.id or not datasets:
                 continue
             for label, value in lab_fields(config, "administration", administration):
-                facts.append((f"{label} ({', '.join(datasets)}): ", value))
-    blocks += [Paragraph(text, label) for label, text in facts if text]
+                facts.append((f"{label} ({', '.join(datasets)})", value))
     for response_set in instrument.response_sets:
         options = ", ".join(
             f"{o.value} = {o.label}" if o.label else str(o.value) for o in response_set.options
         )
-        blocks.append(Paragraph(options, f"Options {response_set.id}: "))
+        facts.append((f"Options ({response_set.id})", options))
+    blocks.append(Facts([(label, value) for label, value in facts if value]))
     blocks += items_part(config, instrument)
     blocks += scores_part(config, instrument)
     blocks += differences_part(result, instrument, given)
@@ -305,7 +335,7 @@ def items_part(config: ProjectConfig, instrument: Instrument) -> list[Block]:
                 *own,
             ]
         )
-    return [Table(columns + labels, rows)]
+    return [Caption("Items"), Table(columns + labels, rows)]
 
 
 def scores_part(config: ProjectConfig, instrument: Instrument) -> list[Block]:
@@ -321,7 +351,10 @@ def scores_part(config: ProjectConfig, instrument: Instrument) -> list[Block]:
         if score.min_valid is not None:
             missing += f", at least {score.min_valid} answered"
         rows.append([score.id, score.label, score.method, ", ".join(score.items), missing, *own])
-    return [Table(["Score", "Label", "Method", "Items", "Scored", *labels], rows)]
+    return [
+        Caption("Scores"),
+        Table(["Score", "Label", "Method", "Items", "Scored", *labels], rows),
+    ]
 
 
 def differences_part(
@@ -353,7 +386,7 @@ def differences_part(
             rows.append([dataset, "; ".join(notes)])
     if not rows:
         return []
-    return [Paragraph("", "Differences between datasets"), Table(["Dataset", "Difference"], rows)]
+    return [Caption("Differences between datasets"), Table(["Dataset", "Difference"], rows)]
 
 
 def statistics_part(rows: list[dict], digits: int) -> list[Block]:
@@ -377,7 +410,7 @@ def statistics_part(rows: list[dict], digits: int) -> list[Block]:
         ]
         for r in rows
     ]
-    return [Paragraph("", "Statistics"), Table(columns, table)]
+    return [Caption("Statistics"), Table(columns, table)]
 
 
 def index_part(datasets: list[str], variables: list[dict]) -> list[Block]:
@@ -504,34 +537,155 @@ def count(n: int, noun: str) -> str:
 
 def rendered(blocks: list[Block]) -> bytes:
     document = Document()
-    # Small enough for the datasets table's columns to fit a portrait page.
-    document.styles["Normal"].font.size = Pt(10)
+    styled(document)
+    footer(document, blocks[0].text)
     for block in blocks:
         if isinstance(block, Heading):
             document.add_heading(block.text, block.level)
-        elif isinstance(block, Paragraph):
-            paragraph = document.add_paragraph()
-            if block.label:
-                paragraph.add_run(block.label).bold = True
-            paragraph.add_run(block.text)
-        else:
+        elif isinstance(block, Facts):
+            add_facts(document, block)
+        elif isinstance(block, Table):
             add_table(document, block)
+        elif isinstance(block, Caption):
+            caption = document.add_paragraph()
+            caption.add_run(block.text).bold = True
+            caption.paragraph_format.space_before = Pt(8)
+            caption.paragraph_format.space_after = Pt(3)
+            caption.paragraph_format.keep_with_next = True
+        else:
+            document.add_paragraph(block.text)
     buffer = io.BytesIO()
     document.save(buffer)
     return buffer.getvalue()
 
 
+def styled(document) -> None:
+    section = document.sections[0]
+    for side in ("left_margin", "right_margin", "top_margin", "bottom_margin"):
+        setattr(section, side, MARGIN)
+    normal = document.styles["Normal"]
+    normal.font.size = Pt(10)
+    normal.font.color.rgb = INK
+    normal.paragraph_format.space_after = Pt(4)
+    sizes = {"Title": Pt(18), "Heading 1": Pt(13), "Heading 2": Pt(11)}
+    for name, size in sizes.items():
+        style = document.styles[name]
+        style.font.size = size
+        style.font.bold = True
+        style.font.color.rgb = INK
+        # The template sets headings in its display font; the body's reads as one document.
+        fonts = style.element.rPr.find(qn("w:rFonts"))
+        for attribute, theme in THEME_FONTS.items():
+            fonts.set(qn(attribute), theme)
+    document.styles["Title"].paragraph_format.space_after = Pt(10)
+    underline(document.styles["Title"], DARK_RULE)
+    heading = document.styles["Heading 1"]
+    heading.paragraph_format.space_before = Pt(18)
+    heading.paragraph_format.space_after = Pt(6)
+    underline(heading, LIGHT_RULE)
+    document.styles["Heading 2"].paragraph_format.space_before = Pt(12)
+    document.styles["Heading 2"].paragraph_format.space_after = Pt(4)
+
+
+def underline(style, rule: tuple[str, int]) -> None:
+    properties = style.element.get_or_add_pPr()
+    old = properties.find(qn("w:pBdr"))
+    if old is not None:
+        properties.remove(old)
+    border = OxmlElement("w:pBdr")
+    border.append(edge("bottom", rule, space=2))
+    properties.insert_element_before(border, *AFTER_BORDER)
+
+
+def footer(document, title: str) -> None:
+    section = document.sections[0]
+    paragraph = section.footer.paragraphs[0]
+    width = section.page_width - section.left_margin - section.right_margin
+    paragraph.paragraph_format.tab_stops.add_tab_stop(width, WD_TAB_ALIGNMENT.RIGHT)
+    run = paragraph.add_run(f"{title}\t")
+    run.font.size = Pt(8)
+    run.font.color.rgb = MUTED
+    page = OxmlElement("w:fldSimple")
+    page.set(qn("w:instr"), "PAGE")
+    shown = paragraph.add_run("1")
+    shown.font.size = Pt(8)
+    shown.font.color.rgb = MUTED
+    paragraph._p.remove(shown._r)
+    page.append(shown._r)
+    paragraph._p.append(page)
+
+
+def add_facts(document, facts: Facts) -> None:
+    section = document.sections[0]
+    width = section.page_width - section.left_margin - section.right_margin
+    grid = document.add_table(rows=0, cols=2)
+    grid.autofit = False
+    for label, value in facts.rows:
+        left, right = grid.add_row().cells
+        put(left, label, size=Pt(9), color=MUTED)
+        put(right, value)
+    for column, size in zip(grid.columns, (LABEL_WIDTH, width - LABEL_WIDTH), strict=True):
+        column.width = size
+        for cell in column.cells:
+            cell.width = size
+    spacer(document)
+
+
 def add_table(document, table: Table) -> None:
     grid = document.add_table(rows=1, cols=len(table.columns))
-    grid.style = "Table Grid"
-    head = grid.rows[0]
-    for cell, label in zip(head.cells, table.columns, strict=True):
-        cell.paragraphs[0].add_run(label).bold = True
+    grid._tbl.tblPr.find(qn("w:tblW")).set(qn("w:type"), "pct")
+    grid._tbl.tblPr.find(qn("w:tblW")).set(qn("w:w"), "5000")
+    numeric = [label in NUMERIC for label in table.columns]
+    for cell, label, right in zip(grid.rows[0].cells, table.columns, numeric, strict=True):
+        put(cell, label, bold=True, size=Pt(9), right=right)
+        bordered(cell, top=DARK_RULE, bottom=DARK_RULE)
     # The header row repeats on each page a long table runs over.
-    marker = OxmlElement("w:tblHeader")
-    marker.set(qn("w:val"), "true")
-    head._tr.get_or_add_trPr().append(marker)
-    for row in table.rows:
-        for cell, value in zip(grid.add_row().cells, row, strict=True):
-            cell.text = value
-    document.add_paragraph()
+    rows(grid.rows[0], "w:cantSplit", "w:tblHeader")
+    for n, values in enumerate(table.rows, start=1):
+        row = grid.add_row()
+        rows(row, "w:cantSplit")
+        below = DARK_RULE if n == len(table.rows) else LIGHT_RULE
+        for cell, value, right in zip(row.cells, values, numeric, strict=True):
+            put(cell, value, size=Pt(9), right=right)
+            bordered(cell, bottom=below)
+    spacer(document)
+
+
+def put(cell, text: str, bold: bool = False, size=None, color=None, right: bool = False) -> None:
+    paragraph = cell.paragraphs[0]
+    paragraph.paragraph_format.space_after = Pt(1)
+    if right:
+        paragraph.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    run = paragraph.add_run(text)
+    run.bold = bold or None
+    run.font.size = size
+    if color is not None:
+        run.font.color.rgb = color
+
+
+def bordered(cell, **rules: tuple[str, int]) -> None:
+    borders = OxmlElement("w:tcBorders")
+    for side, rule in rules.items():
+        borders.append(edge(side, rule))
+    cell._tc.get_or_add_tcPr().insert_element_before(borders, *AFTER_CELL_BORDERS)
+
+
+def edge(side: str, rule: tuple[str, int], space: int = 0):
+    color, size = rule
+    found = OxmlElement(f"w:{side}")
+    for key, value in (("val", "single"), ("sz", str(size)), ("space", str(space))):
+        found.set(qn(f"w:{key}"), value)
+    found.set(qn("w:color"), color)
+    return found
+
+
+def rows(row, *marks: str) -> None:
+    properties = row._tr.get_or_add_trPr()
+    for mark in marks:
+        properties.append(OxmlElement(mark))
+
+
+def spacer(document) -> None:
+    gap = document.add_paragraph()
+    gap.paragraph_format.space_after = Pt(0)
+    gap.paragraph_format.line_spacing = Pt(8)
