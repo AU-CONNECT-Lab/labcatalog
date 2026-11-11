@@ -30,6 +30,7 @@ from labcatalog.datalad.freeze import (
     push_freeze,
 )
 from labcatalog.datalad.history import Saved, history, rerun
+from labcatalog.datalad.line_endings import keep_line_endings
 from labcatalog.datalad.sync import (
     DatasetState,
     branch_name,
@@ -300,6 +301,10 @@ def run_freeze(root: Path, name: str, datalad: str | None) -> tuple[Path, Freeze
 
 def run_push_freeze(root: Path, name: str, datalad: str) -> list[Path]:
     return push_freeze(freeze_roots(load_project(root)), name, datalad)
+
+
+def run_keep_line_endings(root: Path, datalad: str) -> list[Path]:
+    return keep_line_endings(load_project(root), datalad)
 
 
 def run_get(paths: list[Path], datalad: str) -> None:

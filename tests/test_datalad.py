@@ -16,6 +16,7 @@ from labcatalog.datalad.annex import is_placeholder
 from labcatalog.datalad.bridge import datalad_status, use_folder
 from labcatalog.datalad.check import check_git_annex
 from labcatalog.datalad.freeze import differences, push_targets
+from labcatalog.datalad.line_endings import convertible_files
 from labcatalog.datalad.sync import state_text
 from labcatalog.exceptions import DataladError, DataSourceError, FreezeError, MetadataError
 from labcatalog.metadata.history import file_history
@@ -32,6 +33,7 @@ from labcatalog.pipeline import (
     run_get_dataset,
     run_get_missing,
     run_history,
+    run_keep_line_endings,
     run_open_freeze,
     run_push_freeze,
     run_rerun,
@@ -465,6 +467,29 @@ def test_an_opened_freeze_has_the_frozen_data(mock_project, datalad):
     copy = run_open_freeze(mock_project, "pilot", datalad_exe())
     assert differences(record, run_catalog(copy).manifest) == []
     assert differences(record, run_catalog(mock_project).manifest) == ["child_w2"]
+
+
+@needs_datalad
+def test_an_opened_freeze_matches_once_line_endings_are_kept(mock_project, datalad):
+    datalad(mock_project, "create", "-c", "text2git", "--force", ".")
+    with (mock_project / ".gitattributes").open("a", encoding="utf-8") as handle:
+        handle.write("data/** annex.largefiles=anything\n")
+    # git holds this one as text, and a clone where git converts would get it with CRLF.
+    trial = min((mock_project / "raw" / "nback" / "ses-2").glob("*.csv"))
+    trial.write_bytes(trial.read_bytes().replace(b"\r\n", b"\n"))
+    git(mock_project, "config", "core.autocrlf", "true")
+    datalad(mock_project, "save", "-m", "Add the catalog")
+    root = mock_project.resolve()
+    found = convertible_files(load_project(mock_project))[root]
+    assert f"raw/nback/ses-2/{trial.name}" in found
+    assert "data/child_w2.csv" not in found
+
+    assert run_keep_line_endings(mock_project, datalad_exe()) == [root]
+    assert convertible_files(load_project(mock_project)) == {}
+    assert run_data_status(mock_project)[0].changed == []
+    _, record = run_freeze(mock_project, "pilot", datalad_exe())
+    copy = run_open_freeze(mock_project, "pilot", datalad_exe())
+    assert differences(record, run_catalog(copy).manifest) == []
 
 
 @needs_datalad
