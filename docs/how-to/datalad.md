@@ -91,6 +91,8 @@ datalad push --to <sibling> --data anything
 git push <sibling> <freeze name>
 ```
 
+git writes a text file it holds itself (not one in the annex) with the line endings of the computer that checks it out, unless the dataset says otherwise: Git for Windows turns LF into CRLF by default. Such a file is then no longer the same, byte for byte, as the one the freeze recorded. When a file the freeze records (a data file, a roster, or a file or script a prepare step reads) is held that way, the Freeze dialog says how many and offers **Keep line endings as they are**, ticked by default. It adds the line `* -text` to the dataset's `.gitattributes`, takes the text files in again as they are on your computer, and saves both, so every later clone on any computer gets the same bytes. This is done once for a dataset. A clone made before that keeps the line endings git gave it, so clone again.
+
 To see the data as they were at a freeze, open the Datasets page and press Open next to it in the Freezes table. labcatalog clones the datasets into a temporary folder, checks out the tag, downloads the files the project reads, and opens that copy. The window's title bar says whether every data file matches the freeze record; a mismatch usually means a data path in `labcatalog.yaml` is absolute or starts with `~`, so the copy read today's file. Edits in the copy do not change the project. Back to the project returns to it.
 
 To keep a copy, such as the data of a submission, press **Copy to...** instead and choose a folder: labcatalog makes the same copy in a new folder in it, named after the project and the freeze (`mood_study-2026-06-submission`), and leaves the window on the project. Open the copy later with **Open project**.

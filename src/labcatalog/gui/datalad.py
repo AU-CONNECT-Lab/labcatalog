@@ -16,6 +16,7 @@ from labcatalog.datalad.freeze import (
     list_freezes,
     push_targets,
 )
+from labcatalog.datalad.line_endings import ATTRIBUTES, RULE, convertible_files
 from labcatalog.datalad.sync import (
     DatasetState,
     dataset_states,
@@ -48,6 +49,7 @@ from labcatalog.pipeline import (
     run_freeze,
     run_get_dataset,
     run_history,
+    run_keep_line_endings,
     run_open_freeze,
     run_push_freeze,
     run_rerun,
@@ -133,12 +135,25 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                 f"participants) to {defaults.FREEZES_DIR}, so you can say later which data a "
                 "result used."
             )
-            push = None
+            push = keep = None
             if tagged:
                 note(
                     "The data are in DataLad, so the freeze also saves these datasets and tags "
                     f"them with its name, which lets you get this version back: {', '.join(tagged)}."
                 )
+                # Telling annexed files from git's own takes git-annex, which comes with DataLad.
+                if preferences.load().get(preferences.DATALAD):
+                    convertible = sum(len(n) for n in convertible_files(result.project).values())
+                    if convertible:
+                        note(
+                            f"git holds {convertible} of the files a freeze records as text and "
+                            "writes them out with the line endings of whichever computer gets "
+                            "them, where they would no longer match the record."
+                        )
+                        keep = ui.checkbox(
+                            f"Keep line endings as they are, with the line {RULE} in {ATTRIBUTES}",
+                            value=True,
+                        )
                 targets = push_targets(freeze_roots(result.project))
                 siblings = sorted({t for t in targets.values() if t})
                 if siblings:
@@ -162,8 +177,11 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
 
             async def go() -> None:
                 datalad = preferences.load().get(preferences.DATALAD)
-                status.set_text("Freezing")
                 try:
+                    if keep is not None and keep.value:
+                        status.set_text("Keeping line endings")
+                        await computed(run_keep_line_endings, root, datalad)
+                    status.set_text("Freezing")
                     path, record = await computed(
                         run_freeze, root, (name.value or "").strip(), datalad
                     )
