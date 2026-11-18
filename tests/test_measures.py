@@ -42,6 +42,26 @@ def test_default_paragraph_reads_like_a_measures_section(result):
     assert text.endswith("McDonald's ω was .91.")
 
 
+def test_a_dataset_given_other_options_is_described_with_them(mock_project):
+    mood = mock_project / "instruments" / "example_mood.yaml"
+    five = "".join(
+        f"      - {{value: {v}, label: {label}}}\n"
+        for v, label in enumerate(["Not at all", "A little", "Somewhat", "Much", "Very much"], 1)
+    )
+    text = mood.read_text(encoding="utf-8")
+    added = f"  - id: five\n    options:\n{five}default_response_set:"
+    mood.write_text(text.replace("default_response_set:", added, 1), encoding="utf-8")
+    study = mock_project / "studies" / "mock_study.yaml"
+    swapped = ", ".join(
+        f"{{item: ems_{n}, dataset: child_w1, response_set: five}}" for n in range(1, 10)
+    )
+    old = "  - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self}"
+    text = study.read_text(encoding="utf-8")
+    study.write_text(text.replace(old, f"{old[:-1]}, overrides: [{swapped}]}}"), encoding="utf-8")
+    text = paragraph(run_catalog(mock_project))
+    assert "The EMS has nine items, each answered from 1 (Not at all) to 5 (Very much)." in text
+
+
 def test_instrument_template_wins_over_the_project_one(mock_project):
     config = mock_project / "labcatalog.yaml"
     data = yaml.safe_load(config.read_text(encoding="utf-8"))

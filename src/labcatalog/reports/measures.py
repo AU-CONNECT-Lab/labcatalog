@@ -1,7 +1,7 @@
 from collections.abc import Callable
 
 from labcatalog.config import dataset_by_name
-from labcatalog.data.resolve import Catalog, ResolvedScore
+from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable
 from labcatalog.metadata.bibliography import in_text
 from labcatalog.project import Project
 from labcatalog.reports import templates
@@ -59,11 +59,10 @@ def placeholder_values(
 
     cite = "; ".join(in_text(project.bibliography, r.key) for r in instrument.references)
     inside = "; ".join(p for p in (instrument.abbreviation, cite) if p)
-    administered = {
-        v.item_id for v in catalog.variables_for(dataset) if v.instrument_id == instrument.id
-    }
+    variables = [v for v in catalog.variables_for(dataset) if v.instrument_id == instrument.id]
+    administered = {v.item_id for v in variables}
     items = [item for item in instrument.items if item.id in administered]
-    scale = response_scale(instrument, items, say)
+    scale = response_scale(variables, say)
     if instrument.abbreviation:
         subject = say("subject", abbreviation=instrument.abbreviation)
     else:
@@ -106,11 +105,12 @@ def placeholder_values(
     }
 
 
-def response_scale(instrument: Instrument, items: list, say: Callable[..., str]) -> str:
-    sets = {item.response_set or instrument.default_response_set for item in items}
-    if any(item.type != "choice" for item in items) or len(sets) != 1:
+def response_scale(variables: list[ResolvedVariable], say: Callable[..., str]) -> str:
+    # The options the dataset gives, after any override of its administration.
+    sets = {v.response_set for v in variables}
+    if any(v.type != "choice" for v in variables) or len(sets) != 1:
         return ""
-    options = next(s for s in instrument.response_sets if s.id in sets).options
+    options = variables[0].response_options
     first, last = options[0], options[-1]
     return say(
         "scale", low=first.value, low_label=first.label, high=last.value, high_label=last.label

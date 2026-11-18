@@ -33,6 +33,13 @@ def test_a_small_table_is_told_pair_by_pair():
     assert text == "Sleep was not significantly correlated with Mood, rs(118) = .05, p = .587."
 
 
+def test_a_correlation_within_studies_gives_the_df_its_p_has():
+    # Two studies: the test takes the study's mean too, so the df is n - 3 as its p.
+    matrix = matrix_of(2, {(1, 0): (-0.342, 0.0002)})
+    text = results.correlation_text(["Mood", "Sleep"], ["m", "s"], matrix, False, studies=2)
+    assert text == "Sleep was negatively correlated with Mood, r(117) = -.34, p < .001."
+
+
 def test_a_large_table_names_its_strongest_pairs_between_instruments():
     labels = ["A", "B", "C", "D"]
     matrix = matrix_of(

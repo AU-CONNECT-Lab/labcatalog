@@ -66,6 +66,15 @@ def test_unknown_templates_and_parts_are_errors(mock_project):
     assert any(m.startswith("regression.intro: unknown placeholder {nope}") for m in messages)
 
 
+def test_a_model_that_fits_exactly_cannot_name_fit_indices(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    data = yaml.safe_load(config.read_text(encoding="utf-8"))
+    data["templates"] = {"cfa": {"exact": "{Model} fits exactly: {fit}."}}
+    config.write_text(yaml.safe_dump(data), encoding="utf-8")
+    messages = [i.message for i in validate_project(load_project(mock_project))]
+    assert any(m.startswith("cfa.exact: unknown placeholder {fit}") for m in messages)
+
+
 def test_each_built_in_part_uses_its_placeholders_and_its_example_fills_it():
     for found in templates.TEMPLATES.values():
         for slot in found.slots:

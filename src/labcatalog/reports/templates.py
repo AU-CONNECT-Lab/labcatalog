@@ -134,6 +134,8 @@ KAPPA_EXAMPLE = {
 MODEL_EXAMPLE = "a model with one factor for each subscale (Sadness and Worry)"
 NAMES_EXAMPLE = "Sadness and Worry"
 FITTED = ("Model", "model", "package", "estimation", "n", "fit", "indicators")
+# A model that fits exactly has no fit indices to name.
+EXACT = tuple(p for p in FITTED if p != "fit")
 FITTED_EXAMPLE = {
     "Model": "A" + MODEL_EXAMPLE[1:],
     "model": MODEL_EXAMPLE,
@@ -770,8 +772,8 @@ TEMPLATES: dict[str, Template] = {
                     "A model with three indicators, which fits exactly",
                     "{Model}, fitted in {package} with {estimation} (N = {n}), fits exactly with "
                     "three {indicators}, so it has no fit indices.",
-                    FITTED,
-                    FITTED_EXAMPLE,
+                    EXACT,
+                    {k: v for k, v in FITTED_EXAMPLE.items() if k in EXACT},
                 ),
                 Slot(
                     "problem",

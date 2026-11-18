@@ -64,7 +64,9 @@ def correlation_text(
     spearman: bool,
     digits: int = 2,
     wording: Wording = BUILT_IN,
+    studies: int = 1,
 ) -> str:
+    # Within several studies the test also takes each study's mean, a df apiece after the first.
     symbol = "rs" if spearman else "r"
     pairs = [
         (labels[i], labels[j], matrix[i][j], instruments[i] == instruments[j])
@@ -74,7 +76,7 @@ def correlation_text(
     ]
 
     def say(slot: str, a: str, b: str, c: Correlation) -> str:
-        values = pair_values(a, b, c, symbol, digits)
+        values = pair_values(a, b, c, symbol, digits, studies)
         return wording.say("correlation", slot, **values)
 
     if len(pairs) <= EVERY_PAIR:
@@ -110,8 +112,10 @@ def correlation_text(
     return " ".join(sentences)
 
 
-def pair_values(a: str, b: str, c: Correlation, symbol: str, digits: int) -> dict[str, str]:
-    r = f"{symbol}({c.n - 2}) = {bounded(c.r, digits)}"
+def pair_values(
+    a: str, b: str, c: Correlation, symbol: str, digits: int, studies: int = 1
+) -> dict[str, str]:
+    r = f"{symbol}({c.n - 1 - studies}) = {bounded(c.r, digits)}"
     return {
         "a": a,
         "b": b,

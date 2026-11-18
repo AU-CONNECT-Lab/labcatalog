@@ -3,7 +3,7 @@ import pandas as pd
 
 from labcatalog.pipeline import run_catalog, run_freeze
 from labcatalog.project import init_project
-from labcatalog.reports.database import run_database
+from labcatalog.reports.database import run_database, typed
 from labcatalog.reports.export import variable_rows
 from tests.test_folder_source import add_scans
 
@@ -47,6 +47,13 @@ def test_the_database_holds_the_data_and_what_they_mean(mock_project):
     run_database(mock_project)
     with duckdb.connect(str(path), read_only=True) as con:
         assert con.execute('SELECT count(*) FROM data."child_w1"').fetchone()[0] == len(child)
+
+
+def test_ids_written_as_numbers_keep_their_leading_zeros():
+    frame = pd.DataFrame({"pid": ["001", "010"], "family": ["0901", "0902"], "x": ["1", "2"]})
+    out = typed(frame, {"pid", "family", None}, None, "%Y-%m-%d")
+    assert out["pid"].tolist() == ["001", "010"] and out["family"].tolist() == ["0901", "0902"]
+    assert out["x"].tolist() == [1, 2]
 
 
 def test_a_freeze_keeps_its_own_copy_of_the_database(mock_project):

@@ -461,6 +461,7 @@ def correlation_section(
                         method == "spearman",
                         common.decimals(),
                         Wording(result.project.config.templates),
+                        len(analysis.study_options(result, sample)) if by_study else 1,
                     ),
                     [shown],
                     "correlation",

@@ -25,14 +25,16 @@ def full_plan(result: CatalogResult) -> dict[str, list[str]]:
     return plan
 
 
-def typed(frame: pd.DataFrame, date_column: str | None, date_format: str) -> pd.DataFrame:
-    # A column of numbers becomes numeric; missing codes stay as the values they are.
+def typed(
+    frame: pd.DataFrame, ids: set[str], date_column: str | None, date_format: str
+) -> pd.DataFrame:
+    # A column of numbers becomes numeric, but IDs stay as typed, 001 apart from 1.
     out = frame.replace("", None)
     for column in out:
         if column == date_column:
             out[column] = pd.to_datetime(out[column], format=date_format, errors="coerce").dt.date
             continue
-        if out[column].dtype.kind in "biuf":
+        if column in ids or out[column].dtype.kind in "biuf":
             continue
         numbers = pd.to_numeric(out[column], errors="coerce")
         if numbers.notna().sum() == out[column].notna().sum():
@@ -109,10 +111,13 @@ def write_database(result: CatalogResult, path: Path) -> Path:
     try:
         with duckdb.connect(str(partial)) as con:
             con.execute(f"CREATE SCHEMA {DATA_SCHEMA}")
+            group = result.project.config.ids.group
             for name, instruments in full_plan(result).items():
-                config = result.datasets[name].config
+                loaded = result.datasets[name]
+                config = loaded.config
+                ids = {loaded.id_column, config.respondent_column, group.name if group else None}
                 frame = typed(
-                    data_frame(result, name, instruments), config.date_column, date_format
+                    data_frame(result, name, instruments), ids, config.date_column, date_format
                 )
                 write_table(con, f'{DATA_SCHEMA}."{name}"', frame)
             for name, frame in tables(result).items():
