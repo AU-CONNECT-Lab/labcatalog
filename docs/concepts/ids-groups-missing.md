@@ -105,7 +105,7 @@ missing_codes:
   - {code: "", label: blank}
 ```
 
-Missing codes are counted and shown by label on the dataset and instrument pages, and never enter a score or a statistic. Blank cells always count as missing, whether or not a code for them is listed. A dataset with codes of its own sets `missing_codes` on its entry, which replaces the project's list for that file. A code that is also a response option of an item is reported as `missing_code_collision`.
+Missing codes are counted and shown by label on the dataset and instrument pages, and never enter a score or a statistic. A cell holds a code when it is written the same way or, for a code that is a number, holds the same number, so `-99.0` and `-99.00` count as `-99`; codes that share a label are counted together. Blank cells always count as missing, whether or not a code for them is listed. A dataset with codes of its own sets `missing_codes` on its entry, which replaces the project's list for that file. A code that is also a response option of an item is reported as `missing_code_collision`.
 
 ## Exclusions
 

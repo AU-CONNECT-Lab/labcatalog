@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 
 from labcatalog.config import ProjectConfig, dataset_by_name, missing_codes_for
 from labcatalog.data.resolve import Catalog, ResolvedScore
+from labcatalog.data.scoring import fewest_answered
 from labcatalog.schema import SCRIPT
 
 
@@ -40,7 +41,7 @@ def script(
 
 
 def score_lines_r(score: ResolvedScore) -> list[str]:
-    k, enough = len(score.columns), min_valid(score)
+    k, enough = len(score.columns), fewest_answered(score)
     lines = [
         f"items <- c({quoted(score.columns)})",
         "x <- d[items]",
@@ -74,7 +75,7 @@ def score_lines_r(score: ResolvedScore) -> list[str]:
 
 
 def score_lines_python(score: ResolvedScore) -> list[str]:
-    k, enough = len(score.columns), min_valid(score)
+    k, enough = len(score.columns), fewest_answered(score)
     lines = [
         f"items = [{quoted(score.columns)}]",
         'x = d[items].apply(pd.to_numeric, errors="coerce")',
@@ -257,10 +258,6 @@ def unavailable_note(score: ResolvedScore) -> str:
 
 def output_name(score: ResolvedScore) -> str:
     return f"{score.score_id}_{score.dataset}"
-
-
-def min_valid(score: ResolvedScore) -> int:
-    return score.min_valid or len(score.columns)
 
 
 def distinct_valid_sets(score: ResolvedScore) -> list[list[float]]:

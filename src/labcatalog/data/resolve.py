@@ -41,6 +41,12 @@ def numbers_in_range(numbers: pd.Series, variable: ResolvedVariable) -> pd.Serie
     return ok
 
 
+def missing_cells(values: pd.Series, numbers: pd.Series, codes: list[str]) -> pd.Series:
+    # A cell holds a missing code written as it is, or as another form of the same number.
+    numeric = pd.to_numeric(pd.Series(codes, dtype=str), errors="coerce").dropna()
+    return values.isin(codes) | numbers.isin(numeric)
+
+
 class ResolvedScore(BaseModel):
     key: str
     instrument_id: str

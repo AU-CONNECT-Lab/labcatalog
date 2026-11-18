@@ -1,11 +1,52 @@
 import pandas as pd
 import pytest
 
-from labcatalog.data.resolve import resolve_catalog
-from labcatalog.data.scoring import compute_scores
+from labcatalog.config import DatasetConfig, MissingCode, ProjectConfig
+from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, resolve_catalog
+from labcatalog.data.scoring import compute_score, compute_scores
 from labcatalog.pipeline import load_validated
-from labcatalog.sources import load_datasets
-from labcatalog.stats.summary import cronbach_alpha, histogram, summarize
+from labcatalog.schema import ResponseOption
+from labcatalog.sources import LoadedDataset, load_datasets
+from labcatalog.stats.link import link
+from labcatalog.stats.summary import (
+    cronbach_alpha,
+    histogram,
+    modality_counts,
+    retention,
+    summarize,
+    summarize_dataset,
+    summarize_score,
+    summarize_variable,
+)
+
+REFUSED = ProjectConfig(
+    project={"name": "p"}, missing_codes=[MissingCode(code=-99, label="refused")]
+)
+
+
+def loaded_with(name: str = "d", wave: str = "1", **columns: list[str]) -> LoadedDataset:
+    config = DatasetConfig(
+        name=name, modality="q", study="s", wave=wave, reporter="r", source="csv", path="d.csv"
+    )
+    return LoadedDataset(config, pd.DataFrame(columns), "id", None, None)
+
+
+def variable(column: str, kind: str = "choice", options: tuple = ()) -> ResolvedVariable:
+    return ResolvedVariable(
+        column=column,
+        instrument_id="x",
+        item_id=column,
+        dataset="d",
+        study="s",
+        wave="1",
+        reporter="r",
+        modality="q",
+        text={"default": column},
+        type=kind,
+        response_options=[ResponseOption(value=v, label=str(v)) for v in options],
+        reverse=False,
+        reversed_in_data=False,
+    )
 
 
 def summary_for(root):
@@ -131,3 +172,68 @@ def test_number_and_text_items(mock_project):
     background = next(c for c in parent.completeness if c.instrument_id == "example_demographics")
     # The optional comment does not make everyone a partial responder.
     assert background.n_items == 4 and background.complete > 100
+
+
+def test_a_missing_code_written_as_another_form_of_its_number_is_missing():
+    loaded = loaded_with(
+        id=["A1", "A2", "A3", "A4"],
+        hours=["8.0", "-99.0", "7.0", "9.0"],
+        x1=["1", "-99.0", "-99.00", "-99"],
+    )
+    hours = summarize_variable(loaded, variable("hours", "number"), REFUSED)
+    assert (hours.n_valid, hours.missing["refused"], hours.mean, hours.minimum) == (3, 1, 8, 7)
+    x1 = summarize_variable(loaded, variable("x1", options=(1, 2)), REFUSED)
+    assert (x1.n_valid, x1.missing["refused"], x1.n_unexpected) == (1, 3, 0)
+
+
+def test_missing_codes_that_share_a_label_are_counted_together():
+    config = ProjectConfig(
+        project={"name": "p"},
+        missing_codes=[
+            MissingCode(code=-99, label="missing"),
+            MissingCode(code=-999, label="missing"),
+        ],
+    )
+    loaded = loaded_with(id=["A1", "A2", "A3", "A4"], x1=["1", "-99", "-999", "-999"])
+    x1 = summarize_variable(loaded, variable("x1", options=(1, 2)), config)
+    assert (x1.missing, x1.n_unexpected) == ({"blank": 0, "missing": 3}, 0)
+
+
+def test_rows_without_an_id_are_nobody():
+    datasets = {
+        "d1": loaded_with("d1", "1", id=["A1", "", "A3", "  "]),
+        "d2": loaded_with("d2", "2", id=["A1", "", "A4"]),
+    }
+    empty = Catalog(variables=[], scores=[])
+    assert [summarize_dataset(d, empty, [], REFUSED).n_ids for d in datasets.values()] == [2, 2]
+    kept = [(r.wave, r.n, r.n_from_previous, r.n_new) for r in retention(datasets)]
+    assert kept == [("1", 2, None, None), ("2", 2, 1, 1)]
+    counted = [(m.wave, m.n, m.n_from_previous) for m in modality_counts(datasets)]
+    assert counted == [("1", 2, None), ("2", 2, 1)]
+    rows = link(datasets, ["d1", "d2"], "id").rows
+    assert (rows["d1"].to_dict(), rows["d2"].to_dict()) == ({"A1": 0, "A3": 2}, {"A1": 0, "A4": 2})
+
+
+@pytest.mark.parametrize(("method", "possible"), [("sum", (0, 16)), ("mean", (0, 4))])
+def test_a_score_that_counts_missing_items_as_zero_fits_its_range(method, possible):
+    columns = ["a", "b", "c", "d"]
+    score = ResolvedScore(
+        key="x.total@d",
+        instrument_id="x",
+        score_id="total",
+        dataset="d",
+        label="Total",
+        method=method,
+        columns=columns,
+        reverse_columns=[],
+        reverse_bounds={},
+        valid_values={c: [1.0, 2.0, 3.0, 4.0] for c in columns},
+        reversed_in_data=False,
+        missing_rule="zero",
+        min_valid=2,
+    )
+    # Two items answered with 1 sum to 2, below the 4 of answering every item with 1.
+    loaded = loaded_with(id=["A1", "A2"], a=["1", "2"], b=["1", "2"], c=["", "2"], d=["", "2"])
+    summary = summarize_score(loaded, score, compute_score(loaded, score))
+    assert summary.possible_range == possible
+    assert sum(count for _, _, count in summary.histogram) == summary.n_valid == 2

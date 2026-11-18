@@ -231,3 +231,30 @@ def test_a_studys_pattern_must_be_a_regular_expression(pilot_project):
     edit(pilot_project / "labcatalog.yaml", "  pilot:\n", "  pilot:\n    id_pattern: '^(\\d'\n")
     messages = found(run_check(pilot_project))["invalid_value"]
     assert any(m.startswith("studies.pilot.id_pattern: invalid pattern") for m in messages)
+
+
+def test_a_lab_score_holding_a_missing_code_written_as_another_number_is_missing(mock_project):
+    edit(
+        mock_project / "instruments" / "example_mood.yaml",
+        "scores:\n",
+        "scores:\n"
+        "  - {id: ems_mean, label: Mean, method: mean, items: [ems_2, ems_3, ems_5, ems_6]}\n",
+    )
+    items = ["ems_2_w2", "ems_3_w2", "ems_5_w2", "ems_6_w2"]
+
+    def change(frame):
+        # Only the first child answered; the lab's script wrote its refused code as -99.0.
+        frame[items] = ""
+        frame.loc[0, items] = ["1", "1", "2", "1"]
+        frame["ems_mean_w2"] = "-99.0"
+        frame.loc[0, "ems_mean_w2"] = "1.25"
+
+    change_csv(mock_project / "data" / "child_w2.csv", change)
+    path = mock_project / "maps" / "child_w2.csv"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "ems_mean_w2,example_mood,score:ems_mean\n",
+        encoding="utf-8",
+    )
+    report = found(run_check(mock_project))
+    messages = report.get("score_mismatch", []) + report.get("score_coverage", [])
+    assert not [m for m in messages if "ems_mean" in m]

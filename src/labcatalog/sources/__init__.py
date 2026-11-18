@@ -40,7 +40,8 @@ class LoadedDataset:
     answer_cache: dict[tuple, pd.Series] = field(default_factory=dict, repr=False)
 
     def respondents(self) -> pd.Series:
-        return self.frame[self.config.respondent_column or self.id_column]
+        found = self.frame[self.config.respondent_column or self.id_column]
+        return found[has_id(found)]
 
     def numbers(self, column: str) -> pd.Series:
         # Converting text to numbers is the slowest step on wide data, so each column is done once.
@@ -55,6 +56,11 @@ class LoadedDataset:
             numbers = self.numbers(column)
             self.answer_cache[key] = numbers.where(numbers.isin(valid))
         return self.answer_cache[key]
+
+
+def has_id(ids: pd.Series) -> pd.Series:
+    # A row without an ID is nobody's.
+    return ids.str.strip() != ""
 
 
 def get_source(name: str) -> DataSource:

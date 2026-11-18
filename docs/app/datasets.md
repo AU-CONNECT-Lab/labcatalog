@@ -18,7 +18,7 @@ The datasets are grouped by study, under the study's label; its description and 
 |---|---|
 | Dataset, Wave, Reporter, Modality | From the dataset's entry in `labcatalog.yaml`. |
 | Rows | Rows in the file. |
-| IDs | Distinct participant IDs. |
+| IDs | Distinct participant IDs; a row without an ID counts as no one. |
 | Collected | The first and last date in the `date_column`. |
 | Data as of | The dataset's `snapshot_date`. |
 

@@ -64,6 +64,11 @@ def test_zero_counts_missing_items_as_zero():
     assert values(make_score(missing_rule="zero", min_valid=2)) == [5, 4, None, 0]
 
 
+def test_zero_without_min_valid_scores_whoever_answered_an_item():
+    # The second row answered a alone, so b counts as 0; the third answered neither.
+    assert values(make_score(missing_rule="zero", columns=["a", "b"])) == [2, 1, None, 0]
+
+
 def test_mean_score():
     result = values(make_score(method="mean", missing_rule="prorate", min_valid=2))
     assert result == [pytest.approx(5 / 3), 2, None, 0]

@@ -323,3 +323,14 @@ def test_item_types(mock_project):
         "items[5] (dem_comment): needs a response_set, or type: number or text",
         "scores[1] (n).items: dem_household is a number item and cannot be scored",
     ]
+
+
+def test_a_prorated_score_needs_min_valid(mock_project):
+    edit(mock_project / "instruments" / "example_mood.yaml", ", min_valid: 7", "")
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level, issue.location) == (
+        "invalid_value",
+        "error",
+        "instruments/example_mood.yaml",
+    )
+    assert issue.message.startswith("scores[1] (ems_total).min_valid: missing_rule prorate needs")

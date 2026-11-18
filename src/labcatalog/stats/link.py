@@ -4,7 +4,7 @@ from itertools import combinations
 
 import pandas as pd
 
-from labcatalog.sources import LoadedDataset
+from labcatalog.sources import LoadedDataset, has_id
 
 
 @dataclass
@@ -27,6 +27,7 @@ def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str
     for name in names:
         loaded = datasets[name]
         ids = loaded.frame[loaded.id_column].astype("string")
+        ids = ids.where(has_id(ids))
         groups = loaded.group.astype("string") if by_group and loaded.group is not None else ids
         if several:
             ids, groups = study_keys(loaded, ids), study_keys(loaded, groups)

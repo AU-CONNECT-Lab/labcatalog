@@ -30,6 +30,13 @@ def score_items(loaded: LoadedDataset, score: ResolvedScore) -> pd.DataFrame:
     return items
 
 
+def fewest_answered(score: ResolvedScore) -> int:
+    if score.missing_rule == "complete":
+        return len(score.columns)
+    # Validation asks prorate for min_valid; zero without it needs one answered item.
+    return score.min_valid or 1
+
+
 def compute_score(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
     if score.method == SCRIPT:
         return scripted(loaded, score.score_id)
@@ -37,11 +44,7 @@ def compute_score(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
         return pd.Series(np.nan, index=loaded.frame.index, dtype=float)
     items = score_items(loaded, score)
     k = len(score.columns)
-    n_valid = items.notna().sum(axis=1)
-    if score.missing_rule == "complete":
-        enough = n_valid == k
-    else:
-        enough = n_valid >= (score.min_valid or k)
+    enough = items.notna().sum(axis=1) >= fewest_answered(score)
 
     if score.missing_rule == "zero":
         total = items.fillna(0).sum(axis=1)

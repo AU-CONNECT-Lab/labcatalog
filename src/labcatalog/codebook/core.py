@@ -69,7 +69,7 @@ COLUMNS: dict[str, dict[str, str]] = {
         "method": "sum or mean",
         "items": "the item IDs in the score, separated by semicolons; first-last means every item from first to last in items.csv order (cesd_1-cesd_20)",
         "missing_rule": "complete (no score unless every item is answered; the default), prorate (missing items take the mean of the answered ones) or zero (missing items count as 0)",
-        "min_valid": "with prorate, the fewest answered items that still give a score",
+        "min_valid": "the fewest answered items that still give a score: needed with prorate, 1 with zero when empty",
     },
 }
 

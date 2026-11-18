@@ -6,10 +6,16 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, missing_labels_for
-from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
+from labcatalog.data.resolve import (
+    Catalog,
+    ResolvedScore,
+    ResolvedVariable,
+    missing_cells,
+    numbers_in_range,
+)
 from labcatalog.data.scoring import scorable, score_items
 from labcatalog.schema import SCRIPT
-from labcatalog.sources import LoadedDataset
+from labcatalog.sources import LoadedDataset, has_id
 from labcatalog.stats.link import link
 
 
@@ -189,8 +195,14 @@ def summarize_variable(
 ) -> VariableSummary:
     values = loaded.frame[variable.column]
     labels = missing_labels_for(config, loaded.config)
-    missing = {label: int(values.isin([code]).sum()) for code, label in labels.items()}
     numbers = loaded.numbers(variable.column)
+    # Codes that share a label are counted together.
+    by_label: dict[str, list[str]] = {}
+    for code, label in labels.items():
+        by_label.setdefault(label, []).append(code)
+    missing = {
+        label: int(missing_cells(values, numbers, codes).sum()) for label, codes in by_label.items()
+    }
     valid = valid_answers(loaded, variable, labels)
     counts: dict[str, int] = {}
     if variable.type == "choice":
@@ -236,7 +248,7 @@ def valid_answers(
     if variable.type == "choice":
         options = [str(option.value) for option in variable.response_options]
         return values.isin(options) | numbers.isin([float(v) for v in options if is_number(v)])
-    answered = ~values.isin(list(labels))
+    answered = ~missing_cells(values, numbers, list(labels))
     if variable.type == "number":
         return answered & numbers_in_range(numbers, variable)
     return answered
@@ -283,6 +295,9 @@ def score_range(score: ResolvedScore, values: pd.Series) -> tuple[float, float]:
         return (float(values.min()), float(values.max())) if len(values) else (0.0, 0.0)
     lows = [min(score.valid_values[column]) for column in score.columns]
     highs = [max(score.valid_values[column]) for column in score.columns]
+    if score.missing_rule == "zero":
+        # A missing item counts as 0, which its options need not include.
+        lows, highs = [min(low, 0) for low in lows], [max(high, 0) for high in highs]
     if score.method == "sum":
         return sum(lows), sum(highs)
     return min(lows), max(highs)
@@ -362,6 +377,7 @@ def summarize_dataset(
 ) -> DatasetSummary:
     name = loaded.config.name
     frame = loaded.frame
+    ids = frame[loaded.id_column]
     mine = [v for v in variables if v.dataset == name]
     missing_totals: dict[str, int] = {}
     for summary in mine:
@@ -375,7 +391,7 @@ def summarize_dataset(
     return DatasetSummary(
         dataset=name,
         n_rows=len(frame),
-        n_ids=int(frame[loaded.id_column].nunique()),
+        n_ids=int(ids[has_id(ids)].nunique()),
         n_groups=None if loaded.group is None else int(loaded.group.nunique()),
         first_date=dates.min().date() if dates is not None and len(dates) else None,
         last_date=dates.max().date() if dates is not None and len(dates) else None,

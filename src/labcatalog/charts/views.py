@@ -12,7 +12,7 @@ from labcatalog import defaults
 from labcatalog.charts import matrices, network, plots, scatter
 from labcatalog.charts.style import group_color, natural_key, pair_color, wave_color
 from labcatalog.config import dataset_by_name, missing_labels_for
-from labcatalog.data.resolve import ResolvedScore, as_text_dict
+from labcatalog.data.resolve import ResolvedScore, as_text_dict, missing_cells
 from labcatalog.metadata.completeness import gaps
 from labcatalog.metadata.studies import wave_status
 from labcatalog.pipeline import CatalogResult
@@ -979,7 +979,7 @@ def answer_status(
             pass
     status = pd.Series("unexpected", index=text.index)
     label = text + " is not an option"
-    is_code = text.isin([c for c in codes if c]) | numbers.isin(list(code_numbers))
+    is_code = missing_cells(text, numbers, [c for c in codes if c])
     status[is_code] = "missing"
     label[is_code] = (
         text[is_code].map(lambda t: codes.get(t) or code_numbers.get(float(t), t))

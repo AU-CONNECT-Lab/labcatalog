@@ -11,7 +11,13 @@ from labcatalog.config import id_pattern, missing_labels_for
 from labcatalog.data import id_map
 from labcatalog.data.ids import load_exclusions
 from labcatalog.data.prepare import step_states
-from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, numbers_in_range
+from labcatalog.data.resolve import (
+    Catalog,
+    ResolvedScore,
+    ResolvedVariable,
+    missing_cells,
+    numbers_in_range,
+)
 from labcatalog.data.scoring import raw_items, scorable
 from labcatalog.datalad.annex import fetch_advice
 from labcatalog.datalad.check import check_git_annex
@@ -150,12 +156,14 @@ def check_values(
         if variable.type == "text" or variable.column not in loaded.frame:
             continue
         codes = list(missing_labels_for(project.config, loaded.config))
-        allowed = [option.value for option in variable.response_options] + codes
+        options = [option.value for option in variable.response_options]
         values = loaded.frame[variable.column]
         numbers = loaded.numbers(variable.column)
-        numeric_allowed = [float(v) for v in allowed if not isinstance(v, str)]
-        numeric_allowed += [float(v) for v in codes if is_number(v)]
-        ok = values.isin([str(v) for v in allowed]) | numbers.isin(numeric_allowed)
+        ok = (
+            missing_cells(values, numbers, codes)
+            | values.isin([str(v) for v in options])
+            | numbers.isin([float(v) for v in options if not isinstance(v, str)])
+        )
         if variable.type == "number":
             ok |= numbers_in_range(numbers, variable)
             expected = f"numbers{range_text(variable)}"
@@ -523,7 +531,8 @@ def score_agreement(
 ) -> list[Issue]:
     issues = []
     codes = list(missing_labels_for(project.config, loaded.config))
-    existing = pd.to_numeric(raw, errors="coerce").where(~raw.isin(codes))
+    numbers = pd.to_numeric(raw, errors="coerce")
+    existing = numbers.where(~missing_cells(raw, numbers, codes))
     # Within half a unit of the lab's own precision, so any way of rounding agrees.
     places = raw.str.extract(r"\.(\d+)$", expand=False).str.len()
     decimals = int(places.max()) if places.notna().any() else 0
@@ -589,14 +598,6 @@ def range_text(variable: ResolvedVariable) -> str:
     if high is not None:
         return f" of at most {high:g}"
     return ""
-
-
-def is_number(text: str) -> bool:
-    try:
-        float(text)
-    except ValueError:
-        return False
-    return True
 
 
 def location(project: Project, loaded: LoadedDataset) -> str:

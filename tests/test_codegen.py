@@ -54,7 +54,13 @@ def variants(catalog) -> list[ResolvedScore]:
         for base in (ems, eps)
         for rule, method in RULES
     ]
-    return [*scores, mixed]
+    # Zero without min_valid scores whoever answered an item.
+    zero = [
+        base.model_copy(update={"missing_rule": "zero", "method": method, "min_valid": None})
+        for base in (ems, eps)
+        for method in ["sum", "mean"]
+    ]
+    return [*scores, *zero, mixed]
 
 
 def expected(datasets, score) -> np.ndarray:

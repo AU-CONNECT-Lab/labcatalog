@@ -349,6 +349,12 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
         if score.min_valid is not None and score.missing_rule == "complete":
             message = f"{where}.min_valid: has no effect while missing_rule is complete"
             issues.append(problem("invalid_value", message, location, level="warning"))
+        if score.min_valid is None and score.missing_rule == "prorate":
+            message = (
+                f"{where}.min_valid: missing_rule prorate needs the fewest answered items "
+                "that still give a score"
+            )
+            issues.append(problem("invalid_value", message, location))
         if instrument.demographics and score.missing_rule != "complete":
             message = f"{where}.missing_rule: demographic answers are never imputed; use complete"
             issues.append(problem("invalid_value", message, location))

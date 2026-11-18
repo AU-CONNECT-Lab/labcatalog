@@ -65,13 +65,13 @@ A score combines items:
 | `method` | `sum`, `mean`, or `script` (below). |
 | `items` | The item IDs in the score. |
 | `missing_rule` | What to do when items are missing (below). |
-| `min_valid` | The fewest answered items that still give a score. |
+| `min_valid` | The fewest answered items that still give a score: needed with `prorate`, 1 with `zero` when not given. |
 
 The missing rules:
 
 - `complete` (the default): no score unless every item is answered.
-- `prorate`: the mean of the answered items times the number of items, when at least `min_valid` items are answered. A `mean` score is the mean of the answered items.
-- `zero`: missing items count as 0.
+- `prorate`: the mean of the answered items times the number of items, when at least `min_valid` items are answered. A `mean` score is the mean of the answered items. A `prorate` score without `min_valid` is reported as a problem.
+- `zero`: missing items count as 0, when at least `min_valid` items are answered; without `min_valid`, one answered item is enough, so only someone who answered none of the items has no score.
 
 Items marked `reverse: true` are reversed before scoring, using their response options: on a 0 to 3 scale, 0 becomes 3 and 3 becomes 0. If the data already hold the reversed values, set `reversed_in_data: true` on the administration (see [Column Maps and Overrides](variable-maps.md)).
 
