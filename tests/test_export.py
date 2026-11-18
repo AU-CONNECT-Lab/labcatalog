@@ -348,6 +348,17 @@ def test_the_codebook_describes_the_participant_roster(result):
     assert ["gender", "Roster", "gender", "choice"] in blocks[-1].rows
 
 
+def test_roster_rows_without_an_id_are_nobody_in_the_codebook(mock_project):
+    with (mock_project / "data" / "participants.csv").open("a", encoding="utf-8") as roster:
+        roster.write(",9998,child,2016,1\n  ,9999,child,2017,2\n")
+    result = run_catalog(mock_project)
+    blocks = blocks_for(result, {}, studies=["mock_study"])
+    [row] = table_after(blocks, "Participant rosters").rows
+    ids = result.rosters["mock_study"].frame["pid"]
+    assert row[2:4] == [str(len(ids)), str(ids[ids.str.strip() != ""].nunique())]
+    assert int(row[2]) == int(row[3]) + 2
+
+
 def test_an_instrument_given_nowhere_cannot_be_exported(mock_project):
     instruments = mock_project / "instruments"
     text = (instruments / "example_mood.yaml").read_text(encoding="utf-8")

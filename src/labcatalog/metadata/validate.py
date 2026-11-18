@@ -473,21 +473,32 @@ def check_missing_code_collisions(project: Project) -> list[Issue]:
                 dataset = datasets.get(dataset_name)
                 if dataset is None:
                     continue
-                codes = {str(m.code): m.label for m in missing_codes_for(config, dataset)}
+                codes = missing_codes_for(config, dataset)
                 for response_set in instrument.response_sets:
                     for option in response_set.options:
-                        label = codes.get(str(option.value))
-                        if label is not None:
+                        code = next((m for m in codes if same_value(m.code, option.value)), None)
+                        if code is not None:
                             message = (
                                 f"response set '{response_set.id}' uses {option.value}, which is "
-                                f"also the missing code '{label}' (dataset {dataset_name})"
+                                f"also the missing code '{code.label}' (dataset {dataset_name})"
                             )
-                            where = (project.instrument_files[instrument.id], dataset_name, option)
+                            where = (project.instrument_files[instrument.id], dataset_name, code)
                             messages.setdefault(message, where)
+    # The value is the code as written, which Fix takes out of the missing codes.
     return [
-        problem("missing_code_collision", m, loc, dataset=name, value=str(option.value))
-        for m, (loc, name, option) in messages.items()
+        problem("missing_code_collision", m, loc, dataset=name, value=str(code.code))
+        for m, (loc, name, code) in messages.items()
     ]
+
+
+def same_value(code: Any, value: Any) -> bool:
+    # Written alike, or the same number written two ways, as the statistics read a cell.
+    if str(code) == str(value):
+        return True
+    try:
+        return float(code) == float(value)
+    except ValueError:
+        return False
 
 
 def check_variable_maps(project: Project) -> list[Issue]:

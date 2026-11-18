@@ -66,11 +66,14 @@ def read(root: Path) -> pd.DataFrame:
         raise DataSourceError(message) from None
 
 
-def mapping(root: Path, dataset: str) -> dict[str, str]:
+def entries(root: Path) -> pd.DataFrame:
     table = read(root)
     # A table with other columns corrects nothing; check reports it.
-    if list(table.columns) != COLUMNS:
-        return {}
+    return table if list(table.columns) == COLUMNS else pd.DataFrame(columns=COLUMNS)
+
+
+def mapping(root: Path, dataset: str) -> dict[str, str]:
+    table = entries(root)
     rows = table[table["dataset"] == dataset]
     return dict(zip(rows["from"], rows["to"], strict=True))
 

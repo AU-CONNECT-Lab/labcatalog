@@ -237,3 +237,26 @@ def test_a_score_that_counts_missing_items_as_zero_fits_its_range(method, possib
     summary = summarize_score(loaded, score, compute_score(loaded, score))
     assert summary.possible_range == possible
     assert sum(count for _, _, count in summary.histogram) == summary.n_valid == 2
+
+
+def test_a_prorated_sum_of_items_with_other_ranges_fits_its_range():
+    score = ResolvedScore(
+        key="x.total@d",
+        instrument_id="x",
+        score_id="total",
+        dataset="d",
+        label="Total",
+        method="sum",
+        columns=["a", "b"],
+        reverse_columns=[],
+        reverse_bounds={},
+        valid_values={"a": [0.0, 1.0, 2.0, 3.0], "b": [1.0, 2.0, 3.0, 4.0, 5.0]},
+        reversed_in_data=False,
+        missing_rule="prorate",
+        min_valid=1,
+    )
+    # Only a, answered 0, prorates to 0, below the lowest sum of 1; only b, answered 5, to 10.
+    loaded = loaded_with(id=["A1", "A2", "A3"], a=["0", "", "1"], b=["", "5", "2"])
+    summary = summarize_score(loaded, score, compute_score(loaded, score))
+    assert summary.possible_range == (0, 10)
+    assert sum(count for _, _, count in summary.histogram) == summary.n_valid == 3

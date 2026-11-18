@@ -8,6 +8,7 @@ from labcatalog.gui import id_fix
 from labcatalog.gui.common import empty, note, panel
 from labcatalog.issues import Issue
 from labcatalog.pipeline import CatalogResult
+from labcatalog.sources import has_id
 
 # The problems one data file's IDs can have, in the order they are shown.
 CODES = {
@@ -39,11 +40,12 @@ def id_rows(result: CatalogResult) -> list[IdRow]:
     for issue in result.report.issues:
         if issue.code in CODES and "dataset" in issue.details:
             by_dataset.setdefault(issue.details["dataset"], []).append(issue)
-    corrections = id_map.read(result.project.root)
+    corrections = id_map.entries(result.project.root)
     found = []
     for name, loaded in result.datasets.items():
         ids = loaded.frame[loaded.id_column]
-        row = IdRow(name, loaded.config.study, loaded.config.modality, len(ids), ids.nunique())
+        people = int(ids[has_id(ids)].nunique())
+        row = IdRow(name, loaded.config.study, loaded.config.modality, len(ids), people)
         typed = loaded.original_ids if loaded.original_ids is not None else ids
         for issue in by_dataset.get(name, []):
             rows = issue.details.get("rows", [])

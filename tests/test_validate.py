@@ -67,6 +67,19 @@ def test_missing_code_that_is_also_a_response_option(mock_project):
     assert any(issue.location == "instruments/example_mood.yaml" for issue in issues)
 
 
+def test_a_missing_code_that_writes_an_option_another_way_collides(mock_project):
+    edit(
+        mock_project / "labcatalog.yaml",
+        "{code: -98, label: not applicable}",
+        "{code: 3.0, label: not applicable}",
+    )
+    issues = run_validate(mock_project)
+    assert codes(issues) == {"missing_code_collision"}
+    assert any(issue.location == "instruments/example_mood.yaml" for issue in issues)
+    # Fix takes out the code as labcatalog.yaml writes it.
+    assert {issue.details["value"] for issue in issues} == {"3.0"}
+
+
 def test_map_row_with_unknown_item_points_to_the_line(mock_project):
     edit(
         mock_project / "maps" / "parent_w1.csv",

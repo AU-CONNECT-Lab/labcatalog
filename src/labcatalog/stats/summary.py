@@ -298,6 +298,9 @@ def score_range(score: ResolvedScore, values: pd.Series) -> tuple[float, float]:
     if score.missing_rule == "zero":
         # A missing item counts as 0, which its options need not include.
         lows, highs = [min(low, 0) for low in lows], [max(high, 0) for high in highs]
+    if score.method == "sum" and score.missing_rule == "prorate":
+        # A prorated sum is k times the mean of whichever items were answered.
+        return len(lows) * min(lows), len(highs) * max(highs)
     if score.method == "sum":
         return sum(lows), sum(highs)
     return min(lows), max(highs)

@@ -6,9 +6,12 @@ import pandas as pd
 from scipy import stats
 
 from labcatalog import defaults
-from labcatalog.data.resolve import ResolvedVariable, numbers_in_range
+from labcatalog.config import missing_labels_for
+from labcatalog.data.resolve import ResolvedVariable
 from labcatalog.pipeline import CatalogResult
+from labcatalog.sources import LoadedDataset
 from labcatalog.stats.link import Links, link
+from labcatalog.stats.summary import valid_answers
 
 NUMBER = "number"
 CHOICE = "choice"
@@ -210,27 +213,30 @@ def from_roster(result: CatalogResult, variable: ResolvedVariable) -> bool:
     return roster is not None and roster.instrument == variable.instrument_id
 
 
-def roster_numbers(result: CatalogResult, dataset: str, column: str) -> pd.Series:
+def roster_numbers(result: CatalogResult, dataset: str, numbers: pd.Series) -> pd.Series:
     # Each row's value in its study's roster, found by its ID; someone listed twice has none.
     loaded = result.datasets[dataset]
     roster = result.rosters[loaded.config.study]
     ids = roster.frame[roster.id_column]
     once = (~ids.duplicated(keep=False)).to_numpy()
-    table = pd.Series(roster.numbers(column).to_numpy()[once], index=ids[once])
+    table = pd.Series(numbers.to_numpy()[once], index=ids[once])
     found = table.reindex(loaded.frame[loaded.id_column]).to_numpy()
     return pd.Series(found, index=loaded.frame.index)
 
 
+def answer_numbers(
+    result: CatalogResult, loaded: LoadedDataset, variable: ResolvedVariable
+) -> pd.Series:
+    # Only answers that count, as the summary counts them: no missing code, an option or in range.
+    labels = missing_labels_for(result.project.config, loaded.config)
+    return loaded.numbers(variable.column).where(valid_answers(loaded, variable, labels))
+
+
 def item_numbers(result: CatalogResult, variable: ResolvedVariable) -> pd.Series:
-    # Only answers that count: a listed option, or a number within the item's range.
-    numbers = (
-        roster_numbers(result, variable.dataset, variable.column)
-        if from_roster(result, variable)
-        else result.datasets[variable.dataset].numbers(variable.column)
-    )
-    if variable.type == CHOICE:
-        return numbers.where(numbers.isin([float(o.value) for o in variable.response_options]))
-    return numbers.where(numbers_in_range(numbers, variable))
+    if from_roster(result, variable):
+        roster = result.rosters[variable.study]
+        return roster_numbers(result, variable.dataset, answer_numbers(result, roster, variable))
+    return answer_numbers(result, result.datasets[variable.dataset], variable)
 
 
 def number_items(result: CatalogResult, datasets: list[str]) -> list[ResolvedVariable]:

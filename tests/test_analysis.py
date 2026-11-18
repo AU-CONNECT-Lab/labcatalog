@@ -99,6 +99,28 @@ def test_the_summary_pairs_siblings_like_the_sample(siblings):
     assert fit.correlation.n == wave.n[i][j]
 
 
+def test_a_number_item_without_a_range_leaves_out_missing_codes(mock_project):
+    instrument = mock_project / "instruments" / "example_demographics.yaml"
+    text = instrument.read_text(encoding="utf-8")
+    assert "type: number, min: 1, max: 15}" in text
+    instrument.write_text(
+        text.replace("type: number, min: 1, max: 15}", "type: number}"), encoding="utf-8"
+    )
+    path = mock_project / "data" / "parent_w2.csv"
+    data = pd.read_csv(path, dtype=str, keep_default_na=False)
+    data.loc[[0, 1], "dem_household_w2"] = ["-99", "-99.0"]
+    data.to_csv(path, index=False)
+    result = run_catalog(mock_project)
+    [household] = [
+        v for v in result.catalog.variables_for("parent_w2") if v.item_id == "dem_household"
+    ]
+    values = analysis.item_numbers(result, household)
+    assert values.iloc[:2].isna().all()
+    summary = next(v for v in result.summary.variables if v.column == "dem_household_w2")
+    assert values.notna().sum() == summary.n_valid
+    assert values.mean() == pytest.approx(summary.mean)
+
+
 def test_the_correlation_table_reads_like_apa(result):
     sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
     frame = analysis.table(result, sample, [EMS, EPS])

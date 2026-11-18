@@ -27,6 +27,7 @@ from labcatalog.pipeline import CatalogResult
 from labcatalog.project import Project
 from labcatalog.reports.results import bounded, number
 from labcatalog.schema import SCRIPT, Instrument
+from labcatalog.sources import has_id
 from labcatalog.version import __version__
 
 CODEBOOK = "codebook.docx"
@@ -240,6 +241,7 @@ def rosters_table(result: CatalogResult, rosters: Sequence[str]) -> Table:
     for study in rosters:
         roster = config.studies[study].roster
         loaded = result.rosters[study]
+        ids = loaded.frame[loaded.id_column]
         keys = [
             f"ID {loaded.id_column}",
             *([f"group {roster.group_column}"] if roster.group_column else []),
@@ -250,7 +252,7 @@ def rosters_table(result: CatalogResult, rosters: Sequence[str]) -> Table:
                 roster_name(study),
                 config.studies[study].label or study,
                 str(len(loaded.frame)),
-                str(loaded.frame[loaded.id_column].nunique()),
+                str(ids[has_id(ids)].nunique()),
                 ", ".join(keys),
                 abbreviations(result)[roster.instrument],
             ]
