@@ -1,3 +1,5 @@
+import yaml
+
 from labcatalog.metadata import editing, fields, forms
 from labcatalog.metadata.validate import validate_project
 from labcatalog.project import load_project
@@ -63,6 +65,23 @@ def test_a_dataset_field_sits_on_each_datasets_line_and_takes_new_values(mock_pr
         "snapshot_date: 2026-10-10}", "snapshot_date: 2026-10-10, custom: {site: Emory}}", 1
     )
     assert editing.new_tags(mock_project, typed) == {"site": ["Emory"]}
+
+
+def test_a_new_tag_written_as_a_number_or_a_yes_or_no_word_is_declared_as_text(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8").replace(
+        "custom_fields:\n",
+        "custom_fields:\n  - {name: site, applies_to: dataset, type: choice, choices: [Auburn]}\n",
+        1,
+    )
+    config.write_text(text, encoding="utf-8")
+    typed = text.replace(
+        "snapshot_date: 2026-10-10}", "snapshot_date: 2026-10-10, custom: {site: 3}}", 1
+    )
+    assert editing.new_tags(mock_project, typed) == {"site": ["3"]}
+    declared = editing.declare_tags(text, {"site": ["3", "no", "on"]})
+    [site] = [f for f in yaml.safe_load(declared)["custom_fields"] if f["name"] == "site"]
+    assert site["choices"] == ["Auburn", "3", "no", "on"]
 
 
 def test_an_option_renamed_in_place_is_found_and_a_removed_one_is_not():

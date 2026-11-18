@@ -24,7 +24,10 @@ FILES = "FILES_RULE"
 """
 PYTHON_PERSON_FILES = """\
 def person_files(folder: Path) -> list[tuple[str, Path]]:
-    pattern = re.escape(FILES).replace(r"\\*", "[^/]*").replace(r"\\{id\\}", "(?P<id>[^/]+)")
+    # FILES as labcatalog reads it: **/ for any folders, * for part of a name, ? for a character.
+    wildcards = {"{id}": "(?P<id>[^/]+)", "**/": "(?:.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]"}
+    parts = re.split(r"(\\{id\\}|\\*\\*/|\\*\\*|\\*|\\?)", FILES)
+    pattern = "".join(wildcards.get(part, re.escape(part)) for part in parts)
     found = []
     for path in sorted(p for p in folder.rglob("*") if p.is_file()):
         if match := re.fullmatch(pattern, path.relative_to(folder).as_posix()):
@@ -37,11 +40,14 @@ FILES <- "FILES_RULE"
 """
 R_PERSON_FILES = """\
 person_files <- function(folder) {
-  pattern <- gsub("([][.+?^$()|\\\\\\\\])", "\\\\\\\\\\\\1", FILES, perl = TRUE)
-  pattern <- gsub("*", "[^/]*", pattern, fixed = TRUE)
-  pattern <- sub("{id}", "([^/]+)", pattern, fixed = TRUE)
+  # FILES as labcatalog reads it: **/ for any folders, * for part of a name, ? for a character.
+  wildcards <- c("{id}" = "([^/]+)", "**/" = "(?:.*/)?", "**" = ".*", "*" = "[^/]*", "?" = "[^/]")
+  split <- "\\\\{id\\\\}|\\\\*\\\\*/|\\\\*\\\\*|\\\\*|\\\\?|[^*?{]+|\\\\{"
+  parts <- regmatches(FILES, gregexpr(split, FILES, perl = TRUE))[[1]]
+  plain <- gsub("([][{}.+?*^$()|\\\\\\\\])", "\\\\\\\\\\\\1", parts, perl = TRUE)
+  pattern <- paste(ifelse(parts %in% names(wildcards), wildcards[parts], plain), collapse = "")
   paths <- list.files(folder, recursive = TRUE)
-  found <- regmatches(paths, regexec(paste0("^", pattern, "$"), paths))
+  found <- regmatches(paths, regexec(paste0("^", pattern, "$"), paths, perl = TRUE))
   found <- Filter(length, found)
   data.frame(id = vapply(found, `[`, "", 2),
              path = file.path(folder, vapply(found, `[`, "", 1)))
@@ -78,7 +84,9 @@ def clean(raw: pd.DataFrame) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    clean(pd.read_csv(sys.argv[1])).to_csv(sys.argv[2], index=False)
+    # Every cell as text, as labcatalog reads it, so IDs keep their zeros and blanks stay blank.
+    raw = pd.read_csv(sys.argv[1], dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    clean(raw).to_csv(sys.argv[2], index=False)
 """,
     ("clean", "r"): """\
 clean <- function(raw) {
@@ -88,7 +96,10 @@ clean <- function(raw) {
 }
 
 args <- commandArgs(trailingOnly = TRUE)
-write.csv(clean(read.csv(args[1])), args[2], row.names = FALSE)
+# Every cell as text, as labcatalog reads it, so IDs keep their zeros and blanks stay blank.
+raw <- read.csv(args[1], colClasses = "character", check.names = FALSE,
+                na.strings = character(), fileEncoding = "UTF-8-BOM")
+write.csv(clean(raw), args[2], row.names = FALSE, na = "")
 """,
     ("extract", "python"): """\
 import re
@@ -119,9 +130,9 @@ if __name__ == "__main__":
 args <- commandArgs(trailingOnly = TRUE)
 files <- person_files(args[1])
 rows <- lapply(seq_len(nrow(files)), function(i) {
-  as.data.frame(c(list(ID_COLUMN = files$id[i]), features(files$path[i])))
+  as.data.frame(c(list(ID_COLUMN = files$id[i]), features(files$path[i])), check.names = FALSE)
 })
-write.csv(do.call(rbind, rows), args[2], row.names = FALSE)
+write.csv(do.call(rbind, rows), args[2], row.names = FALSE, na = "")
 """,
     ("process", "python"): """\
 import re

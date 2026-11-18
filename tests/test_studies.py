@@ -1,4 +1,7 @@
 import difflib
+import shutil
+import stat
+import sys
 from datetime import date
 
 import pytest
@@ -167,6 +170,37 @@ def test_renaming_a_study_follows_it_into_every_file(mock_project):
     assert after.studies["family_study"].methods
     with pytest.raises(EditError, match="already exists"):
         studies.rename_study(after, "family_study", "family_study")
+
+
+def test_a_change_is_checked_with_the_references_on_a_shared_drive(mock_project, tmp_path):
+    shared = tmp_path / "shared"
+    shutil.copytree(mock_project / "references", shared)
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    config.write_text(text.replace("  root: references", f"  root: {shared.as_posix()}"), "utf-8")
+    project = load_project(mock_project)
+    assert changes.check(project, studies.new_study(project, "pilot", "Pilot")) == []
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="only Windows keeps a read-only file")
+def test_a_save_another_program_stops_halfway_leaves_every_file_as_it_was(mock_project):
+    project = load_project(mock_project)
+    found = studies.rename_study(project, "mock_study", "family_study")
+    files = ["labcatalog.yaml", "maps/roster_mock_study.csv", "studies/mock_study.yaml"]
+    before = {name: (mock_project / name).read_bytes() for name in files}
+    # The last file to go cannot be removed, as when Excel or a sync tool holds it.
+    locked = mock_project / "studies" / "mock_study.yaml"
+    locked.chmod(stat.S_IREAD)
+    try:
+        with pytest.raises(EditError, match="every file was left as it was"):
+            changes.write(project, found)
+    finally:
+        locked.chmod(stat.S_IREAD | stat.S_IWRITE)
+    assert {name: (mock_project / name).read_bytes() for name in files} == before
+    assert not (mock_project / "studies" / "family_study.yaml").exists()
+    assert not (mock_project / "maps" / "roster_family_study.csv").exists()
+    assert not list(mock_project.rglob("*.partial"))
+    assert list(load_project(mock_project).config.studies) == ["mock_study"]
 
 
 def test_deleting_a_new_study_leaves_the_file_as_it_was(mock_project):

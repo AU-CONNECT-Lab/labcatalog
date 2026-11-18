@@ -1,6 +1,8 @@
+import os
 import re
 import shutil
 import tempfile
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,7 +53,8 @@ def copy_issues(project: Project, found: list[Change]) -> list[Issue]:
             if (project.root / folder).is_dir():
                 shutil.copytree(project.root / folder, root / folder)
         bib = references_root(project.config, project.root) / defaults.BIB_FILENAME
-        if bib.is_file():
+        # A bib outside the project, such as on a shared drive, is read where it is.
+        if bib.is_file() and bib.resolve().is_relative_to(project.root.resolve()):
             target = references_root(project.config, root) / defaults.BIB_FILENAME
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(bib, target)
@@ -79,12 +82,38 @@ def write(project: Project, found: list[Change]) -> None:
                 raise EditError(f"{change.path} changed on disk meanwhile; start again")
         elif (project.root / change.path).exists():
             raise EditError(f"{change.path} already exists")
-    for change in found:
-        if change.removed:
-            (project.root / change.path).unlink()
-        elif change.opened is not None:
-            editing.save_file(project.root, change.opened, change.text)
-        else:
+    # All or nothing: each text is written beside its file, and swapped in once all are written.
+    staged: dict[str, Path] = {}
+    done: list[tuple[Path, bytes | None]] = []
+    try:
+        for change in found:
+            if change.removed:
+                continue
             path = project.root / change.path
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(change.text, encoding="utf-8", newline="\n")
+            data = (
+                editing.saved_bytes(path, change.text)
+                if change.opened is not None
+                else change.text.encode("utf-8")
+            )
+            staged[change.path] = path.with_name(f"{path.name}.{uuid.uuid4().hex[:8]}.partial")
+            staged[change.path].write_bytes(data)
+        for change in found:
+            path = project.root / change.path
+            before = path.read_bytes() if path.exists() else None
+            if change.removed:
+                path.unlink()
+            else:
+                os.replace(staged[change.path], path)
+            done.append((path, before))
+    except OSError as err:
+        for path, before in reversed(done):
+            if before is None:
+                path.unlink()
+            else:
+                path.write_bytes(before)
+        message = f"{change.path} could not be written ({err}); every file was left as it was"
+        raise EditError(message) from err
+    finally:
+        for partial in staged.values():
+            partial.unlink(missing_ok=True)

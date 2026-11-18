@@ -99,8 +99,14 @@ def who(root: Path) -> str:
     if given := named():
         return given
     try:
+        # git gives the name in UTF-8, whatever the computer's own encoding.
         found = subprocess.run(
-            ["git", "config", "user.name"], cwd=root, capture_output=True, text=True, check=False
+            ["git", "config", "user.name"],
+            cwd=root,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
         ).stdout.strip()
     except OSError:
         found = ""

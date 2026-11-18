@@ -1,3 +1,5 @@
+import subprocess
+
 from labcatalog import defaults
 from labcatalog.metadata import accepted
 from labcatalog.pipeline import run_check, run_validate
@@ -13,6 +15,13 @@ def test_an_accepted_warning_is_hidden_until_withdrawn(mock_project):
     assert entry.reason.startswith("Checked") and entry.by
     accepted.withdraw(mock_project, warning)
     assert warning in run_check(mock_project).issues
+
+
+def test_the_git_name_of_whoever_accepts_is_read_as_utf8(tmp_path):
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    name = "Jörg Müller 张三"
+    subprocess.run(["git", "-C", str(tmp_path), "config", "--local", "user.name", name], check=True)
+    assert accepted.who(tmp_path) == name
 
 
 def test_errors_are_never_hidden(mock_project):

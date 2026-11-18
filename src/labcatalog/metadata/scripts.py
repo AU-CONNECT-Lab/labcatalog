@@ -42,8 +42,9 @@ LANGUAGES = {
         "base R",
         "commandArgs(trailingOnly = TRUE)",
         "args <- commandArgs(trailingOnly = TRUE)\n"
-        "data <- read.csv(args[1])\n\n"
-        "write.csv(data, args[2], row.names = FALSE)\n",
+        'data <- read.csv(args[1], colClasses = "character", check.names = FALSE,\n'
+        '                 na.strings = character(), fileEncoding = "UTF-8-BOM")\n\n'
+        'write.csv(data, args[2], row.names = FALSE, na = "")\n',
     ),
     "python": Language(
         "Python",
@@ -52,7 +53,7 @@ LANGUAGES = {
         "the Python standard library and pandas",
         "sys.argv",
         "import sys\n\nimport pandas as pd\n\n"
-        "data = pd.read_csv(sys.argv[1])\n\n"
+        'data = pd.read_csv(sys.argv[1], dtype=str, keep_default_na=False, encoding="utf-8-sig")\n\n'
         "data.to_csv(sys.argv[2], index=False)\n",
     ),
 }

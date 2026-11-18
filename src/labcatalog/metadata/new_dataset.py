@@ -464,6 +464,8 @@ def settings_change(
         step["run"] = placement.step.run
         step["inputs"] = flow_list(placement.step.inputs)
         step["outputs"] = flow_list(placement.step.outputs)
+        if placement.step.stage:
+            step["stage"] = placement.step.stage
         steps.insert(after + 1, step)
     return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
 

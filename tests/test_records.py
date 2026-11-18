@@ -275,3 +275,15 @@ def test_a_column_map_reads_and_writes_as_a_table():
     rows[0]["column"] = "id"
     written = records.write_rows(text, records.MAP, table, [rows[1], rows[0]])
     assert written == "column,instrument,item\nems_1_w1,example_mood,ems_1\nid,,\n"
+
+
+def test_a_column_maps_own_columns_are_kept_when_it_is_saved_as_a_table():
+    text = "column,note,instrument,item\npid,the ID,,\nems_1_w1,happy,example_mood,ems_1\n"
+    table = records.tables_for("maps/child_w1.csv", (), ["example_mood"])[records.MAP]
+    rows = records.read_rows(text, records.MAP, table)
+    rows[1]["item"] = "ems_2"
+    added = {records.ORIGIN: None, "column": "x", "instrument": "", "item": ""}
+    written = records.write_rows(text, records.MAP, table, [rows[1], rows[0], added])
+    assert written == (
+        "column,note,instrument,item\nems_1_w1,happy,example_mood,ems_2\npid,the ID,,\nx,,,\n"
+    )

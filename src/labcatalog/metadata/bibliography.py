@@ -26,8 +26,14 @@ def load_bibliography(path: Path, root: Path, issues: list[Issue]) -> Bibliograp
         return {}
     if not path.is_file():
         return {}
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        message = "not UTF-8; export it from the reference manager as UTF-8"
+        issues.append(Issue(level="error", code="bib_encoding", message=message, location=location))
+        return {}
     # No parse stack: @string macros and # joins are evaluated below, the way BibTeX does.
-    library = bibtexparser.parse_string(path.read_text(encoding="utf-8-sig"), parse_stack=[])
+    library = bibtexparser.parse_string(text, parse_stack=[])
     issues.extend(block_issue(block, location) for block in library.failed_blocks)
     strings = {s.key.lower(): s.value for s in library.strings}
     for entry in library.entries:
@@ -145,7 +151,8 @@ def short_authors(field: str) -> str:
 
 
 def last_name(name: str) -> str:
-    parts = parse_single_name_into_parts(name)
+    # Only shown, so a name with a stray comma or brace is read as best it can be.
+    parts = parse_single_name_into_parts(name, strict=False)
     return unbrace(" ".join(parts.von + parts.last))
 
 

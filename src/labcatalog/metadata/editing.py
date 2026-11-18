@@ -78,8 +78,11 @@ def custom_fields(root: Path) -> list[CustomFieldDef]:
 
 def open_file(root: Path, relative: str) -> Opened:
     path = root / relative
-    # Editors show one kind of line ending; saving puts the file's own back.
-    text = path.read_bytes().decode("utf-8-sig").replace("\r\n", "\n")
+    try:
+        # Editors show one kind of line ending; saving puts the file's own back.
+        text = path.read_bytes().decode("utf-8-sig").replace("\r\n", "\n")
+    except UnicodeDecodeError:
+        raise EditError(f"{relative} is not UTF-8; save it as UTF-8 to edit it here") from None
     return Opened(relative, text, path.stat().st_mtime_ns)
 
 
@@ -106,11 +109,15 @@ def save_file(root: Path, opened: Opened, text: str) -> Opened:
         raise EditError(
             f"{opened.path} changed on disk after you opened it; reload it to see the change"
         )
+    path.write_bytes(saved_bytes(path, text))
+    return Opened(opened.path, text, path.stat().st_mtime_ns)
+
+
+def saved_bytes(path: Path, text: str) -> bytes:
     newline = "\r\n" if b"\r\n" in path.read_bytes() else "\n"
     # The editor drops the last line break; every file ends with one.
     body = text.replace("\r\n", "\n").rstrip("\n") + "\n"
-    path.write_bytes(body.replace("\n", newline).encode("utf-8"))
-    return Opened(opened.path, text, path.stat().st_mtime_ns)
+    return body.replace("\n", newline).encode("utf-8")
 
 
 def save_freed(root: Path, freed: list[FreedParameter]) -> None:
@@ -238,9 +245,11 @@ def new_tags(root: Path, text: str) -> dict[str, list[str]]:
         for name, value in (block or {}).items():
             if name not in fields:
                 continue
-            for tag in [value] if isinstance(value, str) else value or []:
+            # One value, such as a number, is a tag of its own, as a list holds several.
+            values = value if isinstance(value, list) else [] if value is None else [value]
+            for tag in map(str, values):
                 if tag not in fields[name].choices and tag not in found.get(name, []):
-                    found.setdefault(name, []).append(str(tag))
+                    found.setdefault(name, []).append(tag)
     return found
 
 
@@ -248,7 +257,7 @@ def declare_tags(config_text: str, tags: dict[str, list[str]]) -> str:
     data = records.load(config_text)
     for field in data.get("custom_fields") or []:
         if field.get("name") in tags:
-            field["choices"].extend(tags[field["name"]])
+            field["choices"].extend(records.as_text(t) for t in tags[field["name"]])
     out = io.StringIO()
     records.round_trip().dump(data, out)
     return out.getvalue()

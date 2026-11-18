@@ -19,6 +19,7 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 | `missing` | error | A required key is missing: "required but missing". |
 | other type codes | error | A value of the wrong type, such as `literal_error` (not one of the allowed words), `string_type`, `list_type`, `bool_parsing` or `date_from_datetime_parsing`. The message names the key and what was expected. |
 | `map_encoding` | error | A column map is not UTF-8; in Excel, save it as "CSV UTF-8". |
+| `bib_encoding` | error | `references.bib` is not UTF-8; export it from the reference manager as UTF-8. |
 | `map_header` | error | A column map's header lacks `column`, `instrument` or `item`. |
 | `map_row` | error | A row of a column map has an instrument without an item or the other way round, or no column. |
 | `bib_syntax` | error | An entry in `references.bib` cannot be read. |

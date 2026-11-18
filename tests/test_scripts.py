@@ -23,6 +23,7 @@ from labcatalog.metadata.scripts import (
 )
 from labcatalog.metadata.stage_scripts import EACH_FILE, stage_script
 from labcatalog.project import load_project
+from labcatalog.sources.folder_source import file_pattern
 
 
 def bids_folder(root: Path) -> str:
@@ -80,6 +81,55 @@ def test_a_process_script_runs_on_each_persons_recordings_in_every_session(mock_
         for person in ("1001C", "1002C")
         for session in ("1", "2")
     ]
+
+
+@pytest.mark.parametrize("language", ["python", "r"])
+def test_an_extract_script_reads_its_rule_as_labcatalog_does(mock_project, language):
+    command = [sys.executable] if language == "python" else [rscript()]
+    if command[0] is None:
+        pytest.skip("R is not installed")
+    folder = mock_project / "derivatives" / "edf"
+    names = ["sub-1001C/eeg.edf", "sub-1002C/ses-1/eeg.edf", "sub-1003C/a/b/eeg.edf"]
+    for name in [*names, "sub-1004C/xeeg.edf", "sub-1005C/eeg.edf.bak"]:
+        (folder / name).parent.mkdir(parents=True, exist_ok=True)
+        (folder / name).write_text("x\n", encoding="utf-8")
+    rule = "sub-{id}/**/?eg.edf"
+    counted = sorted(
+        m["id"]
+        for p in folder.rglob("*")
+        if p.is_file() and (m := file_pattern(rule).fullmatch(p.relative_to(folder).as_posix()))
+    )
+    assert counted == ["1001C", "1002C", "1003C"]
+    project = load_project(mock_project)
+    made = stage_script(project, "extract", language, "derivatives/edf", dataset="eeg_w1")
+    assign = "FILES = " if language == "python" else "FILES <- "
+    line = next(x for x in made.text.splitlines() if x.startswith(assign))
+    script = mock_project / f"extract{'.py' if language == 'python' else '.R'}"
+    script.write_text(made.text.replace(line, f'{assign}"{rule}"'), encoding="utf-8")
+    out = mock_project / "out.csv"
+    subprocess.run([*command, script, folder, out], check=True)
+    assert sorted(pd.read_csv(out)["pid"]) == counted
+
+
+@pytest.mark.parametrize("language", ["python", "r"])
+def test_a_clean_script_left_as_it_is_writes_the_export_back_unchanged(mock_project, language):
+    command = [sys.executable] if language == "python" else [rscript()]
+    if command[0] is None:
+        pytest.skip("R is not installed")
+    project = load_project(mock_project)
+    changes.write(project, [remove_step_change(project, "clean_parent_w1")])
+    project = load_project(mock_project)
+    raw = mock_project / "raw" / "odd_export.csv"
+    raw.parent.mkdir(exist_ok=True)
+    text = "pid,Duration (in seconds),3rd,answer\n0012,30,,None\n0101,,2,NA\n"
+    raw.write_text(text, encoding="utf-8")
+    made = stage_script(project, "clean", language, "raw/odd_export.csv", dataset="parent_w1")
+    script = mock_project / f"clean{'.py' if language == 'python' else '.R'}"
+    script.write_text(made.text, encoding="utf-8")
+    out = mock_project / "out.csv"
+    subprocess.run([*command, script, raw, out], check=True)
+    written = out.read_text(encoding="utf-8").replace('"', "")
+    assert written.splitlines() == text.splitlines()
 
 
 def test_an_extract_script_takes_a_file_per_person_when_the_folder_says_nothing(mock_project):

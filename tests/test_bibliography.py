@@ -2,13 +2,14 @@ from pathlib import Path
 
 import pytest
 
-from labcatalog.exceptions import MetadataError
+from labcatalog.exceptions import EditError, MetadataError
 from labcatalog.metadata.bibliography import (
     add_entries,
     citation,
     load_bibliography,
     pasted_entries,
 )
+from labcatalog.metadata.editing import open_file
 from labcatalog.project import load_project
 
 BIB = r"""
@@ -91,6 +92,31 @@ def test_a_broken_bib_stops_the_project_from_loading(mock_project):
     [issue] = err.value.issues
     assert issue.code == "bib_syntax"
     assert issue.location.startswith("references/references.bib:")
+
+
+def test_a_bib_not_saved_as_utf8_is_reported_and_cannot_be_opened_as_text(mock_project):
+    bib = mock_project / "references" / "references.bib"
+    with bib.open("a", encoding="cp1252") as file:
+        file.write(
+            "\n@article{mueller2020, author = {Müller, Jörg}, title = {Größe}, year = 2020}\n"
+        )
+    with pytest.raises(MetadataError) as err:
+        load_project(mock_project)
+    [issue] = err.value.issues
+    assert (issue.code, issue.level) == ("bib_encoding", "error")
+    with pytest.raises(EditError, match="is not UTF-8"):
+        open_file(mock_project, "references/references.bib")
+
+
+def test_names_with_a_stray_comma_or_brace_are_cited_as_best_they_can_be(tmp_path):
+    authors = ["Smith, John,", "Smith, John, Jr., III", "{World Health Organization", "Doe, Jane"]
+    text = "".join(
+        f"@article{{a{n}, author = {{{name}}}, title = {{T}}, year = 2020}}\n"
+        for n, name in enumerate(authors)
+    )
+    found, issues = load(tmp_path, text)
+    for key in found:
+        assert "2020" in citation(found, key)
 
 
 PASTED = """@article{smith2020,

@@ -343,10 +343,18 @@ def cells(entry: CommentedMap, columns: Iterable[Column], key: str) -> dict[str,
 
 def write_rows(text: str, key: str, table: Table, rows: list[dict]) -> str:
     if table.csv:
+        # A lab's own columns keep their place and values; a new row leaves them empty.
+        before = csv.DictReader(io.StringIO(text))
+        old = list(before)
+        names = [c.key for c in table.columns]
+        header = list(dict.fromkeys([*(before.fieldnames or []), *names]))
         out = io.StringIO()
         writer = csv.writer(out, lineterminator="\n")
-        writer.writerow([c.key for c in table.columns])
-        writer.writerows([[row.get(c.key) or "" for c in table.columns] for row in rows])
+        writer.writerow(header)
+        for row in rows:
+            origin = row.get(ORIGIN)
+            kept = old[origin] if isinstance(origin, int) and origin < len(old) else {}
+            writer.writerow([(row if k in names else kept).get(k) or "" for k in header])
         return out.getvalue()
     loader = round_trip()
     data = loader.load(text) or CommentedMap()

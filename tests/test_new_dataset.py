@@ -90,7 +90,8 @@ def test_a_new_wave_follows_its_template_into_every_file(project_root, export):
     assert "4" in after.config.studies["mock_study"].waves
     added = next(d for d in after.config.datasets if d.name == "child_w4")
     assert (added.wave, added.reporter, added.path) == ("4", "child", "data/child_w4.csv")
-    assert any(s.name == "clean_child_w4" for s in after.config.prepare)
+    [step] = [s for s in after.config.prepare if s.name == "clean_child_w4"]
+    assert step.stage == "clean"
     mood = next(
         a for a in after.studies["mock_study"].administrations if a.instrument == "example_mood"
     )
