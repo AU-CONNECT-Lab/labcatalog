@@ -8,7 +8,6 @@ from labcatalog.issues import Issue
 from labcatalog.metadata.completeness import gaps
 from labcatalog.project import Project
 from labcatalog.schema import Instrument
-from labcatalog.stats.summary import wave_order
 
 EVERY_WAVE = "every wave"
 COMPLETE = "complete"
@@ -398,7 +397,7 @@ def facet(config: ProjectConfig, name: str, rows: list[dict[str, set[str]]]) -> 
         labels = {
             wave_key(s, wave): f"{study.label or s}: {wave}" if several else wave
             for s, study in config.studies.items()
-            for wave in sorted(study.waves, key=wave_order)
+            for wave in study.waves
         }
     elif name == "modality":
         labels = {v: config.vocab.modality_label(v) for v in config.vocab.modalities}

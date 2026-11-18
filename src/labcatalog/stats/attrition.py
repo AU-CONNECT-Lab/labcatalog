@@ -196,8 +196,9 @@ class Compared:
 
 
 def next_wave(result: CatalogResult, study: str, wave: str) -> str | None:
+    config = result.project.config
     waves = sorted(
-        {d.wave for d in result.project.config.datasets if d.study == study}, key=wave_order
+        {d.wave for d in config.datasets if d.study == study}, key=wave_order(config, study)
     )
     later = waves[waves.index(wave) + 1 :]
     return later[0] if later else None

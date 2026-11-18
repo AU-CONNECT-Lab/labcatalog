@@ -1,5 +1,6 @@
 import pandas as pd
 import pytest
+from conftest import NAMED_WAVES, name_waves
 
 from labcatalog.config import DatasetConfig, MissingCode, ProjectConfig
 from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, resolve_catalog
@@ -17,6 +18,7 @@ from labcatalog.stats.summary import (
     summarize_dataset,
     summarize_score,
     summarize_variable,
+    wave_order,
 )
 
 REFUSED = ProjectConfig(
@@ -206,9 +208,10 @@ def test_rows_without_an_id_are_nobody():
     }
     empty = Catalog(variables=[], scores=[])
     assert [summarize_dataset(d, empty, [], REFUSED).n_ids for d in datasets.values()] == [2, 2]
-    kept = [(r.wave, r.n, r.n_from_previous, r.n_new) for r in retention(datasets)]
+    config = ProjectConfig(project={"name": "p"}, studies={"s": {}})
+    kept = [(r.wave, r.n, r.n_from_previous, r.n_new) for r in retention(datasets, config)]
     assert kept == [("1", 2, None, None), ("2", 2, 1, 1)]
-    counted = [(m.wave, m.n, m.n_from_previous) for m in modality_counts(datasets)]
+    counted = [(m.wave, m.n, m.n_from_previous) for m in modality_counts(datasets, config)]
     assert counted == [("1", 2, None), ("2", 2, 1)]
     rows = link(datasets, ["d1", "d2"], "id").rows
     assert (rows["d1"].to_dict(), rows["d2"].to_dict()) == ({"A1": 0, "A3": 2}, {"A1": 0, "A4": 2})
@@ -260,3 +263,32 @@ def test_a_prorated_sum_of_items_with_other_ranges_fits_its_range():
     summary = summarize_score(loaded, score, compute_score(loaded, score))
     assert summary.possible_range == (0, 10)
     assert sum(count for _, _, count in summary.histogram) == summary.n_valid == 3
+
+
+def test_waves_follow_the_order_the_study_writes_them(mock_project):
+    before = summary_for(mock_project)
+    name_waves(mock_project)
+    after = summary_for(mock_project)
+    named = NAMED_WAVES.get
+    assert [(r.reporter, r.wave, r.n, r.n_from_previous) for r in after.retention] == [
+        (r.reporter, named(r.wave), r.n, r.n_from_previous) for r in before.retention
+    ]
+    assert [(m.modality, m.wave, m.previous_wave, m.n_new) for m in after.modalities] == [
+        (m.modality, named(m.wave), named(m.previous_wave), m.n_new) for m in before.modalities
+    ]
+    assert [(s.score_id, s.from_wave, s.to_wave, s.r) for s in after.stability] == [
+        (s.score_id, named(s.from_wave), named(s.to_wave), s.r) for s in before.stability
+    ]
+    assert [(r.score_id, r.wave, r.mean) for r in after.retained] == [
+        (r.score_id, named(r.wave), r.mean) for r in before.retained
+    ]
+    assert [g.wave for g in after.groups] == ["baseline", "6m", "12m"]
+    assert [c.wave for c in after.correlations] == [named(c.wave) for c in before.correlations]
+
+
+def test_waves_the_study_does_not_list_come_last_by_name():
+    config = ProjectConfig(
+        project={"name": "p"}, studies={"s": {"waves": {"T1": {}, "T2": {}, "T10": {}}}}
+    )
+    waves = ["x", "T10", "11", "T2", "3", "T1"]
+    assert sorted(waves, key=wave_order(config, "s")) == ["T1", "T2", "T10", "3", "11", "x"]

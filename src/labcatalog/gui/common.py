@@ -193,8 +193,8 @@ def unique(values: Iterable[str]) -> list[str]:
     return list(dict.fromkeys(values))
 
 
-def sorted_waves(waves: Iterable[str]) -> list[str]:
-    return sorted(set(waves), key=wave_order)
+def sorted_waves(config: ProjectConfig, study: str, waves: Iterable[str]) -> list[str]:
+    return sorted(set(waves), key=wave_order(config, study))
 
 
 def split_location(location: str) -> tuple[str, int | None]:

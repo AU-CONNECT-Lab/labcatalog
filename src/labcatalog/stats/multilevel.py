@@ -563,13 +563,19 @@ def outcome_choices(result: CatalogResult) -> dict[str, str]:
 
 
 def occasions(result: CatalogResult, outcome: str) -> list[str]:
-    configs = {d.name: d for d in result.project.config.datasets}
+    config = result.project.config
+    configs = {d.name: d for d in config.datasets}
     if outcome.startswith(ITEM_PREFIX):
         keys = [item_key(v) for v in analysis.number_items(result, loaded_names(result))]
     else:
         keys = [s.key for s in result.catalog.scores]
     names = [k.rsplit("@", 1)[1] for k in keys if k.rsplit("@", 1)[0] == outcome]
-    return sorted(names, key=lambda n: (configs[n].study, wave_order(configs[n].wave), n))
+
+    def rank(name: str) -> tuple:
+        d = configs[name]
+        return (d.study, wave_order(config, d.study)(d.wave), name)
+
+    return sorted(names, key=rank)
 
 
 def default_model(result: CatalogResult, choices: list[str] | None = None) -> Model | None:
@@ -646,7 +652,8 @@ def covariate_choices(
 
 def pooled_covariates(result: CatalogResult, studies: list[str]) -> dict[str, str]:
     # One file per study: each study's first file of the covariate together, then the second.
-    configs = {d.name: d for d in result.project.config.datasets}
+    config = result.project.config
+    configs = {d.name: d for d in config.datasets}
     by_base: dict[str, dict[str, list[str]]] = {}
     for key in covariate_keys(result):
         base, name = key.rsplit("@", 1)
@@ -655,7 +662,10 @@ def pooled_covariates(result: CatalogResult, studies: list[str]) -> dict[str, st
     for base, held in by_base.items():
         if not all(s in held for s in studies):
             continue
-        files = [sorted(held[s], key=lambda n: wave_order(configs[n].wave)) for s in studies]
+        files = [
+            sorted(held[s], key=lambda n: wave_order(config, configs[n].study)(configs[n].wave))
+            for s in studies
+        ]
         for paired in zip(*files, strict=False):
             label = variable_label(result, f"{base}@{paired[0]}")
             found[f"{base}@{analysis.POOL.join(paired)}"] = f"{label} ({' + '.join(paired)})"
@@ -792,18 +802,19 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
         return pooled_frame(result, model, studies)
     configs = {d.name: d for d in result.project.config.datasets}
     occasional = model.time == OCCASIONS
+    study = studies[0]
+    by_wave = wave_order(result.project.config, study)
     # Occasions of one wave keep the order the project lists them in.
     order = list(configs)
-    ordered = sorted(model.datasets, key=lambda n: (wave_order(configs[n].wave), order.index(n)))
+    ordered = sorted(model.datasets, key=lambda n: (by_wave(configs[n].wave), order.index(n)))
     outcome = identifier(model.outcome.split(".", 1)[1], {PERSON, TIME, WAVE})
     group = group_name(result) if model.by_group else None
     # Occasions take no time column, so an occasion named time keeps its name.
     taken = {PERSON, WAVE, outcome, *([group] if group else []), *([] if occasional else [TIME])}
     factors = occasion_factors(configs, ordered, taken) if occasional else []
-    study = configs[ordered[0]].study
     covariates = [covariate(result, key, taken, study) for key in model.covariates]
     # Time counts the study's waves, so a skipped wave leaves a gap.
-    waves = sorted({d.wave for d in configs.values() if d.study == study}, key=wave_order)
+    waves = sorted({d.wave for d in configs.values() if d.study == study}, key=by_wave)
     first = waves.index(configs[ordered[0]].wave)
     dated = model.time not in (WAVES, OCCASIONS)
     origin = visit_dates(result, ordered[0]).min() if dated else None

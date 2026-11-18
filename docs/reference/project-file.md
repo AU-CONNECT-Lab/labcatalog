@@ -61,7 +61,7 @@ A mapping from each study's ID to:
 | `label` | text | How the study reads in the window. |
 | `description` | text | A sentence or two about the study, shown on the Datasets page. |
 | `reference` | text | The key in `references.bib` of how to cite the study's data. |
-| `waves` | mapping | Each wave's key to its `start` and `end` dates (both optional). |
+| `waves` | mapping | Each wave's key to its `start` and `end` dates (both optional). Pages, charts, retention and the analyses take the waves in the order they are written here. |
 | `milestones` | list | Dates to show on the Overview timeline, each with a `name` and a `date`. |
 | `roster` | mapping | The study's people, see below. |
 | `id_pattern` | text | A regular expression the study's IDs must match, in place of `ids.pattern`, for a study that writes its IDs another way. |

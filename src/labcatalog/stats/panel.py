@@ -165,7 +165,8 @@ def common_waves(
     found = [
         (configs[n].wave, n, by_wave[configs[n].wave]) for n in xs if configs[n].wave in by_wave
     ]
-    return sorted(found, key=lambda w: wave_order(w[0]))
+    order = wave_order(result.project.config, configs[xs[0]].study)
+    return sorted(found, key=lambda w: order(w[0]))
 
 
 def panel_studies(result: CatalogResult, x: str, y: str) -> list[str]:

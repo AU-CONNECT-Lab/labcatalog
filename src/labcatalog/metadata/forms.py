@@ -13,7 +13,6 @@ from labcatalog.metadata.bibliography import load_bibliography
 from labcatalog.metadata.completeness import QUESTIONNAIRE
 from labcatalog.metadata.records import Column, Table
 from labcatalog.project import bib_path, load_config
-from labcatalog.stats.summary import wave_order
 
 ABOUT = Table(
     "About",
@@ -190,11 +189,12 @@ def instrument_contents(root: Path) -> dict[str, CommentedMap]:
 def config_sections(config: ProjectConfig | None, tables: dict[str, Table]) -> list[Section]:
     options = {}
     if config:
-        waves = {w for study in config.studies.values() for w in study.waves}
+        # Each study's waves in the order it lists them.
+        waves = dict.fromkeys(w for study in config.studies.values() for w in study.waves)
         options = {
             "modality": tuple(config.vocab.modalities),
             "study": tuple(config.studies),
-            "wave": tuple(sorted(waves, key=wave_order)),
+            "wave": tuple(waves),
             "reporter": tuple(config.vocab.reporters),
         }
     # The lab's own fields for datasets sit on each dataset's line, after the built-in ones.

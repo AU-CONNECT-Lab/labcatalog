@@ -31,7 +31,7 @@ def placeholder_values(
 
     config = project.config.studies[study]
     rows = [r for r in summary.retention if r.study == study]
-    waves = sorted({r.wave for r in rows}, key=wave_order)
+    waves = sorted({r.wave for r in rows}, key=wave_order(project.config, study))
     described = []
     for wave in waves:
         dates = wave_dates(config.waves.get(wave, WaveConfig()))
@@ -72,19 +72,12 @@ def placeholder_values(
 
 
 def modality_rows(summary: Summary, study: str) -> list[tuple[str, str, list[ModalityCount]]]:
-    # Each modality and reporter of a study with its waves in order; none when it has one modality.
+    # Each modality and reporter of a study with its waves, which the summary keeps in order.
     found = [m for m in summary.modalities if m.study == study]
     if len({m.modality for m in found}) < 2:
         return []
     return [
-        (
-            modality,
-            reporter,
-            sorted(
-                (m for m in found if (m.modality, m.reporter) == (modality, reporter)),
-                key=lambda m: wave_order(m.wave),
-            ),
-        )
+        (modality, reporter, [m for m in found if (m.modality, m.reporter) == (modality, reporter)])
         for modality, reporter in dict.fromkeys((m.modality, m.reporter) for m in found)
     ]
 

@@ -4,7 +4,7 @@ from nicegui import ui
 
 from labcatalog.charts import views
 from labcatalog.gui import charts, theme
-from labcatalog.gui.common import panel, sorted_waves, unique
+from labcatalog.gui.common import panel, unique
 from labcatalog.metadata.completeness import gaps
 from labcatalog.pipeline import CatalogResult
 
@@ -35,7 +35,7 @@ def render(
     errors = sum(i.level == "error" for i in issues)
     warnings = sum(i.level == "warning" for i in issues)
     unfinished = sum(bool(gaps(i)) for i in result.project.instruments.values())
-    waves = sorted_waves(d.wave for d in config.datasets)
+    waves = unique(d.wave for d in config.datasets)
     reporters = unique(d.reporter for d in config.datasets)
     banner(result, on_map)
     with ui.grid(columns=4).classes("lc-lifted w-full gap-4"):

@@ -51,7 +51,9 @@ def render(
 
     @ui.refreshable
     def body() -> None:
-        waves = sorted_waves(d.wave for d in config.datasets if d.study == view.study)
+        waves = sorted_waves(
+            config, view.study, (d.wave for d in config.datasets if d.study == view.study)
+        )
         if view.wave not in waves:
             view.wave = waves[0]
         with page_head(
@@ -129,7 +131,9 @@ def modality_table(result: CatalogResult, study: str) -> tuple[list[dict], list[
     found = participants.modality_rows(result.summary, study)
     totals = participants.wave_totals(result.summary, study)
     several = len({reporter for _, reporter, _ in found}) > 1
-    waves = sorted_waves(m.wave for _, _, counted in found for m in counted)
+    waves = sorted_waves(
+        result.project.config, study, (m.wave for _, _, counted in found for m in counted)
+    )
     columns = [col("modality", "Modality")]
     if several:
         columns.append(col("reporter", "Reporter"))
@@ -159,7 +163,7 @@ def retention_table(result: CatalogResult, study: str) -> tuple[list[dict], list
     summary = result.summary
     rows = [r for r in summary.retention if r.study == study]
     reporters = unique(r.reporter for r in rows)
-    waves = sorted_waves(r.wave for r in rows)
+    waves = sorted_waves(result.project.config, study, (r.wave for r in rows))
     found = {(r.wave, r.reporter): r for r in rows}
     groups = {g.wave: g for g in summary.groups if g.study == study}
     group = summary.group_name

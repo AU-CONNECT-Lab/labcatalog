@@ -54,6 +54,19 @@ def mock_project(tmp_path: Path) -> Path:
     return root
 
 
+# The first study's waves by name, in an order their names do not sort into.
+NAMED_WAVES = {"1": "baseline", "2": "6m", "3": "12m"}
+
+
+def name_waves(root: Path) -> None:
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    for old, new in NAMED_WAVES.items():
+        text = text.replace(f"      {old}: {{start", f"      {new}: {{start")
+        text = text.replace(f"study: mock_study, wave: {old},", f"study: mock_study, wave: {new},")
+    config.write_text(text, encoding="utf-8")
+
+
 @pytest.fixture
 def pilot_project(mock_project: Path) -> Path:
     # A second study whose IDs repeat the first's: its own roster, and child_w1's file and map.

@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import date
 
 import numpy as np
@@ -178,15 +179,13 @@ def summarize(
         datasets=[
             summarize_dataset(loaded, catalog, variables, config) for loaded in datasets.values()
         ],
-        retention=retention(datasets),
-        modalities=modality_counts(datasets),
+        retention=retention(datasets, config),
+        modalities=modality_counts(datasets, config),
         group_name=config.ids.group.name if config.ids.group else None,
-        groups=wave_groups(datasets),
-        correlations=correlations(
-            catalog, datasets, scores, config.stats.correlate_by, config.stats.correlation
-        ),
-        stability=stability(by_wave, config.stats.correlation),
-        retained=retained(by_wave),
+        groups=wave_groups(datasets, config),
+        correlations=correlations(catalog, datasets, scores, config),
+        stability=stability(by_wave, config),
+        retained=retained(by_wave, config),
     )
 
 
@@ -445,7 +444,7 @@ def completeness(
     return rows
 
 
-def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
+def retention(datasets: dict[str, LoadedDataset], config: ProjectConfig) -> list[WaveRetention]:
     # Someone counts at a wave when any of that wave's files has them, whatever the modality.
     groups: dict[tuple[str, str], dict[str, set]] = {}
     for loaded in datasets.values():
@@ -454,7 +453,7 @@ def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
     rows = []
     for (study, reporter), waves in groups.items():
         previous: set[str] | None = None
-        for wave in sorted(waves, key=wave_order):
+        for wave in sorted(waves, key=wave_order(config, study)):
             ids = waves[wave]
             rows.append(
                 WaveRetention(
@@ -470,7 +469,9 @@ def retention(datasets: dict[str, LoadedDataset]) -> list[WaveRetention]:
     return rows
 
 
-def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
+def modality_counts(
+    datasets: dict[str, LoadedDataset], config: ProjectConfig
+) -> list[ModalityCount]:
     # Counted the way retention counts a wave, within each modality's files.
     found: dict[tuple[str, str, str], dict[str, set]] = {}
     for loaded in datasets.values():
@@ -482,7 +483,7 @@ def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
         # Returning counts against the last wave that collected this modality.
         previous: set | None = None
         previous_wave = None
-        for wave in sorted(waves, key=wave_order):
+        for wave in sorted(waves, key=wave_order(config, study)):
             ids = waves[wave]
             rows.append(
                 ModalityCount(
@@ -500,7 +501,7 @@ def modality_counts(datasets: dict[str, LoadedDataset]) -> list[ModalityCount]:
     return rows
 
 
-def wave_groups(datasets: dict[str, LoadedDataset]) -> list[WaveGroups]:
+def wave_groups(datasets: dict[str, LoadedDataset], config: ProjectConfig) -> list[WaveGroups]:
     waves: dict[tuple[str, str], dict[str, set[str]]] = {}
     for loaded in datasets.values():
         if loaded.group is None:
@@ -508,7 +509,8 @@ def wave_groups(datasets: dict[str, LoadedDataset]) -> list[WaveGroups]:
         reporters = waves.setdefault((loaded.config.study, loaded.config.wave), {})
         reporters.setdefault(loaded.config.reporter, set()).update(loaded.group.dropna())
     rows = []
-    for (study, wave), reporters in sorted(waves.items(), key=lambda kv: wave_order(kv[0][1])):
+    order = study_wave_order(config)
+    for (study, wave), reporters in sorted(waves.items(), key=lambda kv: order(kv[0])):
         sets = list(reporters.values())
         rows.append(
             WaveGroups(
@@ -525,19 +527,20 @@ def correlations(
     catalog: Catalog,
     datasets: dict[str, LoadedDataset],
     scores: dict[str, pd.DataFrame],
-    correlate_by: str,
-    method: str = "pearson",
+    config: ProjectConfig,
 ) -> list[Correlation]:
+    correlate_by = config.stats.correlate_by
     if correlate_by == "none":
         return []
     waves: dict[tuple[str, str], list[ResolvedScore]] = {}
     for score in catalog.scores:
         if scores[score.dataset][score.key].notna().sum() == 0:
             continue
-        config = datasets[score.dataset].config
-        waves.setdefault((config.study, config.wave), []).append(score)
+        c = datasets[score.dataset].config
+        waves.setdefault((c.study, c.wave), []).append(score)
     rows = []
-    for (study, wave), found in sorted(waves.items(), key=lambda kv: wave_order(kv[0][1])):
+    order = study_wave_order(config)
+    for (study, wave), found in sorted(waves.items(), key=lambda kv: order(kv[0])):
         if len(found) < 2:
             continue
         names = list(dict.fromkeys(s.dataset for s in found))
@@ -550,7 +553,7 @@ def correlations(
         table = pd.DataFrame(series)
         present = table.notna().astype(float)
         pairs = present.T @ present
-        matrix = table.corr(method=method, min_periods=defaults.MIN_CORRELATION_N)
+        matrix = table.corr(method=config.stats.correlation, min_periods=defaults.MIN_CORRELATION_N)
         rows.append(
             Correlation(
                 study=study,
@@ -586,15 +589,15 @@ def waves_of_scores(
 
 
 def stability(
-    found: dict[ScoreKey, dict[str, pd.Series]], method: str = "pearson"
+    found: dict[ScoreKey, dict[str, pd.Series]], config: ProjectConfig
 ) -> list[ScoreStability]:
     rows = []
     for (study, reporter, instrument_id, score_id), waves in found.items():
-        order = sorted(waves, key=wave_order)
+        order = sorted(waves, key=wave_order(config, study))
         for earlier, later in zip(order, order[1:], strict=False):
             both = pd.concat([waves[earlier], waves[later]], axis=1, join="inner")
             r = (
-                both.iloc[:, 0].corr(both.iloc[:, 1], method=method)
+                both.iloc[:, 0].corr(both.iloc[:, 1], method=config.stats.correlation)
                 if len(both) >= defaults.MIN_CORRELATION_N
                 else None
             )
@@ -613,13 +616,15 @@ def stability(
     return rows
 
 
-def retained(found: dict[ScoreKey, dict[str, pd.Series]]) -> list[RetainedScore]:
+def retained(
+    found: dict[ScoreKey, dict[str, pd.Series]], config: ProjectConfig
+) -> list[RetainedScore]:
     rows = []
     for (study, reporter, instrument_id, score_id), waves in found.items():
         if len(waves) < 2:
             continue
         everyone = set.intersection(*(set(values.index) for values in waves.values()))
-        for wave in sorted(waves, key=wave_order):
+        for wave in sorted(waves, key=wave_order(config, study)):
             kept = waves[wave][waves[wave].index.isin(everyone)]
             stats = describe(kept)
             rows.append(
@@ -637,7 +642,19 @@ def retained(found: dict[ScoreKey, dict[str, pd.Series]]) -> list[RetainedScore]
     return rows
 
 
-def wave_order(wave: str) -> tuple[int, float | str]:
+def wave_order(config: ProjectConfig, study: str) -> Callable[[str], tuple]:
+    # The study's waves as its waves list writes them; any other after them, by its name.
+    written = list(config.studies[study].waves)
+    return lambda wave: (0, written.index(wave)) if wave in written else (1, *name_order(wave))
+
+
+def study_wave_order(config: ProjectConfig) -> Callable[[tuple[str, str]], tuple]:
+    # A study and wave pair: the studies as the project lists them, each with its waves in order.
+    studies = list(config.studies)
+    return lambda pair: (studies.index(pair[0]), wave_order(config, pair[0])(pair[1]))
+
+
+def name_order(wave: str) -> tuple[int, float | str]:
     return (0, float(wave)) if is_number(wave) else (1, wave)
 
 

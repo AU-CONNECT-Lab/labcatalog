@@ -81,14 +81,14 @@ def all_wave_names(result: CatalogResult) -> list[str]:
     return [
         wave_name(result, study, wave)
         for study, config in result.project.config.studies.items()
-        for wave in sorted(config.waves, key=wave_order)
+        for wave in config.waves
     ]
 
 
 def wave_colors(result: CatalogResult) -> dict[str, str]:
     colors = {}
     for config in result.project.config.studies.values():
-        for i, wave in enumerate(sorted(config.waves, key=wave_order)):
+        for i, wave in enumerate(config.waves):
             colors.setdefault(wave, wave_color(i))
     return colors
 
@@ -99,7 +99,7 @@ def dataset_order(result: CatalogResult, names: list[str]) -> list[str]:
 
     def key(name: str) -> tuple:
         d = dataset_by_name(config, name)
-        return (studies.index(d.study), wave_order(d.wave), d.reporter)
+        return (studies.index(d.study), wave_order(config, d.study)(d.wave), d.reporter)
 
     return sorted(dict.fromkeys(names), key=key)
 
@@ -667,9 +667,7 @@ def collecting(result: CatalogResult, today: date) -> list[ToDo]:
         counts.setdefault((r.study, r.wave), {})[r.reporter] = r.n
     found = []
     for study, study_config in result.project.config.studies.items():
-        waves = [
-            w for w in sorted(study_config.waves, key=wave_order) if study_config.waves[w].start
-        ]
+        waves = [w for w in study_config.waves if study_config.waves[w].start]
         for k, wave in enumerate(waves):
             dates = study_config.waves[wave]
             if wave_status(dates, today) != "Collecting":
@@ -741,7 +739,7 @@ def timeline(result: CatalogResult, today: date | None = None) -> go.Figure | No
     lanes, bars, marks = [], [], []
     for study, study_config in config.studies.items():
         earlier = None
-        for wave in sorted(study_config.waves, key=wave_order):
+        for wave in study_config.waves:
             dates = study_config.waves[wave]
             if dates.start is None:
                 continue
@@ -813,7 +811,7 @@ def collection_pace(result: CatalogResult, study: str) -> go.Figure | None:
         start = pd.Timestamp(waves[wave].start) if waves[wave].start else dates.min()
         name = wave_name(result, study, wave)
         by_reporter.setdefault(reporter, {})[name] = [(day - start).days for day in dates]
-    order = sorted({wave for _, wave in first}, key=wave_order)
+    order = sorted({wave for _, wave in first}, key=wave_order(config, study))
     colors = {wave_name(result, study, w): wave_colors(result)[w] for w in order}
     facets = [
         {"title": r.capitalize(), "unit": "people", "days": days} for r, days in by_reporter.items()
@@ -1323,7 +1321,9 @@ def trajectories(long: ml.Long, fitted: ml.Fitted, label: str) -> go.Figure:
         (str(person), rows[ml.TIME].tolist(), rows[long.outcome].tolist())
         for person, rows in used.sort_values(ml.TIME).groupby(ml.PERSON, sort=False)
     ]
-    waves = sorted(used.groupby(ml.WAVE), key=lambda pair: wave_order(pair[0]))
+    # The long frame takes the waves in order, a pooled one by their place in each study.
+    order = list(dict.fromkeys(long.frame[ml.WAVE]))
+    waves = sorted(used.groupby(ml.WAVE), key=lambda pair: order.index(pair[0]))
     means = [
         (float(rows[ml.TIME].mean()), float(rows[long.outcome].mean()), len(rows))
         for _, rows in waves

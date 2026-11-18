@@ -1,13 +1,17 @@
 import pandas as pd
 import pytest
+from conftest import name_waves
 
 from labcatalog.charts import matrices, views
 from labcatalog.config import ProjectConfig
 from labcatalog.gui import analysis as page
 from labcatalog.gui import common
 from labcatalog.gui.common import p_value
+from labcatalog.metadata import forms
+from labcatalog.metadata.browse import build_index
 from labcatalog.pipeline import run_catalog
-from labcatalog.stats import analysis, analysis_script, attrition
+from labcatalog.reports import participants
+from labcatalog.stats import analysis, analysis_script, attrition, invariance, panel
 from labcatalog.stats import multilevel as ml
 
 EMS = "example_mood.ems_total@child_w1"
@@ -217,6 +221,39 @@ def test_measures_filter_every_list_of_the_page(result):
     assert page.default_totals(result, view, choices) == []
     outcomes = analysis.of_instruments(ml.outcome_choices(result), ["eeg_resting"])
     assert ml.default_model(result, list(outcomes)).outcome.startswith("item:eeg_resting.")
+
+
+def test_every_page_takes_the_waves_in_the_order_the_study_writes_them(mock_project):
+    name_waves(mock_project)
+    result = run_catalog(mock_project)
+    order = ["baseline", "6m", "12m"]
+    assert views.all_wave_names(result) == [f"Wave {w}" for w in order]
+    assert list(views.wave_colors(result)) == order
+    children = ["child_w1", "child_w2", "child_w3"]
+    assert views.dataset_order(result, children[::-1]) == children
+    assert common.sorted_waves(result.project.config, "mock_study", order[::-1]) == order
+    assert attrition.next_wave(result, "mock_study", "baseline") == "6m"
+    total = "example_mood.ems_total"
+    assert ml.occasions(result, total) == children
+    long = ml.long_frame(result, ml.Model(total, children[::-1]))
+    assert long.frame.groupby(ml.WAVE)[ml.TIME].first().to_dict() == {
+        "baseline": 0,
+        "6m": 1,
+        "12m": 2,
+    }
+    stress = "example_parent_stress.eps_mean"
+    assert [w for w, _, _ in panel.common_waves(result, stress, total)] == order
+    models = invariance.wave_models(result.project, result.catalog, result.datasets)
+    assert [list(m.occasions) for m in models if m.instrument_id == "example_mood"] == [order]
+    [waves] = [f for f in build_index(result.project).facets if f.name == "wave"]
+    assert list(waves.values.values()) == order
+    text = participants.paragraph(result.project, result.summary, "mock_study")
+    assert text.index("baseline") < text.index("6m") < text.index("12m")
+    yaml_text = (mock_project / "labcatalog.yaml").read_text(encoding="utf-8")
+    [datasets] = [
+        s for s in forms.sections(mock_project, "labcatalog.yaml", yaml_text) if s.key == "datasets"
+    ]
+    assert datasets.options["wave"] == tuple(order)
 
 
 def test_apa_numbers():

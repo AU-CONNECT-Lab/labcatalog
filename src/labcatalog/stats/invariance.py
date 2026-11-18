@@ -123,7 +123,7 @@ def wave_models(
         for kind, members in factor_sets(instrument):
             factors = {s.id: list(s.items) for s in members}
             occasions = {}
-            for wave in sorted(waves, key=wave_order):
+            for wave in sorted(waves, key=wave_order(project.config, study)):
                 frame = by_person(datasets, waves[wave], factors, by_id(datasets, waves[wave]))
                 if frame is not None and len(frame):
                     occasions[wave] = frame
