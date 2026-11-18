@@ -6,7 +6,7 @@ The header must contain three columns:
 
 | Column | Meaning |
 |---|---|
-| `column` | A column of the data file, exactly as it is written there. |
+| `column` | A column of the data file, exactly as it is written there, including a space at its start or end. |
 | `instrument` | The instrument's ID, or empty for a column that is not an item. |
 | `item` | The item's ID, or `score:` and a score's ID for a column with a score your lab computed. Empty when `instrument` is empty. |
 

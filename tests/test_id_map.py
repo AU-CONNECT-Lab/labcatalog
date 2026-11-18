@@ -1,8 +1,10 @@
 import pandas as pd
+import pytest
 
 from labcatalog import defaults
 from labcatalog.data import id_map
 from labcatalog.data.id_map import Rule
+from labcatalog.exceptions import DataSourceError
 from labcatalog.pipeline import run_catalog
 
 
@@ -75,3 +77,21 @@ def test_a_broken_map_is_reported(tmp_path):
     assert "more than one new ID" in messages
     assert "does not have: gone" in messages and "no new ID" in messages
     assert {i.level for i in found} == {"error", "warning"}
+
+
+def test_a_map_with_another_header_is_reported_and_corrects_nothing(mock_project):
+    (mock_project / defaults.ID_MAP_FILENAME).write_text(
+        "Dataset,From,To\nchild_w1,1001C,1099C\n", encoding="utf-8"
+    )
+    result = run_catalog(mock_project)
+    [issue] = [i for i in result.report.issues if i.code == "id_map_invalid"]
+    assert issue.level == "error" and "dataset, from, to" in issue.message
+    assert "1001C" in set(result.datasets["child_w1"].frame["pid"])
+
+
+def test_a_map_not_saved_as_utf8(mock_project):
+    (mock_project / defaults.ID_MAP_FILENAME).write_bytes(
+        "dataset,from,to\nchild_w1,1001C,1001\xe9\n".encode("cp1252")
+    )
+    with pytest.raises(DataSourceError, match="CSV UTF-8"):
+        run_catalog(mock_project)

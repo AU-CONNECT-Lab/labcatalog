@@ -43,6 +43,15 @@ def test_each_person_gets_a_count_of_their_matching_files(mock_project):
     assert not [i for i in validate_project(project) if "scans_w1" in i.message]
 
 
+def test_a_rule_ending_in_two_stars_counts_every_file_below(mock_project):
+    add_scans(mock_project, SCANS.replace("sub-{id}/ses-1/func/*_bold.nii.gz", "sub-{id}/**"))
+    scans = load_datasets(load_project(mock_project))["scans_w1"]
+    assert scans.frame.to_dict("list") == {
+        scans.id_column: ["1001C", "1002C", "1003C"],
+        "files": ["2", "2", "1"],
+    }
+
+
 def test_the_manifest_fingerprints_which_files_are_there(mock_project):
     add_scans(mock_project)
     project = load_project(mock_project)

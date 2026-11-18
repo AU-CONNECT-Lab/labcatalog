@@ -166,6 +166,62 @@ def test_group_pattern_needs_one_capture(mock_project):
     assert issue.message.startswith("ids.group.from_id")
 
 
+def test_an_item_listed_twice_in_a_score(mock_project):
+    edit(
+        mock_project / "instruments" / "example_mood.yaml",
+        "items: [ems_2, ems_6, ems_7]",
+        "items: [ems_2, ems_6, ems_6, ems_7]",
+    )
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level) == ("duplicate_id", "error")
+    assert issue.message == "scores[2] (ems_sadness).items: ems_6 is listed 2 times"
+    places = [found["path"] for found in issue.details["places"]]
+    assert places == [["scores", 1, "items", 1], ["scores", 1, "items", 2]]
+    assert issue.details["remove"]
+
+
+def test_an_instrument_given_twice_in_one_dataset(mock_project):
+    path = mock_project / "studies" / "mock_study.yaml"
+    edit(path, "datasets: [fnirs_w2]", "datasets: [fnirs_w2, fnirs_w2]")
+    video = "  - {instrument: video_play, datasets: [video_w2], target: child}\n"
+    edit(path, video, video + video.replace("target: child", "target: self"))
+    issues = run_validate(mock_project)
+    assert [(i.code, i.level, i.message) for i in issues] == [
+        ("duplicate_id", "error", "administrations: fnirs_social is given in fnirs_w2 2 times"),
+        ("duplicate_id", "error", "administrations: video_play is given in video_w2 2 times"),
+    ]
+    places = [[found["path"] for found in i.details["places"]] for i in issues]
+    assert places == [
+        [["administrations", 9, "datasets", 0], ["administrations", 9, "datasets", 1]],
+        [["administrations", 11, "datasets", 0], ["administrations", 12, "datasets", 0]],
+    ]
+
+
+def test_a_dataset_cannot_take_the_name_of_a_roster(mock_project):
+    edit(
+        mock_project / "labcatalog.yaml",
+        "datasets:\n",
+        "datasets:\n  - {name: roster_mock_study, modality: questionnaire, study: mock_study, "
+        "wave: 1, reporter: parent, source: csv, path: data/parent_w1.csv}\n",
+    )
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.level) == ("duplicate_id", "error")
+    assert issue.message == (
+        "dataset name 'roster_mock_study' is the name of study mock_study's participant roster"
+    )
+    assert [found["path"] for found in issue.details["places"]] == [["datasets", 0, "name"]]
+
+
+def test_prepare_steps_may_name_files_outside_the_project(mock_project):
+    outside = (mock_project.parent / "exports" / "parent_w1.csv").as_posix()
+    path = mock_project / "labcatalog.yaml"
+    edit(path, "inputs: [raw/parent_w1_export.csv,", "inputs: [../exports/parent_w1.csv,")
+    assert run_validate(mock_project) == []
+    edit(path, "outputs: [data/parent_w1.csv]", f"outputs: ['{outside}']")
+    [issue] = run_validate(mock_project)
+    assert "is also an input" in issue.message
+
+
 def test_correlate_by_must_name_id_none_or_the_group(mock_project):
     edit(mock_project / "labcatalog.yaml", "correlate_by: family", "correlate_by: household")
     [issue] = run_validate(mock_project)
@@ -181,6 +237,28 @@ def test_scored_items_need_numeric_options(mock_project):
     issues = run_validate(mock_project)
     assert codes(issues) == {"invalid_value"}
     assert "numeric" in issues[0].message
+
+
+def test_an_override_gives_a_scored_item_numeric_options_only(mock_project):
+    edit(
+        mock_project / "instruments" / "example_mood.yaml",
+        "default_response_set: frequency",
+        "  - id: letters\n    options:\n"
+        "      - {value: a, label: A}\n      - {value: b, label: B}\n"
+        "default_response_set: frequency",
+    )
+    mood = "  - {instrument: example_mood, datasets: [child_w1, child_w2, child_w3], target: self"
+    edit(
+        mock_project / "studies" / "mock_study.yaml",
+        mood + "}",
+        mood + ", overrides: [{item: ems_2, response_set: letters}]}",
+    )
+    [issue] = run_validate(mock_project)
+    assert (issue.code, issue.location) == ("invalid_value", "studies/mock_study.yaml")
+    assert issue.message == (
+        "administrations[3].overrides[1].response_set: ems_2 is scored, "
+        "so 'letters' needs numeric options"
+    )
 
 
 def test_missing_reference_pdf_is_a_warning(mock_project):

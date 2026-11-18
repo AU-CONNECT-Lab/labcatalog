@@ -86,7 +86,8 @@ EXPLAIN: dict[str, tuple[str, str]] = {
     "reference_missing": ("The reference key is not in references.bib, often a typo.", PICK),
     "pdf_missing": ("The reference's PDF is not where the instrument says.", SETTINGS),
     "column_missing": (
-        "The column map names a column the data file does not have, often a renamed column.",
+        "The column map, or the dataset's date_column, names a column the data file does not "
+        "have, often a renamed column.",
         PICK,
     ),
     "column_unmapped": (
@@ -543,6 +544,9 @@ def wrong_id(project: Project, result: CatalogResult, issue: Issue, save) -> Non
 
 def missing_column(project: Project, result: CatalogResult, issue: Issue, save) -> None:
     details = issue.details
+    if "line" not in details:
+        note("Give the dataset's date_column the name the date column has in the data file.")
+        return
     dataset, line = details["dataset"], details["line"]
     loaded = result.datasets.get(dataset)
     columns = fixes.free_columns(project, dataset, list(loaded.frame.columns) if loaded else [])

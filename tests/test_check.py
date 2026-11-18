@@ -48,6 +48,41 @@ def test_columns_missing_from_data_and_undescribed_columns(mock_project):
     assert "notes" in issues["column_unmapped"].message
 
 
+def test_a_column_name_ending_in_a_space_is_mapped_as_written(mock_project):
+    change_csv(
+        mock_project / "data" / "child_w2.csv",
+        lambda frame: frame.rename(columns={"ems_1_w2": "ems_1_w2 "}, inplace=True),
+    )
+    edit(mock_project / "maps" / "child_w2.csv", "\nems_1_w2,", '\n"ems_1_w2 ",')
+    issues = run_check(mock_project).issues
+    columns = [i for i in issues if i.code in ("column_unmapped", "column_missing")]
+    assert not any(i.details.get("dataset") == "child_w2" for i in columns)
+
+
+def test_ids_that_give_no_group_are_reported_when_the_roster_gives_none(mock_project):
+    yaml = mock_project / "labcatalog.yaml"
+    edit(yaml, "      group_column: family_id\n", "")
+    edit(yaml, "    name: family\n", "    name: family\n    from_id: '^([0-9]{4})[PC]$'\n")
+
+    def change(frame):
+        frame.loc[0, "pid"] = "1001X"
+
+    change_csv(mock_project / "data" / "child_w1.csv", change)
+    assert found(run_check(mock_project))["group_missing"] == ["1 ID(s) give no family ID: 1001X"]
+
+
+def test_a_date_column_the_data_do_not_have(mock_project):
+    edit(
+        mock_project / "labcatalog.yaml",
+        "path: data/child_w2.csv, date_column: visit_date,",
+        "path: data/child_w2.csv, date_column: visit_dat,",
+    )
+    [issue] = [i for i in run_check(mock_project).issues if i.code == "column_missing"]
+    assert (issue.level, issue.location) == ("error", "labcatalog.yaml")
+    assert issue.message == "visit_dat is the date_column of child_w2 but not in the data"
+    assert issue.details == {"dataset": "child_w2", "column": "visit_dat"}
+
+
 def test_a_column_another_dataset_of_the_same_file_maps_is_described(mock_project):
     # Each administration of one wide file is a dataset of its own with its own map.
     assert any("notes" in m for m in found(run_check(mock_project))["column_unmapped"])
@@ -118,6 +153,33 @@ def test_existing_score_column_is_cross_checked(mock_project):
     codes = found(run_check(mock_project))
     assert "1 row(s) differ" in codes["score_mismatch"][0]
     assert "score_coverage" in codes
+
+
+def test_a_score_the_lab_rounded_half_up_agrees(mock_project):
+    edit(
+        mock_project / "instruments" / "example_mood.yaml",
+        "scores:\n",
+        "scores:\n"
+        "  - {id: ems_mean, label: Mean, method: mean, items: [ems_2, ems_3, ems_5, ems_6]}\n",
+    )
+    items = ["ems_2_w2", "ems_3_w2", "ems_5_w2", "ems_6_w2"]
+
+    def change(frame):
+        # A mean of 1.25 that the lab's script wrote half up, and a mean of 1 written wrong.
+        frame.loc[0, items] = ["1", "1", "2", "1"]
+        frame.loc[1, items] = ["1", "1", "1", "1"]
+        frame["ems_mean_w2"] = ""
+        frame.loc[[0, 1], "ems_mean_w2"] = ["1.3", "1.2"]
+
+    change_csv(mock_project / "data" / "child_w2.csv", change)
+    path = mock_project / "maps" / "child_w2.csv"
+    path.write_text(
+        path.read_text(encoding="utf-8") + "ems_mean_w2,example_mood,score:ems_mean\n",
+        encoding="utf-8",
+    )
+    [message] = found(run_check(mock_project))["score_mismatch"]
+    assert message.startswith("example_mood.ems_mean@child_w2: 1 row(s) differ")
+    assert message.endswith("for example 1004C")
 
 
 def test_numbers_outside_their_range(mock_project):

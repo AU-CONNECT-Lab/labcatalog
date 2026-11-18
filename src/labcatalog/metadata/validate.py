@@ -14,9 +14,10 @@ from labcatalog.config import (
 )
 from labcatalog.issues import Issue, IssueLevel
 from labcatalog.metadata.varmap import MapEntry
+from labcatalog.paths import expand_path
 from labcatalog.project import Project, bib_path, reference_pdf, references_root
 from labcatalog.reports import templates
-from labcatalog.schema import SCRIPT, Administration, Instrument
+from labcatalog.schema import SCRIPT, Administration, Instrument, ResponseSet
 
 CONFIG = defaults.CONFIG_FILENAME
 
@@ -126,6 +127,19 @@ def check_cross_references(project: Project) -> list[Issue]:
         for name, count in Counter(d.name for d in config.datasets).items()
         if count > 1
     ]
+    # A study's roster is read as a dataset of this name, with its map in maps/.
+    rostered = {roster_name(study): study for study in rosters(config)}
+    issues += [
+        problem(
+            "duplicate_id",
+            f"dataset name '{d.name}' is the name of study {rostered[d.name]}'s participant roster",
+            CONFIG,
+            value=d.name,
+            places=[place(["datasets", n, "name"], f"{d.study} wave {d.wave}, {d.path or ''}")],
+        )
+        for n, d in enumerate(config.datasets)
+        if d.name in rostered
+    ]
     for name, content in project.studies.items():
         location = project.study_files[name]
         if content.study not in config.studies:
@@ -163,7 +177,10 @@ def check_cross_references(project: Project) -> list[Issue]:
                     message = f"{where}.datasets: '{dataset_name}' belongs to study {dataset.study}"
                     issues.append(unknown(message, location))
             item_ids = {item.id for item in instrument.items}
-            set_ids = {response_set.id for response_set in instrument.response_sets}
+            sets = {response_set.id: response_set for response_set in instrument.response_sets}
+            scored = {
+                i for score in instrument.scores if score.method != SCRIPT for i in score.items
+            }
             for m, override in enumerate(administration.overrides, start=1):
                 prefix = f"{where}.overrides[{m}]"
                 if override.item not in item_ids:
@@ -182,9 +199,34 @@ def check_cross_references(project: Project) -> list[Issue]:
                         f"{prefix}.dataset: '{override.dataset}' is not in this administration"
                     )
                     issues.append(unknown(message, location))
-                if override.response_set and override.response_set not in set_ids:
+                if override.response_set and override.response_set not in sets:
                     message = f"{prefix}.response_set: no response set '{override.response_set}'"
                     issues.append(unknown(message, location))
+                elif (
+                    override.response_set
+                    and override.item in scored
+                    and not numeric_options(sets[override.response_set])
+                ):
+                    message = (
+                        f"{prefix}.response_set: {override.item} is scored, "
+                        f"so '{override.response_set}' needs numeric options"
+                    )
+                    issues.append(problem("invalid_value", message, location))
+        given: dict[tuple[str, str], list[dict]] = {}
+        for n, administration in enumerate(content.administrations):
+            target = f", target {administration.target}" if administration.target else ""
+            for k, dataset_name in enumerate(administration.datasets):
+                shown = f"administration {n + 1}{target}, dataset {k + 1} in its list"
+                given.setdefault((administration.instrument, dataset_name), []).append(
+                    place(["administrations", n, "datasets", k], shown)
+                )
+        for (instrument_id, dataset_name), found in given.items():
+            if len(found) > 1:
+                message = (
+                    f"administrations: {instrument_id} is given in {dataset_name} "
+                    f"{len(found)} times"
+                )
+                issues.append(problem("duplicate_id", message, location, places=found, remove=True))
     for instrument_id, instrument in project.instruments.items():
         issues.extend(check_instrument(instrument, project.instrument_files[instrument_id]))
     return issues
@@ -266,6 +308,19 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
         absent = [item_id for item_id in score.items if item_id not in items]
         if absent:
             issues.append(unknown(f"{where}.items: no item(s) {', '.join(absent)}", location))
+        for item_id, count in Counter(score.items).items():
+            if count > 1:
+                found = [
+                    place(["scores", n - 1, "items", m], f"{item_id}, number {m + 1} in the list")
+                    for m, listed in enumerate(score.items)
+                    if listed == item_id
+                ]
+                message = f"{where}.items: {item_id} is listed {count} times"
+                issues.append(
+                    problem(
+                        "duplicate_id", message, location, value=item_id, places=found, remove=True
+                    )
+                )
         # A script's score may name the items it reads, but labcatalog does not score them.
         if score.method == SCRIPT:
             continue
@@ -283,10 +338,7 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
                 issues.append(problem("invalid_value", message, location))
                 continue
             response_set = sets.get(items[item_id].response_set or instrument.default_response_set)
-            numeric = response_set is not None and all(
-                isinstance(option.value, int | float) for option in response_set.options
-            )
-            if not numeric:
+            if response_set is None or not numeric_options(response_set):
                 unscorable.append(item_id)
         if unscorable:
             message = f"{where}.items: need numeric response options: {', '.join(unscorable)}"
@@ -301,6 +353,10 @@ def check_instrument(instrument: Instrument, location: str) -> list[Issue]:
             message = f"{where}.missing_rule: demographic answers are never imputed; use complete"
             issues.append(problem("invalid_value", message, location))
     return issues
+
+
+def numeric_options(response_set: ResponseSet) -> bool:
+    return all(isinstance(option.value, int | float) for option in response_set.options)
 
 
 def check_custom_fields(project: Project) -> list[Issue]:
@@ -726,8 +782,8 @@ def check_analyses(project: Project) -> list[Issue]:
 
 
 def same_file(project: Project, path: str) -> str:
-    # The same file however a step spells it, in any letter case on Windows.
-    return os.path.normcase((project.root / path).resolve().relative_to(project.root.resolve()))
+    # The same file however it is spelled, inside the project or not, in any letter case on Windows.
+    return os.path.normcase(expand_path(path, project.root).resolve())
 
 
 def check_templates(project: Project) -> list[Issue]:

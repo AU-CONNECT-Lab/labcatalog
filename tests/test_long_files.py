@@ -111,6 +111,16 @@ def test_a_wave_no_dataset_reads_is_reported(long_project):
     assert (found.details["dataset"], found.details["waves"]) == ("parent_w3", ["T3"])
 
 
+def test_one_file_named_two_ways_has_its_waves_read(long_project):
+    root, _ = long_project
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    line = next(x for x in text.splitlines() if "name: parent_w2," in x)
+    other = line.replace("path: data/parent_long.csv,", "path: data/../data/parent_long.csv,")
+    config.write_text(text.replace(line, other), encoding="utf-8")
+    assert not [i for i in run_catalog(root).report.issues if i.code == "wave_unclaimed"]
+
+
 def test_a_missing_wave_column_stops_loading(long_project):
     root, _ = long_project
     path = root / "labcatalog.yaml"

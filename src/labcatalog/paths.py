@@ -17,7 +17,7 @@ def clean_file_url(value: str) -> str:
         # file:///C:/... names a Windows drive, not a folder "C:" under the root.
         if re.match(r"/[A-Za-z]:[/\\]", value):
             value = value[1:]
-    if "%" in value:
+        # Only a URL is percent-encoded; elsewhere % starts a Windows variable or is a plain %.
         value = unquote(value)
     return value
 

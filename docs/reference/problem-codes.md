@@ -45,7 +45,7 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 
 | Code | Level | Meaning |
 |---|---|---|
-| `column_missing` | error | The column map names a column that is not in the data. |
+| `column_missing` | error | The column map, or a dataset's `date_column`, names a column that is not in the data. |
 | `column_unmapped` | warning | The data have columns that the column map does not list, nor the map of another dataset that reads the same file. |
 | `wave_unclaimed` | warning | A file read by datasets with a `wave_column` has rows for a wave none of them reads. |
 | `unexpected_value` | error | Values that are neither response options nor missing codes, or numbers outside `min` and `max`. |

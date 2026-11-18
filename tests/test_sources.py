@@ -52,6 +52,12 @@ def test_data_file_not_saved_as_utf8(mock_project):
         load_datasets(load_project(mock_project))
 
 
+def test_an_empty_data_file(mock_project):
+    (mock_project / "data" / "child_w2.csv").write_bytes(b"")
+    with pytest.raises(DataSourceError, match=r"child_w2: .*child_w2\.csv is empty"):
+        load_datasets(load_project(mock_project))
+
+
 def test_missing_id_column(mock_project):
     edit(
         mock_project / "labcatalog.yaml",

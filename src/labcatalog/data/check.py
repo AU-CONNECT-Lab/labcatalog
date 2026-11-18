@@ -21,8 +21,8 @@ from labcatalog.project import Project
 from labcatalog.schema import SCRIPT
 from labcatalog.sources import LoadedDataset, Roster, load_roster_datasets, load_rosters
 
-EMAIL = re.compile(r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}")
-PHONE = re.compile(r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b")
+EMAIL = re.compile(defaults.EMAIL_PATTERN)
+PHONE = re.compile(defaults.PHONE_PATTERN)
 
 
 class CheckReport(BaseModel):
@@ -117,7 +117,8 @@ def check_waves(project: Project, datasets: dict[str, LoadedDataset]) -> list[Is
     files: dict[tuple, list[LoadedDataset]] = {}
     for loaded in datasets.values():
         if loaded.file_waves is not None:
-            files.setdefault((loaded.source_path, loaded.config.wave_column), []).append(loaded)
+            key = (same_source(loaded.source_path), loaded.config.wave_column)
+            files.setdefault(key, []).append(loaded)
     issues = []
     for (_, column), readers in files.items():
         left = readers[0].file_waves - {loaded.config.wave_in_file() for loaded in readers}
@@ -190,8 +191,9 @@ def check_ids(project: Project, datasets: dict[str, LoadedDataset]) -> list[Issu
         dataset_name = loaded.config.name
         clean, found = id_problems(project, ids, where, loaded.config.study, dataset=dataset_name)
         issues += found
-        # With a roster, people missing from it are reported by check_roster instead.
-        if loaded.group is not None and project.config.studies[loaded.config.study].roster is None:
+        # With a roster that gives the groups, people missing from it are reported by check_roster.
+        roster = project.config.studies[loaded.config.study].roster
+        if loaded.group is not None and (roster is None or roster.group_column is None):
             no_group = clean & loaded.group.isna()
             if no_group.any():
                 name = project.config.ids.group.name if project.config.ids.group else "group"
@@ -424,7 +426,13 @@ def check_dates(project: Project, datasets: dict[str, LoadedDataset]) -> list[Is
     issues = []
     for loaded in datasets.values():
         column = loaded.config.date_column
-        if column is None or column not in loaded.frame:
+        if column is None:
+            continue
+        if column not in loaded.frame:
+            name = loaded.config.name
+            message = f"{column} is the date_column of {name} but not in the data"
+            where = defaults.CONFIG_FILENAME
+            issues.append(problem("column_missing", message, where, dataset=name, column=column))
             continue
         values = loaded.frame[column]
         parsed = pd.to_datetime(values, format=project.config.defaults.date_format, errors="coerce")
@@ -516,12 +524,13 @@ def score_agreement(
     issues = []
     codes = list(missing_labels_for(project.config, loaded.config))
     existing = pd.to_numeric(raw, errors="coerce").where(~raw.isin(codes))
-    # Compare at the precision the lab's own script wrote.
+    # Within half a unit of the lab's own precision, so any way of rounding agrees.
     places = raw.str.extract(r"\.(\d+)$", expand=False).str.len()
     decimals = int(places.max()) if places.notna().any() else 0
-    computed = scores[score.dataset][score.key].round(decimals)
+    computed = scores[score.dataset][score.key]
     both = existing.notna() & computed.notna()
-    differ = both & (existing.round(decimals) != computed)
+    allowed = 0.5 * 10**-decimals + defaults.ROUNDING_SLACK
+    differ = both & ((existing - computed).abs() > allowed)
     one_sided = existing.notna() != computed.notna()
     where = location(project, loaded)
     if differ.any():

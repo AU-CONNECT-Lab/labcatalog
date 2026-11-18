@@ -26,3 +26,5 @@ def read_csv(path: Path, name: str) -> pd.DataFrame:
         raise DataSourceError(message) from None
     except pd.errors.ParserError as err:
         raise DataSourceError(f"{name}: could not read {path}: {err}") from None
+    except pd.errors.EmptyDataError:
+        raise DataSourceError(f"{name}: {path} is empty") from None

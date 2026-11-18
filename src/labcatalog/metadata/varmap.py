@@ -47,13 +47,14 @@ def load_variable_map(path: Path, root: Path, issues: list[Issue]) -> list[MapEn
     for row in reader:
         # The reader's own count, since it skips blank lines.
         line = reader.line_num
-        column = (row["column"] or "").strip()
+        # As written, since a data file's own column name may start or end with a space.
+        column = row["column"] or ""
         instrument = (row["instrument"] or "").strip() or None
         item = (row["item"] or "").strip() or None
         where = f"{location}:{line}"
-        if not (column or instrument or item):
+        if not (column.strip() or instrument or item):
             continue
-        if not column:
+        if not column.strip():
             issues.append(map_issue("map_row", "column is empty", where))
         elif bool(instrument) != bool(item):
             issues.append(

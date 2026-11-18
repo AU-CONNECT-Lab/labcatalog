@@ -252,6 +252,23 @@ def test_codebook_describes_datasets_instruments_and_every_column(result):
     assert ["ems_total_child_w1", "EMS", "ems_total", "score, sum"] in index.rows
 
 
+def test_the_codebook_takes_a_data_file_outside_the_project(mock_project):
+    shared = mock_project.parent / "shared"
+    shared.mkdir()
+    (mock_project / "data" / "child_w1.csv").rename(shared / "child_w1.csv")
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    text = text.replace("path: data/child_w1.csv,", "path: ../shared/child_w1.csv,")
+    written = (shared / "child_w1.csv").as_posix()
+    text = text.replace("outputs: [data/child_w1.csv]", f"outputs: ['{written}']")
+    config.write_text(text, encoding="utf-8")
+    result = run_catalog(mock_project)
+    blocks = blocks_for(result, {"child_w1": ["example_mood"]})
+    datasets = next(b for b in blocks if isinstance(b, Table))
+    child = dict(zip(datasets.columns, datasets.rows[0], strict=True))
+    assert child["Made by"] == "clean_child_w1 (scripts/clean_export.R)"
+
+
 def test_codebook_alone_without_data_or_statistics(result):
     plan = {"child_w1": ["example_mood"]}
     done = write_export(result, plan, BY_DATASET, data=False, statistics=False)

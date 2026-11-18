@@ -88,7 +88,7 @@ A list with one entry per data file.
 
 | Key | Type | Meaning |
 |---|---|---|
-| `name` | text | The dataset's ID. Required. |
+| `name` | text | The dataset's ID. Required. `roster_<study>` is taken by the participant roster of a study that has one. |
 | `modality` | text | One of `vocab.modalities`. Required. |
 | `study` | text | A study under `studies`. Required. |
 | `wave` | text | One of the study's waves. Required. |

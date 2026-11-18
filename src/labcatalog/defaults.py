@@ -36,6 +36,8 @@ IMPUTATIONS = 20
 SEED = 1
 LLM_PROVIDER = "anthropic"
 SAME_ANSWER_MIN_ITEMS = 5
+# Float error allowed on top of half a unit when a lab's own score is held against labcatalog's.
+ROUNDING_SLACK = 1e-9
 DEFAULT_MODALITIES = ("questionnaire",)
 BUILTIN_FACETS = ("study", "wave", "coverage", "reporter", "target", "modality", "status")
 # About the catalog rather than the scores, so the score network cannot color by them.
@@ -56,6 +58,8 @@ IDENTIFIER_NAME_PATTERNS = (
     r"\bdob\b",
     r"\bssn\b",
 )
+EMAIL_PATTERN = r"[^@\s]+@[^@\s]+\.[A-Za-z]{2,}"
+PHONE_PATTERN = r"\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"
 
 CHART_MIN_R = 0.3
 CHART_PEOPLE_PER_PAGE = 200

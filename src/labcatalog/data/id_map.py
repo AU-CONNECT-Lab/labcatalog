@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog import defaults
+from labcatalog.exceptions import DataSourceError
 from labcatalog.issues import Issue
 
 COLUMNS = ["dataset", "from", "to"]
@@ -55,11 +56,18 @@ def read(root: Path) -> pd.DataFrame:
     path = path_of(root)
     if not path.exists():
         return pd.DataFrame(columns=COLUMNS)
-    return pd.read_csv(path, dtype=str, keep_default_na=False)
+    try:
+        return pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        message = f"{defaults.ID_MAP_FILENAME} is not UTF-8; in Excel save it as 'CSV UTF-8'"
+        raise DataSourceError(message) from None
 
 
 def mapping(root: Path, dataset: str) -> dict[str, str]:
     table = read(root)
+    # A table with other columns corrects nothing; check reports it.
+    if list(table.columns) != COLUMNS:
+        return {}
     rows = table[table["dataset"] == dataset]
     return dict(zip(rows["from"], rows["to"], strict=True))
 
