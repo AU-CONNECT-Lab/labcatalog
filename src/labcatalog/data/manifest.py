@@ -92,7 +92,9 @@ def used_paths(config: ProjectConfig, root: Path) -> list[Path]:
             metadata.append(expand_path(study.exclusions, root))
         if study.roster:
             metadata.append(expand_path(study.roster.path, root))
-    sources = [expand_path(p, root) for d in config.datasets for p in (d.path, *d.scores) if p]
+    sources = [
+        expand_path(p, root) for d in config.datasets for p in (d.path, *d.scores.values()) if p
+    ]
     inputs = [expand_path(path, root) for step in config.prepare for path in step.inputs]
     return present(list(dict.fromkeys([*metadata, *sources, *inputs])))
 
@@ -115,7 +117,7 @@ def file_times(root: Path) -> dict[Path, int]:
         paths += [
             expand_path(d.path, root) for d in config.datasets if d.source == "csv" and d.path
         ]
-        paths += [expand_path(p, root) for d in config.datasets for p in d.scores]
+        paths += [expand_path(p, root) for d in config.datasets for p in d.scores.values()]
     return {p: p.stat().st_mtime_ns for p in dict.fromkeys(paths) if p.is_file()}
 
 

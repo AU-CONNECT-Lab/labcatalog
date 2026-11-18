@@ -65,8 +65,9 @@ Loading comes first: if a file cannot be read (the codes in the first table), th
 | `same_answer` | warning | People who gave the same answer to every item of a score with five or more items. |
 | `score_mismatch` | error | A score column in the data or in the `scores` file differs from the score labcatalog computes. |
 | `score_coverage` | warning | Rows with a score in the data but not in labcatalog's computation, or the other way round. |
-| `scores_missing` | warning | A dataset's `scores` file does not exist yet, or a score with `method: script` has no `scores` file or no column in it. |
+| `scores_missing` | warning | A dataset's `scores` file does not exist yet, or a score with `method: script` has no `scores` file for its instrument or no column in it. |
 | `scores_unmatched` | warning | IDs in a dataset's `scores` file that are not in its data. |
+| `scores_repeated` | warning | IDs a dataset's `scores` file gives more than one row, within the dataset's own wave when the file has its `wave_column`; they take no score from it. |
 | `prepare_output_missing` | warning | A prepare step's output does not exist, or has not been downloaded. |
 | `prepare_outdated` | warning | A prepare step's output is older than one of its inputs. |
 | `git_annex_not_found` | warning | The project's files are in DataLad datasets, but git-annex cannot be found, so their versions are not recorded. |

@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 
 from labcatalog import defaults
-from labcatalog.data.resolve import ResolvedVariable
+from labcatalog.data.resolve import ResolvedScore, ResolvedVariable
 from labcatalog.data.scoring import score_items
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.codegen import number
@@ -596,6 +596,16 @@ class Paired:
     effect_high: float | None = None
 
 
+def score_name(result: CatalogResult, score: ResolvedScore, datasets: list[str]) -> str:
+    # The instrument joins the name only when another instrument's score in the files shares it.
+    shared = any(
+        s.score_id == score.score_id and s.instrument_id != score.instrument_id
+        for s in result.catalog.scores
+        if s.dataset in datasets
+    )
+    return f"{score.instrument_id}_{score.score_id}" if shared else score.score_id
+
+
 class AnalysisData:
     # The columns one analysis reads, aligned to the people of the sample.
     def __init__(self, result: CatalogResult, sample: analysis.Sample) -> None:
@@ -611,7 +621,7 @@ class AnalysisData:
         score = next(s for s in self.result.catalog.scores if s.key == first_key(key))
         instrument = self.result.project.instruments[score.instrument_id]
         definition = next(s for s in instrument.scores if s.id == score.score_id)
-        column = f"{score.score_id}_{'_'.join(parts(key))}"
+        column = f"{score_name(self.result, score, parts(key))}_{'_'.join(parts(key))}"
         self.columns[column] = analysis.values(self.result, self.sample, key)
         names: list[str] = []
         if items:

@@ -3,6 +3,7 @@ from conftest import rscript
 
 from labcatalog import pipeline
 from labcatalog.ai import scoring as ai_scoring
+from labcatalog.config import dataset_by_name
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.pipeline import run_catalog
 
@@ -43,6 +44,13 @@ def test_the_request_holds_the_items_columns_codes_and_reference(result):
     assert "ID column: pid" in request
     assert "ems_total | Total score | sum of ems_1, ems_2" in request
     assert "<reference>" in request and "Example Mood Scale" in request
+    assert "several waves" not in request
+
+
+def test_one_wave_of_a_long_file_asks_for_that_waves_rows(result):
+    dataset_by_name(result.project.config, "child_w1").wave_column = "wave"
+    request = ai_scoring.scoring_request(result.project, result.catalog, "example_mood", "child_w1")
+    assert "this dataset is its rows with wave 1, so score only those rows" in request
 
 
 def test_the_scripts_are_saved_with_who_wrote_them_and_the_notes(result):

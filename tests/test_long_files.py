@@ -1,12 +1,15 @@
 import math
 import re
 import shutil
+import subprocess
+import sys
 
 import pandas as pd
 import pytest
+from conftest import rscript
 
 from labcatalog.exceptions import DataSourceError
-from labcatalog.metadata import changes, new_dataset
+from labcatalog.metadata import changes, new_dataset, scoring_steps
 from labcatalog.metadata.fixes import evidence
 from labcatalog.pipeline import run_catalog
 from labcatalog.project import load_project
@@ -191,3 +194,57 @@ def test_repeating_a_wave_written_another_way_suggests_the_next_value(long_proje
     )
     assert "wave_column: wave, wave_value: T4," in line
     assert len(load_datasets(load_project(root))["parent_w4"].frame) == len(fourth)
+
+
+T_SCORE = "example_parent_stress.eps_t@parent_w2"
+
+
+def score_wave_2_by_script(root, scores_file: str | None) -> None:
+    path = root / "instruments" / "example_parent_stress.yaml"
+    text = path.read_text(encoding="utf-8")
+    scripted = "  - {id: eps_t, label: T score, method: script}\nreferences:\n"
+    path.write_text(text.replace("references:\n", scripted, 1), encoding="utf-8")
+    if scores_file:
+        config = root / "labcatalog.yaml"
+        lines = config.read_text(encoding="utf-8").split("\n")
+        files = f"wave_column: wave, scores: {{example_parent_stress: {scores_file}}},"
+        lines = [
+            x.replace("wave_column: wave,", files) if "name: parent_w2" in x else x for x in lines
+        ]
+        config.write_text("\n".join(lines), encoding="utf-8")
+
+
+def test_a_scores_file_of_several_waves_gives_each_wave_its_own_rows(long_project):
+    root, _ = long_project
+    long = pd.read_csv(root / "data" / "parent_long.csv", dtype=str, keep_default_na=False)
+    scores = long[["pid", "wave"]].assign(eps_t=long["wave"].astype(int) * 10)
+    scores.to_csv(root / "data" / "parent_long_scores.csv", index=False)
+    score_wave_2_by_script(root, "data/parent_long_scores.csv")
+    values = run_catalog(root).scores["parent_w2"][T_SCORE]
+    assert set(values.dropna()) == {20.0}
+    assert values.notna().sum() == (long["wave"] == "2").sum()
+
+
+@pytest.mark.parametrize("language", ["python", "r"])
+def test_a_scoring_script_of_a_long_file_scores_its_own_waves_rows(long_project, language):
+    if language == "r" and rscript() is None:
+        pytest.skip("R is not installed")
+    root, _ = long_project
+    score_wave_2_by_script(root, None)
+    project = load_project(root)
+    result = run_catalog(root)
+    stress = "example_parent_stress"
+    script = scoring_steps.start_script(project, result.catalog, stress, "parent_w2", language)
+    text = (root / script).read_text(encoding="utf-8")
+    filled = text.replace('scores["eps_t"] = pd.NA', 'scores["eps_t"] = d["wave"]').replace(
+        'scores[["eps_t"]] <- NA', 'scores[["eps_t"]] <- d[["wave"]]'
+    )
+    assert filled != text
+    (root / script).write_text(filled, encoding="utf-8")
+    step = scoring_steps.register(project, stress, "parent_w2", script)
+    run = [sys.executable] if language == "python" else [rscript()]
+    subprocess.run([*run, script, "data/parent_long.csv", step.outputs[0]], cwd=root, check=True)
+    written = pd.read_csv(root / step.outputs[0], dtype=str)
+    long = pd.read_csv(root / "data" / "parent_long.csv", dtype=str)
+    assert set(written["eps_t"]) == {"2"} and len(written) == (long["wave"] == "2").sum()
+    assert set(run_catalog(root).scores["parent_w2"][T_SCORE].dropna()) == {2.0}

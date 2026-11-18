@@ -642,6 +642,10 @@ def check_data_settings(project: Project) -> list[Issue]:
         if dataset.source != "folder" and dataset.files is not None:
             message = f"{where}.files: only folder datasets take files"
             issues.append(problem("invalid_value", message, CONFIG))
+        for instrument_id in dataset.scores:
+            if instrument_id not in project.instruments:
+                message = f"{where}.scores: no instrument '{instrument_id}'"
+                issues.append(unknown(message, CONFIG))
     for name, study in config.studies.items():
         roster = study.roster
         where = f"studies.{name}.roster"

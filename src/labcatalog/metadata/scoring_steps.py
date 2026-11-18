@@ -1,9 +1,15 @@
 from pathlib import Path
 
-from ruamel.yaml.comments import CommentedSeq
+from ruamel.yaml.comments import CommentedMap
 
 from labcatalog import defaults
-from labcatalog.config import PrepareStep, dataset_by_name, id_column_for, missing_codes_for
+from labcatalog.config import (
+    DatasetConfig,
+    PrepareStep,
+    dataset_by_name,
+    id_column_for,
+    missing_codes_for,
+)
 from labcatalog.data.resolve import Catalog
 from labcatalog.exceptions import EditError
 from labcatalog.metadata import editing, records
@@ -20,8 +26,8 @@ R_TEMPLATE = """\
 # The scores file holds the ID column, then one column per score, named by the score's ID; leave
 # a cell empty where a person has no score. Missing codes in this dataset: {codes}.
 args <- commandArgs(trailingOnly = TRUE)
-d <- read.csv(args[1], check.names = FALSE, colClasses = c({id_text} = "character"))
-scores <- data.frame(d[{id_text}], check.names = FALSE)
+d <- read.csv(args[1], check.names = FALSE, colClasses = c({classes}))
+{rows}scores <- data.frame(d[{id_text}], check.names = FALSE)
 {blocks}
 write.csv(scores, args[2], row.names = FALSE, na = "")
 """
@@ -34,8 +40,8 @@ import sys
 
 import pandas as pd
 
-d = pd.read_csv(sys.argv[1], dtype={{{id_text}: str}})
-scores = pd.DataFrame({{{id_text}: d[{id_text}]}})
+d = pd.read_csv(sys.argv[1], dtype={{{dtypes}}})
+{rows}scores = pd.DataFrame({{{id_text}: d[{id_text}]}})
 {blocks}
 scores.to_csv(sys.argv[2], index=False)
 """
@@ -83,9 +89,8 @@ def register(project: Project, instrument_id: str, dataset: str, script: str) ->
     opened = editing.open_file(project.root, defaults.CONFIG_FILENAME)
     data = records.load(opened.text)
     entry = next(d for d in data["datasets"] if d["name"] == dataset)
-    files = entry.get("scores") or CommentedSeq()
-    if step.outputs[0] not in files:
-        files.append(step.outputs[0])
+    files = entry.get("scores") or CommentedMap()
+    files[instrument_id] = step.outputs[0]
     files.fa.set_flow_style()
     entry["scores"] = files
     editing.save_data(project.root, opened, data)
@@ -130,6 +135,7 @@ def template(
         blocks = [line.replace(" <- ", " = ") for line in blocks]
     codes = ", ".join(f"{c.code} = {c.label}" for c in missing_codes_for(config, found)) or "none"
     id_column = id_column_for(config, found)
+    text_columns = [f'"{c}"' for c in dict.fromkeys(filter(None, (id_column, found.wave_column)))]
     values = {
         "name": instrument.name,
         "dataset": dataset,
@@ -137,6 +143,22 @@ def template(
         "codes": codes,
         "id": id_column,
         "id_text": f'"{id_column}"',
+        "classes": ", ".join(f'{c} = "character"' for c in text_columns),
+        "dtypes": ", ".join(f"{c}: str" for c in text_columns),
+        "rows": wave_rows(found, language),
         "blocks": "\n".join(blocks),
     }
     return (R_TEMPLATE if language == "r" else PYTHON_TEMPLATE).format(**values)
+
+
+def wave_rows(dataset: DatasetConfig, language: str) -> str:
+    # A file of several waves gives this dataset only its own wave's rows, as labcatalog reads it.
+    if not dataset.wave_column:
+        return ""
+    column, wave = dataset.wave_column, dataset.wave_in_file()
+    note = (
+        f"# The data file holds several waves; {dataset.name} is its rows with {column} {wave}.\n"
+    )
+    if language == "r":
+        return note + f'd <- d[d[["{column}"]] %in% "{wave}", , drop = FALSE]\n'
+    return note + f'd = d[d["{column}"] == "{wave}"]\n'

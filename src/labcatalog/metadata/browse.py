@@ -177,7 +177,7 @@ def build_dataset_index(project: Project, levels: dict[str, set[str]]) -> RowInd
             *(str(v) for v in dataset.model_dump(exclude={"custom"}).values() if is_text(v)),
             study.label,
             config.vocab.modality_label(dataset.modality),
-            *dataset.scores,
+            *dataset.scores.values(),
             *(v for value in custom.values() for v in as_set(value)),
             *(t for i in instruments for t in (i.id, i.name, i.abbreviation)),
             *(t for i in instruments for item in i.items for t in as_text_dict(item.text).values()),

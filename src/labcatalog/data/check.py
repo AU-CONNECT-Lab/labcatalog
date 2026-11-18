@@ -25,7 +25,13 @@ from labcatalog.issues import Issue, IssueLevel, has_errors
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project
 from labcatalog.schema import SCRIPT
-from labcatalog.sources import LoadedDataset, Roster, load_roster_datasets, load_rosters
+from labcatalog.sources import (
+    LoadedDataset,
+    Roster,
+    has_id,
+    load_roster_datasets,
+    load_rosters,
+)
 
 EMAIL = re.compile(defaults.EMAIL_PATTERN)
 PHONE = re.compile(defaults.PHONE_PATTERN)
@@ -515,9 +521,9 @@ def given_scores(loaded: LoadedDataset, score: ResolvedScore) -> list[tuple[str,
     column = score.existing_column
     if column is not None and column in loaded.frame:
         found.append((column, loaded.frame[column]))
-    if loaded.scores is not None and score.score_id in loaded.scores:
-        name = f"the scores file's {score.score_id}"
-        found.append((name, loaded.scores[score.score_id].fillna("")))
+    own = loaded.scores.get(score.instrument_id)
+    if own is not None and score.score_id in own:
+        found.append((f"the scores file's {score.score_id}", own[score.score_id].fillna("")))
     return found
 
 
@@ -557,33 +563,44 @@ def score_agreement(
 def check_scores_files(
     project: Project, catalog: Catalog, datasets: dict[str, LoadedDataset]
 ) -> list[Issue]:
-    # Scores a script computes need its file, a column each, and the data's own IDs.
+    # Scores a script computes need their instrument's file, a column each, and the data's IDs.
     issues = []
     for name, loaded in datasets.items():
         found: list[tuple[str, str]] = []
-        absent = [p for p in loaded.config.scores if p not in loaded.score_ids]
-        for path in absent:
-            message = (
-                f"{name}: the scores file {path} is not there yet; run the step that writes it"
-            )
-            found.append(("scores_missing", message))
-        for score in catalog.scores_for(name):
-            held = loaded.scores is not None and score.score_id in loaded.scores
-            if score.method != SCRIPT or held:
-                continue
-            if not loaded.config.scores:
-                message = f"{score.key}: computed by a script, but {name} names no scores file"
+        files = loaded.config.scores
+        for path in files.values():
+            if path not in loaded.score_ids:
+                message = (
+                    f"{name}: the scores file {path} is not there yet; run the step that writes it"
+                )
                 found.append(("scores_missing", message))
-            elif not absent:
-                message = f"{score.key}: no scores file of {name} has a column {score.score_id}"
+        for score in catalog.scores_for(name):
+            own = loaded.scores.get(score.instrument_id)
+            if score.method != SCRIPT or (own is not None and score.score_id in own):
+                continue
+            path = files.get(score.instrument_id)
+            if path is None:
+                message = (
+                    f"{score.key}: computed by a script, but {name} names no scores file "
+                    f"for {score.instrument_id}"
+                )
+                found.append(("scores_missing", message))
+            elif path in loaded.score_ids:
+                message = f"{score.key}: the scores file {path} has no column {score.score_id}"
                 found.append(("scores_missing", message))
         data_ids = set(loaded.frame[loaded.id_column])
         for path, ids in loaded.score_ids.items():
-            if stray := sorted(ids - data_ids):
+            if stray := sorted(set(ids) - data_ids):
                 message = (
                     f"{name}: {len(stray)} ID(s) of {path} are not in the data: {examples(stray)}"
                 )
                 found.append(("scores_unmatched", message))
+            if twice := sorted(set(ids[has_id(ids) & ids.duplicated()])):
+                message = (
+                    f"{name}: {path} gives {len(twice)} ID(s) more than one row, so they take no "
+                    f"score: {examples(twice)}"
+                )
+                found.append(("scores_repeated", message))
         where = location(project, loaded)
         issues += [problem(c, m, where, "warning", dataset=name) for c, m in found]
     return issues

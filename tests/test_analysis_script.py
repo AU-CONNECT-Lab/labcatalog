@@ -471,3 +471,21 @@ def test_table_one_offers_number_items_but_starts_without_them(result):
     assert key in script.measures(result, datasets)
     defaults = script.default_measures(result, datasets)
     assert key not in defaults and "item:example_demographics.dem_gender" in defaults
+
+
+def test_two_instruments_scores_of_one_id_keep_their_own_columns(mock_project):
+    sleep = mock_project / "instruments" / "example_child_sleep.yaml"
+    text = sleep.read_text(encoding="utf-8")
+    same_id = "  - {id: eps_mean, label: Two items, method: mean, items: [ecs_1, ecs_2]}\n"
+    sleep.write_text(text.replace("references:\n", same_id + "references:\n", 1), encoding="utf-8")
+    result = run_catalog(mock_project)
+    sample = analysis.build_sample(result, ["parent_w1", "child_w1"], True)
+    data = script.AnalysisData(result, sample)
+    stress, sleeps = data.score(EPS), data.score("example_child_sleep.eps_mean@parent_w1")
+    assert (stress.column, sleeps.column) == (
+        "example_parent_stress_eps_mean_parent_w1",
+        "example_child_sleep_eps_mean_parent_w1",
+    )
+    frame = data.frame()
+    assert not frame[stress.column].equals(frame[sleeps.column])
+    assert data.score(EMS).column == "ems_total_child_w1"

@@ -39,7 +39,7 @@ def fewest_answered(score: ResolvedScore) -> int:
 
 def compute_score(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
     if score.method == SCRIPT:
-        return scripted(loaded, score.score_id)
+        return scripted(loaded, score)
     if not scorable(loaded, score):
         return pd.Series(np.nan, index=loaded.frame.index, dtype=float)
     items = score_items(loaded, score)
@@ -58,10 +58,11 @@ def compute_score(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
     return value.where(enough)
 
 
-def scripted(loaded: LoadedDataset, score_id: str) -> pd.Series:
-    if loaded.scores is None or score_id not in loaded.scores:
+def scripted(loaded: LoadedDataset, score: ResolvedScore) -> pd.Series:
+    found = loaded.scores.get(score.instrument_id)
+    if found is None or score.score_id not in found:
         return pd.Series(np.nan, index=loaded.frame.index, dtype=float)
-    return pd.to_numeric(loaded.scores[score_id], errors="coerce")
+    return pd.to_numeric(found[score.score_id], errors="coerce")
 
 
 def compute_scores(catalog: Catalog, datasets: dict[str, LoadedDataset]) -> dict[str, pd.DataFrame]:

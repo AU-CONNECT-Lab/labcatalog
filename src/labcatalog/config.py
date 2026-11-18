@@ -105,8 +105,8 @@ class DatasetConfig(StrictModel):
     occasion: dict[str, str] | None = None
     # The column map in maps/ this dataset reads, when it shares one with other datasets.
     map: str | None = None
-    # Files scripts write: the ID column, then a column per score, named by the score's ID.
-    scores: list[str] = []
+    # Each instrument's file a script writes: the ID column, then a column per score, by its ID.
+    scores: dict[str, str] = {}
     snapshot_date: date | None = None
     missing_codes: list[MissingCode] | None = None
     custom: dict[str, Any] = {}

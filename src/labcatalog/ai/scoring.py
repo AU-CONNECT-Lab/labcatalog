@@ -99,10 +99,16 @@ def scoring_request(project: Project, catalog: Catalog, instrument_id: str, data
                 f"{item.id} | {columns[item.id]} | {text} | {answer(instrument, item)} | {reverse}"
             )
     config = project.config
-    codes = missing_codes_for(config, dataset_by_name(config, dataset))
+    found = dataset_by_name(config, dataset)
+    codes = missing_codes_for(config, found)
     listed = ", ".join(f"{c.code} = {c.label}" for c in codes) or "none"
     lines += ["", f"Missing codes in this dataset: {listed}"]
-    lines.append(f"ID column: {id_column_for(config, dataset_by_name(config, dataset))}")
+    lines.append(f"ID column: {id_column_for(config, found)}")
+    if found.wave_column:
+        lines.append(
+            f"The data file holds several waves; this dataset is its rows with "
+            f"{found.wave_column} {found.wave_in_file()}, so score only those rows."
+        )
     if instrument.scores:
         lines += ["", "Scores in the catalog (id | label | how):"]
         lines += [f"{s.id} | {s.label} | {how(s)}" for s in instrument.scores]

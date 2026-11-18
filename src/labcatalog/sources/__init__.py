@@ -32,10 +32,10 @@ class LoadedDataset:
     file_waves: set[str] | None = None
     # The IDs as the file writes them, before id_map.csv corrects them.
     original_ids: pd.Series | None = None
-    # The scores files' columns, one row per row of the data; None when the dataset names none.
-    scores: pd.DataFrame | None = None
-    # Each scores file found and its IDs, to find those the data do not have.
-    score_ids: dict[str, set[str]] = field(default_factory=dict)
+    # Each instrument's scores from the file a script writes, one row per row of the data.
+    scores: dict[str, pd.DataFrame] = field(default_factory=dict)
+    # Each scores file found and its IDs, to find those the data lack or that it gives twice.
+    score_ids: dict[str, pd.Series] = field(default_factory=dict)
     numeric_cache: dict[str, pd.Series] = field(default_factory=dict, repr=False)
     answer_cache: dict[tuple, pd.Series] = field(default_factory=dict, repr=False)
 
@@ -167,11 +167,9 @@ def read_scores(
     id_column: str,
     ids: pd.Series,
     corrected: dict[str, str],
-) -> tuple[pd.DataFrame | None, dict[str, set[str]]]:
-    if not dataset.scores:
-        return None, {}
-    parts, found = [], {}
-    for name in dataset.scores:
+) -> tuple[dict[str, pd.DataFrame], dict[str, pd.Series]]:
+    scores, found = {}, {}
+    for instrument_id, name in dataset.scores.items():
         path = expand_path(name, project.root)
         # Before its prepare step has run the file is not there; the checks say so.
         if not path.is_file():
@@ -182,10 +180,15 @@ def read_scores(
                 f"{dataset.name}: the scores file {name} has no column '{id_column}'"
             )
         table[id_column] = id_map.apply(table[id_column], corrected)
-        found[name] = set(table[id_column])
-        by_id = table.drop_duplicates(id_column).set_index(id_column)
-        parts.append(by_id.reindex(ids.to_numpy()).set_axis(ids.index))
-    return pd.concat(parts, axis=1) if parts else pd.DataFrame(index=ids.index), found
+        # A file of several waves, like the data file, gives this dataset its own wave's rows.
+        if dataset.wave_column and dataset.wave_column in table:
+            table = table[table[dataset.wave_column] == dataset.wave_in_file()]
+        found[name] = table[id_column]
+        # An ID the file gives twice has no one score, so it takes none; the checks say so.
+        once = has_id(table[id_column]) & ~table[id_column].duplicated(keep=False)
+        by_id = table[once].set_index(id_column)
+        scores[instrument_id] = by_id.reindex(ids.to_numpy()).set_axis(ids.index)
+    return scores, found
 
 
 def load_datasets(project: Project) -> dict[str, LoadedDataset]:

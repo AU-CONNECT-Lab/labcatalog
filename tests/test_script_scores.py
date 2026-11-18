@@ -16,24 +16,37 @@ SCRIPTED = "  - {id: eps_t, label: T score, method: script}\n"
 KEY = "example_parent_stress.eps_t@parent_w1"
 
 
-def score_by_script(root, scores_file: str | None = "data/parent_w1_scores.csv") -> None:
-    path = root / INSTRUMENT
+SLEEP = "instruments/example_child_sleep.yaml"
+SLEEP_FILE = "data/parent_w1_sleep_scores.csv"
+
+
+def add_score(root, instrument: str, line: str) -> None:
+    path = root / instrument
     text = path.read_text(encoding="utf-8")
-    path.write_text(text.replace("references:\n", SCRIPTED + "references:\n", 1), encoding="utf-8")
+    path.write_text(text.replace("references:\n", line + "references:\n", 1), encoding="utf-8")
+
+
+def score_by_script(
+    root, scores_file: str | None = "data/parent_w1_scores.csv", sleep_file: str | None = None
+) -> None:
+    add_score(root, INSTRUMENT, SCRIPTED)
     if scores_file:
+        files = f"example_parent_stress: {scores_file}"
+        if sleep_file:
+            files += f", example_child_sleep: {sleep_file}"
         config = root / "labcatalog.yaml"
         entry = "path: data/parent_w1.csv,"
         config.write_text(
-            config.read_text(encoding="utf-8").replace(
-                entry, f"{entry} scores: [{scores_file}],", 1
-            ),
+            config.read_text(encoding="utf-8").replace(entry, f"{entry} scores: {{{files}}},", 1),
             encoding="utf-8",
         )
 
 
-def write_scores(root, rows: dict[str, str], **columns: list[str]) -> None:
+def write_scores(
+    root, rows: dict[str, str], name: str = "parent_w1_scores.csv", **columns: list[str]
+) -> None:
     frame = pd.DataFrame({"pid": list(rows), "eps_t": list(rows.values()), **columns})
-    frame.to_csv(root / "data" / "parent_w1_scores.csv", index=False)
+    frame.to_csv(root / "data" / name, index=False)
 
 
 def issues_of(result, code: str) -> list[str]:
@@ -70,13 +83,68 @@ def test_a_missing_scores_file_or_column_is_a_warning(mock_project):
         mock_project / "data" / "parent_w1_scores.csv", index=False
     )
     [missing] = issues_of(run_catalog(mock_project), "scores_missing")
-    assert missing == f"{KEY}: no scores file of parent_w1 has a column eps_t"
+    assert missing == f"{KEY}: the scores file data/parent_w1_scores.csv has no column eps_t"
 
 
 def test_without_a_scores_file_a_script_score_says_so(mock_project):
     score_by_script(mock_project, None)
     [missing] = issues_of(run_catalog(mock_project), "scores_missing")
-    assert missing == f"{KEY}: computed by a script, but parent_w1 names no scores file"
+    assert missing == (
+        f"{KEY}: computed by a script, but parent_w1 names no scores file for example_parent_stress"
+    )
+
+
+def test_a_scores_file_under_an_unknown_instrument_is_reported(mock_project):
+    score_by_script(mock_project)
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    config.write_text(text.replace("{example_parent_stress: ", "{no_such: "), encoding="utf-8")
+    messages = [
+        i.message for i in validate_project(load_project(mock_project)) if i.level == "error"
+    ]
+    assert any(m.endswith("(parent_w1).scores: no instrument 'no_such'") for m in messages)
+
+
+def test_a_score_of_another_instrument_with_the_same_id_is_not_held_to_the_file(mock_project):
+    score_by_script(mock_project)
+    add_score(
+        mock_project, SLEEP, "  - {id: eps_t, label: Two, method: sum, items: [ecs_1, ecs_2]}\n"
+    )
+    write_scores(mock_project, {"1001P": "51.5"})
+    result = run_catalog(mock_project)
+    assert not issues_of(result, "score_mismatch")
+    assert result.scores["parent_w1"][KEY].notna().sum() == 1
+    assert result.scores["parent_w1"]["example_child_sleep.eps_t@parent_w1"].notna().sum() > 1
+
+
+def test_scores_of_one_id_by_script_each_take_their_own_instruments_file(mock_project):
+    score_by_script(mock_project, sleep_file=SLEEP_FILE)
+    add_score(mock_project, SLEEP, "  - {id: eps_t, label: T score, method: script}\n")
+    write_scores(mock_project, {"1001P": "51.5", "1002P": "40"})
+    write_scores(mock_project, {"1001P": "7"}, name="parent_w1_sleep_scores.csv")
+    result = run_catalog(mock_project)
+    loaded = result.datasets["parent_w1"]
+    found = result.scores["parent_w1"].assign(pid=loaded.frame[loaded.id_column]).set_index("pid")
+    sleep = "example_child_sleep.eps_t@parent_w1"
+    assert found.loc["1001P", [KEY, sleep]].tolist() == [51.5, 7.0]
+    assert found.loc["1002P", KEY] == 40 and pd.isna(found.loc["1002P", sleep])
+    assert not issues_of(result, "scores_missing")
+
+
+def test_an_id_the_scores_file_gives_twice_takes_no_score(mock_project):
+    score_by_script(mock_project)
+    (mock_project / "data" / "parent_w1_scores.csv").write_text(
+        "pid,eps_t\n1001P,50\n1001P,60\n1002P,40\n", encoding="utf-8"
+    )
+    result = run_catalog(mock_project)
+    loaded = result.datasets["parent_w1"]
+    values = result.scores["parent_w1"][KEY].set_axis(loaded.frame[loaded.id_column])
+    assert values.isna()["1001P"] and values["1002P"] == 40
+    [repeated] = issues_of(result, "scores_repeated")
+    assert repeated == (
+        "parent_w1: data/parent_w1_scores.csv gives 1 ID(s) more than one row, so they take no "
+        "score: 1001P"
+    )
 
 
 def test_a_scores_file_column_for_a_summed_score_is_held_to_labcatalogs(mock_project):
@@ -130,10 +198,11 @@ def test_a_started_script_becomes_a_step_whose_scores_the_dataset_reads(mock_pro
     assert step.inputs == ["data/parent_w1.csv", script]
     project = load_project(mock_project)
     assert project.config.prepare[-1] == step
-    assert dataset_by_name(project.config, "parent_w1").scores == step.outputs
+    files = {"example_parent_stress": step.outputs[0]}
+    assert dataset_by_name(project.config, "parent_w1").scores == files
     # Registering again changes nothing.
     scoring_steps.register(project, "example_parent_stress", "parent_w1", script)
-    assert dataset_by_name(load_project(mock_project).config, "parent_w1").scores == step.outputs
+    assert dataset_by_name(load_project(mock_project).config, "parent_w1").scores == files
     filled = text.replace('scores["eps_t"] = pd.NA', 'scores["eps_t"] = 50')
     (mock_project / script).write_text(filled, encoding="utf-8")
     subprocess.run(
