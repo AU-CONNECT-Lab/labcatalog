@@ -9,7 +9,7 @@ from labcatalog.schema import SCRIPT
 
 
 def scoring_code_r(scores: list[ResolvedScore]) -> str:
-    return script(scores, "read.csv()", [], score_lines_r)
+    return script(scores, "read.csv(check.names = FALSE)", [], score_lines_r)
 
 
 def scoring_code_python(scores: list[ResolvedScore]) -> str:
@@ -53,7 +53,9 @@ def score_lines_r(score: ResolvedScore) -> list[str]:
             f"ifelse(v %in% c({numbers(valid_sets[0])}), v, NA) }})"
         )
     else:
-        entries = ", ".join(f"{c} = c({numbers(score.valid_values[c])})" for c in score.columns)
+        entries = ", ".join(
+            f"{text(c)} = c({numbers(score.valid_values[c])})" for c in score.columns
+        )
         lines.append(f"valid <- list({entries})")
         lines.append(
             "x[] <- Map(function(v, ok) { v <- suppressWarnings(as.numeric(v)); "
@@ -70,7 +72,7 @@ def score_lines_r(score: ResolvedScore) -> list[str]:
         ("zero", "mean"): f"rowSums(x, na.rm = TRUE) / {k}",
     }[(score.missing_rule, score.method)]
     test = f"n_valid == {k}" if score.missing_rule == "complete" else f"n_valid >= {enough}"
-    lines.append(f"d${output_name(score)} <- ifelse({test}, {value}, NA)")
+    lines.append(f"d[[{text(output_name(score))}]] <- ifelse({test}, {value}, NA)")
     return lines
 
 
@@ -84,7 +86,7 @@ def score_lines_python(score: ResolvedScore) -> list[str]:
     if len(valid_sets) == 1:
         lines.append(f"x = x.where(x.isin([{numbers(valid_sets[0])}]))")
     else:
-        entries = ", ".join(f'"{c}": [{numbers(score.valid_values[c])}]' for c in score.columns)
+        entries = ", ".join(f"{text(c)}: [{numbers(score.valid_values[c])}]" for c in score.columns)
         lines.append(f"valid = {{{entries}}}")
         lines.append("x = x.apply(lambda col: col.where(col.isin(valid[col.name])))")
     lines += reverse_lines(score, "python")
@@ -98,7 +100,7 @@ def score_lines_python(score: ResolvedScore) -> list[str]:
         ("zero", "mean"): f"(x.fillna(0).sum(axis=1) / {k})",
     }[(score.missing_rule, score.method)]
     test = f"n_valid == {k}" if score.missing_rule == "complete" else f"n_valid >= {enough}"
-    lines.append(f'd["{output_name(score)}"] = {value}.where({test})')
+    lines.append(f"d[{text(output_name(score))}] = {value}.where({test})")
     return lines
 
 
@@ -151,7 +153,8 @@ def label_plan(config: ProjectConfig, catalog: Catalog, dataset_name: str) -> La
 
 def label_code_r(plan: LabelPlan) -> str:
     lines = [
-        f"# Labels for {plan.dataset}; d is that dataset read with read.csv(). Needs the haven package.",
+        f"# Labels for {plan.dataset}; d is that dataset read with read.csv(check.names = FALSE). "
+        "Needs the haven package.",
         "library(haven)",
         f"missing <- {r_vector(plan.missing)}",
     ]
@@ -270,7 +273,7 @@ def distinct_valid_sets(score: ResolvedScore) -> list[list[float]]:
 
 
 def quoted(columns: list[str]) -> str:
-    return ", ".join(f'"{column}"' for column in columns)
+    return ", ".join(text(column) for column in columns)
 
 
 def numbers(values: list[float]) -> str:

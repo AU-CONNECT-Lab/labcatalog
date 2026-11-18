@@ -35,6 +35,10 @@ FIGURE_MIN_WIDTH = 360
 
 
 R_NOTE = "Computed in R."
+NO_COMPARISON = (
+    "Fewer than two groups have two or more people with a value, or the outcome does not vary "
+    "within any group."
+)
 
 
 def rscript() -> str | None:
@@ -257,7 +261,7 @@ def group_section(
 
                 plan = build("")
                 if plan is None:
-                    return lambda: note("Fewer than two groups have two or more people.")
+                    return lambda: note(NO_COMPARISON)
                 try:
                     found, engine, code = await missing.pooled(
                         result, sample, frame, found_plan, lambda file: build(file).code
@@ -271,9 +275,7 @@ def group_section(
                 t_test = view.t_test or result.project.config.stats.t_test
                 plan = script.comparison_plan(frame, group, outcome, t_test)
                 if plan is None:
-                    return lambda: note(
-                        "Fewer than two groups have two or more people with a value."
-                    )
+                    return lambda: note(NO_COMPARISON)
                 found, engine = await compute(result, sample, frame, plan.code)
             comparison = script.read_comparison(found, plan)
             figure = plot_code.groups(group.label, outcome.label, len(comparison.groups))

@@ -109,6 +109,40 @@ def test_generated_r_matches_labcatalog(mock, tmp_path):
         np.testing.assert_allclose(got, expected(datasets, score), err_msg=score.key)
 
 
+ODD = {"eps_1_w1": "Item 1", "ecs_1_w1": "PSS-2", "ecs_2_w1": '3rd "x"'}
+
+
+def test_scoring_code_runs_on_names_that_are_not_r_names(mock, tmp_path):
+    root, catalog, datasets = mock
+    mixed = variants(catalog)[-1]
+    odd = mixed.model_copy(
+        update={
+            "dataset": "parent-w1",
+            "columns": [ODD[c] for c in mixed.columns],
+            "reverse_columns": [ODD[c] for c in mixed.reverse_columns],
+            "reverse_bounds": {ODD[c]: b for c, b in mixed.reverse_bounds.items()},
+            "valid_values": {ODD[c]: v for c, v in mixed.valid_values.items()},
+        }
+    )
+    path = tmp_path / "odd.csv"
+    pd.read_csv(root / "data" / "parent_w1.csv").rename(columns=ODD).to_csv(path, index=False)
+    want = expected(datasets, mixed)
+    d = pd.read_csv(path)
+    exec(scoring_code_python([odd]), {"d": d})
+    np.testing.assert_allclose(d[output_name(odd)].to_numpy(dtype=float), want)
+    if rscript() is None:
+        return
+    out = tmp_path / "out.csv"
+    script = tmp_path / "odd.R"
+    script.write_text(
+        f'd <- read.csv("{path.as_posix()}", check.names = FALSE)\n{scoring_code_r([odd])}\n'
+        f'write.csv(d["{output_name(odd)}"], "{out.as_posix()}", row.names = FALSE)',
+        encoding="utf-8",
+    )
+    subprocess.run([rscript(), str(script)], check=True, capture_output=True)
+    np.testing.assert_allclose(pd.read_csv(out).iloc[:, 0].to_numpy(dtype=float), want)
+
+
 def test_unavailable_items_explain_why(mock):
     _, catalog, _ = mock
     score = catalog.scores[0].model_copy(update={"unavailable_items": ["x"]})

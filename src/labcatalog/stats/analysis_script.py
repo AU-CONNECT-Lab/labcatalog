@@ -66,6 +66,11 @@ from scipy import stats
 d = pd.read_csv({path})
 """
 R_PACKAGES = "\n# Needs the R packages {names}; install them once with: {install}"
+# Each result R hands back, with the names of its text columns beside it.
+R_WRITE = """\
+write.csv({name}, {path}, row.names = FALSE, na = "")
+text <- vapply({name}, function(x) is.character(x) || is.factor(x), logical(1))
+writeLines(names({name})[text], {text})"""
 R_TABLE_ONE = """\
 # Table 1: N in each dataset; n, M and SD (psych::describe) for numbers and scores, with
 # Cronbach's alpha (psych::alpha) on pairwise complete cases; n (%) for answer options.
@@ -532,6 +537,11 @@ class Variable:
     # Columns of the score's items, for alpha.
     items: list[str] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # Labels go into comments of the code written, which a line break would end.
+        self.label = " ".join(self.label.split())
+        self.options = [(value, " ".join(text.split())) for value, text in self.options]
+
 
 @dataclass
 class Code:
@@ -623,19 +633,25 @@ class AnalysisData:
         definition = next(s for s in instrument.scores if s.id == score.score_id)
         column = f"{score_name(self.result, score, parts(key))}_{'_'.join(parts(key))}"
         self.columns[column] = analysis.values(self.result, self.sample, key)
-        names: list[str] = []
+        # A pooled score's items are matched by item ID and named as the first file holding each.
+        by_item: dict[str, str] = {}
         if items:
             for dataset in parts(key):
                 part = next(
                     s for s in self.result.catalog.scores if s.key == part_key(key, dataset)
                 )
                 found = score_items(self.result.datasets[dataset], part)
-                # A pooled score's items take the first file's names; its studies' people differ.
-                names = names or [self.column_name(dataset, c) for c in found.columns]
-                for name, source in zip(names, found.columns, strict=True):
+                item_ids = {
+                    v.column: v.item_id
+                    for v in self.result.catalog.variables_for(dataset)
+                    if v.instrument_id == score.instrument_id
+                }
+                for source in found.columns:
+                    name = by_item.setdefault(item_ids[source], self.column_name(dataset, source))
                     values = self.align(dataset, found[source].to_numpy(dtype=float))
                     held = self.columns.get(name)
                     self.columns[name] = values if held is None else held.combine_first(values)
+        names = list(by_item.values())
         return Variable(
             key=key,
             label=f"{abbreviation(instrument)} {definition.label}",
@@ -958,7 +974,10 @@ def comparison_plan(
 ) -> ComparisonPlan | None:
     sizes = group_sizes(frame, group, outcome)
     kept = [(value, text) for value, text, n in sizes if n >= MIN_GROUP]
-    if len(kept) < 2:
+    both = frame[[group.column, outcome.column]].dropna()
+    # An outcome that varies within no group leaves the test no error to divide by.
+    varies = any(both.loc[both[group.column] == v, outcome.column].nunique() > 1 for v, _ in kept)
+    if len(kept) < 2 or not varies:
         return None
     left = [(text, n) for _, text, n in sizes if n < MIN_GROUP]
     shown = ", ".join(f"{text} ({n})" for text, n in left)
@@ -1067,7 +1086,11 @@ def run_code(
         r_head, py_head = headers(result, sample, (folder / DATA_FILE).as_posix(), code.packages)
         if rscript:
             writes = [
-                f"write.csv({name}, {r_string((folder / f'{name}.csv').as_posix())}, row.names = FALSE)"
+                R_WRITE.format(
+                    name=name,
+                    path=r_string((folder / f"{name}.csv").as_posix()),
+                    text=r_string((folder / f"{name}.txt").as_posix()),
+                )
                 for name in code.outputs
             ]
             path = folder / "analysis.R"
@@ -1076,11 +1099,17 @@ def run_code(
                 "\n".join([prelude, r_head, code.r, code.r_footer, *writes]), encoding="utf-8"
             )
             run_r(rscript, [str(path)])
-            return {n: pd.read_csv(folder / f"{n}.csv") for n in code.outputs}, R
+            return {n: r_output(folder / f"{n}.csv") for n in code.outputs}, R
         names: dict = {}
         with contextlib.redirect_stdout(io.StringIO()):
             exec("\n".join([py_head, code.python, code.python_footer]), names)
         return {n: names[n] for n in code.outputs}, PYTHON
+
+
+def r_output(path: Path) -> pd.DataFrame:
+    # R's text columns stay text, so a label such as None, NA or 1 is read as written.
+    text = path.with_suffix(".txt").read_text(encoding="utf-8").splitlines()
+    return pd.read_csv(path, keep_default_na=False, na_values=[""], dtype=dict.fromkeys(text, str))
 
 
 def read_comparison(found: dict[str, pd.DataFrame], plan: ComparisonPlan) -> Comparison:

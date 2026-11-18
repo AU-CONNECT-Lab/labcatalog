@@ -536,3 +536,25 @@ def test_two_reporters_of_one_score_pool_apart(raters):
     parent = choices["example_worries_temper.ewt_total@parent_child_w1+pilot_parent"]
     assert child.endswith("(child)") and parent.endswith("(parent)")
     assert choices["example_mood.ems_total@child_w1+pilot_w1"] == "EMS total score"
+
+
+def test_a_pooled_scores_items_are_matched_by_id_when_a_study_lacks_one(pilot_project):
+    maps = pilot_project / "maps"
+    rows = (maps / "child_w1.csv").read_text(encoding="utf-8").splitlines(keepends=True)
+    (maps / "pilot_w1.csv").write_text("".join(r for r in rows if ",ems_9" not in r), "utf-8")
+    config = pilot_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8").replace("correlate_by: family", "correlate_by: id")
+    own_map = text.replace("path: data/child_w1.csv, map: child_w1}", "path: data/child_w1.csv}")
+    config.write_text(own_map, encoding="utf-8")
+    found = run_catalog(pilot_project)
+    data = script.AnalysisData(found, analysis.build_sample(found, FILES, True))
+    total = data.score(TOTAL, items=True)
+    frame = data.frame()
+    assert len(total.items) == 9
+    alone = script.AnalysisData(found, analysis.build_sample(found, ["child_w1"], True))
+    child = alone.score("example_mood.ems_total@child_w1", items=True)
+    alone_frame = alone.frame()
+    # The pilot's people, a copy of child_w1's, give every item but the ninth.
+    for column, by_one in [(total.items[0], child.items[0]), (total.items[-1], child.items[-1])]:
+        times = 2 if column == total.items[0] else 1
+        assert frame[column].notna().sum() == times * alone_frame[by_one].notna().sum() > 0

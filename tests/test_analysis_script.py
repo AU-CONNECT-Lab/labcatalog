@@ -1,3 +1,4 @@
+import ast
 import shutil
 import subprocess
 from dataclasses import replace
@@ -471,6 +472,40 @@ def test_table_one_offers_number_items_but_starts_without_them(result):
     assert key in script.measures(result, datasets)
     defaults = script.default_measures(result, datasets)
     assert key not in defaults and "item:example_demographics.dem_gender" in defaults
+
+
+def test_an_outcome_that_varies_within_no_group_is_not_compared(result, sample):
+    data = script.AnalysisData(result, sample)
+    group, outcome = data.item(GENDER), data.score(EMS)
+    frame = data.frame()
+    assert script.comparison_plan(frame, group, outcome) is not None
+    frame[outcome.column] = frame[group.column].where(frame[outcome.column].notna())
+    assert script.comparison_plan(frame, group, outcome) is None
+    frame[outcome.column] = 0.0
+    assert script.comparison_plan(frame, group, outcome) is None
+
+
+def test_a_label_with_a_line_break_stays_in_its_comment(result, sample):
+    data = script.AnalysisData(result, sample)
+    group = replace(data.item(GENDER), label="DEM: Gender of the child\nPlease pick one")
+    outcome = data.score(EMS)
+    plan = script.comparison_plan(data.frame(), group, outcome)
+    ast.parse(plan.code.python)
+    assert "Gender of the child Please pick one" in plan.code.r
+
+
+@needs_r
+def test_r_results_keep_labels_that_look_missing_or_numeric_as_text(result, sample):
+    code = script.Code(
+        "Labels",
+        r='out <- data.frame(name = c("None", "1", "NA"), n = c(1, NA, 3))',
+        python="",
+        outputs=("out",),
+    )
+    found, engine = script.run_code(result, sample, pd.DataFrame({"x": [1]}), code, rscript())
+    assert engine == script.R
+    assert found["out"]["name"].tolist() == ["None", "1", "NA"]
+    assert found["out"]["n"].iloc[0] == 1 and pd.isna(found["out"]["n"].iloc[1])
 
 
 def test_two_instruments_scores_of_one_id_keep_their_own_columns(mock_project):
