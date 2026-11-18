@@ -73,3 +73,25 @@ def test_existing_score_column_is_picked_up(mock_project):
     catalog = resolve_catalog(load_project(mock_project))
     score = next(s for s in catalog.scores_for("parent_w1") if s.score_id == "eps_mean")
     assert score.existing_column == "eps_mean_w1"
+
+
+def test_a_scripts_score_may_list_items_whose_options_are_text(mock_project):
+    path = mock_project / "instruments" / "example_screen_time.yaml"
+    edit(
+        path,
+        "default_response_set: hours",
+        "  - id: letters\n    options:\n"
+        "      - {value: a, label: A}\n      - {value: b, label: B}\n"
+        "default_response_set: hours",
+    )
+    edit(path, "response_set: frequency}", "response_set: letters, reverse: true}")
+    edit(
+        path,
+        "custom:",
+        "scores:\n  - {id: est_use, label: Use, method: script, items: [est_1, est_3]}\ncustom:",
+    )
+    catalog = resolve_catalog(load_project(mock_project))
+    score = next(s for s in catalog.scores_for("child_w2") if s.score_id == "est_use")
+    assert score.columns == ["est_1_w2", "est_3_w2"]
+    assert score.valid_values == {"est_1_w2": [0.0, 1.0, 2.0, 3.0], "est_3_w2": []}
+    assert (score.reverse_columns, score.reverse_bounds) == ([], {})

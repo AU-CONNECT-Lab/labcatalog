@@ -78,8 +78,11 @@ def matched(dataset: DatasetConfig, project_root: Path) -> Iterator[tuple[str, P
     # The files the dataset's rule matches, as the catalog counts them, each with its ID.
     folder = expand_path(dataset.path, project_root)
     matcher = file_pattern(dataset.files)
-    # The rule's own pattern decides, since glob's trailing ** finds no files before Python 3.13.
-    for path in sorted(folder.rglob("*")):
+    pattern = dataset.files.replace(ID, "*")
+    # Before Python 3.13 a trailing ** finds folders only; **/* finds files in every version.
+    if pattern.endswith("**"):
+        pattern += "/*"
+    for path in sorted(folder.glob(pattern)):
         found = matcher.fullmatch(path.relative_to(folder).as_posix())
         if found and not path.is_dir():
             yield found.group("id"), path

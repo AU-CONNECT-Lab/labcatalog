@@ -169,7 +169,9 @@ def resolve_scores(
     scores = []
     for score in instrument.scores:
         present = [by_item[item_id] for item_id in score.items if item_id in by_item]
-        reversed_items = [variable for variable in present if variable.reverse]
+        values = {variable.column: option_values(variable) for variable in present}
+        # Only a script's score may list items without numeric options, which have no bounds.
+        reversed_items = [v for v in present if v.reverse and values[v.column]]
         scores.append(
             ResolvedScore(
                 key=f"{instrument.id}.{score.id}@{dataset.name}",
@@ -181,13 +183,9 @@ def resolve_scores(
                 columns=[variable.column for variable in present],
                 reverse_columns=[variable.column for variable in reversed_items],
                 reverse_bounds={
-                    variable.column: option_bounds(variable.response_options)
-                    for variable in reversed_items
+                    v.column: (min(values[v.column]), max(values[v.column])) for v in reversed_items
                 },
-                valid_values={
-                    variable.column: [float(option.value) for option in variable.response_options]
-                    for variable in present
-                },
+                valid_values=values,
                 reversed_in_data=administration.reversed_in_data,
                 missing_rule=score.missing_rule,
                 min_valid=score.min_valid,
@@ -198,9 +196,8 @@ def resolve_scores(
     return scores
 
 
-def option_bounds(options: list[ResponseOption]) -> tuple[float, float]:
-    values = [float(option.value) for option in options]
-    return min(values), max(values)
+def option_values(variable: ResolvedVariable) -> list[float]:
+    return [float(o.value) for o in variable.response_options if not isinstance(o.value, str)]
 
 
 def as_text_dict(text: Text) -> dict[str, str]:

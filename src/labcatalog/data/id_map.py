@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 
 from labcatalog import defaults
-from labcatalog.exceptions import DataSourceError
+from labcatalog.exceptions import DataSourceError, EditError
 from labcatalog.issues import Issue
 
 COLUMNS = ["dataset", "from", "to"]
@@ -58,6 +58,9 @@ def read(root: Path) -> pd.DataFrame:
         return pd.DataFrame(columns=COLUMNS)
     try:
         return pd.read_csv(path, dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    except pd.errors.EmptyDataError:
+        # An empty file corrects nothing, as no file does.
+        return pd.DataFrame(columns=COLUMNS)
     except UnicodeDecodeError:
         message = f"{defaults.ID_MAP_FILENAME} is not UTF-8; in Excel save it as 'CSV UTF-8'"
         raise DataSourceError(message) from None
@@ -133,6 +136,11 @@ def propose(
 def save(root: Path, dataset: str, rows: list[Row]) -> int:
     # Replaces this dataset's entries for these IDs; an ID left as it is needs no entry.
     table = read(root)
+    if list(table.columns) != COLUMNS:
+        raise EditError(
+            f"{defaults.ID_MAP_FILENAME} needs the columns {', '.join(COLUMNS)}; "
+            "correct its header first"
+        )
     olds = {r.old for r in rows}
     kept = table[~((table["dataset"] == dataset) & table["from"].isin(olds))]
     added = pd.DataFrame(

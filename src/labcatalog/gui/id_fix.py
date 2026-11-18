@@ -7,6 +7,7 @@ from labcatalog import defaults
 from labcatalog.config import id_pattern
 from labcatalog.data import id_map
 from labcatalog.data.id_map import Row, Rule
+from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui.common import note
 from labcatalog.pipeline import CatalogResult
 from labcatalog.sources import load_rosters
@@ -185,7 +186,11 @@ def open_dialog(
         source = loaded.source_path.name if loaded.source_path else state.dataset
 
         async def go() -> None:
-            id_map.save(root, state.dataset, found)
+            try:
+                id_map.save(root, state.dataset, found)
+            except LabCatalogError as err:
+                ui.notify(str(err), type="negative", multi_line=True)
+                return
             asked.close()
             dialog.close()
             await on_saved()

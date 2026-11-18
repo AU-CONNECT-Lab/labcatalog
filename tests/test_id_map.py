@@ -4,7 +4,7 @@ import pytest
 from labcatalog import defaults
 from labcatalog.data import id_map
 from labcatalog.data.id_map import Rule
-from labcatalog.exceptions import DataSourceError
+from labcatalog.exceptions import DataSourceError, EditError
 from labcatalog.pipeline import run_catalog
 
 
@@ -95,3 +95,19 @@ def test_a_map_not_saved_as_utf8(mock_project):
     )
     with pytest.raises(DataSourceError, match="CSV UTF-8"):
         run_catalog(mock_project)
+
+
+def test_an_empty_map_corrects_nothing(tmp_path):
+    (tmp_path / defaults.ID_MAP_FILENAME).write_bytes(b"")
+    assert id_map.mapping(tmp_path, "a") == {}
+    assert id_map.check(tmp_path, {"a"}) == []
+    assert id_map.save(tmp_path, "a", [id_map.Row("sub-1", "1", None, None)]) == 1
+    assert id_map.mapping(tmp_path, "a") == {"sub-1": "1"}
+
+
+def test_saving_into_a_map_with_another_header_asks_to_correct_the_header(tmp_path):
+    path = tmp_path / defaults.ID_MAP_FILENAME
+    path.write_text("Dataset,From,To\na,1,2\n", encoding="utf-8")
+    with pytest.raises(EditError, match="dataset, from, to"):
+        id_map.save(tmp_path, "a", [id_map.Row("sub-1", "1", None, None)])
+    assert path.read_text(encoding="utf-8") == "Dataset,From,To\na,1,2\n"
