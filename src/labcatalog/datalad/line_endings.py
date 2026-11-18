@@ -50,9 +50,9 @@ def convertible(root: Path, paths: list[str]) -> list[str]:
 
 
 def checksummed(project: Project) -> list[Path]:
-    # What a manifest gives a checksum: the data files, the rosters and what prepare steps read.
+    # What a manifest gives a checksum: the data and scores files, the rosters and step inputs.
     config, root = project.config, project.root
-    sources = [d.path for d in config.datasets if d.path]
+    sources = [p for d in config.datasets for p in (d.path, *d.scores.values()) if p]
     rosters = [study.roster.path for study in config.studies.values() if study.roster]
     inputs = [path for step in config.prepare for path in step.inputs]
     return present([expand_path(path, root) for path in (*sources, *rosters, *inputs)])

@@ -1,6 +1,13 @@
 import os
 
-from labcatalog.data.manifest import build_manifest, changed, file_times, git_commit
+from labcatalog.data.manifest import (
+    build_manifest,
+    changed,
+    file_times,
+    folder_sha256,
+    git_commit,
+)
+from labcatalog.datalad.line_endings import checksummed
 from labcatalog.project import EXAMPLE_DIR, load_project
 from labcatalog.sources import load_datasets
 
@@ -36,6 +43,38 @@ def test_checksum_changes_when_a_value_changes(mock_project):
     after = {r.dataset: r.sha256 for r in manifest_for(mock_project).files}
     assert before["child_w2"] != after["child_w2"]
     assert before["child_w1"] == after["child_w1"]
+
+
+def test_a_scripts_scores_file_is_recorded_and_its_change_seen(mock_project):
+    path = mock_project / "instruments" / "example_parent_stress.yaml"
+    scripted = "  - {id: eps_t, label: T score, method: script}\nreferences:\n"
+    path.write_text(path.read_text(encoding="utf-8").replace("references:\n", scripted, 1), "utf-8")
+    config = mock_project / "labcatalog.yaml"
+    entry = "path: data/parent_w1.csv,"
+    files = f"{entry} scores: {{example_parent_stress: data/parent_w1_scores.csv}},"
+    config.write_text(config.read_text(encoding="utf-8").replace(entry, files, 1), "utf-8")
+    scores = mock_project / "data" / "parent_w1_scores.csv"
+    scores.write_text("pid,eps_t\n1001P,50\n1002P,51\n", encoding="utf-8")
+    name = "parent_w1: example_parent_stress scores"
+    before = {r.dataset: r for r in manifest_for(mock_project).files}
+    assert (before[name].path, before[name].rows) == ("data/parent_w1_scores.csv", 2)
+    scores.write_text("pid,eps_t\n1001P,50\n1002P,99\n", encoding="utf-8")
+    after = {r.dataset: r.sha256 for r in manifest_for(mock_project).files}
+    assert before[name].sha256 != after[name]
+    assert before["parent_w1"].sha256 == after["parent_w1"]
+    found = load_project(mock_project)
+    assert scores in checksummed(found)
+
+
+def test_a_folders_fingerprint_is_the_same_with_its_content_fetched_or_not(tmp_path):
+    folder = tmp_path / "raw"
+    folder.mkdir()
+    content = b"trial,rt\n" + b"1,512\n" * 200
+    (folder / "A1_task.csv").write_bytes(content)
+    fetched = folder_sha256(folder)
+    key = f"MD5E-s{len(content)}--0123456789abcdef0123456789abcdef.csv"
+    (folder / "A1_task.csv").write_bytes(f"/annex/objects/{key}\n".encode())
+    assert folder_sha256(folder) == fetched
 
 
 def test_file_times_see_what_others_change(mock_project):

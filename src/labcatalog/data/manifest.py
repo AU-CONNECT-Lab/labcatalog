@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from labcatalog import defaults
 from labcatalog.config import ProjectConfig, roster_name
 from labcatalog.data.prepare import step_states
-from labcatalog.datalad.annex import is_placeholder
+from labcatalog.datalad.annex import annexed_size, is_placeholder
 from labcatalog.datalad.versions import (
     DataladRecord,
     commit_of,
@@ -60,8 +60,16 @@ def folder_sha256(folder: Path) -> str:
     # Which files are there and how big, without reading what may be gigabytes of images.
     digest = hashlib.sha256()
     for path in sorted(p for p in folder.rglob("*") if not p.is_dir()):
-        digest.update(f"{path.relative_to(folder).as_posix()}\t{path.lstat().st_size}\n".encode())
+        digest.update(f"{path.relative_to(folder).as_posix()}\t{content_size(path)}\n".encode())
     return digest.hexdigest()
+
+
+def content_size(path: Path) -> int | str:
+    # Content git-annex has not fetched counts by its key's size, so a freeze matches either way.
+    if is_placeholder(path):
+        size = annexed_size(path)
+        return "?" if size is None else size
+    return path.stat().st_size if path.exists() else path.lstat().st_size
 
 
 def git_commit(root: Path) -> str | None:
@@ -141,6 +149,23 @@ def roster_records(project: Project) -> list[FileRecord]:
     ]
 
 
+def scores_records(project: Project, datasets: dict[str, LoadedDataset]) -> list[FileRecord]:
+    # A script's scores are read like the data, so a changed scores file shows in a freeze.
+    found = []
+    for name, loaded in datasets.items():
+        for instrument_id, path in loaded.config.scores.items():
+            if path in loaded.score_ids:
+                resolved = expand_path(path, project.root)
+                record = FileRecord(
+                    dataset=f"{name}: {instrument_id} scores",
+                    path=portable_path(resolved, project.root).as_posix(),
+                    sha256=file_sha256(resolved),
+                    rows=len(loaded.score_ids[path]),
+                )
+                found.append(record)
+    return found
+
+
 def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Manifest:
     states = step_states(project)
     return Manifest(
@@ -160,6 +185,7 @@ def build_manifest(project: Project, datasets: dict[str, LoadedDataset]) -> Mani
             for name, loaded in datasets.items()
             if loaded.source_path is not None
         ]
+        + scores_records(project, datasets)
         + roster_records(project),
         inputs=[
             InputRecord(step=state.step.name, path=f.path, sha256=file_sha256(f.resolved))
