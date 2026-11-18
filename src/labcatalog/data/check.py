@@ -452,9 +452,11 @@ def check_dates(project: Project, datasets: dict[str, LoadedDataset]) -> list[Is
         parsed = pd.to_datetime(values, format=project.config.defaults.date_format, errors="coerce")
         bad = parsed.isna() & (values.str.strip() != "")
         if bad.any():
+            # Each date's shape with its digits as 0, since a date can be one person's visit.
+            shapes = dict.fromkeys(re.sub(r"\d", "0", value.strip()) for value in values[bad])
             message = (
-                f"{column}: {bad.sum()} date(s) do not match {project.config.defaults.date_format}: "
-                f"{examples(values[bad])}"
+                f"{column}: {bad.sum()} date(s) do not match {project.config.defaults.date_format}, "
+                f"written as {examples(shapes)}"
             )
             issues.append(
                 problem(

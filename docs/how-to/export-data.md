@@ -37,7 +37,7 @@ Open answers (`text` items) are listed in `variables.csv` but never exported, si
 
 - **Front**: the project, each study's description and how to cite it, the missing codes, and where each person's group comes from.
 
-- **Datasets**: one row per dataset with its wave, reporter, the dates its data were collected, its rows and people, its ID, respondent and date columns, its instruments and the prepare step that writes its file; then a row for each participant roster.
+- **Datasets**: one row per dataset with its wave, reporter, the first and last month its data were collected, its rows and people, its ID, respondent and date columns, its instruments and the prepare step that writes its file; then a row for each participant roster.
 
 - **One section per instrument**: its description, construct, instructions, references and license, the datasets that give it, its response options, its items with their wording, and its scores with their items and how missing items are handled. Where the datasets differ (an item dropped or not mapped, an item reworded or given other options, reversed items already reversed in the data) a table says how. With **Statistics** ticked, each score's n, mean, SD and α in each dataset follow, and ω when the window has fitted the factor models.
 

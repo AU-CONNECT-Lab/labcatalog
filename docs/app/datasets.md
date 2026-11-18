@@ -19,7 +19,7 @@ The datasets are grouped by study, under the study's label; its description and 
 | Dataset, Wave, Reporter, Modality | From the dataset's entry in `labcatalog.yaml`. |
 | Rows | Rows in the file. |
 | IDs | Distinct participant IDs; a row without an ID counts as no one. |
-| Collected | The first and last date in the `date_column`. |
+| Collected | The first and last month in the `date_column`. |
 | Data as of | The dataset's `snapshot_date`. |
 
 Click a row to open the dataset. For a folder of files, its summary also gives the number of **Files** its rule matches and their **Size**; when some of them are in DataLad and not downloaded yet, **On this computer** says how many are here and how much they take. The size of a file not downloaded comes from its git-annex key; when a key does not give it, the size reads "over" what is known.

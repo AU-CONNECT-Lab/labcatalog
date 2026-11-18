@@ -74,14 +74,17 @@ class DatasetSummary(BaseModel):
     n_rows: int
     n_ids: int
     n_groups: int | None = None
-    first_date: date | None = None
-    last_date: date | None = None
     collected_by_month: dict[str, int] = {}
-    collected_by_day: dict[str, int] = {}
     snapshot_date: date | None = None
     missing_totals: dict[str, int] = {}
     n_unexpected: int = 0
     completeness: list[InstrumentCompleteness] = []
+
+    @property
+    def collected(self) -> str:
+        # The first and last month, never a day: one day can be one person's visit.
+        months = list(self.collected_by_month)
+        return " to ".join(dict.fromkeys([months[0], months[-1]])) if months else ""
 
 
 class WaveRetention(BaseModel):
@@ -395,10 +398,7 @@ def summarize_dataset(
         n_rows=len(frame),
         n_ids=int(ids[has_id(ids)].nunique()),
         n_groups=None if loaded.group is None else int(loaded.group.nunique()),
-        first_date=dates.min().date() if dates is not None and len(dates) else None,
-        last_date=dates.max().date() if dates is not None and len(dates) else None,
         collected_by_month=collected_by_month(dates) if dates is not None else {},
-        collected_by_day=collected_by_day(dates) if dates is not None else {},
         snapshot_date=loaded.config.snapshot_date,
         missing_totals=missing_totals,
         n_unexpected=sum(v.n_unexpected for v in mine),
@@ -409,11 +409,6 @@ def summarize_dataset(
 def collected_by_month(dates: pd.Series) -> dict[str, int]:
     counts = dates.dt.strftime("%Y-%m").value_counts()
     return {month: int(counts[month]) for month in sorted(counts.index)}
-
-
-def collected_by_day(dates: pd.Series) -> dict[str, int]:
-    counts = dates.dt.strftime("%Y-%m-%d").value_counts()
-    return {day: int(counts[day]) for day in sorted(counts.index)}
 
 
 def completeness(

@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 import pytest
 from docx import Document
@@ -238,6 +240,8 @@ def test_codebook_describes_datasets_instruments_and_every_column(result):
     assert (child["Dataset"], child["Instruments"]) == ("child_w1", "EMS")
     assert child["Made by"] == "clean_child_w1 (scripts/clean_export.R)"
     assert child["Rows"] == str(len(result.datasets["child_w1"].frame))
+    # By month only: a first or last day can be one person's visit.
+    assert re.fullmatch(r"\d{4}-\d\d( to \d{4}-\d\d)?", child["Collected"])
     efb, ems = [b for b in blocks if isinstance(b, Table) and b.columns[:2] == ["Item", "Text"]]
     assert efb.columns == ["Item", "Text", "Answer"]
     assert efb.rows[0][2] == "number 3 to 18" and efb.rows[-1][2].startswith("open answer")

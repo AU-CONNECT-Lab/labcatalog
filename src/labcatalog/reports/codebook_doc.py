@@ -211,7 +211,6 @@ def datasets_table(
         wave = f"Wave {dataset.wave}"
         if len(studies) > 1:
             wave = f"{config.studies[dataset.study].label or dataset.study} {wave.lower()}"
-        dates = [d.isoformat() for d in (summary.first_date, summary.last_date) if d]
         keys = [
             f"ID {id_column_for(config, dataset)}",
             *([f"filled in by {dataset.respondent_column}"] if dataset.respondent_column else []),
@@ -222,7 +221,7 @@ def datasets_table(
                 name,
                 wave,
                 dataset.reporter,
-                " to ".join(dict.fromkeys(dates)),
+                summary.collected,
                 str(summary.n_rows),
                 str(summary.n_ids),
                 ", ".join(keys),

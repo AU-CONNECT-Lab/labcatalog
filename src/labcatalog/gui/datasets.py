@@ -189,9 +189,7 @@ def dataset_table(
                 "modality": config.vocab.modality_label(dataset.modality),
                 "n_rows": summary.n_rows,
                 "n_ids": summary.n_ids,
-                "collected": f"{summary.first_date} to {summary.last_date}"
-                if summary.first_date
-                else "",
+                "collected": summary.collected,
                 "snapshot": str(summary.snapshot_date or ""),
             }
         )
@@ -281,8 +279,8 @@ def facts(
     if counted.previous_wave is not None:
         rows.append((f"Also at Wave {counted.previous_wave}", counted.n_from_previous))
         rows.append((f"New since Wave {counted.previous_wave}", counted.n_new))
-    if summary.first_date:
-        rows.append(("Collected", f"{summary.first_date} to {summary.last_date}"))
+    if summary.collected:
+        rows.append(("Collected", summary.collected))
     if summary.snapshot_date:
         rows.append(("Data as of", summary.snapshot_date))
     path = data_path(result, summary.dataset)

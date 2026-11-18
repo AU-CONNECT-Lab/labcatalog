@@ -83,6 +83,16 @@ def test_a_date_column_the_data_do_not_have(mock_project):
     assert issue.details == {"dataset": "child_w2", "column": "visit_dat"}
 
 
+def test_dates_written_another_way_are_shown_by_their_shape(mock_project):
+    def change(frame):
+        frame.loc[[0, 1, 2], "visit_date"] = ["03/02/2025", "17/02/2025", "3/2/25"]
+
+    change_csv(mock_project / "data" / "child_w2.csv", change)
+    assert found(run_check(mock_project))["date_unparseable"] == [
+        "visit_date: 3 date(s) do not match %Y-%m-%d, written as 00/00/0000, 0/0/00"
+    ]
+
+
 def test_a_column_another_dataset_of_the_same_file_maps_is_described(mock_project):
     # Each administration of one wide file is a dataset of its own with its own map.
     assert any("notes" in m for m in found(run_check(mock_project))["column_unmapped"])

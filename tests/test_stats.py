@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 import pytest
 from conftest import NAMED_WAVES, name_waves
@@ -156,9 +158,14 @@ def test_stability_pairs_adjacent_waves_and_retained_scores_need_every_wave(mock
     assert 0 < n <= min(s.n for s in ems)
 
 
-def test_collected_by_day_adds_up_to_the_month_counts(mock_project):
+def test_collection_is_given_by_month_and_never_by_day(mock_project):
     parent = next(d for d in summary_for(mock_project).datasets if d.dataset == "parent_w1")
-    assert sum(parent.collected_by_day.values()) == sum(parent.collected_by_month.values())
+    months = list(parent.collected_by_month)
+    assert parent.collected == f"{months[0]} to {months[-1]}"
+    assert re.fullmatch(r"\d{4}-\d\d to \d{4}-\d\d", parent.collected)
+    # The snapshot date is the project's own, not a person's.
+    shown = parent.model_dump(exclude={"snapshot_date"}).values()
+    assert not any(re.search(r"\d{4}-\d\d-\d\d", str(v)) for v in shown)
 
 
 def test_number_and_text_items(mock_project):
