@@ -1561,7 +1561,12 @@ def invariance_section(
             else:
                 note("A drop in CFI of more than 0.01 is a common sign that a step does not hold.")
                 method = invariance_view.method_text(result, WAVES, "waves", chosen)
+                # The target is named only when one reporter answers about several.
+                several = len({(t.study, t.reporter, t.target) for t in waves}) > len(
+                    {(t.study, t.reporter) for t in waves}
+                )
                 for i, test in enumerate(waves, start=1):
+                    by = views.who(test.reporter, test.target) if several else test.reporter
                     counts = ", ".join(
                         f"{views.wave_name(result, test.study, wave)} {n}"
                         for wave, n in test.n.items()
@@ -1573,8 +1578,7 @@ def invariance_section(
                         test,
                         f"Invariance of {instrument.name} Across Waves",
                         f"{method} n per wave: {counts}.",
-                        f"{study}, reported by {test.reporter}; people who answered every item: "
-                        f"{counts}.",
+                        f"{study}, reported by {by}; people who answered every item: {counts}.",
                         f"invariance_{instrument.id}_{i}",
                         lambda test=test: model_of(result, test),
                         cfa.reload,
@@ -1608,8 +1612,16 @@ def model_of(result: CatalogResult, test: InvarianceTest) -> InvarianceModel:
     return next(
         m
         for m in build_models(result.project, result.catalog, result.datasets)
-        if (m.instrument_id, m.across, m.study, m.reporter, m.wave, m.kind)
-        == (test.instrument_id, test.across, test.study, test.reporter, test.wave, test.kind)
+        if (m.instrument_id, m.across, m.study, m.reporter, m.target, m.wave, m.kind)
+        == (
+            test.instrument_id,
+            test.across,
+            test.study,
+            test.reporter,
+            test.target,
+            test.wave,
+            test.kind,
+        )
         and list(m.factors) == list(test.factors)
     )
 

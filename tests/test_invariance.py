@@ -4,6 +4,7 @@ from glob import glob
 
 import pandas as pd
 import pytest
+from conftest import VISIT
 
 from labcatalog.config import FreedParameter
 from labcatalog.data.scoring import score_items
@@ -51,6 +52,72 @@ def test_each_instrument_given_in_several_waves_gets_its_subscale_model(result):
     assert (mood.study, mood.reporter, mood.kind) == ("mock_study", "child", SUBSCALES)
     assert list(mood.factors) == ["ems_sadness", "ems_worry", "ems_low_positive"]
     assert list(mood.occasions) == ["1", "2", "3"]
+
+
+def test_each_dataset_with_an_occasion_is_an_occasion_of_its_own(visit_project):
+    result = run_catalog(visit_project)
+    models = invariance.wave_models(result.project, result.catalog, result.datasets)
+    mood = next(m for m in models if m.instrument_id == "example_mood" and m.kind == SUBSCALES)
+    times = [f"2 ({time}, {interaction})" for _, time, interaction in VISIT]
+    assert list(mood.occasions) == ["1", "2", *times, "3"]
+    assert all(len(frame) and frame.index.is_unique for frame in mood.occasions.values())
+
+
+@pytest.fixture
+def two_targets(mock_project):
+    # Parents answer the child's worries questionnaire about themselves too, in waves 1 and 2.
+    root = mock_project
+    lines = []
+    for wave in (1, 2):
+        name, source = f"parent_self_w{wave}", f"parent_child_w{wave}"
+        shutil.copy(root / "data" / f"{source}.csv", root / "data" / f"{name}.csv")
+        shutil.copy(root / "maps" / f"{source}.csv", root / "maps" / f"{name}.csv")
+        lines.append(
+            f"  - {{name: {name}, modality: questionnaire, study: mock_study, wave: {wave}, "
+            f"reporter: parent, source: csv, path: data/{name}.csv, id_column: parent_pid}}\n"
+        )
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    text = text.replace("  - {name: eeg_w1,", "".join(lines) + "  - {name: eeg_w1,")
+    config.write_text(text, encoding="utf-8")
+    study = root / "studies" / "mock_study.yaml"
+    text = study.read_text(encoding="utf-8")
+    ewt = "  - {instrument: example_worries_temper, datasets: [parent_child_w1"
+    added = "  - {instrument: example_worries_temper, datasets: [parent_self_w1, parent_self_w2], "
+    study.write_text(text.replace(ewt, added + "target: self}\n" + ewt), encoding="utf-8")
+    return run_catalog(root)
+
+
+def test_a_reporter_answering_about_two_targets_has_a_wave_model_for_each(two_targets):
+    result = two_targets
+    models = [
+        m
+        for m in invariance.wave_models(result.project, result.catalog, result.datasets)
+        if (m.instrument_id, m.reporter) == ("example_worries_temper", "parent")
+    ]
+    assert {m.target for m in models} == {"child", "self"}
+    for m in models:
+        # Children's IDs end in C, their parents' in P.
+        ending = "C" if m.target == "child" else "P"
+        assert all(i.strip().endswith(ending) for f in m.occasions.values() for i in f.index)
+    assert {tuple(m.occasions) for m in models if m.target == "self"} == {("1", "2")}
+
+
+def test_reporters_are_not_compared_where_one_answers_about_two_targets(two_targets):
+    result = two_targets
+    models = [
+        m
+        for m in invariance.reporter_models(result.project, result.catalog, result.datasets)
+        if m.instrument_id == "example_worries_temper"
+    ]
+    first = [m for m in models if m.wave == "1"]
+    assert first and all(
+        set(m.occasions) == {"parent about child", "parent about self", "child"} for m in first
+    )
+    assert all(m.problem.startswith("Not fitted: parent answers it about ") for m in first)
+    assert all(m.problem is None for m in models if m.wave == "3")
+    [test] = invariance.fit_models(first[:1], "")
+    assert test.problem == first[0].problem and test.steps == []
 
 
 def test_wave_data_are_the_reversed_items_of_people_who_answered_all(result):
@@ -176,6 +243,17 @@ def test_a_freed_loading_frees_a_constraint_and_score_tests_name_each_item(resul
     assert "ems_2" not in [s.item for s in invariance.score_tests(freed, "metric", rscript())]
 
 
+@needs_r
+def test_ordered_items_get_a_test_of_each_items_intercepts_at_the_scalar_step(result):
+    mood = models_of(result)["example_mood"]
+    mood.occasions = {wave: mood.occasions[wave] for wave in ("1", "2")}
+    scores = invariance.score_tests(mood, "scalar", rscript())
+    assert sorted(s.item for s in scores) == [f"ems_{i}" for i in range(1, 10)]
+    assert all(s.parameter == "intercept" and s.df == 1 and 0 <= s.p <= 1 for s in scores)
+    mood.freed = [FreedParameter(instrument="example_mood", item="ems_2", parameter="intercept")]
+    assert "ems_2" not in [s.item for s in invariance.score_tests(mood, "scalar", rscript())]
+
+
 def add_parent_mood(project):
     # Parents rate their child's mood at wave 1, here with the child's wave 2 answers.
     data = pd.read_csv(project / "data" / "child_w2.csv", dtype=str)
@@ -268,7 +346,12 @@ def run_saved_script(model, estimator: str, folder) -> pd.DataFrame:
         [rscript(), invariance.SCRIPT_FILE], cwd=folder, capture_output=True, text=True
     )
     assert done.returncode == 0, done.stderr
-    return pd.read_csv(folder / "fits.csv", index_col=0)
+    fits = pd.read_csv(folder / "fits.csv", index_col=0)
+    # The comparison of the steps names each one, not the whole fitted model.
+    assert len(done.stdout) < 10_000
+    lines = done.stdout.splitlines()
+    assert all(any(line.startswith(f"{step} ") for line in lines) for step in fits.index)
+    return fits
 
 
 @needs_r

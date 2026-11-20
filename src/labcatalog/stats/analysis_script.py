@@ -769,10 +769,10 @@ def other_numbers(result: CatalogResult, datasets: list[str]) -> list[ResolvedVa
 
 
 def item_label(result: CatalogResult, variable: ResolvedVariable) -> str:
-    if variable.label:
-        return variable.label
     instrument = result.project.instruments[variable.instrument_id]
-    return f"{abbreviation(instrument)}: {next(iter(variable.text.values()))}"
+    found = variable.label or f"{abbreviation(instrument)}: {next(iter(variable.text.values()))}"
+    # One line, since the label also goes into the comments of the code the analyses write.
+    return " ".join(found.split())
 
 
 def measures(result: CatalogResult, datasets: list[str]) -> dict[str, str]:

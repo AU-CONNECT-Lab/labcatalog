@@ -12,6 +12,7 @@ from labcatalog.stats.cfa import (
     GENERAL,
     ML,
     MLR,
+    NOT_POSITIVE,
     ONE_FACTOR,
     PYTHON,
     SECOND_ORDER,
@@ -191,6 +192,14 @@ def test_models_fit_in_python_without_r(result):
     sadness.data = sadness.data[sadness.factors["ems_sadness"]]
     [three] = fit_models([sadness], None)
     assert three.fit == {"chisq": None, "df": 0.0} and set(three.omega) == {"ems_sadness"}
+
+
+def test_python_reports_fewer_people_than_items_instead_of_fitting(result):
+    # As lavaan does, rather than fit the nearest positive-definite matrix as semopy would.
+    mood = next(m for m in models_of(result) if m.dataset == "child_w1" and m.kind == SUBSCALES)
+    mood.data = mood.data.head(len(mood.data.columns) - 1)
+    [fit] = fit_models([mood], None)
+    assert fit.problem == NOT_POSITIVE and fit.fit == {}
 
 
 ML_SCRIPT = """\

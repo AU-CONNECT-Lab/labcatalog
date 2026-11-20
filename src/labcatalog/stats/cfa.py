@@ -3,6 +3,7 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import semopy
 
@@ -28,6 +29,7 @@ GENERAL = "general"
 R = "R"
 PYTHON = "Python"
 IMPROPER = "improper solution (a negative variance or a correlation above 1)"
+NOT_POSITIVE = "the sample covariance matrix is not positive-definite"
 WLSMV = "wlsmv"
 ML = "ml"
 MLR = "mlr"
@@ -292,6 +294,10 @@ def fit_python(model: CfaModel) -> CfaFit:
         engine=PYTHON,
         estimator=ML,
     )
+    # semopy would fit the nearest positive-definite matrix instead; lavaan stops, as here.
+    if np.linalg.matrix_rank(data.cov().to_numpy()) < data.shape[1]:
+        fit.problem = NOT_POSITIVE
+        return fit
     sem = semopy.Model(syntax)
     # As cfa.R does, a model that fails is reported, and the other models still run.
     try:

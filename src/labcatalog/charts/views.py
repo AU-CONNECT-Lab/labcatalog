@@ -20,7 +20,7 @@ from labcatalog.schema import Instrument, Score
 from labcatalog.stats import analysis, analysis_script
 from labcatalog.stats import multilevel as ml
 from labcatalog.stats.link import as_written
-from labcatalog.stats.summary import wave_order
+from labcatalog.stats.summary import wave_order, who
 
 RADAR_AXES = 3
 # Kinds of the overview's to-do rows, in the order they show.
@@ -492,10 +492,6 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
                 }
             )
     return plots.score_means(panels, all_wave_names(result)) if panels else None
-
-
-def who(reporter: str, target: str | None) -> str:
-    return f"{reporter} about {target}" if target else reporter
 
 
 def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -> go.Figure | None:

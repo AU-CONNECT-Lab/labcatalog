@@ -3,6 +3,7 @@ import io
 import re
 import tempfile
 import textwrap
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from itertools import combinations
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from labcatalog.exceptions import LabCatalogError
 from labcatalog.pipeline import CatalogResult
 from labcatalog.reports.codegen import number
 from labcatalog.stats import analysis, imputation
@@ -76,7 +78,8 @@ R_MODEL = """\
 before <- nrow(d)
 d <- droplevels(d[complete.cases(d[, used]), ])
 null_model <- lmerTest::lmer({y} ~ 1 + {null_random}, data = d, REML = TRUE)
-icc <- performance::icc(null_model, by_group = TRUE)
+# tolerance = 0: a variance of zero gives an ICC of 0, as in Python, instead of none at all.
+icc <- performance::icc(null_model, by_group = TRUE, tolerance = 0)
 print(icc)
 fit <- lmerTest::lmer({y} ~ {fixed} + {random}, data = d, REML = TRUE{contrasts})
 print(summary(fit))
@@ -228,6 +231,11 @@ def mixed(formula, re_formula, vc_formula):
                 continue
         if best is None or result.llf > best.llf:
             best, notes = result, [str(w.message) for w in caught]
+    if best is None:
+        raise np.linalg.LinAlgError(
+            "statsmodels could not fit the model: two or more of its predictors carry the same "
+            "information, such as one measure from two datasets that differ by a constant"
+        )
     return best, list(dict.fromkeys(notes))
 
 
@@ -353,7 +361,7 @@ fit_set <- function(d) {{
 }}
 sets <- lapply(completed, fit_set)
 fits <- lapply(sets, function(s) s$fit)
-iccs <- lapply(sets, function(s) performance::icc(s$null_model, by_group = TRUE))
+iccs <- lapply(sets, function(s) performance::icc(s$null_model, by_group = TRUE, tolerance = 0))
 icc <- data.frame(level = iccs[[1]]$Group, icc = average(lapply(iccs, function(x) x$ICC)))
 print(icc)
 df_com <- average(lapply(fits, function(f) summary(f)$coefficients[, "df"]))
@@ -807,12 +815,13 @@ def long_frame(result: CatalogResult, model: Model) -> Long:
     # Occasions of one wave keep the order the project lists them in.
     order = list(configs)
     ordered = sorted(model.datasets, key=lambda n: (by_wave(configs[n].wave), order.index(n)))
-    outcome = identifier(model.outcome.split(".", 1)[1], {PERSON, TIME, WAVE})
-    group = group_name(result) if model.by_group else None
+    name = group_name(result) if model.by_group else None
+    group = identifier(name, {PERSON, TIME, WAVE}) if name else None
+    outcome = identifier(model.outcome.split(".", 1)[1], {PERSON, TIME, WAVE, group})
     # Occasions take no time column, so an occasion named time keeps its name.
     taken = {PERSON, WAVE, outcome, *([group] if group else []), *([] if occasional else [TIME])}
     factors = occasion_factors(configs, ordered, taken) if occasional else []
-    covariates = [covariate(result, key, taken, study) for key in model.covariates]
+    covariates = told_apart([covariate(result, key, taken, study) for key in model.covariates])
     # Time counts the study's waves, so a skipped wave leaves a gap.
     waves = sorted({d.wave for d in configs.values() if d.study == study}, key=by_wave)
     first = waves.index(configs[ordered[0]].wave)
@@ -960,6 +969,15 @@ def covariate(result: CatalogResult, key: str, taken: set[str], study: str) -> C
         wave = configs[name].wave if timed else None
         sources.setdefault(wave, []).append(source(result, f"{key}@{name}" if timed else key))
     return Covariate(key=key, label=label, column=column, levels=levels, sources=sources)
+
+
+def told_apart(covariates: list[Covariate]) -> list[Covariate]:
+    # One measure taken from two datasets: each of its labels names its dataset.
+    counts = Counter(c.label for c in covariates)
+    return [
+        replace(c, label=f"{c.label} ({c.key.rsplit('@', 1)[1]})") if counts[c.label] > 1 else c
+        for c in covariates
+    ]
 
 
 def source(result: CatalogResult, key: str) -> Source:
@@ -1343,8 +1361,11 @@ def run(
             found = {n: pd.read_csv(folder / f"{n}.csv") for n in outputs}
             return read(found, long, R)
         names: dict = {}
-        with contextlib.redirect_stdout(io.StringIO()):
-            exec("\n".join([py_head, python, python_footer]), names)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                exec("\n".join([py_head, python, python_footer]), names)
+        except np.linalg.LinAlgError as err:
+            raise LabCatalogError(str(err)) from None
         return read({n: names[n] for n in outputs}, long, PYTHON)
 
 

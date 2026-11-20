@@ -103,6 +103,7 @@ test_one <- function(model, entry, data) {
 score_one <- function(model, entry, data) {
   step <- entry$step
   fit <- fit_step(entry$syntax, data, steps[[step]], entry$partial, entry$group)
+  if (ordinal && step == "scalar") return(refit_one(model, entry, data, fit))
   table <- lavaan::parTable(fit)
   constraints <- table[table$op == "==", ]
   target <- table[match(constraints$lhs, table$plabel), ]
@@ -117,6 +118,20 @@ score_one <- function(model, entry, data) {
     add(model, step, "score", item, row$X2, "chisq")
     add(model, step, "score", item, row$df, "df")
     add(model, step, "score", item, row$p.value, "p")
+  }
+}
+
+# Wu and Estabrook fix the scalar intercepts, so nothing to release: refit each with them free.
+refit_one <- function(model, entry, data, fit) {
+  held <- strsplit(entry$partial, "; ", fixed = TRUE)[[1]]
+  freed <- sub(" ~1$", "", held[grepl(" ~1$", held)])
+  for (item in setdiff(unique(stem(lavaan::lavNames(fit, "ov"))), freed)) {
+    free <- paste(c(held, paste(item, "~1")), collapse = "; ")
+    refit <- fit_step(entry$syntax, data, steps[["scalar"]], free, entry$group)
+    found <- suppressWarnings(lavaan::lavTestLRT(fit, refit))
+    add(model, "scalar", "score", item, found[2, "Chisq diff"], "chisq")
+    add(model, "scalar", "score", item, found[2, "Df diff"], "df")
+    add(model, "scalar", "score", item, found[2, "Pr(>Chisq)"], "p")
   }
 }
 

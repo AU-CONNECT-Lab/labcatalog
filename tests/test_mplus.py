@@ -1,3 +1,5 @@
+import numpy as np
+import pandas as pd
 import pytest
 
 from labcatalog.config import FreedParameter
@@ -82,7 +84,7 @@ def test_waves_get_one_input_per_step_chained_by_difftest(result):
     configural, metric, scalar = (files[n] for n in list(files)[1:])
     assert "  f1_t2 BY x1_t2*;" in configural and "  f1_t2@1;" in configural
     assert "  DIFFTEST = configural.dif;" in configural.split("SAVEDATA:")[1]
-    assert "  f1_t2 BY x1_t2* (l1);" in metric and "  f1_t2*;" in metric
+    assert "  f1_t2 BY x1_t2* (l1_1);" in metric and "  f1_t2*;" in metric
     assert "  DIFFTEST = configural.dif;" in metric.split("MODEL:")[0]
     assert "$" not in metric and "  [x1_t2$1] (t1_1);" in scalar and "  x1_t2*;" in scalar
     assert "  [f1_t2*];" in scalar and "SAVEDATA" not in scalar
@@ -91,6 +93,18 @@ def test_waves_get_one_input_per_step_chained_by_difftest(result):
     assert all(len(row.split()) == 27 for row in rows) and "-999" in files[mplus.DATA]
     inputs = [text for name, text in files.items() if name.endswith(".inp")]
     assert all(len(line) <= 90 for text in inputs for line in text.splitlines())
+
+
+def test_an_item_of_two_factors_keeps_a_loading_on_each():
+    rng = np.random.default_rng(0)
+    items = ["i1", "i2", "i3", "i4", "i5"]
+    waves = {w: pd.DataFrame(rng.integers(1, 5, size=(40, 5)), columns=items) for w in "12"}
+    factors = {"a": ["i1", "i2", "i3"], "b": ["i3", "i4", "i5"]}
+    model = invariance.InvarianceModel("s", "child", "inst", SUBSCALES, factors, waves)
+    metric = mplus.invariance_files(model, "ml", "Inst")["mplus_invariance_2_metric.inp"]
+    for t in (1, 2):
+        assert f"  f1_t{t} BY x3_t{t}* (l1_3);" in metric
+        assert f"  f2_t{t} BY x3_t{t}* (l2_3);" in metric
 
 
 def test_freed_parameters_stay_free_across_waves(result):

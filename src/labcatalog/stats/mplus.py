@@ -215,7 +215,8 @@ def longitudinal_input(
             for item in members:
                 x = columns[item]
                 same = equal_loadings and (item, "loading") not in freed
-                lines.append(f"  f{j}_t{t} BY {x}_t{t}*{f' (l{x[1:]})' if same else ''};")
+                # One label per factor and item, so an item of two factors keeps two loadings.
+                lines.append(f"  f{j}_t{t} BY {x}_t{t}*{f' (l{j}_{x[1:]})' if same else ''};")
     for t in times:
         for j in range(1, len(model.factors) + 1):
             # Factors on the first occasion set the scale; later ones vary once loadings hold.

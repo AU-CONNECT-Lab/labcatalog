@@ -242,8 +242,8 @@ def score_dialog(
         with body:
             note(
                 f"Each row tests freeing the item's {PARAMETERS[parameter]} on every occasion at "
-                "once, in the model of this step (lavaan's score test, mean-scaled under WLSMV). "
-                "Tick the items to free, then save; the tests rerun with them freed."
+                f"once, in the model of this step ({invariance.item_test(chosen['step'], estimator)})"
+                ". Tick the items to free, then save; the tests rerun with them freed."
             )
             columns = [
                 col("name", "Item"),

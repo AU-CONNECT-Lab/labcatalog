@@ -564,6 +564,10 @@ def correlations(
     return rows
 
 
+def who(reporter: str, target: str | None) -> str:
+    return f"{reporter} about {target}" if target else reporter
+
+
 ScoreKey = tuple[str, str, str | None, str, str]
 
 

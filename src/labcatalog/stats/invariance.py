@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from labcatalog.config import FreedParameter
+from labcatalog.config import DatasetConfig, FreedParameter
 from labcatalog.data.resolve import Catalog, ResolvedScore
 from labcatalog.data.scoring import scorable, score_items
 from labcatalog.project import Project
@@ -14,7 +14,7 @@ from labcatalog.sources import LoadedDataset
 from labcatalog.stats.cfa import FIT, MIN_ITEMS, ML, MLR, ONE_FACTOR, SUBSCALES, WLSMV, is_total
 from labcatalog.stats.link import link
 from labcatalog.stats.rbridge import run_r
-from labcatalog.stats.summary import wave_order
+from labcatalog.stats.summary import wave_order, who
 
 R_SCRIPT = Path(__file__).parent / "invariance.R"
 STEPS = ("configural", "thresholds", "metric", "scalar")
@@ -45,6 +45,10 @@ class InvarianceModel:
     freed: list[FreedParameter] = field(default_factory=list)
     # Groups too small to fit, with their sizes.
     left_out: dict[str, int] = field(default_factory=dict)
+    # Whom the reporter answers about, across waves.
+    target: str | None = None
+    # Why the model is not fitted at all.
+    problem: str | None = None
 
 
 @dataclass
@@ -72,6 +76,7 @@ class InvarianceTest:
     wave: str = ""
     freed: list[FreedParameter] = field(default_factory=list)
     estimator: str = WLSMV
+    target: str | None = None
 
 
 @dataclass
@@ -97,16 +102,20 @@ def build_models(
     return wave_models(project, catalog, datasets) + reporter_models(project, catalog, datasets)
 
 
+ScorableKey = tuple[str, str, str, str, str | None]
+ByDataset = dict[str, dict[str, ResolvedScore]]
+
+
 def scorable_scores(
     catalog: Catalog, datasets: dict[str, LoadedDataset]
-) -> dict[tuple[str, str, str, str], dict[str, dict[str, ResolvedScore]]]:
-    # (study, wave, reporter, instrument) -> dataset -> scorable scores
-    found: dict[tuple[str, str, str, str], dict[str, dict[str, ResolvedScore]]] = {}
+) -> dict[ScorableKey, ByDataset]:
+    # (study, wave, reporter, instrument, target) -> dataset -> scorable scores
+    found: dict[ScorableKey, ByDataset] = {}
     for score in catalog.scores:
         loaded = datasets[score.dataset]
         if scorable(loaded, score):
             config = loaded.config
-            key = (config.study, config.wave, config.reporter, score.instrument_id)
+            key = (config.study, config.wave, config.reporter, score.instrument_id, score.target)
             found.setdefault(key, {}).setdefault(score.dataset, {})[score.score_id] = score
     return found
 
@@ -114,23 +123,42 @@ def scorable_scores(
 def wave_models(
     project: Project, catalog: Catalog, datasets: dict[str, LoadedDataset]
 ) -> list[InvarianceModel]:
-    by_wave: dict[tuple[str, str, str], dict[str, dict[str, dict[str, ResolvedScore]]]] = {}
-    for (study, wave, reporter, instrument_id), found in scorable_scores(catalog, datasets).items():
-        by_wave.setdefault((study, reporter, instrument_id), {})[wave] = found
+    by_wave: dict[tuple[str, str, str, str | None], dict[str, ByDataset]] = {}
+    for (study, wave, reporter, instrument_id, target), found in scorable_scores(
+        catalog, datasets
+    ).items():
+        by_wave.setdefault((study, reporter, instrument_id, target), {})[wave] = found
+    configs = {d.name: d for d in project.config.datasets}
     models = []
-    for (study, reporter, instrument_id), waves in by_wave.items():
+    for (study, reporter, instrument_id, target), waves in by_wave.items():
         instrument = project.instruments[instrument_id]
         for kind, members in factor_sets(instrument):
             factors = {s.id: list(s.items) for s in members}
             occasions = {}
             for wave in sorted(waves, key=wave_order(project.config, study)):
-                frame = by_person(datasets, waves[wave], factors, by_id(datasets, waves[wave]))
-                if frame is not None and len(frame):
-                    occasions[wave] = frame
+                for key, found in wave_occasions(configs, wave, waves[wave]).items():
+                    frame = by_person(datasets, found, factors, by_id(datasets, found))
+                    if frame is not None and len(frame):
+                        occasions[key] = frame
             if len(occasions) >= 2:
-                model = InvarianceModel(study, reporter, instrument_id, kind, factors, occasions)
+                model = InvarianceModel(
+                    study, reporter, instrument_id, kind, factors, occasions, target=target
+                )
                 models.append(with_freed(project, model))
     return models
+
+
+def wave_occasions(
+    configs: dict[str, DatasetConfig], wave: str, found: ByDataset
+) -> dict[str, ByDataset]:
+    # A dataset given an occasion is an occasion of its own; the wave's other files are one.
+    plain = {n: s for n, s in found.items() if not configs[n].occasion}
+    each = {
+        f"{wave} ({', '.join(configs[n].occasion.values())})": {n: s}
+        for n, s in found.items()
+        if configs[n].occasion
+    }
+    return ({wave: plain} if plain else {}) | each
 
 
 def reporter_models(
@@ -140,27 +168,43 @@ def reporter_models(
     correlate_by = project.config.stats.correlate_by
     if correlate_by in ("id", "none"):
         return []
-    by_reporter: dict[tuple[str, str, str], dict[str, dict[str, dict[str, ResolvedScore]]]] = {}
-    for (study, wave, reporter, instrument_id), found in scorable_scores(catalog, datasets).items():
-        by_reporter.setdefault((study, wave, instrument_id), {})[reporter] = found
+    by_reporter: dict[tuple[str, str, str], dict[tuple[str, str | None], ByDataset]] = {}
+    for (study, wave, reporter, instrument_id, target), found in scorable_scores(
+        catalog, datasets
+    ).items():
+        by_reporter.setdefault((study, wave, instrument_id), {})[(reporter, target)] = found
     models = []
     for (study, wave, instrument_id), reporters in by_reporter.items():
-        if len(reporters) < 2:
+        targets: dict[str, list[str | None]] = {}
+        for reporter, target in reporters:
+            targets.setdefault(reporter, []).append(target)
+        if len(targets) < 2:
             continue
+        # Which of a reporter's several targets the other reporters describe is not known.
+        several = {r: found for r, found in targets.items() if len(found) > 1}
         names = [name for found in reporters.values() for name in found]
         rows = link(datasets, names, correlate_by).rows
         instrument = project.instruments[instrument_id]
         for kind, members in factor_sets(instrument):
             factors = {s.id: list(s.items) for s in members}
             occasions = {}
-            for reporter, found in reporters.items():
+            for (reporter, target), found in reporters.items():
                 frame = by_person(datasets, found, factors, {n: rows[n] for n in found})
                 if frame is not None and len(frame):
-                    occasions[reporter] = frame
+                    occasions[who(reporter, target) if reporter in several else reporter] = frame
             if len(occasions) >= 2:
                 model = InvarianceModel(
                     study, "", instrument_id, kind, factors, occasions, REPORTERS, wave
                 )
+                if several:
+                    answers = "; ".join(
+                        f"{r} answers it about {' and '.join(map(str, t))}"
+                        for r, t in several.items()
+                    )
+                    model.problem = (
+                        f"Not fitted: {answers} in this wave, so which answers the other "
+                        "reporters' match is not known."
+                    )
                 models.append(with_freed(project, model))
     return models
 
@@ -231,7 +275,10 @@ def fit_models(
     models: list[InvarianceModel], rscript: str, estimator: str = WLSMV
 ) -> list[InvarianceTest]:
     # Only ordered items have thresholds that every occasion must share.
-    gaps = [unchosen_options(model) if estimator == WLSMV else None for model in models]
+    gaps = [
+        model.problem or (unchosen_options(model) if estimator == WLSMV else None)
+        for model in models
+    ]
     ready = [model for model, gap in zip(models, gaps, strict=True) if gap is None]
     tested = iter(fit_in_r(ready, rscript, estimator))
     found = [
@@ -292,6 +339,16 @@ def score_tests(
         ScoreTest(items[stem], STEP_PARAMETER[step], v.get("chisq"), v.get("df"), v.get("p"))
         for stem, v in found.items()
     ]
+
+
+def item_test(step: str, estimator: str) -> str:
+    # As invariance.R makes each item's test.
+    if estimator == WLSMV and step == "scalar":
+        return (
+            "the scaled χ² difference from refitting with them free, since Wu and Estabrook's "
+            "identification fixes the intercepts rather than holding them equal"
+        )
+    return "lavaan's score test, mean-scaled under WLSMV"
 
 
 def run_script(folder: Path, rscript: str, estimator: str, action: str) -> pd.DataFrame:
@@ -407,7 +464,7 @@ for (step in names(steps)) {{
   cat("\\n", step, "\\n")
   print(lavaan::fitMeasures(fits[[step]], c({measures})))
 }}
-print(do.call(lavaan::lavTestLRT, unname(fits)))
+print(do.call(lavaan::lavTestLRT, c(unname(fits), list(model.names = names(fits)))))
 """
 R_LONG_NAMES = """\
 # The same item or factor on each occasion differs only in its _t<occasion> ending.
@@ -521,6 +578,7 @@ def new_test(model: InvarianceModel, problem: str | None = None) -> InvarianceTe
         across=model.across,
         wave=model.wave,
         freed=list(model.freed),
+        target=model.target,
     )
 
 

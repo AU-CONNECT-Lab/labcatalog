@@ -12,6 +12,7 @@ import pytest
 from conftest import VISIT
 
 from labcatalog.charts import views
+from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import multilevel as multilevel_view
 from labcatalog.pipeline import run_catalog
 from labcatalog.reports import results
@@ -123,6 +124,21 @@ def test_a_number_item_is_an_outcome_and_a_covariate(result):
     assert len(fitted.fixed) == 3 and fitted.observations > 0
 
 
+def test_an_item_whose_text_runs_over_lines_still_fits(mock_project):
+    # Without a label the item's text names it, in the comments of the code that is run.
+    path = mock_project / "instruments" / "eeg_resting.yaml"
+    text = path.read_text(encoding="utf-8")
+    old = 'label: "Frontal alpha asymmetry", text: "Frontal alpha asymmetry: log alpha power at F4 minus F3"'
+    assert old in text
+    new = 'text: "Frontal alpha asymmetry:\\nlog alpha power at F4 minus F3\\n"'
+    path.write_text(text.replace(old, new), encoding="utf-8")
+    result = run_catalog(mock_project)
+    label = ml.outcome_choices(result)[FAA]
+    assert label == "EEG: Frontal alpha asymmetry: log alpha power at F4 minus F3"
+    model = eeg_model([])
+    assert ml.run(result, model, ml.long_frame(result, model), label, None).observations > 0
+
+
 def test_problems_are_named(result):
     assert ml.problem(result, growth(datasets=["child_w1", "parent_w1"])) == (
         "Choose one dataset per wave."
@@ -152,6 +168,35 @@ def test_long_data_has_a_row_per_person_and_wave(result):
     assert child["dem_gender_w1"].iloc[0] == float(
         parent.frame.loc[parent.group == family, "dem_gender_w1"].iloc[0]
     )
+
+
+def named_group(root, name: str):
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    text = text.replace("    name: family\n", f"    name: {name}\n")
+    config.write_text(
+        text.replace("correlate_by: family", f"correlate_by: {name}"), encoding="utf-8"
+    )
+    return run_catalog(root)
+
+
+@pytest.mark.parametrize("name", ["ems_total", "family id"])
+def test_the_group_keeps_its_own_column_whatever_its_name(mock_project, name):
+    result = named_group(mock_project, name)
+    long = ml.long_frame(result, growth(covariates=[], by_group=True, slope=False))
+    assert long.group != long.outcome and " " not in long.group
+    first = result.datasets["child_w1"]
+    families = dict(zip(first.frame[first.id_column], first.group.astype("string"), strict=True))
+    rows = long.frame[long.frame["wave"] == "1"]
+    assert rows[long.group].astype(str).tolist() == [str(families[i]) for i in rows["id"]]
+
+
+@needs_r
+def test_r_fits_a_group_whose_name_has_a_space(mock_project):
+    result = named_group(mock_project, "family id")
+    model = growth(covariates=[], by_group=True, slope=False)
+    long = ml.long_frame(result, model)
+    close(ml.run(result, model, long, "EMS", rscript()), ml.run(result, model, long, "EMS", None))
 
 
 def test_python_fit_reads_back_in_formula_order(result):
@@ -212,6 +257,27 @@ def test_saved_python_script_draws_the_trajectories(result, tmp_path):
 @needs_r
 def test_saved_r_script_draws_the_trajectories_over_months(result, tmp_path):
     run_with_figure(result, tmp_path, growth(time="month"), [rscript()], "multilevel.R")
+
+
+@needs_r
+def test_r_gives_an_icc_of_zero_when_people_do_not_differ():
+    # Every person's mean is the same, so the null model's person variance is zero.
+    noise = np.random.default_rng(4).normal(0, 1, (60, 3))
+    noise -= noise.mean(axis=1, keepdims=True)
+    rows = [
+        {"id": f"p{p}", "wave": t + 1, "time": t, "y": 10 + noise[p, t]}
+        for p in range(60)
+        for t in range(3)
+    ]
+    result = SimpleNamespace(
+        project=SimpleNamespace(config=SimpleNamespace(project=SimpleNamespace(name="demo")))
+    )
+    model = ml.Model("x.y", ["a", "b", "c"], slope=False)
+    long = ml.Long(pd.DataFrame(rows), "y", None, [], 0)
+    in_r = ml.run(result, model, long, "Y", rscript())
+    assert in_r.singular and [level for level, _ in in_r.icc] == ["Person"]
+    assert in_r.icc[0][1] == pytest.approx(0, abs=1e-6)
+    assert ml.run(result, model, long, "Y", None).icc[0][1] == pytest.approx(0, abs=1e-6)
 
 
 def test_groups_and_people_fit_in_python():
@@ -345,6 +411,31 @@ def test_a_number_covariate_sits_at_its_mean_in_the_prediction(result):
     line = ml.prediction(long, fitted)
     assert list(line) == [0.0, 2.0]
     assert line[0.0] == pytest.approx(estimates["Intercept"] + estimates[covariate] * mean)
+
+
+def test_one_measure_from_two_datasets_is_two_covariates_told_apart(result):
+    stress = [f"example_parent_stress.eps_mean@parent_w{w}" for w in (1, 2)]
+    model = growth(covariates=stress, slope=False)
+    long = ml.long_frame(result, model)
+    first, second = (c.label for c in long.covariates)
+    assert first.endswith(" (parent_w1)") and second.endswith(" (parent_w2)")
+    assert first.removesuffix(" (parent_w1)") == second.removesuffix(" (parent_w2)")
+    fitted = ml.run(result, model, long, "EMS", None)
+    estimates = {t.label: t.estimate for t in fitted.fixed}
+    assert len(estimates) == len(fitted.fixed)
+    used = long.frame.dropna()
+    base = estimates["Intercept"] + sum(
+        estimates[c.label] * used[c.column].mean() for c in long.covariates
+    )
+    assert ml.prediction(long, fitted)[0.0] == pytest.approx(base)
+
+
+def test_python_says_why_it_cannot_fit_predictors_that_carry_the_same_information(result):
+    # Each child's age at wave 2 is their age at wave 1 plus one.
+    ages = [f"item:example_demographics.dem_age@parent_w{w}" for w in (1, 2)]
+    model = growth(covariates=ages, slope=False)
+    with pytest.raises(LabCatalogError, match="carry the same information"):
+        ml.run(result, model, ml.long_frame(result, model), "EMS", None)
 
 
 def test_time_can_count_months_or_years_from_the_dates(result):
