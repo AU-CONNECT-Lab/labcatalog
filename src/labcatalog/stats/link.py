@@ -17,18 +17,25 @@ class Links:
     repeated: int
     # Groups where two files each hold several people and none in common.
     crossed: int
+    # The IDs and groups of the rows left out as repeated, by file.
+    repeated_keys: dict[str, set[str]]
 
 
 def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str) -> Links:
     by_group = correlate_by not in ("id", "none")
     # IDs belong to their study, so files of several studies share no one.
     several = len({datasets[name].config.study for name in names}) > 1
-    parts, repeated = [], 0
+    parts, repeated, repeated_keys = [], 0, {}
     for name in names:
         loaded = datasets[name]
         ids = loaded.frame[loaded.id_column].astype("string")
         ids = ids.where(has_id(ids))
-        groups = loaded.group.astype("string") if by_group and loaded.group is not None else ids
+        # Someone the roster gives no group links by their own ID, as in a file without groups.
+        groups = (
+            loaded.group.astype("string").fillna(ids)
+            if by_group and loaded.group is not None
+            else ids
+        )
         if several:
             ids, groups = study_keys(loaded, ids), study_keys(loaded, groups)
         rows = pd.DataFrame(
@@ -36,6 +43,7 @@ def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str
         )
         twice = (rows["id"].notna() & rows["id"].duplicated(keep=False)).to_numpy()
         repeated += int(twice.sum())
+        repeated_keys[name] = {*rows["id"][twice].dropna(), *rows["group"][twice].dropna()}
         parts.append(rows[~twice & rows["group"].notna().to_numpy()])
     found: dict[str, dict[str, int]] = {name: {} for name in names}
     split: dict[str, str] = {}
@@ -70,7 +78,7 @@ def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str
                     found[name][person] = int(rows[0])
         split |= dict.fromkeys(people, group)
     rows = {name: pd.Series(found[name], dtype=int) for name in names}
-    return Links(rows, split, repeated, crossed)
+    return Links(rows, split, repeated, crossed, repeated_keys)
 
 
 def study_keys(loaded: LoadedDataset, keys: pd.Series) -> pd.Series:

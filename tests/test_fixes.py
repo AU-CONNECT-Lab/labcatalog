@@ -137,6 +137,19 @@ def test_a_stray_value_becomes_an_option_or_a_missing_code(mock_project):
     assert not any(i.message.startswith("dem_age_w2") for i in run_check(mock_project).issues)
 
 
+def test_a_code_for_every_dataset_reaches_the_datasets_with_their_own_list(mock_project):
+    project = load_project(mock_project)
+    apply(mock_project, fixes.add_missing_codes(project, "child_w1", [("-96", "skipped")], False))
+    codes = [("-96", "skipped"), ("-95", "unsure")]
+    apply(
+        mock_project, fixes.add_missing_codes(load_project(mock_project), "child_w1", codes, True)
+    )
+    config = load_project(mock_project).config
+    own = next(d for d in config.datasets if d.name == "child_w1").missing_codes
+    assert [m.code for m in own] == [-99, -98, -97, "", -96, -95]
+    assert [m.code for m in config.missing_codes][-2:] == [-96, -95]
+
+
 def test_a_mistyped_id_is_swapped_for_the_one_meant(mock_project):
     study = mock_project / "studies" / "mock_study.yaml"
     old = "{instrument: example_mood, datasets: [child_w1, child_w2,"

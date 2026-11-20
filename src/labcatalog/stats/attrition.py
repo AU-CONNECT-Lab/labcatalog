@@ -226,7 +226,9 @@ def plan(result: CatalogResult, study: str, wave: str, keys: list[str]) -> Plan 
     # Both waves together, so a group taken person by person is so in both.
     both = analysis.build_sample(result, first + then, intersect=False)
     sample = analysis.within(both, first)
-    later = set(analysis.within(both, then).people)
+    # Someone whose ID repeats in a file of the next wave still came back.
+    repeats = {key for name in then for key in both.links.repeated_keys[name]}
+    later = set(analysis.within(both, then).people) | repeats
     data = AnalysisData(result, sample)
     # A variable in several files of the wave gets a row per file, as reporters may differ.
     variables = [

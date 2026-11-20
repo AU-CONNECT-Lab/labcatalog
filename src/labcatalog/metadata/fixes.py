@@ -160,7 +160,9 @@ def add_missing_codes(
     if everywhere:
         if not data.get("missing_codes"):
             data["missing_codes"] = CommentedSeq()
-        target = data["missing_codes"]
+        # A dataset's own list replaces the project's, so every such list gets the codes too.
+        own = [d["missing_codes"] for d in data["datasets"] if "missing_codes" in d]
+        targets = [data["missing_codes"], *own]
     else:
         entry = next(d for d in data["datasets"] if d["name"] == dataset)
         if "missing_codes" not in entry:
@@ -168,9 +170,12 @@ def add_missing_codes(
             config = dataset_by_name(project.config, dataset)
             known = missing_codes_for(project.config, config)
             entry["missing_codes"] = flow([{"code": m.code, "label": m.label} for m in known])
-        target = entry["missing_codes"]
-    for value, label in codes:
-        target.append(pair("code", value, label))
+        targets = [entry["missing_codes"]]
+    for target in targets:
+        held = {str(m["code"]) for m in target}
+        for value, label in codes:
+            if str(value) not in held:
+                target.append(pair("code", value, label))
     return Change(defaults.CONFIG_FILENAME, records.dumped(data), opened)
 
 

@@ -53,6 +53,31 @@ def test_returned_means_in_any_file_of_the_next_wave(result):
     assert attrition.plan(result, "mock_study", "3", [EMS]) is None
 
 
+def test_someone_whose_id_repeats_in_the_next_wave_still_came_back(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8").replace("correlate_by: family", "correlate_by: id")
+    config.write_text(text, encoding="utf-8")
+    result = run_catalog(mock_project)
+    before = attrition.plan(result, "mock_study", "1", [EMS])
+    second = attrition.wave_files(result, "mock_study", "2")
+    later = analysis.build_sample(result, second, False).links.rows
+    files = [n for n in second if result.datasets[n].config.source == "csv"]
+    files = [n for n in files if not result.datasets[n].config.wave_column]
+    returned = set(before.sample.people) & set().union(*(later[n].index for n in second))
+    name, person = next(
+        (n, p)
+        for p in sorted(returned)
+        for n in files
+        if p in later[n].index and sum(p in later[m].index for m in second) == 1
+    )
+    path = mock_project / result.datasets[name].config.path
+    data = pd.read_csv(path, dtype=str, keep_default_na=False)
+    twice = data[data[result.datasets[name].id_column] == person]
+    pd.concat([data, twice]).to_csv(path, index=False)
+    after = attrition.plan(run_catalog(mock_project), "mock_study", "1", [EMS])
+    assert (after.stayed, after.left) == (before.stayed, before.left)
+
+
 def test_a_variable_in_two_files_of_the_wave_gets_a_row_each(mock_project):
     # Split child_w1 into two files of wave 1 that both hold the mood scale.
     data = pd.read_csv(mock_project / "data" / "child_w1.csv", dtype=str)

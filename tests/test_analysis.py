@@ -32,6 +32,14 @@ def test_the_sample_keeps_people_in_every_dataset_or_in_any(result):
     assert list(frame.index) == both.people
 
 
+def test_someone_the_roster_gives_no_group_is_in_the_sample_by_their_id(result):
+    loaded = result.datasets["parent_w1"]
+    alone = set(loaded.frame[loaded.id_column][loaded.group.isna()])
+    assert alone
+    sample = analysis.build_sample(result, ["parent_w1"], intersect=False)
+    assert alone <= set(sample.people)
+
+
 def test_a_pair_matches_the_correlation_of_the_summary(result):
     sample = analysis.build_sample(result, ["parent_w1", "child_w1"], False)
     fit = analysis.regress(
