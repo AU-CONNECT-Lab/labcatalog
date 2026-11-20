@@ -1,6 +1,7 @@
 import pytest
 
 from labcatalog.ai import cleaning
+from labcatalog.exceptions import DataSourceError
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.metadata.validate import validate_project
 from labcatalog.pipeline import run_catalog
@@ -76,6 +77,33 @@ def test_a_drafted_script_becomes_a_step_that_writes_a_new_file(result):
     assert steps[0].run == f"Rscript scripts/clean_parent_w1.R {RAW} data/parent_w1.csv"
     assert "{name: clean_parent_w1, run: Rscript" in (root / "labcatalog.yaml").read_text()
     assert not [i for i in validate_project(project) if i.location == "labcatalog.yaml"]
+
+
+def test_a_draft_replaces_the_step_that_writes_the_file_whatever_its_name(mock_project):
+    config = mock_project / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8").replace("name: clean_parent_w1,", "name: tidy,")
+    config.write_text(text, encoding="utf-8")
+    result = run_catalog(mock_project)
+    client = FakeClient({"script": "d <- read.csv(args[1])", "changes": [], "notes": []})
+    draft = cleaning.draft_script(result.project, result.catalog, "parent_w1", RAW, "r", client)
+    assert (draft.step.name, draft.script_path) == ("tidy", "scripts/clean_parent_w1.R")
+    cleaning.save_draft(mock_project, draft)
+    project = load_project(mock_project)
+    assert [s.name for s in project.config.prepare].count("tidy") == 1
+    assert not [i for i in validate_project(project) if i.level == "error"]
+
+
+def test_an_empty_export_or_a_script_not_in_utf8_says_so(result):
+    root = result.project.root
+    (root / RAW).write_bytes(b"")
+    client = FakeClient({"script": "", "notes": []})
+    with pytest.raises(DataSourceError, match="parent_w1_export.csv is empty"):
+        cleaning.draft_script(result.project, result.catalog, "parent_w1", RAW, "r", client)
+    script = root / "scripts/clean_export.R"
+    script.write_bytes(script.read_bytes() + "# café\n".encode("cp1252"))
+    [issue] = [i for i in result.report.issues if i.code == "id_whitespace"]
+    with pytest.raises(DataSourceError, match="clean_export.R is not saved as UTF-8"):
+        cleaning.fix_script(result.project, result.catalog, issue, [], client)
 
 
 def test_only_a_script_that_reads_a_table_is_offered_a_fix(result):

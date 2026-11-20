@@ -182,6 +182,45 @@ def test_a_word_file_reads_in_order_with_its_tables_and_numbered_pictures(tmp_pa
     assert found.unsent == []
 
 
+W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+MC = 'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"'
+
+
+def test_a_word_file_reads_content_controls_nested_tables_and_text_boxes_once(tmp_path):
+    from docx import Document as Word
+    from docx.oxml import parse_xml
+
+    word = Word()
+    end = word.element.body[-1]
+    end.addprevious(
+        parse_xml(
+            f"<w:sdt {W}><w:sdtPr/><w:sdtContent>"
+            "<w:p><w:r><w:t>Item in a control</w:t></w:r></w:p>"
+            "<w:tbl><w:tblGrid><w:gridCol/></w:tblGrid><w:tr><w:tc>"
+            "<w:p><w:r><w:t>Cell in a control</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"
+            "</w:sdtContent></w:sdt>"
+        )
+    )
+    box = "<w:txbxContent><w:p><w:r><w:t>Text box item</w:t></w:r></w:p></w:txbxContent>"
+    end.addprevious(
+        parse_xml(
+            f"<w:p {W} {MC}><w:r><mc:AlternateContent><mc:Choice Requires='wps'>{box}"
+            f"</mc:Choice><mc:Fallback>{box}</mc:Fallback></mc:AlternateContent></w:r></w:p>"
+        )
+    )
+    cell = word.add_table(rows=1, cols=1).cell(0, 0)
+    cell.paragraphs[0].text = "Pick one:"
+    inner = cell.add_table(rows=1, cols=2)
+    inner.cell(0, 0).text = "Option A"
+    inner.cell(0, 1).text = "Option B"
+    path = tmp_path / "packet.docx"
+    word.save(path)
+    text = documents.read_document(path).text
+    assert text.splitlines()[0] == "Item in a control"
+    assert "| Cell in a control |" in text and "| Pick one: Option A Option B |" in text
+    assert text.count("Text box item") == 1
+
+
 def test_a_word_files_pictures_go_to_the_model_unless_turned_off(mock_project, tmp_path):
     path = word_file(tmp_path / "packet.docx")
     client = FakeClient()

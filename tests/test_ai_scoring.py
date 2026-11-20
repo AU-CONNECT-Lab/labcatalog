@@ -4,6 +4,7 @@ from conftest import rscript
 from labcatalog import pipeline
 from labcatalog.ai import scoring as ai_scoring
 from labcatalog.config import dataset_by_name
+from labcatalog.exceptions import EditError, LLMError
 from labcatalog.llm import CallMetadata, LLMClient
 from labcatalog.pipeline import run_catalog
 
@@ -45,6 +46,29 @@ def test_the_request_holds_the_items_columns_codes_and_reference(result):
     assert "ems_total | Total score | sum of ems_1, ems_2" in request
     assert "<reference>" in request and "Example Mood Scale" in request
     assert "several waves" not in request
+
+
+def test_a_pdf_that_cannot_be_read_says_why(tmp_path):
+    pymupdf = pytest.importorskip("pymupdf")
+    broken = tmp_path / "broken.pdf"
+    broken.write_bytes(b"not a pdf\n" * 20)
+    with pytest.raises(LLMError, match="broken.pdf cannot be read as a PDF"):
+        ai_scoring.pdf_text(broken)
+    locked = tmp_path / "locked.pdf"
+    document = pymupdf.open()
+    document.new_page().insert_text((72, 72), "Item 1. I feel sad.")
+    document.save(locked, encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="u", owner_pw="o")
+    with pytest.raises(LLMError, match="locked.pdf needs a password"):
+        ai_scoring.pdf_text(locked)
+
+
+def test_a_folder_dataset_is_refused_before_the_model_is_asked(result):
+    client = FakeClient()
+    with pytest.raises(EditError, match="nback_trials_w2 reads a folder"):
+        ai_scoring.write_scoring_scripts(
+            result.project, result.catalog, "example_mood", "nback_trials_w2", client
+        )
+    assert client.request == ""
 
 
 def test_one_wave_of_a_long_file_asks_for_that_waves_rows(result):

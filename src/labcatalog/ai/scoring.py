@@ -71,10 +71,17 @@ def reference_pdfs(project: Project, instrument: Instrument) -> list[tuple[Refer
 def pdf_text(path: Path) -> str:
     # Markdown keeps the tables that scoring keys are often printed in.
     try:
+        import pymupdf
         import pymupdf4llm
     except ImportError as e:
         raise LLMError("The pymupdf4llm package is missing: pip install labcatalog[ai]") from e
-    return pymupdf4llm.to_markdown(str(path), show_progress=False)
+    try:
+        document = pymupdf.open(path)
+    except pymupdf.FileDataError:
+        raise LLMError(f"{path.name} cannot be read as a PDF") from None
+    if document.needs_pass:
+        raise LLMError(f"{path.name} needs a password to open; save a copy without one")
+    return pymupdf4llm.to_markdown(document, show_progress=False)
 
 
 def scoring_request(project: Project, catalog: Catalog, instrument_id: str, dataset: str) -> str:
@@ -141,15 +148,22 @@ def answer(instrument: Instrument, item: Item) -> str:
 def write_scoring_scripts(
     project: Project, catalog: Catalog, instrument_id: str, dataset: str, client: LLMClient
 ) -> CallMetadata:
+    # The steps first, so a dataset no script can score is refused before the model is paid.
+    paths = script_paths(project, instrument_id, dataset)
+    steps = {
+        language: scoring_step(
+            project, instrument_id, dataset, posix_str(p.relative_to(project.root))
+        )
+        for language, p in paths.items()
+    }
     request = scoring_request(project, catalog, instrument_id, dataset)
     output, meta = client.complete_structured(
         system=SYSTEM, user_message=request, tool_schema=SCHEMA
     )
     instrument = project.instruments[instrument_id]
     sources = ", ".join(path.name for _, path in reference_pdfs(project, instrument))
-    for language, path in script_paths(project, instrument_id, dataset).items():
-        script = posix_str(path.relative_to(project.root))
-        step = scoring_step(project, instrument_id, dataset, script)
+    for language, path in paths.items():
+        step = steps[language]
         header = [
             f"# {instrument.name}, dataset {dataset}: written by {meta.provider} {meta.model} "
             f"on {date.today().isoformat()} from {sources}.",

@@ -43,6 +43,7 @@ from labcatalog.gui.paper import (
     without_empty,
     wording_button,
 )
+from labcatalog.metadata import scoring_steps
 from labcatalog.metadata.browse import BrowseIndex, counts, matches
 from labcatalog.metadata.completeness import gaps
 from labcatalog.metadata.history import Change, file_history
@@ -1074,7 +1075,9 @@ def written_scripts(
     dataset: str,
     reload: Callable[[], Awaitable[None]],
 ) -> None:
-    if not ai_scoring.reference_pdfs(result.project, instrument):
+    # A folder dataset has no data file for a script to add scores to.
+    folder = dataset_by_name(result.project.config, dataset).source == "folder"
+    if folder or not ai_scoring.reference_pdfs(result.project, instrument):
         return
     paths = ai_scoring.script_paths(result.project, instrument.id, dataset)
 
@@ -1115,10 +1118,37 @@ def written_scripts(
         finally:
             button.enable()
 
+    async def ask() -> None:
+        # The scripts may have been checked and edited, and a step may run one of them.
+        there = [
+            posix_str(p.relative_to(result.project.root)) for p in paths.values() if p.is_file()
+        ]
+        if not there:
+            await write()
+            return
+        step = scoring_steps.registered(result.project, instrument.id, dataset)
+        runs = step is not None and step.inputs[-1] in there
+        with ui.dialog() as dialog, ui.card().classes("w-[32rem] max-w-full"):
+            ui.label("Replace the scripts").classes("text-lg font-medium")
+            note(
+                f"Writing again replaces {' and '.join(there)}; any changes made to "
+                f"{'it' if len(there) == 1 else 'them'} are lost."
+                + (f" The step {step.name} runs {step.inputs[-1]}." if runs else "")
+            )
+
+            async def go() -> None:
+                dialog.close()
+                await write()
+
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Cancel", on_click=dialog.close).props("flat no-caps")
+                ui.button("Replace", on_click=go)
+        dialog.open()
+
     with panel("Scoring script from the reference PDF", dataset):
         if common.model_set():
             with ui.row().classes("items-center gap-3"):
-                button = ui.button("Write with the language model", on_click=write)
+                button = ui.button("Write with the language model", on_click=ask)
                 status = ui.label().classes("lc-note")
         else:
             note("Set a language model on the Settings page to write the scripts from the PDF.")

@@ -224,6 +224,8 @@ def read_text_table(path: Path, raw: str) -> pd.DataFrame:
         )
     except (OSError, UnicodeError, pd.errors.ParserError) as err:
         raise DataSourceError(f"{raw}: cannot read it as a CSV file: {err}") from err
+    except pd.errors.EmptyDataError:
+        raise DataSourceError(f"{raw} is empty") from None
 
 
 def value_lines(frame: pd.DataFrame) -> list[str]:
@@ -253,18 +255,20 @@ def draft_request(project: Project, catalog: Catalog, dataset: str, raw: str, sh
     )
 
 
+def script_text(root: Path, script: str) -> str:
+    try:
+        return (root / script).read_text("utf-8")
+    except UnicodeDecodeError:
+        raise DataSourceError(f"{script} is not saved as UTF-8; save it as UTF-8 first") from None
+
+
 def fix_request(
     project: Project, catalog: Catalog, issue: Issue, rows: list[dict[str, str]], shown: str
 ) -> str:
     dataset = issue.details["dataset"]
     step = cleaning_step(project, dataset)
     script = script_of(step)
-    lines = [
-        f"Script: {script}",
-        "<script>",
-        (project.root / script).read_text("utf-8"),
-        "</script>",
-    ]
+    lines = [f"Script: {script}", "<script>", script_text(project.root, script), "</script>"]
     if raw := raw_of(step):
         lines += ["", *raw_lines(project.root, raw, shown)]
     lines += ["", *clean_file_lines(project, catalog, dataset), "", f"Problem: {issue.message}"]
@@ -299,8 +303,10 @@ def draft_script(
         *(["# Notes from the model:"] if output["notes"] else []),
         *[f"# - {line}" for line in output["notes"]],
     ]
+    # The step that writes the file now is replaced, whatever its name, so one step writes it.
+    existing = cleaning_step(project, dataset)
     step = PrepareStep(
-        name=f"clean_{dataset}",
+        name=existing.name if existing else f"clean_{dataset}",
         run=command(language, script, raw, clean),
         inputs=[raw, script],
         outputs=[clean],
@@ -324,7 +330,7 @@ def fix_script(
     output, meta = client.complete_structured(
         system=system, user_message=request, tool_schema=SCHEMA
     )
-    previous = (project.root / script).read_text("utf-8")
+    previous = script_text(project.root, script)
     text = unfenced(output["script"]).strip() + "\n"
     return CleaningDraft(
         issue.details["dataset"],

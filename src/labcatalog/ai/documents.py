@@ -6,6 +6,7 @@ from labcatalog.exceptions import LLMError
 from labcatalog.llm import Image
 
 SUFFIXES = (".pdf", ".docx")
+FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
 # Picture formats every provider takes; others are numbered in the text but not sent.
 SENDABLE = ("image/png", "image/jpeg", "image/gif", "image/webp")
 # Boxes to tick that Word draws from a symbol font.
@@ -63,9 +64,16 @@ def word_document(path: Path) -> Document:
                 found.unsent.append(number)
         return f"[picture {numbers[str(part.partname)]}]"
 
+    def inside(element):
+        # Word keeps a text box twice, as a drawing and as its VML fallback; read it once.
+        for child in element:
+            if child.tag != FALLBACK:
+                yield child
+                yield from inside(child)
+
     def text_of(paragraph: Paragraph) -> str:
         out = []
-        for el in paragraph._p.iter():
+        for el in inside(paragraph._p):
             if el.tag == qn("w:t"):
                 out.append(el.text or "")
             elif el.tag == qn("w:tab"):
@@ -78,8 +86,27 @@ def word_document(path: Path) -> Document:
                 out.append(picture(el))
         return "".join(out).strip()
 
+    def blocks(parent):
+        # Content controls wrap paragraphs and tables, so their content counts as the parent's.
+        for child in parent.iterchildren():
+            if child.tag == qn("w:sdt"):
+                yield from blocks(child.find(qn("w:sdtContent")))
+            elif child.tag in (qn("w:p"), qn("w:tbl")):
+                yield child
+
+    def cell_text(tc) -> str:
+        # A table inside a cell, often a grid of options, reads as the cell's text.
+        texts = []
+        for block in blocks(tc):
+            if block.tag == qn("w:p"):
+                texts.append(text_of(Paragraph(block, word)))
+            else:
+                inner = dict.fromkeys(c._tc for row in Table(block, word).rows for c in row.cells)
+                texts += [cell_text(c) for c in inner]
+        return " ".join(t for t in texts if t)
+
     lines = []
-    for child in word.element.body.iterchildren():
+    for child in blocks(word.element.body):
         if child.tag == qn("w:p"):
             paragraph = Paragraph(child, word)
             text = text_of(paragraph)
@@ -89,7 +116,7 @@ def word_document(path: Path) -> Document:
                     "# " if style == "Heading 1" else "## " if style.startswith("Heading") else ""
                 )
                 lines.append(heading + text)
-        elif child.tag == qn("w:tbl"):
+        else:
             lines.append("")
             for n, row in enumerate(Table(child, word).rows):
                 seen, cells = set(), []
@@ -98,8 +125,7 @@ def word_document(path: Path) -> Document:
                     if id(cell._tc) in seen:
                         continue
                     seen.add(id(cell._tc))
-                    texts = (text_of(p) for p in cell.paragraphs)
-                    cells.append(" ".join(t for t in texts if t).replace("|", "/"))
+                    cells.append(cell_text(cell._tc).replace("|", "/"))
                 if any(cells):
                     lines.append("| " + " | ".join(cells) + " |")
                     if n == 0:

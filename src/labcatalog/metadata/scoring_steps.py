@@ -60,9 +60,10 @@ def script_path(instrument_id: str, dataset: str, language: str) -> str:
 
 
 def scoring_step(project: Project, instrument_id: str, dataset: str, script: str) -> PrepareStep:
-    data = dataset_by_name(project.config, dataset).path
-    if data is None:
+    found = dataset_by_name(project.config, dataset)
+    if found.source == "folder":
         raise EditError(f"{dataset} reads a folder, so a script cannot add scores to it")
+    data = found.path
     command = COMMANDS.get(Path(script).suffix.lower())
     if command is None:
         raise EditError(f"{script}: a scoring script is an R (.R) or Python (.py) file")

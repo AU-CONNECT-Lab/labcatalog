@@ -364,8 +364,9 @@ def render(root: Path, view: EditView, on_saved: Callable[[], Awaitable[None]]) 
                         " A model that reads text only needs the pictures left out." if sent else ""
                     )
                     status.set_text(f"{err}{hint}")
-                    button.enable()
                     return
+                finally:
+                    button.enable()
                 dialog.close()
                 meta = drafted.meta
                 ui.notify(
