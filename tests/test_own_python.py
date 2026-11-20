@@ -58,4 +58,4 @@ def test_the_program_calls_itself_with_the_flag_only_when_frozen(monkeypatch, tm
 def test_a_steps_path_starts_with_the_chosen_r_and_python():
     path = environment("C:/R/bin/Rscript.exe", sys.executable)["PATH"].split(os.pathsep)
     assert path[:2] == [str(Path("C:/R/bin")), str(Path(sys.executable).parent)]
-    assert environment(None, None) is None
+    assert environment(None, None) == {**os.environ, "PYTHONUTF8": "1"}
