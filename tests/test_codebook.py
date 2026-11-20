@@ -1,4 +1,5 @@
 import csv
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -475,6 +476,30 @@ def test_new_instruments_come_from_a_dictionary_before_any_data(pilot, tmp_path)
     archived = [p.name for p in (pilot / "codebook").iterdir()]
     assert len(archived) == 1 and archived[0].startswith(f"{NEW}_")
     assert {"mood_scale", "background"} <= set(load_project(pilot).instruments)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="only Windows keeps an open file's folder")
+def test_importing_while_a_codebook_file_is_open_writes_nothing(pilot):
+    project = load_project(pilot)
+    paths = codebook_paths(project, NEW)
+    paths[ITEMS].parent.mkdir(parents=True)
+    paths[ITEMS].write_text(
+        "column,instrument,item,text,type,choices,reverse,min,max\n"
+        ",newq,newq_1,I feel calm,choice,0=No; 1=Yes,,,\n",
+        encoding="utf-8",
+    )
+    paths[INSTRUMENTS].write_text(
+        "instrument,name,abbreviation,modality,demographics,construct\nnewq,New,,,,\n",
+        encoding="utf-8",
+    )
+    paths[SCORES].write_text(
+        "instrument,score,label,method,items,missing_rule,min_valid\n", encoding="utf-8"
+    )
+    # As Excel does with a file it has open.
+    with paths[ITEMS].open("rb"), pytest.raises(CodebookError, match="close it and import again"):
+        import_instruments(project)
+    assert not (pilot / "instruments" / "newq.yaml").exists()
+    assert [p.name for p in import_instruments(project).written] == ["newq.yaml"]
 
 
 def test_an_empty_new_codebook_says_there_is_nothing_to_import(pilot):

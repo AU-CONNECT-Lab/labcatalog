@@ -30,6 +30,8 @@ ID_COLUMN = "id"
 DATE_FORMAT = "%Y-%m-%d"
 BLANK_LABEL = "blank"
 MIN_CORRELATION_N = 3
+# People both raters rated, below which a pair gets no kappa.
+MIN_KAPPA_N = 3
 CORRELATE_BY = "id"
 DECIMALS = 2
 IMPUTATIONS = 20

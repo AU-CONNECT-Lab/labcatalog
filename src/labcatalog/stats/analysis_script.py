@@ -28,6 +28,7 @@ from labcatalog.stats.analysis import (
     parts,
 )
 from labcatalog.stats.cfa import is_total
+from labcatalog.stats.link import as_written
 from labcatalog.stats.rbridge import install_command, package_check, run_r
 
 DATA_FILE = "analysis_data.csv"
@@ -80,7 +81,9 @@ n_row <- function(dataset, present) {{
 }}
 number_row <- function(variable, dataset, x, items = NULL) {{
   described <- psych::describe(x)
-  alpha <- if (is.null(items)) NA else psych::alpha(items, warnings = FALSE)$total$raw_alpha
+  # An item no one answered leaves no alpha: it would describe fewer items than the score has.
+  empty <- is.null(items) || any(colSums(!is.na(items)) == 0)
+  alpha <- if (empty) NA else psych::alpha(items, warnings = FALSE)$total$raw_alpha
   data.frame(variable = variable, dataset = dataset, level = "", n = described$n,
              mean = described$mean, sd = described$sd, percent = NA, alpha = alpha)
 }}
@@ -111,14 +114,17 @@ def n_row(dataset, present):
 
 
 def number_row(variable, dataset, x, items=None):
-    alpha = np.nan if items is None else cronbach_alpha(items)
+    # An item no one answered leaves no alpha: it would describe fewer items than the score has.
+    empty = items is None or items.count().eq(0).any()
+    alpha = np.nan if empty else cronbach_alpha(items)
     return [dict(variable=variable, dataset=dataset, level="", n=x.count(), mean=x.mean(),
                  sd=x.std(), alpha=alpha)]
 
 
-def choice_rows(variable, dataset, x, levels):
-    counts = x.map({{value: label for label, value in levels.items()}}).value_counts()
-    counts = counts.reindex(list(levels), fill_value=0)
+def choice_rows(variable, dataset, x, labels):
+    # Options that share a label are counted together, as R's factor does.
+    levels = list(dict.fromkeys(labels.values()))
+    counts = x.map(labels).value_counts().reindex(levels, fill_value=0)
     return [dict(variable=variable, dataset=dataset, level=label, n=n,
                  percent=100 * n / counts.sum()) for label, n in counts.items()]
 
@@ -176,6 +182,8 @@ descriptives <- data.frame(variable = variables,
 print(descriptives)
 study <- factor(d$study)
 within_study <- function(v, s) if (nlevels(s) > 1) resid(lm(v ~ s)) else v - mean(v)
+# A variable that differs only between studies has nothing left once the study is taken out.
+varies <- function(v, s) any(tapply(v, s, function(u) length(unique(u)) > 1))
 pairs <- t(combn(variables, 2))
 correlations <- do.call(rbind, lapply(seq_len(nrow(pairs)), function(i) {{
   x <- pairs[i, 1]
@@ -185,7 +193,7 @@ correlations <- do.call(rbind, lapply(seq_len(nrow(pairs)), function(i) {{
   s <- droplevels(study[keep])
   xs <- {transform}(d[[x]][keep])
   ys <- {transform}(d[[y]][keep])
-  ok <- n > nlevels(s) + 1 && sd(xs) > 0 && sd(ys) > 0
+  ok <- n > nlevels(s) + 1 && varies(xs, s) && varies(ys, s)
   fit <- if (!ok) NULL else if (nlevels(s) > 1) lm(ys ~ xs + s) else lm(ys ~ xs)
   coefs <- if (is.null(fit)) NULL else summary(fit)$coefficients
   found <- !is.null(coefs) && "xs" %in% rownames(coefs)
@@ -213,6 +221,11 @@ def within_study(v, dummies):
     return sm.OLS(v, sm.add_constant(dummies)).fit().resid
 
 
+def varies(v, study):
+    # A variable that differs only between studies has nothing left once the study is taken out.
+    return bool((v.groupby(study).nunique() > 1).any())
+
+
 rows = []
 for i, x in enumerate(variables):
     for y in variables[i + 1:]:
@@ -221,7 +234,8 @@ for i, x in enumerate(variables):
                                  dtype=float)
         xs, ys = both[x]{rank}.rename("xs"), both[y]{rank}
         r = p = np.nan
-        if len(both) > dummies.shape[1] + 2 and xs.std() > 0 and ys.std() > 0:
+        ok = varies(xs, both["study"]) and varies(ys, both["study"])
+        if len(both) > dummies.shape[1] + 2 and ok:
             fit = sm.OLS(ys, sm.add_constant(pd.concat([xs, dummies], axis=1))).fit()
             r = np.corrcoef(within_study(xs, dummies), within_study(ys, dummies))[0, 1]
             p = fit.pvalues["xs"]
@@ -363,7 +377,7 @@ print(regressions)
 """
 R_GROUPS = """\
 # Group comparison: {outcome_label} by {group_label}{left_out}
-group <- factor(d[[{group}]], levels = c({values}), labels = c({labels}))
+group <- factor(d[[{group}]], levels = c({values}), labels = c({value_labels}))
 y <- d[[{outcome}]]
 keep <- !is.na(group) & !is.na(y)
 group <- group[keep]
@@ -542,6 +556,14 @@ class Variable:
         self.label = " ".join(self.label.split())
         self.options = [(value, " ".join(text.split())) for value, text in self.options]
 
+    @property
+    def levels(self) -> list[tuple[list[float], str]]:
+        # Options that share a label are one level, as R's factor makes them.
+        found: dict[str, list[float]] = {}
+        for value, text in self.options:
+            found.setdefault(text, []).append(value)
+        return [(values, text) for text, values in found.items()]
+
 
 @dataclass
 class Code:
@@ -706,10 +728,10 @@ class AnalysisData:
 
     def frame(self) -> pd.DataFrame:
         people, split = self.sample.people, self.sample.links.split
-        keys = {link_name(self.result): [split.get(p, p) for p in people]}
+        keys = {link_name(self.result): [as_written(split.get(p, p)) for p in people]}
         # A group taken person by person repeats, so its people get their own IDs.
         if split:
-            keys[PERSON_ID] = [p if p in split else "" for p in people]
+            keys[PERSON_ID] = [as_written(p) if p in split else "" for p in people]
         if analysis.pooling(self.result, self.sample.datasets):
             keys[STUDY_KEY] = analysis.study_numbers(self.result, self.sample).to_list()
         presence = {
@@ -846,7 +868,7 @@ def table_one_code(datasets: list[str], rows: list[tuple[str, list[Variable]]]) 
                     f"{r_string(text)} = {number(value)}" for value, text in v.options
                 )
                 py_levels = ", ".join(
-                    f"{r_string(text)}: {number(value)}" for value, text in v.options
+                    f"{number(value)}: {r_string(text)}" for value, text in v.options
                 )
                 r_rows.append(f"  choice_rows({args}, c({levels}))")
                 py_rows.append(f"    *choice_rows({py_args}, {{{py_levels}}}),")
@@ -953,19 +975,22 @@ def regression_code(xs: list[Variable], y: Variable, by_study: bool = False) -> 
 
 
 def fittable(frame: pd.DataFrame, x: str, y: str) -> bool:
-    # A line needs three people with both values, and both must vary.
+    # A line needs three people with both values, and both must vary, within a study when pooled.
     both = frame[[x, y]].dropna()
+    study = frame.loc[both.index, STUDY_KEY] if STUDY_KEY in frame else pd.Series(0, both.index)
     return (
-        len(both) >= defaults.MIN_CORRELATION_N and both[x].nunique() > 1 and both[y].nunique() > 1
+        len(both) >= defaults.MIN_CORRELATION_N
+        and len(both) > study.nunique() + 1
+        and all((both[c].groupby(study).nunique() > 1).any() for c in (x, y))
     )
 
 
 def group_sizes(
     frame: pd.DataFrame, group: Variable, outcome: Variable
-) -> list[tuple[float, str, int]]:
+) -> list[tuple[list[float], str, int]]:
     both = frame[[group.column, outcome.column]].dropna()
     return [
-        (value, text, int((both[group.column] == value).sum())) for value, text in group.options
+        (values, text, int(both[group.column].isin(values).sum())) for values, text in group.levels
     ]
 
 
@@ -973,10 +998,13 @@ def comparison_plan(
     frame: pd.DataFrame, group: Variable, outcome: Variable, t_test: str = WELCH
 ) -> ComparisonPlan | None:
     sizes = group_sizes(frame, group, outcome)
-    kept = [(value, text) for value, text, n in sizes if n >= MIN_GROUP]
+    kept = [(values, text) for values, text, n in sizes if n >= MIN_GROUP]
     both = frame[[group.column, outcome.column]].dropna()
     # An outcome that varies within no group leaves the test no error to divide by.
-    varies = any(both.loc[both[group.column] == v, outcome.column].nunique() > 1 for v, _ in kept)
+    varies = any(
+        both.loc[both[group.column].isin(values), outcome.column].nunique() > 1
+        for values, _ in kept
+    )
     if len(kept) < 2 or not varies:
         return None
     left = [(text, n) for _, text, n in sizes if n < MIN_GROUP]
@@ -992,9 +1020,14 @@ def comparison_plan(
         left_out=left_out,
         labels=labels,
     )
-    r = R_GROUPS.format(values=", ".join(number(v) for v, _ in kept), **fields)
+    r = R_GROUPS.format(
+        values=", ".join(number(v) for values, _ in kept for v in values),
+        value_labels=", ".join(r_string(text) for values, text in kept for _ in values),
+        **fields,
+    )
     python = PYTHON_GROUPS.format(
-        mapping=", ".join(f"{number(v)}: {r_string(t)}" for v, t in kept), **fields
+        mapping=", ".join(f"{number(v)}: {r_string(t)}" for values, t in kept for v in values),
+        **fields,
     )
     interval = PYTHON_D_INTERVAL.format(scale=TWO_SCALE)
     tests = {

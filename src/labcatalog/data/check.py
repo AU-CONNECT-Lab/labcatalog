@@ -372,9 +372,9 @@ def check_exclusions(project: Project, datasets: dict[str, LoadedDataset]) -> li
         if excluded is None:
             continue
         ids = loaded.frame[loaded.id_column]
-        hits = ids.isin(excluded)
+        hits = ids.isin(excluded.people)
         if loaded.group is not None:
-            hits |= loaded.group.isin(excluded)
+            hits |= loaded.group.isin(excluded.groups)
         if hits.any():
             message = (
                 f"{hits.sum()} row(s) belong to people or groups on the exclusion list: "

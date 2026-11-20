@@ -207,12 +207,13 @@ def test_two_reporters_of_one_wave_pair_through_the_family(mock_project):
     child, parent = mood.occasions["child"], mood.occasions["parent"]
     # The same index is the same family in both; a family with two children is taken by child.
     assert set(child.index) & set(parent.index)
-    assert any(len(i) == 4 for i in child.index) and "1301C" in child.index
+    assert any(i.startswith("group:") for i in child.index) and "id:1301C" in child.index
     # The parents gave the children's wave 2 answers, reversed the same way.
     later = next(m for m in models if m.instrument_id == "example_mood" and m.across == "waves")
-    families = {i for i in parent.index if len(i) == 4}
+    families = {i.removeprefix("group:") for i in parent.index if i.startswith("group:")}
     family = next(iter(families & {i[:4] for i in later.occasions["2"].index}))
-    assert parent.loc[family].equals(later.occasions["2"].loc[f"{family}C"].rename(family))
+    key = f"group:{family}"
+    assert parent.loc[key].equals(later.occasions["2"].loc[f"{family}C"].rename(key))
 
 
 GENDER = "item:example_demographics.dem_gender@parent_w1"

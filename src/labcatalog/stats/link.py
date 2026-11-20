@@ -6,12 +6,15 @@ import pandas as pd
 
 from labcatalog.sources import LoadedDataset, has_id
 
+# A person and a group may be written alike, so each key says which it is.
+PERSON, GROUP = "id:", "group:"
+
 
 @dataclass
 class Links:
     # Each file's row for every unit: a group, or each person of a group that a file holds several of.
     rows: dict[str, pd.Series]
-    # Person -> group, for the groups taken person by person.
+    # Person key -> group key, for the groups taken person by person.
     split: dict[str, str]
     # Rows left out because their ID repeats within a file.
     repeated: int
@@ -29,15 +32,13 @@ def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str
     for name in names:
         loaded = datasets[name]
         ids = loaded.frame[loaded.id_column].astype("string")
-        ids = ids.where(has_id(ids))
+        ids = PERSON + study_keys(loaded, ids.where(has_id(ids)), several)
         # Someone the roster gives no group links by their own ID, as in a file without groups.
         groups = (
-            loaded.group.astype("string").fillna(ids)
+            (GROUP + study_keys(loaded, loaded.group.astype("string"), several)).fillna(ids)
             if by_group and loaded.group is not None
             else ids
         )
-        if several:
-            ids, groups = study_keys(loaded, ids), study_keys(loaded, groups)
         rows = pd.DataFrame(
             {"name": name, "id": ids.to_numpy(), "group": groups.to_numpy(), "row": range(len(ids))}
         )
@@ -81,5 +82,9 @@ def link(datasets: dict[str, LoadedDataset], names: list[str], correlate_by: str
     return Links(rows, split, repeated, crossed, repeated_keys)
 
 
-def study_keys(loaded: LoadedDataset, keys: pd.Series) -> pd.Series:
-    return f"{loaded.config.study}/" + keys
+def study_keys(loaded: LoadedDataset, keys: pd.Series, several: bool) -> pd.Series:
+    return f"{loaded.config.study}/" + keys if several else keys
+
+
+def as_written(key: str) -> str:
+    return key.partition(":")[2]

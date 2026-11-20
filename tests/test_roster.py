@@ -12,6 +12,7 @@ from labcatalog.reports.export import BY_ID, data_frame, wide_frame
 from labcatalog.sources import load_datasets
 from labcatalog.stats import analysis
 from labcatalog.stats import analysis_script as script
+from labcatalog.stats.link import as_written
 
 PARTICIPANTS = "example_participants"
 
@@ -260,8 +261,8 @@ def test_people_of_two_studies_are_never_the_same(pilot_project):
     # Each study has one of the files, so every file of one's own study is that one.
     assert analysis.build_sample(result, files, True).people == union
     # The example links by family; 1001C is in family 1001 of one study and 9001 of the other.
-    assert {"mock_study/1001", "pilot/9001"} <= set(union)
-    assert all(p.startswith(("mock_study/", "pilot/")) for p in union)
+    assert {"group:mock_study/1001", "group:pilot/9001"} <= set(union)
+    assert all(as_written(p).startswith(("mock_study/", "pilot/")) for p in union)
     plan = {name: ["example_mood"] for name in files}
     data, _ = wide_frame(result, plan, BY_ID)
     assert list(data.columns[:2]) == ["study", "id"]

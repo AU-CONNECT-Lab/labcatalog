@@ -96,6 +96,42 @@ def test_two_groups_get_welch_and_more_get_anova(result, sample):
     assert 0 <= anova.effect < 1
 
 
+@pytest.mark.parametrize("engine", [script.PYTHON, pytest.param(script.R, marks=needs_r)])
+def test_options_that_share_a_label_are_one_level(result, sample, engine):
+    data = script.AnalysisData(result, sample)
+    group, outcome = data.item(GENDER), data.score(EMS)
+    group = replace(group, options=[(1.0, "Girl"), (2.0, "Not a girl"), (3.0, "Not a girl")])
+    frame = data.frame()
+    path = rscript() if engine == script.R else None
+    code = script.table_one_code(sample.datasets, [("Child gender", [group])])
+    table = script.run_code(result, sample, frame, code, path)[0]["table1"]
+    rows = table[table["variable"] == "Child gender"]
+    answers = frame[group.column]
+    assert rows[["level", "n"]].values.tolist() == [
+        ["Girl", (answers == 1).sum()],
+        ["Not a girl", answers.isin([2, 3]).sum()],
+    ]
+    plan = script.comparison_plan(frame, group, outcome)
+    found = script.read_comparison(script.run_code(result, sample, frame, plan.code, path)[0], plan)
+    assert found.test == script.WELCH
+    assert [(g.label, g.n) for g in found.groups] == [
+        ("Girl", frame.loc[answers == 1, outcome.column].notna().sum()),
+        ("Not a girl", frame.loc[answers.isin([2, 3]), outcome.column].notna().sum()),
+    ]
+
+
+@pytest.mark.parametrize("engine", [script.PYTHON, pytest.param(script.R, marks=needs_r)])
+def test_a_score_with_an_item_no_one_answered_has_no_alpha(result, sample, engine):
+    data = script.AnalysisData(result, sample)
+    ems = data.score(EMS, items=True)
+    frame = data.frame()
+    frame[ems.items[0]] = np.nan
+    code = script.table_one_code(sample.datasets, [("EMS", [ems])])
+    path = rscript() if engine == script.R else None
+    table = script.run_code(result, sample, frame, code, path)[0]["table1"]
+    assert table.loc[table["variable"] == "EMS", "alpha"].isna().all()
+
+
 def test_student_uses_equal_variances_and_the_pooled_sd(result, sample):
     found, _ = comparison(result, sample, two_groups=True, t_test=script.STUDENT)
     assert found.test == script.STUDENT
@@ -443,7 +479,12 @@ def test_number_items_analyse_beside_scores(result, tmp_path, monkeypatch):
     eeg = result.datasets["eeg_w1"].frame
     roster = pd.read_csv(result.project.root / "data" / "participants.csv", dtype=str)
     family = roster.set_index("pid")["family_id"]
-    keys = [pid if pid in sample.people else family.get(pid, pid) for pid in eeg["pid"]]
+
+    def key(pid: str) -> str:
+        own = f"id:{pid}"
+        return own if own in sample.people or pd.isna(family.get(pid)) else f"group:{family[pid]}"
+
+    keys = [key(pid) for pid in eeg["pid"]]
     expected = pd.Series(
         pd.to_numeric(eeg["frontal_alpha_asymmetry"]).to_numpy(), index=keys
     ).reindex(sample.people)
@@ -472,6 +513,27 @@ def test_table_one_offers_number_items_but_starts_without_them(result):
     assert key in script.measures(result, datasets)
     defaults = script.default_measures(result, datasets)
     assert key not in defaults and "item:example_demographics.dem_gender" in defaults
+
+
+@pytest.mark.parametrize("engine", [script.PYTHON, pytest.param(script.R, marks=needs_r)])
+def test_pooled_pairs_need_a_variable_to_vary_within_a_study(result, sample, engine):
+    # X differs between the two studies but not within either.
+    rng = np.random.default_rng(4)
+    frame = pd.DataFrame(
+        {
+            "study": [1.0] * 6 + [2.0] * 6,
+            "x": [3.0] * 6 + [5.0] * 6,
+            "y": rng.normal(0, 1, 12).round(2),
+            "z": rng.normal(0, 1, 12).round(2),
+        }
+    )
+    variables = [script.Variable(c, c, "d", script.NUMBER, c) for c in ("x", "y", "z")]
+    code = script.correlation_code(variables, by_study=True)
+    path = rscript() if engine == script.R else None
+    found = script.run_code(result, sample, frame, code, path)[0]["correlations"]
+    r = {(row.x, row.y): row.r for row in found.itertuples()}
+    assert pd.isna(r[("x", "y")]) and pd.isna(r[("x", "z")]) and not pd.isna(r[("y", "z")])
+    assert not script.fittable(frame, "x", "y") and script.fittable(frame, "z", "y")
 
 
 def test_an_outcome_that_varies_within_no_group_is_not_compared(result, sample):

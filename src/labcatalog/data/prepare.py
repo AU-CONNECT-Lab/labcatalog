@@ -191,10 +191,11 @@ def execute(
     if step.table is not None:
         take_table(step, root, run, echo, datalad is not None)
         return
+    command, cwd = (run_args(step, root, datalad), root) if datalad else shell_line(step.run, root)
     process = subprocess.Popen(
-        run_args(step, root, datalad) if datalad else step.run,
+        command,
         shell=not datalad,
-        cwd=root,
+        cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         encoding="utf-8",
@@ -210,6 +211,13 @@ def execute(
     run.exit_code = process.wait()
     run.stopped = session.stopping
     session.process = None
+
+
+def shell_line(command: str, root: Path) -> tuple[str, Path | None]:
+    # cmd cannot start in a network folder (\\server\share), so it maps one with pushd instead.
+    if os.name == "nt" and str(root).startswith("\\\\"):
+        return f'pushd "{root}" && {command}', None
+    return command, root
 
 
 def take_table(

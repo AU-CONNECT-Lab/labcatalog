@@ -65,7 +65,7 @@ A mapping from each study's ID to:
 | `milestones` | list | Dates to show on the Overview timeline, each with a `name` and a `date`. |
 | `roster` | mapping | The study's people, see below. |
 | `id_pattern` | text | A regular expression the study's IDs must match, in place of `ids.pattern`, for a study that writes its IDs another way. |
-| `exclusions` | text | A path to a CSV file with an `id` column listing people or groups of the study who must not be in the data. `labcatalog check` reports rows of the study's datasets that belong to them. |
+| `exclusions` | text | A path to a CSV file listing people (an `id` column), whole groups (a `group` column) or both, of the study, who must not be in the data. `labcatalog check` reports rows of the study's datasets that belong to them. |
 | `custom` | mapping | Values of custom fields that apply to studies. |
 
 IDs belong to their study: two studies may both have a `1001P`, and they are different people. So each study lists its own people and exclusions.

@@ -73,7 +73,7 @@ Choose the **First** and **Second** measure of the same people, such as a score 
 
 ## Rater agreement
 
-Choose one variable for each rater: the same people rated by two or more coders, each coder's ratings in a column of their own. When every chosen variable is an item with answer options, the table gives Cohen's κ for each pair of raters on everyone both rated, unweighted and with quadratic weights (for ordered options), each with its 95% CI (`psych::cohen.kappa`), and with three or more raters their average (Light's κ). Otherwise it gives the six intraclass correlations of Shrout and Fleiss with their 95% CIs, *F* tests and *p* values (`psych::ICC` with its variance components from `lme4`, as JASP gives them), on everyone with at least one rating; these need R. The Results paragraph reports ICC(2,1) and ICC(2,k), or the κ.
+Choose one variable for each rater: the same people rated by two or more coders, each coder's ratings in a column of their own. When every chosen variable is an item with answer options, the table gives Cohen's κ for each pair of raters on everyone both rated (a pair who rated fewer than three of the same people gets none), unweighted and with quadratic weights (for ordered options), each with its 95% CI (`psych::cohen.kappa`), and with three or more raters their average (Light's κ). Otherwise it gives the six intraclass correlations of Shrout and Fleiss with their 95% CIs, *F* tests and *p* values (`psych::ICC` with its variance components from `lme4`, as JASP gives them), on everyone with at least one rating; these need R. The Results paragraph reports ICC(2,1) and ICC(2,k), or the κ.
 
 ## Measurement model
 

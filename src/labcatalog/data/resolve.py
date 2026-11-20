@@ -63,6 +63,7 @@ class ResolvedScore(BaseModel):
     min_valid: int | None = None
     existing_column: str | None = None
     unavailable_items: list[str] = []
+    target: str | None = None
 
 
 class Catalog(BaseModel):
@@ -197,6 +198,7 @@ def resolve_scores(
                 min_valid=score.min_valid,
                 existing_column=columns.get(f"{defaults.SCORE_PREFIX}{score.id}"),
                 unavailable_items=[item_id for item_id in score.items if item_id not in by_item],
+                target=administration.target,
             )
         )
     return scores

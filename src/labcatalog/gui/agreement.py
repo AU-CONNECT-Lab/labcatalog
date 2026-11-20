@@ -2,6 +2,7 @@ from collections.abc import Callable
 
 from nicegui import ui
 
+from labcatalog import defaults
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import analysis as page
 from labcatalog.gui import analysis_tables, paper
@@ -142,8 +143,8 @@ def table(found: Agreement, names: dict[str, str], by_study: bool = False) -> Pa
     if found.light is not None:
         rows.append({"pair": "Average (Light's κ)", "n": "", "kappa": apa(found.light)})
     text = (
-        "Cohen's κ on everyone both raters rated; weighted κ uses quadratic weights, for "
-        "ordered options."
+        f"Cohen's κ on everyone both raters rated, given when they rated {defaults.MIN_KAPPA_N} "
+        "or more people; weighted κ uses quadratic weights, for ordered options."
     )
     if by_study:
         text += " The studies' people together."

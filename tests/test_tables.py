@@ -70,6 +70,13 @@ def test_latex_writes_the_greek_of_fit_tables():
     assert r"$\omega$ \\" in text
 
 
+def test_latex_writes_every_symbol_of_the_tables_in_ascii():
+    # Agreement, mediation, panel and correlation tables, which pdflatex reads only as ASCII.
+    symbols = "κ β ρ × a′ X → M ≥ ≤ — … †"
+    shown = PaperTable(symbols, [{"name": "s", "label": symbols}], [{"s": symbols}], symbols)
+    assert latex(shown).isascii()
+
+
 def test_docx_holds_the_label_title_table_and_note():
     document = Document(io.BytesIO(docx(TABLE)))
     texts = [p.text for p in document.paragraphs]

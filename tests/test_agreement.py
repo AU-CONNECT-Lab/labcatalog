@@ -47,6 +47,23 @@ def test_answer_options_give_kappa_and_scores_give_intraclass_correlations(resul
     assert agreement.agreement_code(totals).outputs == ("icc",)
 
 
+@pytest.mark.parametrize("engine", ["python", pytest.param("r", marks=needs_r)])
+@pytest.mark.parametrize("both", [2, 0])
+def test_a_pair_with_fewer_than_three_people_rated_by_both_gets_no_kappa(
+    result, sample, engine, both
+):
+    data = script.AnalysisData(result, sample)
+    items = [data.variable(k) for k in item_raters(result, sample)]
+    frame = data.frame()
+    first, second = (v.column for v in items)
+    rated = frame.index[frame[[first, second]].notna().all(axis=1)]
+    frame.loc[rated[both:], first] = None
+    code = agreement.agreement_code(items)
+    found, _ = script.run_code(result, sample, frame, code, rscript() if engine == "r" else None)
+    [pair] = agreement.read_agreement(found, items).kappas
+    assert (pair.n, pair.kappa, pair.weighted) == (both, None, None)
+
+
 @needs_r
 def test_kappa_is_the_same_in_r_and_python(result, sample):
     data = script.AnalysisData(result, sample)

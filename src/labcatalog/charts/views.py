@@ -19,6 +19,7 @@ from labcatalog.pipeline import CatalogResult
 from labcatalog.schema import Instrument, Score
 from labcatalog.stats import analysis, analysis_script
 from labcatalog.stats import multilevel as ml
+from labcatalog.stats.link import as_written
 from labcatalog.stats.summary import wave_order
 
 RADAR_AXES = 3
@@ -457,17 +458,17 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     config = result.project.config
     instrument = result.project.instruments[instrument_id]
     retained = {
-        (r.study, r.reporter, r.score_id, r.wave): r
+        (r.study, r.reporter, r.target, r.score_id, r.wave): r
         for r in result.summary.retained
         if r.instrument_id == instrument_id
     }
     panels = []
     for score in instrument.scores:
-        by_reporter: dict[tuple[str, str], list[ResolvedScore]] = {}
+        by_reporter: dict[tuple[str, str, str | None], list[ResolvedScore]] = {}
         for s in resolved(result, instrument_id, score.id):
             d = dataset_by_name(config, s.dataset)
-            by_reporter.setdefault((d.study, d.reporter), []).append(s)
-        for (study, reporter), scores in by_reporter.items():
+            by_reporter.setdefault((d.study, d.reporter, s.target), []).append(s)
+        for (study, reporter, target), scores in by_reporter.items():
             if len(scores) < 2:
                 continue
             everyone, kept = [], []
@@ -476,14 +477,14 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
                 summary = summary_of(result, s.key)
                 if summary.mean is not None:
                     everyone.append((wave_name(result, study, wave), summary.mean, summary.n_valid))
-                r = retained.get((study, reporter, score.id, wave))
+                r = retained.get((study, reporter, target, score.id, wave))
                 if r is not None and r.mean is not None:
                     kept.append((wave_name(result, study, wave), r.mean, r.n))
             panels.append(
                 {
                     "title": score.label
                     if len(by_reporter) == 1
-                    else f"{score.label} ({reporter})",
+                    else f"{score.label} ({who(reporter, target)})",
                     "series": [
                         {"name": "All participants", "color": pair_color(0), "points": everyone},
                         {"name": "In every wave", "color": pair_color(1), "points": kept},
@@ -491,6 +492,10 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
                 }
             )
     return plots.score_means(panels, all_wave_names(result)) if panels else None
+
+
+def who(reporter: str, target: str | None) -> str:
+    return f"{reporter} about {target}" if target else reporter
 
 
 def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -> go.Figure | None:
@@ -1306,7 +1311,7 @@ def pair_scatter(
                 "color": group_color(k),
                 "x": frame[x].to_numpy(dtype=float),
                 "y": frame[y].to_numpy(dtype=float),
-                "ids": [str(i) for i in frame.index],
+                "ids": [as_written(i) for i in frame.index],
             }
         )
     if not groups:

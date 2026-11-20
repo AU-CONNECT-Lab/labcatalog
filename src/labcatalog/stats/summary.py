@@ -127,6 +127,7 @@ class Correlation(BaseModel):
 class ScoreStability(BaseModel):
     study: str
     reporter: str
+    target: str | None = None
     instrument_id: str
     score_id: str
     from_wave: str
@@ -138,6 +139,7 @@ class ScoreStability(BaseModel):
 class RetainedScore(BaseModel):
     study: str
     reporter: str
+    target: str | None = None
     instrument_id: str
     score_id: str
     wave: str
@@ -562,19 +564,20 @@ def correlations(
     return rows
 
 
-ScoreKey = tuple[str, str, str, str]
+ScoreKey = tuple[str, str, str | None, str, str]
 
 
 def waves_of_scores(
     catalog: Catalog, datasets: dict[str, LoadedDataset], scores: dict[str, pd.DataFrame]
 ) -> dict[ScoreKey, dict[str, pd.Series]]:
-    # (study, reporter, instrument, score) -> {wave: valid scores indexed by participant ID}
+    # (study, reporter, target, instrument, score) -> {wave: valid scores indexed by participant ID}
     found: dict[ScoreKey, dict[str, pd.Series]] = {}
     for score in catalog.scores:
         loaded = datasets[score.dataset]
         ids = loaded.frame[loaded.id_column].to_numpy()
         values = pd.Series(scores[score.dataset][score.key].to_numpy(), index=ids).dropna()
-        key = (loaded.config.study, loaded.config.reporter, score.instrument_id, score.score_id)
+        c = loaded.config
+        key = (c.study, c.reporter, score.target, score.instrument_id, score.score_id)
         waves = found.setdefault(key, {})
         wave = loaded.config.wave
         values = pd.concat([waves[wave], values]) if wave in waves else values
@@ -587,7 +590,7 @@ def stability(
     found: dict[ScoreKey, dict[str, pd.Series]], config: ProjectConfig
 ) -> list[ScoreStability]:
     rows = []
-    for (study, reporter, instrument_id, score_id), waves in found.items():
+    for (study, reporter, target, instrument_id, score_id), waves in found.items():
         order = sorted(waves, key=wave_order(config, study))
         for earlier, later in zip(order, order[1:], strict=False):
             both = pd.concat([waves[earlier], waves[later]], axis=1, join="inner")
@@ -600,6 +603,7 @@ def stability(
                 ScoreStability(
                     study=study,
                     reporter=reporter,
+                    target=target,
                     instrument_id=instrument_id,
                     score_id=score_id,
                     from_wave=earlier,
@@ -615,7 +619,7 @@ def retained(
     found: dict[ScoreKey, dict[str, pd.Series]], config: ProjectConfig
 ) -> list[RetainedScore]:
     rows = []
-    for (study, reporter, instrument_id, score_id), waves in found.items():
+    for (study, reporter, target, instrument_id, score_id), waves in found.items():
         if len(waves) < 2:
             continue
         everyone = set.intersection(*(set(values.index) for values in waves.values()))
@@ -626,6 +630,7 @@ def retained(
                 RetainedScore(
                     study=study,
                     reporter=reporter,
+                    target=target,
                     instrument_id=instrument_id,
                     score_id=score_id,
                     wave=wave,

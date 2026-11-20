@@ -109,7 +109,15 @@ Missing codes are counted and shown by label on the dataset and instrument pages
 
 ## Exclusions
 
-A study's `exclusions` points to a CSV file with an `id` column that lists people or groups of the study who must not be in the data, for example those who withdrew consent:
+A study's `exclusions` points to a CSV file that lists people or groups of the study who must not be in the data, for example those who withdrew consent. People go in an `id` column and whole groups in a `group` column; the file may have one of the two or both, so an ID and a group written alike are never mistaken for each other:
+
+```text
+id,group,reason
+1032P,,withdrew
+,1003,family withdrew
+```
+
+The study's entry names the file:
 
 ```yaml
 studies:

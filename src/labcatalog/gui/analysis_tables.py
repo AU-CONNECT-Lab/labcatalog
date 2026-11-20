@@ -514,10 +514,10 @@ def paired_test_table(paired: script.Paired) -> tuple[list[dict], list[dict]]:
 
 def group_figure(frame, group, outcome, comparison: Comparison, link: str):
     labels = [g.label for g in comparison.groups]
-    names = dict((text, value) for value, text in group.options)
+    names = {text: found for found, text in group.levels}
     values = {}
     for i, label in enumerate(labels):
-        rows = frame[(frame[group.column] == names[label]) & frame[outcome.column].notna()]
+        rows = frame[frame[group.column].isin(names[label]) & frame[outcome.column].notna()]
         values[i] = (rows[outcome.column].tolist(), rows[link].astype(str).tolist())
     series = [{"name": outcome.label, "color": style.group_color(0), "values": values}]
     fig = plots.score_boxes(f"{outcome.label} by group", labels, series)

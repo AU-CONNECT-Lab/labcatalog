@@ -190,6 +190,17 @@ def test_a_step_may_print_any_character(project_root):
     assert (run.outcome, run.log) == ("succeeded", ["清理 Jörg \U0001f600"])
 
 
+@pytest.mark.skipif(sys.platform != "win32", reason="only cmd.exe refuses a network folder")
+def test_a_step_runs_in_a_project_opened_by_its_network_path(project_root):
+    drive, rest = str(project_root).split(":", 1)
+    unc = Path(rf"\\localhost\{drive}${rest}")
+    if not unc.exists():
+        pytest.skip("the drive's administrative share is not reachable")
+    [run] = run_steps(load_project(unc), ["clean"], Session())
+    assert (run.outcome, run.log) == ("succeeded", ["cleaned 2 rows"])
+    assert (project_root / "data" / "a.csv").is_file()
+
+
 def test_check_warns_about_missing_and_outdated_outputs(project_root):
     warnings = [(i.code, i.message) for i in run_check(project_root).issues]
     assert warnings == [

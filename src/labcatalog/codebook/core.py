@@ -247,13 +247,20 @@ def new_prompt(project: Project) -> str:
 
 
 def import_instruments(project: Project) -> ImportResult:
-    found = Importer(project, None).run()
-    if found.written:
-        # Kept beside the instruments they made, so the next codebook starts from empty files.
-        folder = project.root / defaults.CODEBOOK_DIR / NEW
-        stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    return Importer(project, None).run()
+
+
+def put_aside(project: Project) -> None:
+    # Kept beside the instruments they made, so the next codebook starts from empty files.
+    folder = project.root / defaults.CODEBOOK_DIR / NEW
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    try:
         folder.rename(folder.with_name(f"{NEW}_{stamp}"))
-    return found
+    except PermissionError:
+        raise CodebookError(
+            f"A file in {relative(project, folder)} is open in another program, such as Excel; "
+            "close it and import again"
+        ) from None
 
 
 def unmapped_datasets(project: Project) -> list[str]:
@@ -555,6 +562,8 @@ class Importer:
             self.report(ITEMS, None, "no new instrument to import")
         if has_errors(self.issues):
             return ImportResult(self.issues)
+        # First, so a file another program holds stops the import before anything is written.
+        put_aside(self.project)
         written = [self.write_instrument(draft) for draft in self.drafts.values()]
         return ImportResult(self.issues, written)
 

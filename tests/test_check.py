@@ -123,7 +123,8 @@ def test_duplicate_and_malformed_ids(mock_project):
 
 
 def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):
-    (mock_project / "withdrawn.csv").write_text("id,reason\n1032P,withdrew\n1003,family withdrew\n")
+    withdrawn = "id,group,reason\n1032P,,withdrew\n,1003,family withdrew\n"
+    (mock_project / "withdrawn.csv").write_text(withdrawn)
     edit(
         mock_project / "labcatalog.yaml",
         "    reference: mockstudy2026\n",
@@ -135,6 +136,16 @@ def test_people_on_the_exclusion_list_are_reported_not_removed(mock_project):
     # modalities.
     assert len(messages) == 19
     assert any("1032P" in m and "1003P" in m for m in messages)
+
+
+def test_an_id_on_the_exclusion_list_is_a_person_even_when_a_group_is_written_alike(mock_project):
+    (mock_project / "withdrawn.csv").write_text("id\n1003\n")
+    edit(
+        mock_project / "labcatalog.yaml",
+        "    reference: mockstudy2026\n",
+        "    reference: mockstudy2026\n    exclusions: withdrawn.csv\n",
+    )
+    assert "excluded_present" not in found(run_check(mock_project))
 
 
 def test_possible_identifiers(mock_project):

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from labcatalog import defaults
 from labcatalog.pipeline import CatalogResult
 from labcatalog.stats import analysis
 from labcatalog.stats.analysis_script import (
@@ -73,7 +74,8 @@ pairs <- t(combn(raters, 2))
 kappa_pairs <- function(data) {{
   do.call(rbind, lapply(seq_len(nrow(pairs)), function(i) {{
     both <- na.omit(data[pairs[i, ]])
-    found <- psych::cohen.kappa(both)$confid
+    # Fewer than {least} people rated by both give no kappa.
+    found <- if (nrow(both) >= {least}) psych::cohen.kappa(both)$confid else matrix(NA, 2, 3)
     data.frame(first = pairs[i, 1], second = pairs[i, 2], n = nrow(both),
                kappa = found[1, 2], kappa_low = found[1, 1], kappa_high = found[1, 3],
                weighted = found[2, 2], weighted_low = found[2, 1], weighted_high = found[2, 3])
@@ -94,6 +96,8 @@ PYTHON_KAPPA = """\
 from statsmodels.stats.inter_rater import cohens_kappa
 
 raters = [{columns}]
+kappa_columns = ["first", "second", "n", "kappa", "kappa_low", "kappa_high", "weighted",
+                 "weighted_low", "weighted_high"]
 
 
 def kappa_pairs(data):
@@ -101,6 +105,10 @@ def kappa_pairs(data):
     for i, first in enumerate(raters):
         for second in raters[i + 1:]:
             both = data[[first, second]].dropna()
+            # Fewer than {least} people rated by both give no kappa.
+            if len(both) < {least}:
+                rows.append(dict(first=first, second=second, n=len(both)))
+                continue
             levels = sorted(set(both[first]) | set(both[second]))
             table = pd.crosstab(both[first], both[second]).reindex(
                 index=levels, columns=levels, fill_value=0).to_numpy()
@@ -109,7 +117,7 @@ def kappa_pairs(data):
                              kappa_low=plain.kappa_low, kappa_high=plain.kappa_upp,
                              weighted=weighted.kappa, weighted_low=weighted.kappa_low,
                              weighted_high=weighted.kappa_upp))
-    return pd.DataFrame(rows)
+    return pd.DataFrame(rows, columns=kappa_columns)
 
 
 kappas = kappa_pairs(d)
@@ -191,8 +199,8 @@ def agreement_code(variables: list[Variable], by_study: bool = False) -> Code:
             r, python = r + R_STUDY_KAPPA, python + PYTHON_STUDY_KAPPA
         return Code(
             title="Rater agreement",
-            r=r.format(columns=columns),
-            python=python.format(columns=columns),
+            r=r.format(columns=columns, least=defaults.MIN_KAPPA_N),
+            python=python.format(columns=columns, least=defaults.MIN_KAPPA_N),
             outputs=("kappas", *(("study_kappas",) if by_study else ())),
             packages=("psych",),
         )

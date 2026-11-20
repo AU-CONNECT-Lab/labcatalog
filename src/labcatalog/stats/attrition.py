@@ -124,11 +124,11 @@ def number_rows(variable, x, test):
                           df=t_test.df, p=t_test.pvalue, effect=effect, small=False))
 
 
-def choice_rows(variable, x, levels, test):
-    answer = x.map({{value: label for label, value in levels.items()}})
-    data = pd.DataFrame(dict(g=returned, answer=answer)).dropna()
+def choice_rows(variable, x, labels, test):
+    # Options that share a label are counted together, as R's factor does.
+    data = pd.DataFrame(dict(g=returned, answer=x.map(labels))).dropna()
     counts = pd.crosstab(data["answer"], data["g"]).reindex(
-        index=list(levels), columns=[{stayed}, {left}], fill_value=0)
+        index=list(dict.fromkeys(labels.values())), columns=[{stayed}, {left}], fill_value=0)
     shares = 100 * counts / counts.sum()
     for level in counts.index:
         groups.append(dict(variable=variable, level=level,
@@ -283,7 +283,7 @@ def call(frame: pd.DataFrame, label: str, v: Variable) -> tuple[str, str]:
     if v.kind == CHOICE:
         test = enough and pd.concat([stayed, left]).nunique() > 1
         levels = ", ".join(f"{r_string(text)} = {number(value)}" for value, text in v.options)
-        py_levels = ", ".join(f"{r_string(text)}: {number(value)}" for value, text in v.options)
+        py_levels = ", ".join(f"{number(value)}: {r_string(text)}" for value, text in v.options)
         return (
             f"choice_rows({r_string(label)}, d[[{r_string(v.column)}]], c({levels}), "
             f"{'TRUE' if test else 'FALSE'})",

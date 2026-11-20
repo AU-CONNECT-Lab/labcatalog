@@ -391,7 +391,8 @@ R_GROUPS = """\
 # whose group is known, with the outcome imputed where it is missing{left_out}
 keep <- d[[{group}]] %in% c({values})
 sets <- lapply(completed, function(x) {{
-  data.frame(group = factor(x[[{group}]][keep], levels = c({values}), labels = c({labels})),
+  data.frame(group = factor(x[[{group}]][keep], levels = c({values}),
+                            labels = c({value_labels})),
              y = x[[{outcome}]][keep])
 }})
 groups <- data.frame(group = c({labels}), n = as.vector(table(sets[[1]]$group)),
@@ -445,9 +446,9 @@ def comparison_plan(
 ) -> ComparisonPlan | None:
     # Group sizes count everyone whose group is known, since the outcome is imputed.
     sizes = [
-        (value, text, int((frame[group.column] == value).sum())) for value, text in group.options
+        (values, text, int(frame[group.column].isin(values).sum())) for values, text in group.levels
     ]
-    kept = [(value, text) for value, text, n in sizes if n >= MIN_GROUP]
+    kept = [(values, text) for values, text, n in sizes if n >= MIN_GROUP]
     if len(kept) < 2:
         return None
     left = [(text, n) for _, text, n in sizes if n < MIN_GROUP]
@@ -461,7 +462,8 @@ def comparison_plan(
         group_label=group.label,
         outcome_label=outcome.label,
         left_out=left_out,
-        values=", ".join(number(v) for v, _ in kept),
+        values=", ".join(number(v) for values, _ in kept for v in values),
+        value_labels=", ".join(r_string(text) for values, text in kept for _ in values),
         labels=", ".join(r_string(text) for _, text in kept),
     ) + (R_STUDENT if kind == STUDENT else R_ANOVA)
     python = PYTHON_IMPUTE + (available.code.python if available else "")

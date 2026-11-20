@@ -10,7 +10,7 @@ from labcatalog.config import missing_labels_for
 from labcatalog.data.resolve import ResolvedVariable
 from labcatalog.pipeline import CatalogResult
 from labcatalog.sources import LoadedDataset
-from labcatalog.stats.link import Links, link
+from labcatalog.stats.link import Links, as_written, link
 from labcatalog.stats.summary import valid_answers
 
 NUMBER = "number"
@@ -139,7 +139,9 @@ def study_options(result: CatalogResult, sample: Sample) -> list[tuple[float, st
 def study_numbers(result: CatalogResult, sample: Sample) -> pd.Series:
     # Pooled people are written study/key, so the study is read back from their key.
     codes = {s: float(n) for n, s in enumerate(studies_of(result, sample.datasets), start=1)}
-    return pd.Series([codes[p.split("/", 1)[0]] for p in sample.people], index=sample.people)
+    return pd.Series(
+        [codes[as_written(p).split("/", 1)[0]] for p in sample.people], index=sample.people
+    )
 
 
 def within(sample: Sample, datasets: list[str]) -> Sample:

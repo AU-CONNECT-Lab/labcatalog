@@ -20,6 +20,7 @@ from labcatalog.stats import (
 from labcatalog.stats import analysis_script as script
 from labcatalog.stats import measurement as mm
 from labcatalog.stats import mediation as med
+from labcatalog.stats.link import as_written
 from labcatalog.stats.mediation_r import mediation_code
 from tests.test_analysis_script import needs_r, rscript
 from tests.test_imputation import needs_mice
@@ -69,9 +70,10 @@ def test_a_pooled_value_comes_from_each_persons_own_study(result, sample):
     pooled = analysis.values(result, sample, TOTAL)
     one = analysis.build_sample(result, ["child_w1"], True)
     alone = analysis.values(result, one, "example_mood.ems_total@child_w1")
+    alone = alone.set_axis([as_written(p) for p in alone.index])
     for study in ("mock_study", "pilot"):
-        mine = pooled[[p.startswith(f"{study}/") for p in pooled.index]]
-        assert mine.set_axis([p.split("/", 1)[1] for p in mine.index]).equals(alone)
+        mine = pooled[[as_written(p).startswith(f"{study}/") for p in pooled.index]]
+        assert mine.set_axis([as_written(p).split("/", 1)[1] for p in mine.index]).equals(alone)
 
 
 def pooled_correlation(result, sample, rscript_path=None, method="pearson"):
@@ -188,7 +190,7 @@ def test_an_instrument_is_tested_across_studies(result, sample):
     assert list(model.occasions) == ["Mock Family Study", "pilot"]
     mine, theirs = model.occasions.values()
     # Each study's group holds its own people's answers, the same answers in both.
-    assert all(p.startswith("mock_study/") for p in mine.index)
+    assert all(as_written(p).startswith("mock_study/") for p in mine.index)
     assert mine.to_numpy().tolist() == theirs.to_numpy().tolist()
 
 
@@ -256,7 +258,7 @@ def test_the_example_pools_its_two_studies(example_project):
     assert "example_child_sleep.ecs_total@parent_w1+s2_parent_baseline" in choices
     # 1001P of each study is someone else, with a parent of their own family.
     people = analysis.build_sample(result, files, True).people
-    assert {"mock_study/1001", "mock_study_2/1001"} <= set(people)
+    assert {"group:mock_study/1001", "group:mock_study_2/1001"} <= set(people)
 
 
 WORRIES = "example_worries_temper.ewt_worries@child_w1+pilot_w1"

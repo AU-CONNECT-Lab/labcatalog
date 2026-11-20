@@ -1,4 +1,5 @@
 import re
+from dataclasses import replace
 
 import pandas as pd
 import pytest
@@ -15,12 +16,15 @@ from labcatalog.stats.summary import (
     cronbach_alpha,
     histogram,
     modality_counts,
+    retained,
     retention,
+    stability,
     summarize,
     summarize_dataset,
     summarize_score,
     summarize_variable,
     wave_order,
+    waves_of_scores,
 )
 
 REFUSED = ProjectConfig(
@@ -158,6 +162,52 @@ def test_stability_pairs_adjacent_waves_and_retained_scores_need_every_wave(mock
     assert 0 < n <= min(s.n for s in ems)
 
 
+def test_one_reporter_answering_about_two_targets_has_a_series_for_each():
+    totals = {
+        "self_w1": [4, 6, 8, 10, 12],
+        "self_w2": [5, 6, 9, 11, 12],
+        "child_w1": [16, 14, 12, 10, 8],
+        "child_w2": [8, 16, 10, 14, 12],
+    }
+    datasets = {
+        name: loaded_with(name, name[-1], id=[f"{name[0]}{i}" for i in range(5)]) for name in totals
+    }
+    catalog = Catalog(
+        variables=[],
+        scores=[
+            ResolvedScore(
+                key=f"x.total@{name}",
+                instrument_id="x",
+                score_id="total",
+                dataset=name,
+                label="Total",
+                method="sum",
+                columns=[],
+                reverse_columns=[],
+                reverse_bounds={},
+                valid_values={},
+                reversed_in_data=False,
+                missing_rule="complete",
+                target=name.split("_")[0],
+            )
+            for name in totals
+        ],
+    )
+    scores = {name: pd.DataFrame({f"x.total@{name}": t}) for name, t in totals.items()}
+    config = ProjectConfig(project={"name": "p"}, studies={"s": {}})
+    found = waves_of_scores(catalog, datasets, scores)
+    expected = {
+        t: pd.Series(totals[f"{t}_w1"]).corr(pd.Series(totals[f"{t}_w2"]))
+        for t in ("self", "child")
+    }
+    assert {s.target: (s.r, s.n) for s in stability(found, config)} == {
+        t: (pytest.approx(r), 5) for t, r in expected.items()
+    }
+    assert {(r.target, r.wave, r.n) for r in retained(found, config)} == {
+        (t, w, 5) for t in ("self", "child") for w in ("1", "2")
+    }
+
+
 def test_collection_is_given_by_month_and_never_by_day(mock_project):
     parent = next(d for d in summary_for(mock_project).datasets if d.dataset == "parent_w1")
     months = list(parent.collected_by_month)
@@ -221,7 +271,23 @@ def test_rows_without_an_id_are_nobody():
     counted = [(m.wave, m.n, m.n_from_previous) for m in modality_counts(datasets, config)]
     assert counted == [("1", 2, None), ("2", 2, 1)]
     rows = link(datasets, ["d1", "d2"], "id").rows
-    assert (rows["d1"].to_dict(), rows["d2"].to_dict()) == ({"A1": 0, "A3": 2}, {"A1": 0, "A4": 2})
+    assert (rows["d1"].to_dict(), rows["d2"].to_dict()) == (
+        {"id:A1": 0, "id:A3": 2},
+        {"id:A1": 0, "id:A4": 2},
+    )
+
+
+def test_a_person_and_a_group_written_alike_stay_apart():
+    # Family 5 has children 2 and 7, family 2 has child 9; parent 5 has no family.
+    children = replace(loaded_with("c", id=["2", "7", "9"]), group=pd.Series(["5", "5", "2"]))
+    parents = replace(loaded_with("p", id=["30", "31", "5"]), group=pd.Series(["5", "2", None]))
+    rows = link({"c": children, "p": parents}, ["c", "p"], "family").rows
+    pairs = {
+        (children.frame["id"][rows["c"][key]], parents.frame["id"][rows["p"][key]])
+        for key in rows["c"].index.intersection(rows["p"].index)
+    }
+    assert pairs == {("2", "30"), ("7", "30"), ("9", "31")}
+    assert "id:5" in rows["p"].index
 
 
 @pytest.mark.parametrize(("method", "possible"), [("sum", (0, 16)), ("mean", (0, 4))])

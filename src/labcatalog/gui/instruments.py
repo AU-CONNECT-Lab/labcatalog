@@ -960,7 +960,7 @@ def pdf_url(pdf: Path) -> str:
 
 
 def reported(variables: list) -> str:
-    pairs = unique(f"{v.reporter} about {v.target}" if v.target else v.reporter for v in variables)
+    pairs = unique(views.who(v.reporter, v.target) for v in variables)
     return f"Reported by {', '.join(pairs)}" if pairs else ""
 
 
@@ -1199,8 +1199,10 @@ def stability_table(
     if not rows_found:
         return None
     pairs = list(dict.fromkeys((s.study, s.from_wave, s.to_wave) for s in rows_found))
-    reporters = unique(s.reporter for s in rows_found)
-    cells = {(s.score_id, s.reporter, s.study, s.from_wave, s.to_wave): s for s in rows_found}
+    reporters = list(dict.fromkeys((s.reporter, s.target) for s in rows_found))
+    cells = {
+        (s.score_id, (s.reporter, s.target), s.study, s.from_wave, s.to_wave): s for s in rows_found
+    }
     columns = [
         col("score", "Score"),
         *[
@@ -1220,7 +1222,9 @@ def stability_table(
                 continue
             rows.append(
                 {
-                    "score": score.label if len(reporters) == 1 else f"{score.label} ({reporter})",
+                    "score": score.label
+                    if len(reporters) == 1
+                    else f"{score.label} ({views.who(*reporter)})",
                     **{
                         f"p{i}": f"{fmt(s.r)} (n {s.n})" if s and s.r is not None else ""
                         for i, s in enumerate(found)

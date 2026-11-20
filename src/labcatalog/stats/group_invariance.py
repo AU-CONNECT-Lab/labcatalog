@@ -69,10 +69,11 @@ def group_models(
             continue
         items = pd.concat(frames).dropna()
         found = groups.reindex(items.index)
-        occasions = {
-            label: items[found == value]
-            for value, label in group_options(result, sample, group_key)
-        }
+        # Options that share a label are one group.
+        by_label: dict[str, list[float]] = {}
+        for value, label in group_options(result, sample, group_key):
+            by_label.setdefault(label, []).append(value)
+        occasions = {label: items[found.isin(values)] for label, values in by_label.items()}
         enough = len(items.columns) + 1
         left_out = {k: len(v) for k, v in occasions.items() if 0 < len(v) < enough}
         occasions = {k: v for k, v in occasions.items() if len(v) >= enough}

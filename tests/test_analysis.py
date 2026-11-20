@@ -37,7 +37,7 @@ def test_someone_the_roster_gives_no_group_is_in_the_sample_by_their_id(result):
     alone = set(loaded.frame[loaded.id_column][loaded.group.isna()])
     assert alone
     sample = analysis.build_sample(result, ["parent_w1"], intersect=False)
-    assert alone <= set(sample.people)
+    assert {f"id:{p}" for p in alone} <= set(sample.people)
 
 
 def test_a_pair_matches_the_correlation_of_the_summary(result):
@@ -76,16 +76,17 @@ def siblings(mock_project):
 
 def test_a_family_with_two_children_counts_each_child(siblings):
     sample = analysis.build_sample(siblings, ["parent_w1", "child_w1"], False)
-    assert {"1001C", "1001D", "1002C", "1002D", "1002P", "1002Q"} <= set(sample.people)
-    assert "1001" not in sample.people and "1003" in sample.people
+    people = {f"id:{p}" for p in ("1001C", "1001D", "1002C", "1002D", "1002P", "1002Q")}
+    assert people <= set(sample.people)
+    assert "group:1001" not in sample.people and "group:1003" in sample.people
     frame = analysis.table(siblings, sample, [EMS, EPS])
     # The one parent's answer goes with each child; two parents pair with neither child.
-    assert frame.loc["1001C", EPS] == frame.loc["1001D", EPS]
-    assert frame.loc["1001D", EMS] == frame.loc["1003", EMS]
-    assert frame.loc[["1002C", "1002D"], EPS].isna().all()
-    assert frame.loc[["1002P", "1002Q"], EMS].isna().all()
+    assert frame.loc["id:1001C", EPS] == frame.loc["id:1001D", EPS]
+    assert frame.loc["id:1001D", EMS] == frame.loc["group:1003", EMS]
+    assert frame.loc[["id:1002C", "id:1002D"], EPS].isna().all()
+    assert frame.loc[["id:1002P", "id:1002Q"], EMS].isna().all()
     split = set(sample.links.split.values())
-    assert sample.links.crossed == 1 and {"1001", "1002"} <= split
+    assert sample.links.crossed == 1 and {"group:1001", "group:1002"} <= split
     notes = analysis.group_notes(siblings, sample)
     assert f"{len(split)} family groups have several people" in notes
     assert "In 1 family groups" in notes
@@ -95,9 +96,11 @@ def test_a_family_with_two_children_counts_each_child(siblings):
     assert written.loc["1001D", "family"] == "1001" and written.loc["1001D", "in_parent_w1"] == 1
     # A file with one person per family keeps families as they were.
     later = analysis.build_sample(siblings, ["parent_w2"], True)
-    assert "1003" in later.people and not later.links.split
+    assert "group:1003" in later.people and not later.links.split
     found = attrition.plan(siblings, "mock_study", "1", ["example_mood.ems_total"])
-    assert "1001D" in found.sample.people and found.stayed + found.left == len(found.sample.people)
+    assert "id:1001D" in found.sample.people and found.stayed + found.left == len(
+        found.sample.people
+    )
 
 
 def test_the_summary_pairs_siblings_like_the_sample(siblings):
