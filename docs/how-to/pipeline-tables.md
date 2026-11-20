@@ -23,7 +23,7 @@ In the **Add data** step of the Set up page, **From a pipeline's table** brings 
 | **Wave** | The wave of every row, for a table without sessions. With sessions, `ses-01` is wave `1`. |
 | **Instrument name** | The instruments' name; the **Name** when left empty. |
 
-Several values in one field are separated by spaces or commas. It writes `instruments/<name>_<value>.yaml`, and `data/<name>_w<wave>.csv` and `maps/<name>_w<wave>.csv` for each wave, and lists the columns it left out. The first time, it also shows the lines to add: the study's new waves and the datasets in `labcatalog.yaml`, and the administrations in the study file. Add them, then press **Refresh**.
+Several values in one field are separated by spaces or commas. It writes `instruments/<name>_<value>.yaml`, and `data/<name>_w<wave>.csv` and `maps/<name>_w<wave>.csv` for each wave, and lists the columns it left out. It writes over only what it wrote from the same table before: an instrument file it wrote names the table in a comment at its top, and a column map it wrote names only such instruments. When a file of that name is already there from elsewhere, or a dataset of that name reads another file, it writes nothing and asks for another Name. The first time, it also shows the lines to add: the study's new waves and the datasets in `labcatalog.yaml`, and the administrations in the study file. Add them, then press **Refresh**.
 
 ## When the pipeline runs again
 

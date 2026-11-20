@@ -154,17 +154,19 @@ def run_steps(
 @contextmanager
 def prepare_lock(root: Path, anyway: bool = False) -> Iterator[None]:
     lock = root / defaults.PREPARE_LOCK_FILENAME
-    # Two people running the steps at once would write the same files.
-    if not anyway and (other := running(root)):
-        raise PrepareBusyError(other.by, other.since, lock)
-    lock.write_text(
-        json.dumps({"by": who(root), "since": datetime.now().isoformat(timespec="seconds")}),
-        encoding="utf-8",
-    )
+    mine = json.dumps({"by": who(root), "since": datetime.now().isoformat(timespec="seconds")})
+    # Two people running the steps at once would write the same files; anyway takes a stale lock.
+    try:
+        with lock.open("w" if anyway else "x", encoding="utf-8") as file:
+            file.write(mine)
+    except FileExistsError:
+        other = running(root)
+        raise PrepareBusyError(other.by, other.since, lock) from None
     try:
         yield
     finally:
-        lock.unlink(missing_ok=True)
+        if lock.is_file() and lock.read_text(encoding="utf-8") == mine:
+            lock.unlink()
 
 
 def running(root: Path) -> Runner | None:
@@ -195,7 +197,7 @@ def execute(
         cwd=root,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        text=True,
+        encoding="utf-8",
         errors="replace",
         env=environment(rscript, python),
         **NEW_GROUP,
@@ -241,14 +243,14 @@ def take_table(
             echo(line)
 
 
-def environment(rscript: str | None, python: str | None = None) -> dict[str, str] | None:
+def environment(rscript: str | None, python: str | None = None) -> dict[str, str]:
     # A step can then call Rscript and python by name and get the ones the Settings page chose.
     first = [str(Path(rscript).parent)] if rscript else []
     if python:
         first.append(str(folder_for(python)))
-    if not first:
-        return None
-    return {**os.environ, "PATH": os.pathsep.join([*first, os.environ.get("PATH", "")])}
+    path = os.pathsep.join([*first, os.environ.get("PATH", "")])
+    # Python then prints UTF-8 as R does, whatever the Windows code page.
+    return {**os.environ, "PATH": path, "PYTHONUTF8": "1"}
 
 
 def stop(session: Session) -> None:

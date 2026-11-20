@@ -221,6 +221,15 @@ def test_prompt_holds_column_names_but_no_data(pilot):
     assert "moved house" not in prompt
 
 
+def test_a_prompt_from_items_not_saved_as_utf8_says_so(pilot):
+    project = load_project(pilot)
+    write_templates(project, "pilot_w1")
+    items = codebook_paths(project, "pilot_w1")["items.csv"]
+    items.write_bytes(items.read_bytes().removeprefix(b"\xef\xbb\xbf") + "café\n".encode("cp1252"))
+    with pytest.raises(CodebookError, match="items.csv: not UTF-8"):
+        ai_prompt(project, "pilot_w1")
+
+
 REDCAP_HEADER = [
     "Variable / Field Name",
     "Form Name",

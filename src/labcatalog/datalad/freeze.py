@@ -1,6 +1,5 @@
 import os
 import re
-import subprocess
 from collections.abc import Callable
 from datetime import date, datetime
 from pathlib import Path
@@ -9,14 +8,15 @@ from pydantic import BaseModel
 
 from labcatalog import defaults
 from labcatalog.data.manifest import Manifest, build_manifest, used_paths
-from labcatalog.datalad.annex import group_by_dataset
+from labcatalog.datalad.annex import fetch_advice, group_by_dataset, is_placeholder
 from labcatalog.datalad.bridge import run_datalad
 from labcatalog.datalad.versions import ADJUSTED, original_branch, run_git
 from labcatalog.exceptions import DataladError, FreezeError
 from labcatalog.project import Project
 from labcatalog.sources import LoadedDataset
 
-NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+# Also a git tag, which cannot hold '..' or end in '.' or '.lock'.
+NAME = re.compile(r"(?!.*\.\.)[A-Za-z0-9][A-Za-z0-9._-]*(?<!\.)(?<!\.lock)")
 RECORD_ONLY = (
     "The data are not in DataLad, so a freeze only writes a record: it shows later whether "
     "the data changed, but data that are overwritten cannot be got back."
@@ -100,7 +100,7 @@ def push_to(root: Path, sibling: str, datalad: str, *options: str) -> None:
 def annex_known(root: Path, sibling: str) -> bool:
     try:
         return bool(run_git(root, "config", f"remote.{sibling}.annex-uuid"))
-    except subprocess.CalledProcessError:
+    except DataladError:
         return False
 
 
@@ -129,18 +129,19 @@ def datalad_datasets(project: Project) -> dict[Path, list[str]]:
 def check_name(folder: Path, name: str) -> None:
     if not NAME.fullmatch(name):
         raise FreezeError(
-            f"'{name}' cannot name a freeze; use letters, digits, '.', '-' and '_', "
-            "for example 2026-06-submission"
+            f"'{name}' cannot name a freeze; use letters, digits, '.', '-' and '_', with no '..' "
+            "and not ending in '.' or '.lock', for example 2026-06-submission"
         )
-    if any(folder.glob(f"*_{name}.json")):
+    # Records are named <date>_<name>, and a date holds no '_'.
+    if any(p.stem.split("_", 1)[-1] == name for p in folder.glob("*.json")):
         raise FreezeError(f"There is already a freeze named {name} in {defaults.FREEZES_DIR}")
 
 
 def list_freezes(root: Path) -> list[Freeze]:
-    found = [
-        Freeze.model_validate_json(path.read_text(encoding="utf-8"))
-        for path in (root / defaults.FREEZES_DIR).glob("*.json")
-    ]
+    paths = sorted((root / defaults.FREEZES_DIR).glob("*.json"))
+    if absent := next((p for p in paths if is_placeholder(p)), None):
+        raise FreezeError(fetch_advice(absent))
+    found = [Freeze.model_validate_json(p.read_text(encoding="utf-8")) for p in paths]
     return sorted(found, key=lambda f: f.frozen_at, reverse=True)
 
 

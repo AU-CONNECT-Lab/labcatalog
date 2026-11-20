@@ -17,6 +17,10 @@ def write_output(root: Path, name: str, files: dict[str, bytes], manifest: Manif
         except FileExistsError:
             n += 1
             folder = base.with_name(f"{base.name}_{n}")
+    # Exports hold row-level data, so git and DataLad leave the whole folder out.
+    ignore = folder.parent / ".gitignore"
+    if not ignore.exists():
+        ignore.write_text("*\n", encoding="utf-8")
     for filename, content in files.items():
         (folder / filename).write_bytes(content)
     # Which data files, at which checksums, the saved numbers came from.

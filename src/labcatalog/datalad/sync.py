@@ -1,6 +1,5 @@
 import json
 import re
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,7 +8,8 @@ from labcatalog.data.manifest import used_paths
 from labcatalog.datalad.annex import group_by_dataset
 from labcatalog.datalad.bridge import run_datalad
 from labcatalog.datalad.freeze import push_targets, push_to
-from labcatalog.datalad.versions import ADJUSTED, run_git
+from labcatalog.datalad.versions import ADJUSTED, git_output, run_git
+from labcatalog.exceptions import DataladError
 
 
 @dataclass
@@ -45,8 +45,15 @@ def branch_name(root: Path) -> str:
 
 
 def changed_paths(root: Path) -> list[str]:
-    lines = run_git(root, "status", "--porcelain").splitlines()
-    return [line[3:].strip('"') for line in lines if line.strip()]
+    # -z keeps each entry's leading status column and names unquoted; a rename adds its old name.
+    entries = iter(git_output(root, "status", "--porcelain", "-z").split("\0"))
+    found = []
+    for entry in entries:
+        if entry:
+            found.append(entry[3:])
+            if entry[0] in "RC":
+                next(entries)
+    return found
 
 
 def dataset_state(root: Path) -> DatasetState:
@@ -65,7 +72,7 @@ def dataset_state(root: Path) -> DatasetState:
 def space(root: Path) -> tuple[int, int] | None:
     try:
         found = json.loads(run_git(root, "annex", "info", "--fast", "--bytes", "--json", "."))
-    except subprocess.CalledProcessError:
+    except DataladError:
         return None
     return int(found["local annex size"]), int(found["size of annexed files in working tree"])
 
@@ -89,7 +96,7 @@ def clone(url: str, folder: Path, datalad: str) -> Path:
 def has_ref(root: Path, ref: str) -> bool:
     try:
         run_git(root, "rev-parse", "--verify", "--quiet", ref)
-    except subprocess.CalledProcessError:
+    except DataladError:
         return False
     return True
 

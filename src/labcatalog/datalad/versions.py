@@ -4,6 +4,7 @@ from pathlib import Path
 from pydantic import BaseModel
 
 from labcatalog.datalad.annex import DATALAD_CONFIG, group_by_dataset
+from labcatalog.exceptions import DataladError
 from labcatalog.paths import portable_path
 
 ADJUSTED = "adjusted/"
@@ -60,12 +61,27 @@ def datalad_record(project_root: Path, folder: Path, paths: list[str]) -> Datala
             commit=commit_of(folder, branch, paths),
             tags=tags_at(folder, branch),
         )
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, DataladError):
         return None
 
 
 def run_git(root: Path, *args: str) -> str:
-    result = subprocess.run(
-        ["git", "-C", str(root), *args], capture_output=True, text=True, check=True
-    )
-    return result.stdout.strip()
+    return git_output(root, *args).strip()
+
+
+def git_output(root: Path, *args: str, given: str | None = None) -> str:
+    # git writes names and messages in UTF-8; quotepath off keeps file names as they are.
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(root), "-c", "core.quotepath=off", *args],
+            input=given,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+        )
+    except subprocess.CalledProcessError as err:
+        output = (err.stderr or err.stdout).strip()
+        command = " ".join(args)[:100]
+        raise DataladError(f"git {command} failed in {root}: {output[-500:]}") from None
+    return result.stdout

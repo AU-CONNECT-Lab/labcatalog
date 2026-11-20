@@ -7,7 +7,7 @@ import pytest
 import yaml
 
 from labcatalog.codebook.derivatives import Request, run_derivatives, table_step
-from labcatalog.data.check import check_values
+from labcatalog.data.check import check_columns, check_values
 from labcatalog.data.prepare import Session, run_steps, step_states
 from labcatalog.data.resolve import Catalog, resolve_catalog
 from labcatalog.exceptions import CodebookError
@@ -61,10 +61,21 @@ def test_writes_an_instrument_per_task_and_a_data_file_per_session(demo_project)
     first = (demo_project / "data" / "qc_w1.csv").read_text().splitlines()
     assert first[0].split(",")[1:] == ["nback_sci", "nback_snr", "rest_sci", "rest_snr"]
     assert first[1:] == ["sub-01,0.8,,0.9,12", "sub-02,,,0.7,9"]
-    assert (demo_project / "maps" / "qc_w2.csv").read_text().splitlines()[3] == (
+    assert (demo_project / "maps" / "qc_w1.csv").read_text().splitlines()[3] == (
         "nback_snr,qc_nback,snr"
     )
+    # The second session has rest only, so its map leaves the N-back columns out.
+    assert (demo_project / "maps" / "qc_w2.csv").read_text().splitlines() == [
+        "column,instrument,item",
+        "id,,",
+        "rest_sci,qc_rest,sci",
+        "rest_snr,qc_rest,snr",
+    ]
     steps = dict(done.steps)
+    assert steps["In studies/demo_study.yaml, add under administrations:"] == (
+        "  - {instrument: qc_nback, datasets: [qc_w1]}\n"
+        "  - {instrument: qc_rest, datasets: [qc_w1, qc_w2]}"
+    )
     assert list(steps) == [
         "In labcatalog.yaml, add under studies, demo_study, waves:",
         "In labcatalog.yaml, add under datasets:",
@@ -93,6 +104,11 @@ def test_the_printed_lines_make_a_valid_project(demo_project):
     study.write_text(yaml.safe_dump(content, sort_keys=False))
     issues = validate_project(load_project(demo_project))
     assert [i for i in issues if i.level == "error"] == []
+    project = load_project(demo_project)
+    loaded = {
+        d.name: load_dataset(project, d) for d in project.config.datasets if d.name != "parent_w1"
+    }
+    assert check_columns(project, loaded) == []
     assert run_derivatives(demo_project, request(table, split=["task"])).steps == []
 
 
@@ -100,15 +116,40 @@ def test_running_again_keeps_what_the_user_changed(demo_project):
     table = pipeline_table(demo_project)
     run_derivatives(demo_project, request(table, columns=["sci"], split=["task"]))
     path = demo_project / "instruments" / "qc_rest.yaml"
-    edited = yaml.safe_load(path.read_text())
+    text = path.read_text()
+    edited = yaml.safe_load(text)
     edited["name"] = "Resting quality"
     edited["items"][0]["text"] = "My wording."
-    path.write_text(yaml.safe_dump(edited, sort_keys=False))
+    # Edits in labcatalog keep the comments at the top, the header among them.
+    top = "\n".join(text.splitlines()[:2])
+    path.write_text(f"{top}\n{yaml.safe_dump(edited, sort_keys=False)}")
     run_derivatives(demo_project, request(table, split=["task"]))
     again = yaml.safe_load(path.read_text())
     assert again["name"] == "Resting quality"
     assert [i["id"] for i in again["items"]] == ["sci", "snr"]
     assert again["items"][0]["text"] == "My wording."
+
+
+def test_a_table_does_not_overwrite_files_it_did_not_write(demo_project):
+    table = pipeline_table(demo_project, ["participant_id\tage", "sub-01\t30"])
+    mood = demo_project / "instruments" / "example_mood.yaml"
+    parent_map = demo_project / "maps" / "parent_w1.csv"
+    before = mood.read_text(), parent_map.read_text()
+    with pytest.raises(CodebookError, match="desc-qc.tsv: instruments/example_mood.yaml;"):
+        run_derivatives(demo_project, request(table, name="example_mood", wave="1"))
+    with pytest.raises(CodebookError, match="desc-qc.tsv: maps/parent_w1.csv;"):
+        run_derivatives(demo_project, request(table, name="parent", wave="1"))
+    assert (mood.read_text(), parent_map.read_text()) == before
+    run_derivatives(demo_project, request(table, wave="1"))
+    run_derivatives(demo_project, request(table, wave="1"))
+    other = table.with_name("other.tsv")
+    other.write_text("participant_id\tage\nsub-01\t31\n")
+    with pytest.raises(
+        CodebookError,
+        match="other.tsv: instruments/qc.yaml, maps/qc_w1.csv, data/qc_w1.csv; give the table",
+    ):
+        run_derivatives(demo_project, request(other, wave="1"))
+    assert "sub-01,30" in (demo_project / "data" / "qc_w1.csv").read_text()
 
 
 def test_rows_that_repeat_name_the_entity_to_split_by(demo_project):
@@ -166,7 +207,8 @@ def test_a_column_with_levels_is_a_choice_with_its_own_options(demo_project):
     # Running again keeps a set the user renamed and adds none twice.
     path = demo_project / "instruments" / "qc_rest.yaml"
     found["response_sets"][0]["options"][1]["label"] = "kept"
-    path.write_text(yaml.safe_dump(found))
+    top = "\n".join(path.read_text().splitlines()[:2])
+    path.write_text(f"{top}\n{yaml.safe_dump(found)}")
     run_derivatives(demo_project, request(table, split=["task"]))
     again = yaml.safe_load(path.read_text())
     assert [o["label"] for o in again["response_sets"][0]["options"]] == ["no", "kept"]

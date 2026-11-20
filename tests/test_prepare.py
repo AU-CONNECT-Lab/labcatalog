@@ -171,6 +171,25 @@ def test_someone_elses_run_stops_a_second_one_unless_asked(project_root):
     assert not lock.exists()
 
 
+def test_a_run_ends_without_taking_away_a_lock_someone_else_wrote_since(project_root):
+    (project_root / "scripts" / "clean.py").write_text(
+        "from pathlib import Path\n"
+        "Path('prepare_running.json').write_text("
+        '\'{"by": "Sam", "since": "2026-10-18T11:00:00"}\')\n',
+        encoding="utf-8",
+    )
+    run_steps(load_project(project_root), ["clean"], Session(), anyway=True)
+    assert running(project_root).by == "Sam"
+
+
+def test_a_step_may_print_any_character(project_root):
+    (project_root / "scripts" / "clean.py").write_text(
+        "print('清理 Jörg \\U0001F600')\n", encoding="utf-8"
+    )
+    [run] = run_steps(load_project(project_root), ["clean"], Session())
+    assert (run.outcome, run.log) == ("succeeded", ["清理 Jörg \U0001f600"])
+
+
 def test_check_warns_about_missing_and_outdated_outputs(project_root):
     warnings = [(i.code, i.message) for i in run_check(project_root).issues]
     assert warnings == [

@@ -1,5 +1,4 @@
 import hashlib
-import subprocess
 from datetime import date, datetime
 from pathlib import Path
 
@@ -15,7 +14,7 @@ from labcatalog.datalad.versions import (
     datalad_records,
     original_branch,
 )
-from labcatalog.exceptions import LabCatalogError
+from labcatalog.exceptions import DataladError, LabCatalogError
 from labcatalog.paths import expand_path, portable_path
 from labcatalog.project import Project, bib_path, load_config, references_root
 from labcatalog.sources import LoadedDataset, load_rosters
@@ -76,7 +75,7 @@ def git_commit(root: Path) -> str | None:
     # Metadata outside git, or a machine without git, simply has no commit to record.
     try:
         return commit_of(root, original_branch(root), ["."])
-    except (OSError, subprocess.CalledProcessError):
+    except (OSError, DataladError):
         return None
 
 

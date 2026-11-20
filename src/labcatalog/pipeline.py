@@ -322,7 +322,9 @@ def run_get_missing(root: Path, datalad: str) -> None:
     folders = {
         expand_path(d.path, root) for d in config.datasets if d.source == "folder" and d.path
     }
-    get_content(datalad, [p for p in used_paths(config, root) if p != pdfs and p not in folders])
+    used = [p for p in used_paths(config, root) if p != pdfs and p not in folders]
+    # The freeze records too, not their databases, so the Freezes table can list them.
+    get_content(datalad, [*used, *sorted((root / defaults.FREEZES_DIR).glob("*.json"))])
 
 
 def data_datasets(root: Path) -> list[Path]:

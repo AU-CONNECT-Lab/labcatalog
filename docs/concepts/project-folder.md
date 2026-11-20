@@ -49,7 +49,7 @@ Your own scripts that turn raw exports and pipeline outputs into the files in `d
 
 ## outputs/
 
-Everything you save or export from the window goes into a new subfolder here, named with the date and time. Each subfolder also holds `manifest.json`, which records which data files, at which checksums, the saved numbers came from.
+Everything you save or export from the window goes into a new subfolder here, named with the date and time. Each subfolder also holds `manifest.json`, which records which data files, at which checksums, the saved numbers came from. Exports can hold row-level data, so labcatalog keeps a `.gitignore` in `outputs/` that leaves the whole folder out of git: saving in Data versions does not save it, and pushing does not send it.
 
 ## drafts/, codebook/ and freezes/
 

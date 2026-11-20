@@ -1,13 +1,35 @@
 import subprocess
 
+import pytest
+
 from labcatalog.datalad.history import history
-from labcatalog.datalad.sync import DatasetState, size_text, state_text, summary
+from labcatalog.datalad.sync import DatasetState, changed_paths, size_text, state_text, summary
+from labcatalog.datalad.versions import run_git
+from labcatalog.exceptions import DataladError
 from labcatalog.pipeline import run_data_status
 from tests.test_datalad import (
     git,
     make_dataset,
     needs_git,
 )
+
+
+@needs_git
+def test_git_gives_names_and_messages_as_written(tmp_path):
+    root = tmp_path / "lab"
+    root.mkdir()
+    git(root, "init", "-q", "-b", "main")
+    (root / "清理.csv").write_text("a\n", encoding="utf-8")
+    (root / "labcatalog.yaml").write_text("a\n", encoding="utf-8")
+    git(root, "add", ".")
+    git(root, "-c", "user.name=张三", "commit", "-q", "-m", "清理数据")
+    assert run_git(root, "log", "-1", "--format=%an %s") == "张三 清理数据"
+    assert run_git(root, "show", "--name-only", "--format=").splitlines()[1] == "清理.csv"
+    (root / "labcatalog.yaml").write_text("b\n", encoding="utf-8")
+    (root / "new notes.txt").write_text("c\n", encoding="utf-8")
+    assert changed_paths(root) == ["labcatalog.yaml", "new notes.txt"]
+    with pytest.raises(DataladError, match="git rev-parse nothing failed"):
+        run_git(root, "rev-parse", "nothing")
 
 
 @needs_git

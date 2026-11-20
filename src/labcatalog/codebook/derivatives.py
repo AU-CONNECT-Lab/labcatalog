@@ -101,28 +101,81 @@ def derive(project: Project, request: Request) -> Derived:
     measures, left_out = measure_columns(table, request.columns, sidecar)
     if not measures:
         raise CodebookError(f"No numeric columns to take from {request.table.name}")
-    groups = sorted({tuple(row[e] for e in request.split) for _, row in keys.iterrows()})
+    waves = sorted(keys["wave"].unique(), key=wave_order)
+    instruments = {
+        g: identifier("_".join([request.name, *g])) for g in groups_in(keys, request.split)
+    }
+    if taken := foreign_files(project, request, list(instruments.values()), waves):
+        raise CodebookError(
+            f"Already in the project and not written from {request.table.name}: "
+            f"{', '.join(taken)}; give the table another name"
+        )
     done = Derived(left_out=left_out)
-    instruments = {}
-    for group in groups:
-        instrument_id = identifier("_".join([request.name, *group]))
+    for group, instrument_id in instruments.items():
         path = project.root / defaults.INSTRUMENTS_DIR / f"{instrument_id}.yaml"
         text = instrument_text(project, request, instrument_id, group, measures, sidecar, path)
         write_text(path, text)
         done.written.append(path)
-        instruments[group] = instrument_id
-    datasets = {}
-    for wave in sorted(keys["wave"].unique(), key=wave_order):
+    datasets: dict[str, tuple[str, Path]] = {}
+    given_in: dict[str, list[str]] = {i: [] for i in instruments.values()}
+    for wave in waves:
         dataset = f"{request.name}_w{wave}"
         rows = keys["wave"] == wave
         data_path = project.root / defaults.DATA_DIR / f"{dataset}.csv"
         write_data(project, data_path, table[rows], keys[rows], request.split, measures)
+        # A group missing from a wave, such as a task not done at that visit, has no columns there.
+        present = groups_in(keys[rows], request.split)
         map_path = project.root / defaults.MAPS_DIR / f"{dataset}.csv"
-        write_map(project, map_path, groups, instruments, measures)
+        write_map(project, map_path, present, instruments, measures)
         done.written += [data_path, map_path]
         datasets[dataset] = (wave, data_path)
-    done.steps = registration(project, request, datasets, list(instruments.values()))
+        for group in present:
+            given_in[instruments[group]].append(dataset)
+    done.steps = registration(project, request, datasets, given_in)
     return done
+
+
+def groups_in(keys: pd.DataFrame, split: list[str]) -> list[tuple[str, ...]]:
+    return sorted({tuple(row[e] for e in split) for _, row in keys.iterrows()})
+
+
+def foreign_files(
+    project: Project, request: Request, instrument_ids: list[str], waves: list[str]
+) -> list[str]:
+    # A table rewrites only what it wrote: instruments under its header, and maps naming only those.
+    root = project.root
+    header = header_line(project, request)
+
+    def foreign(instrument_id: str) -> bool:
+        stored = f"{defaults.INSTRUMENTS_DIR}/{instrument_id}.yaml"
+        if project.instrument_files.get(instrument_id, stored) != stored:
+            return True
+        path = root / stored
+        return path.is_file() and header not in path.read_text(encoding="utf-8").splitlines()
+
+    taken = [
+        project.instrument_files.get(i, f"{defaults.INSTRUMENTS_DIR}/{i}.yaml")
+        for i in instrument_ids
+        if foreign(i)
+    ]
+    registered = {d.name: d for d in project.config.datasets}
+    for wave in waves:
+        name = f"{request.name}_w{wave}"
+        data = root / defaults.DATA_DIR / f"{name}.csv"
+        map_path = root / defaults.MAPS_DIR / f"{name}.csv"
+        if name in registered and expand_path(registered[name].path, root).resolve() != data:
+            taken.append(f"the dataset {name} (reads {registered[name].path})")
+        named = {e.instrument for e in project.maps.get(name, []) if e.instrument}
+        if map_path.is_file() and any(foreign(i) for i in named):
+            taken.append(portable_path(map_path, root).as_posix())
+        if data.is_file() and (not map_path.is_file() or any(foreign(i) for i in named)):
+            taken.append(portable_path(data, root).as_posix())
+    return taken
+
+
+def header_line(project: Project, request: Request) -> str:
+    table = portable_path(request.table.resolve(), project.root.resolve()).as_posix()
+    return HEADER.format(table=table)
 
 
 def read_table(path: Path) -> pd.DataFrame:
@@ -302,9 +355,8 @@ def instrument_text(
             **({"response_sets": sets} if sets else {}),
             "items": items,
         }
-    table = portable_path(request.table.resolve(), project.root.resolve()).as_posix()
     modeline, rest = yaml_text(document, "instrument").split("\n", 1)
-    return f"{modeline}\n{HEADER.format(table=table)}\n{rest}"
+    return f"{modeline}\n{header_line(project, request)}\n{rest}"
 
 
 def item(column: str, sidecar: dict[str, Any]) -> dict[str, Any]:
@@ -399,7 +451,7 @@ def registration(
     project: Project,
     request: Request,
     datasets: dict[str, tuple[str, Path]],
-    instrument_ids: list[str],
+    given_in: dict[str, list[str]],
 ) -> list[tuple[str, str]]:
     # What the user adds by hand once, as for an imported codebook.
     known = {d.name for d in project.config.datasets}
@@ -438,11 +490,11 @@ def registration(
     )
     given = {a.instrument: a for a in content.administrations} if content else {}
     added, changed = [], []
-    for instrument_id in instrument_ids:
+    for instrument_id, names in given_in.items():
         administration = given.get(instrument_id)
         if administration is None:
-            added.append(flow({"instrument": instrument_id, "datasets": list(datasets)}))
-        elif missing := [d for d in datasets if d not in administration.datasets]:
+            added.append(flow({"instrument": instrument_id, "datasets": names}))
+        elif missing := [d for d in names if d not in administration.datasets]:
             fields = administration.model_dump(exclude_defaults=True)
             fields["datasets"] = [*administration.datasets, *missing]
             changed.append(flow(fields))

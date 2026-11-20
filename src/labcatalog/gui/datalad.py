@@ -16,7 +16,7 @@ from labcatalog.datalad.freeze import (
     list_freezes,
     push_targets,
 )
-from labcatalog.datalad.line_endings import ATTRIBUTES, RULE, convertible_files
+from labcatalog.datalad.line_endings import ATTRIBUTE, ATTRIBUTES, convertible_files
 from labcatalog.datalad.sync import (
     DatasetState,
     dataset_states,
@@ -151,7 +151,8 @@ def freeze_button(result: CatalogResult, on_frozen: Callable[[], Awaitable[None]
                             "them, where they would no longer match the record."
                         )
                         keep = ui.checkbox(
-                            f"Keep line endings as they are, with the line {RULE} in {ATTRIBUTES}",
+                            "Keep line endings as they are, marking the files a freeze records "
+                            f"{ATTRIBUTE} in {ATTRIBUTES}",
                             value=True,
                         )
                 targets = push_targets(freeze_roots(result.project))
@@ -247,7 +248,11 @@ async def copy_freeze(root: Path, name: str) -> None:
 
 
 def freezes_table(root: Path, on_open: Callable[[str], Awaitable[None]] | None) -> None:
-    found = list_freezes(root)
+    try:
+        found = list_freezes(root)
+    except LabCatalogError as err:
+        note(str(err))
+        return
     if not found:
         return
     columns = [

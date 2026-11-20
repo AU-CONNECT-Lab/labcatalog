@@ -34,6 +34,7 @@ ITEMS = "items.csv"
 INSTRUMENTS = "instruments.csv"
 SCORES = "scores.csv"
 SOURCE_DIR = "source"
+NOT_UTF8 = "not UTF-8; in Excel save it as 'CSV UTF-8'"
 # The codebook of new instruments, made before any data file; not a dataset's name.
 NEW = "_instruments"
 # What the column cell means in that codebook, where no data file lists the columns.
@@ -228,9 +229,16 @@ def write_new_templates(project: Project, dictionary: Path | None = None) -> lis
     return list(paths.values())
 
 
+def items_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8-sig").strip()
+    except UnicodeDecodeError:
+        raise CodebookError(f"{path.name}: {NOT_UTF8}") from None
+
+
 def new_prompt(project: Project) -> str:
     known = [f"  - {i.id}: {i.name}" for i in project.instruments.values()]
-    items = codebook_paths(project, NEW)[ITEMS].read_text(encoding="utf-8-sig").strip()
+    items = items_text(codebook_paths(project, NEW)[ITEMS])
     return NEW_PROMPT.format(
         format=format_text(NEW_COLUMN),
         known="\n".join(known) or "  (none yet)",
@@ -424,7 +432,7 @@ def write_table(path: Path, name: str, rows: list[dict[str, str]]) -> None:
 
 def ai_prompt(project: Project, dataset_name: str) -> str:
     dataset = dataset_by_name(project.config, dataset_name)
-    items = codebook_paths(project, dataset_name)[ITEMS].read_text(encoding="utf-8-sig").strip()
+    items = items_text(codebook_paths(project, dataset_name)[ITEMS])
     guessed = {row.get("instrument") for row in csv.DictReader(io.StringIO(items))}
     known = [
         f"  - {instrument.id}: {instrument.name}"
@@ -564,7 +572,7 @@ class Importer:
         try:
             text = path.read_text(encoding="utf-8-sig")
         except UnicodeDecodeError:
-            self.report(name, None, "not UTF-8; in Excel save it as 'CSV UTF-8'")
+            self.report(name, None, NOT_UTF8)
             return []
         reader = csv.reader(io.StringIO(text))
         header = [cell.strip() for cell in next(reader, [])]
