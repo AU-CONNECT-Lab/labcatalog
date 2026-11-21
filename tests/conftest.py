@@ -144,3 +144,28 @@ def visit_project(mock_project: Path) -> Path:
     text = study.read_text(encoding="utf-8")
     study.write_text(text.replace(MOOD, MOOD.replace("child_w3]", f"child_w3, {names}]")))
     return root
+
+
+@pytest.fixture
+def two_targets_project(mock_project: Path) -> Path:
+    # Parents answer the child's worries questionnaire about themselves too, in waves 1 and 2.
+    root = mock_project
+    lines = []
+    for wave in (1, 2):
+        name, source = f"parent_self_w{wave}", f"parent_child_w{wave}"
+        shutil.copy(root / "data" / f"{source}.csv", root / "data" / f"{name}.csv")
+        shutil.copy(root / "maps" / f"{source}.csv", root / "maps" / f"{name}.csv")
+        lines.append(
+            f"  - {{name: {name}, modality: questionnaire, study: mock_study, wave: {wave}, "
+            f"reporter: parent, source: csv, path: data/{name}.csv, id_column: parent_pid}}\n"
+        )
+    config = root / "labcatalog.yaml"
+    text = config.read_text(encoding="utf-8")
+    text = text.replace("  - {name: eeg_w1,", "".join(lines) + "  - {name: eeg_w1,")
+    config.write_text(text, encoding="utf-8")
+    study = root / "studies" / "mock_study.yaml"
+    text = study.read_text(encoding="utf-8")
+    ewt = "  - {instrument: example_worries_temper, datasets: [parent_child_w1"
+    added = "  - {instrument: example_worries_temper, datasets: [parent_self_w1, parent_self_w2], "
+    study.write_text(text.replace(ewt, added + "target: self}\n" + ewt), encoding="utf-8")
+    return root

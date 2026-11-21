@@ -20,7 +20,7 @@ from labcatalog.schema import Instrument, Score
 from labcatalog.stats import analysis, analysis_script
 from labcatalog.stats import multilevel as ml
 from labcatalog.stats.link import as_written
-from labcatalog.stats.summary import wave_order, who
+from labcatalog.stats.summary import dataset_occasion, wave_order, who
 
 RADAR_AXES = 3
 # Kinds of the overview's to-do rows, in the order they show.
@@ -76,14 +76,6 @@ def wave_name(result: CatalogResult, study: str, wave: str) -> str:
     if several_studies(result):
         return f"{result.project.config.studies[study].label or study} wave {wave}"
     return f"Wave {wave}"
-
-
-def all_wave_names(result: CatalogResult) -> list[str]:
-    return [
-        wave_name(result, study, wave)
-        for study, config in result.project.config.studies.items()
-        for wave in config.waves
-    ]
 
 
 def wave_colors(result: CatalogResult) -> dict[str, str]:
@@ -289,29 +281,24 @@ def score_distribution(result: CatalogResult, instrument_id: str) -> go.Figure |
 
 def item_responses(result: CatalogResult, instrument_id: str) -> list[go.Figure]:
     instrument = result.project.instruments[instrument_id]
-    default = instrument.default_response_set
     names = series_names(result, instrument_datasets(result, instrument_id))
     counts = {(v.dataset, v.column): v.value_counts for v in result.summary.variables}
+    items = [item.id for item in instrument.items]
     figures = []
     for response_set in instrument.response_sets:
-        rows = []
-        for item in instrument.items:
-            if item.type != "choice" or (item.response_set or default) != response_set.id:
-                continue
-            for v in result.catalog.variables:
-                if (
-                    v.instrument_id == instrument_id
-                    and v.item_id == item.id
-                    and (v.dataset, v.column) in counts
-                ):
-                    rows.append(
-                        {
-                            "label": f"{item.id} · {names[v.dataset]}",
-                            "text": item_text(instrument, item.id),
-                            "counts": counts[(v.dataset, v.column)],
-                            "order": (instrument.items.index(item), list(names).index(v.dataset)),
-                        }
-                    )
+        # Each item in each dataset joins the chart of the options it was answered on there.
+        rows = [
+            {
+                "label": f"{v.item_id} · {names[v.dataset]}",
+                "text": " / ".join(v.text.values()) + (" (R)" if v.reverse else ""),
+                "counts": counts[(v.dataset, v.column)],
+                "order": (items.index(v.item_id), list(names).index(v.dataset)),
+            }
+            for v in result.catalog.variables
+            if v.instrument_id == instrument_id
+            and v.response_set == response_set.id
+            and (v.dataset, v.column) in counts
+        ]
         if rows:
             rows.sort(key=lambda r: r["order"])
             options = [(str(o.value), o.label) for o in response_set.options]
@@ -454,6 +441,26 @@ def item_grid(result: CatalogResult, instrument_id: str, dataset: str) -> go.Fig
     return matrices.heatmap(z, items, hover, "Spearman ρ")
 
 
+def occasion_label(result: CatalogResult, name: str) -> str:
+    d = dataset_by_name(result.project.config, name)
+    return wave_name(result, d.study, dataset_occasion(d))
+
+
+def occasion_labels(result: CatalogResult, names: list[str]) -> list[str]:
+    # Every wave of every study, a wave with occasions as each of them in the order files list them.
+    config = result.project.config
+    found: dict[tuple[str, str], list[str]] = {}
+    for d in config.datasets:
+        if d.name in names:
+            found.setdefault((d.study, d.wave), []).append(occasion_label(result, d.name))
+    return [
+        label
+        for study, study_config in config.studies.items()
+        for wave in study_config.waves
+        for label in dict.fromkeys(found.get((study, wave), [wave_name(result, study, wave)]))
+    ]
+
+
 def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
     config = result.project.config
     instrument = result.project.instruments[instrument_id]
@@ -462,6 +469,7 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
         for r in result.summary.retained
         if r.instrument_id == instrument_id
     }
+    labels = occasion_labels(result, instrument_datasets(result, instrument_id))
     panels = []
     for score in instrument.scores:
         by_reporter: dict[tuple[str, str, str | None], list[ResolvedScore]] = {}
@@ -469,17 +477,22 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
             d = dataset_by_name(config, s.dataset)
             by_reporter.setdefault((d.study, d.reporter, s.target), []).append(s)
         for (study, reporter, target), scores in by_reporter.items():
-            if len(scores) < 2:
+            # A wave split over several files is one point; each occasion is its own.
+            by_occasion: dict[str, list[ResolvedScore]] = {}
+            for s in scores:
+                by_occasion.setdefault(occasion_label(result, s.dataset), []).append(s)
+            if len(by_occasion) < 2:
                 continue
             everyone, kept = [], []
-            for s in scores:
-                wave = dataset_by_name(config, s.dataset).wave
-                summary = summary_of(result, s.key)
-                if summary.mean is not None:
-                    everyone.append((wave_name(result, study, wave), summary.mean, summary.n_valid))
-                r = retained.get((study, reporter, target, score.id, wave))
+            for label in sorted(by_occasion, key=labels.index):
+                found = by_occasion[label]
+                values = pd.concat([result.scores[s.dataset][s.key] for s in found]).dropna()
+                if len(values):
+                    everyone.append((label, float(values.mean()), len(values)))
+                occasion = dataset_occasion(dataset_by_name(config, found[0].dataset))
+                r = retained.get((study, reporter, target, score.id, occasion))
                 if r is not None and r.mean is not None:
-                    kept.append((wave_name(result, study, wave), r.mean, r.n))
+                    kept.append((label, r.mean, r.n))
             panels.append(
                 {
                     "title": score.label
@@ -491,20 +504,30 @@ def score_means(result: CatalogResult, instrument_id: str) -> go.Figure | None:
                     ],
                 }
             )
-    return plots.score_means(panels, all_wave_names(result)) if panels else None
+    return plots.score_means(panels, labels) if panels else None
 
 
 def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -> go.Figure | None:
     # This score against every other score measured in the same wave, strongest first.
     config = result.project.config
     by_key = {s.key: s for s in result.catalog.scores}
-    reporter = {s.key: dataset_by_name(config, s.dataset).reporter for s in result.catalog.scores}
-    reporters_of: dict[str, set[str]] = {}
+    asked = {
+        s.key: (dataset_by_name(config, s.dataset).reporter, s.target)
+        for s in result.catalog.scores
+    }
+    asked_of: dict[str, set[tuple[str, str | None]]] = {}
     for s in result.catalog.scores:
-        reporters_of.setdefault(s.instrument_id, set()).add(reporter[s.key])
+        asked_of.setdefault(s.instrument_id, set()).add(asked[s.key])
+
+    def named(key: str) -> str:
+        # The reporter, and the target too where that reporter answers the instrument about several.
+        reporter, target = asked[key]
+        pairs = asked_of[by_key[key].instrument_id]
+        return who(reporter, target) if sum(r == reporter for r, _ in pairs) > 1 else reporter
+
     own = {s.key for s in resolved(result, instrument_id, score_id)}
-    several_own = len({reporter[k] for k in own}) > 1
-    members: dict[tuple[str, str, str], dict] = {}
+    several_own = len({asked[k] for k in own}) > 1
+    members: dict[tuple, dict] = {}
     series = []
     for corr in result.summary.correlations:
         for i, key in enumerate(corr.keys):
@@ -515,21 +538,21 @@ def score_correlates(result: CatalogResult, instrument_id: str, score_id: str) -
                 other = by_key[other_key]
                 if j == i or corr.r[i][j] is None or nested(result, by_key[key], other):
                     continue
-                member = (other.instrument_id, other.score_id, reporter[other_key])
+                member = (other.instrument_id, other.score_id, *asked[other_key])
                 values[member] = corr.r[i][j]
                 if member not in members:
                     other_instrument = result.project.instruments[other.instrument_id]
                     label = short_label(other_instrument, definition(result, other))
-                    several = len(reporters_of[other.instrument_id]) > 1
+                    several = len(asked_of[other.instrument_id]) > 1
                     members[member] = {
                         "id": member,
-                        "tick": f"{label} ({member[2]})" if several else label,
-                        "hover": f"{label}, {member[2]}",
+                        "tick": f"{label} ({named(other_key)})" if several else label,
+                        "hover": f"{label}, {named(other_key)}",
                     }
             name = wave_name(result, corr.study, corr.wave)
             series.append(
                 {
-                    "name": f"{name} · {reporter[key]}" if several_own else name,
+                    "name": f"{name} · {named(key)}" if several_own else name,
                     "color": series_color(result, by_key[key].dataset),
                     "values": values,
                 }
@@ -746,14 +769,19 @@ def timeline(result: CatalogResult, today: date | None = None) -> go.Figure | No
                 continue
             lane = wave_name(result, study, wave)
             found = counts.get((study, wave), {})
-            ongoing = dates.end is None
+            planned = wave_status(dates, today) == "Planned"
+            ongoing = dates.end is None and not planned
+            when = f"{dates.start} to {dates.end or 'now, still collecting'}"
+            if planned:
+                when = f"planned, from {dates.start}" + (f" to {dates.end}" if dates.end else "")
             bar = {
                 "lane": lane,
                 "start": dates.start,
-                "end": dates.end or today,
+                "end": dates.end or (dates.start if planned else today),
                 "ongoing": ongoing,
+                "planned": planned,
                 "color": wave_colors(result)[wave],
-                "hover": f"<b>{lane}</b><br>{dates.start} to {dates.end or 'now, still collecting'}"
+                "hover": f"<b>{lane}</b><br>{when}"
                 + "".join(f"<br>{reporter}: {n}" for reporter, n in found.items()),
             }
             before = counts.get((study, earlier), {}) if earlier else {}
@@ -766,9 +794,9 @@ def timeline(result: CatalogResult, today: date | None = None) -> go.Figure | No
                 )
                 for reporter, n in found.items()
             )
-            # A wave still collecting is drawn as long as the one before it took.
+            # A wave still collecting, or planned without an end, is drawn as long as the one before.
             previous = study_config.waves.get(earlier) if earlier else None
-            if ongoing and previous and previous.start and previous.end:
+            if dates.end is None and previous and previous.start and previous.end:
                 bar["projected"] = dates.start + (previous.end - previous.start)
             lanes.append(lane)
             bars.append(bar)
@@ -1157,7 +1185,8 @@ def variable_choices(result: CatalogResult, datasets: list[str]) -> dict[str, st
             )
         for v in analysis.number_items(result, [name]):
             instrument = instruments[v.instrument_id]
-            text = v.label or next(iter(v.text.values()))
+            # One line, since the label also goes into the comments of the code the analyses write.
+            text = " ".join((v.label or next(iter(v.text.values()))).split())
             found[analysis.item_key(v)] = (
                 f"{instrument.abbreviation or instrument.id}: {text} ({names[name]})"
             )

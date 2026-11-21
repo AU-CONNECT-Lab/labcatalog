@@ -238,9 +238,9 @@ def test_every_page_takes_the_waves_in_the_order_the_study_writes_them(mock_proj
     name_waves(mock_project)
     result = run_catalog(mock_project)
     order = ["baseline", "6m", "12m"]
-    assert views.all_wave_names(result) == [f"Wave {w}" for w in order]
-    assert list(views.wave_colors(result)) == order
     children = ["child_w1", "child_w2", "child_w3"]
+    assert views.occasion_labels(result, children) == [f"Wave {w}" for w in order]
+    assert list(views.wave_colors(result)) == order
     assert views.dataset_order(result, children[::-1]) == children
     assert common.sorted_waves(result.project.config, "mock_study", order[::-1]) == order
     assert attrition.next_wave(result, "mock_study", "baseline") == "6m"

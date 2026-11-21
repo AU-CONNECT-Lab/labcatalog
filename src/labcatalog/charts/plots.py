@@ -58,6 +58,8 @@ def timeline(lanes: list[str], bars: list[dict], marks: list[dict], today: date)
         pieces = [(bar["start"], bar["end"], 0.45 if bar["ongoing"] else 1.0)]
         if bar.get("projected"):
             pieces = [(bar["start"], bar["projected"], 0.25), (bar["start"], bar["end"], 1.0)]
+        if bar.get("planned"):
+            pieces = [(bar["start"], bar.get("projected") or bar["end"], 0.25)]
         for start, end, alpha in pieces:
             fig.add_trace(
                 go.Bar(

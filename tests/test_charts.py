@@ -2,8 +2,9 @@ from datetime import date
 from itertools import pairwise
 
 import pytest
+from conftest import VISIT
 
-from labcatalog.charts import network, plots, style, views
+from labcatalog.charts import network, plot_code, plots, style, views
 from labcatalog.charts.style import STATUS_COLORS
 from labcatalog.gui import charts as gui_charts
 from labcatalog.pipeline import run_catalog
@@ -82,6 +83,20 @@ def test_means_show_one_instrument(result):
     assert [a.text for a in means.layout.annotations] == labels
 
 
+def test_each_occasion_is_a_point_of_its_own_across_waves(visit_project):
+    result = run_catalog(visit_project)
+    fig = views.score_means(result, "example_mood")
+    times = [f"Wave 2 ({time}, {interaction})" for _, time, interaction in VISIT]
+    assert list(fig.layout.xaxis.ticktext) == ["Wave 1", "Wave 2", *times, "Wave 3"]
+    everyone = next(t for t in fig.data if t.name == "All participants")
+    kept = next(t for t in fig.data if t.name == "In every wave")
+    assert list(everyone.x) == list(kept.x) == list(range(7))
+    after = next(
+        s for s in result.summary.scores if s.key == "example_mood.ems_total@mood_post_parent"
+    )
+    assert everyone.y[3] == pytest.approx(after.mean)
+
+
 def test_timeline_draws_waves_up_to_today_and_the_milestones(result):
     today = date(2026, 10, 15)
     fig = views.timeline(result, today)
@@ -102,6 +117,15 @@ def test_timeline_draws_waves_up_to_today_and_the_milestones(result):
         "parent 170, child 182",
         "parent 160 of 170 (94%), child 174 of 182 (96%)",
     ]
+
+
+def test_a_wave_that_has_not_started_is_drawn_faint_from_its_start(result):
+    fig = views.timeline(result, date(2026, 2, 1))
+    planned = [t for t in fig.data if t.type == "bar" and t.y[0] == "Wave 3"]
+    assert len(planned) == 1 and planned[0].base[0] == "2026-03-01"
+    assert planned[0].x[0] == (date(2025, 10, 31) - date(2025, 3, 1)).days * 86_400_000
+    assert "planned, from 2026-03-01" in planned[0].hovertext[0]
+    assert "rgba(" in planned[0].marker.color and planned[0].marker.color.endswith(",0.25)")
 
 
 def test_next_up_lists_errors_gaps_the_wave_collecting_and_warnings(result):
@@ -219,6 +243,73 @@ def test_number_items_get_one_distribution_per_wave(result):
     assert len(ticks) == 3 and all("n " in tick for tick in ticks)
     assert household.layout.xaxis.range[0] < 2 < 7 < household.layout.xaxis.range[1]
     assert views.number_distributions(result, "example_mood") == []
+
+
+def test_a_reporter_answering_about_two_targets_gets_a_row_for_each(two_targets_project):
+    result = run_catalog(two_targets_project)
+    fig = views.score_correlates(result, "example_parent_stress", "eps_mean")
+    ticks = list(fig.layout.yaxis.ticktext)
+    for who in ("parent about self", "parent about child", "child"):
+        assert f"EWT total score ({who})" in ticks
+    [wave_1] = [s for s in result.summary.correlations if s.wave == "1"]
+    own = wave_1.keys.index("example_parent_stress.eps_mean@parent_w1")
+    found = {
+        k.split("@")[1]: wave_1.r[own][j]
+        for j, k in enumerate(wave_1.keys)
+        if k.startswith("example_worries_temper.ewt_total@parent_")
+    }
+    shown = next(t for t in fig.data if t.name == "Wave 1")
+    rows = dict(zip(shown.y, shown.x, strict=True))
+    for dataset, who in (
+        ("parent_self_w1", "parent about self"),
+        ("parent_child_w1", "parent about child"),
+    ):
+        assert rows[ticks.index(f"EWT total score ({who})")] == pytest.approx(found[dataset])
+
+
+def test_an_item_answered_on_other_options_in_one_dataset_joins_their_chart(mock_project):
+    path = mock_project / "instruments" / "example_mood.yaml"
+    text = path.read_text(encoding="utf-8")
+    other = "  - id: days\n    options:\n" + "".join(
+        f"      - {{value: {v}, label: {label}}}\n"
+        for v, label in enumerate(["No days", "A few days", "Most days", "Every day"])
+    )
+    path.write_text(text.replace("default_response_set:", other + "default_response_set:"), "utf-8")
+    path = mock_project / "studies" / "mock_study.yaml"
+    text = path.read_text(encoding="utf-8")
+    old = "example_mood, datasets: [child_w1, child_w2, child_w3], target: self}"
+    override = "overrides: [{item: ems_1, dataset: child_w2, response_set: days}]"
+    path.write_text(text.replace(old, f"{old[:-1]}, {override}}}"), "utf-8")
+    result = run_catalog(mock_project)
+    frequency, days = views.item_responses(result, "example_mood")
+    assert not any("ems_1 · Wave 2" in trace.y for trace in frequency.data)
+    assert [trace.name for trace in days.data] == [
+        "No days",
+        "A few days",
+        "Most days",
+        "Every day",
+    ]
+    [summary] = [
+        v for v in result.summary.variables if v.dataset == "child_w2" and v.column == "ems_1_w2"
+    ]
+    total = sum(summary.value_counts.values())
+    shares = [trace.x[0] for trace in days.data]
+    assert list(days.data[0].y) == ["ems_1 · Wave 2"]
+    assert shares == pytest.approx([100 * n / total for n in summary.value_counts.values()])
+
+
+def test_an_item_text_over_lines_is_one_line_in_the_analysis_and_its_figure_code(mock_project):
+    path = mock_project / "instruments" / "example_demographics.yaml"
+    text = path.read_text(encoding="utf-8")
+    old = 'label: "Child age", text: "How old is your child (in years)?"'
+    path.write_text(text.replace(old, 'text: "How old is your child\\n(in years)?\\n"'), "utf-8")
+    result = run_catalog(mock_project)
+    label = views.variable_choices(result, ["parent_w1"])[
+        "item:example_demographics.dem_age@parent_w1"
+    ]
+    assert label == "EFB: How old is your child (in years)? (Wave 1)"
+    _, python = plot_code.regression({"x": "X"}, label)
+    compile(python, "figure.py", "exec")
 
 
 def test_catalog_map_hangs_items_from_their_smallest_score_and_links_scores_across_instruments(

@@ -6,7 +6,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from labcatalog import defaults
-from labcatalog.config import ProjectConfig, missing_labels_for
+from labcatalog.config import DatasetConfig, ProjectConfig, missing_labels_for
 from labcatalog.data.resolve import (
     Catalog,
     ResolvedScore,
@@ -174,7 +174,7 @@ def summarize(
         for v in catalog.variables
         if v.column in datasets[v.dataset].frame
     ]
-    by_wave = waves_of_scores(catalog, datasets, scores)
+    by_wave = waves_of_scores(catalog, datasets, scores, config)
     return Summary(
         variables=variables,
         scores=[
@@ -190,7 +190,7 @@ def summarize(
         groups=wave_groups(datasets, config),
         correlations=correlations(catalog, datasets, scores, config),
         stability=stability(by_wave, config),
-        retained=retained(by_wave, config),
+        retained=retained(by_wave),
     )
 
 
@@ -571,22 +571,39 @@ def who(reporter: str, target: str | None) -> str:
 ScoreKey = tuple[str, str, str | None, str, str]
 
 
+def dataset_occasion(dataset: DatasetConfig) -> str:
+    # A dataset given an occasion is an occasion of its own; a wave's other files are the wave.
+    if not dataset.occasion:
+        return dataset.wave
+    return f"{dataset.wave} ({', '.join(dataset.occasion.values())})"
+
+
 def waves_of_scores(
-    catalog: Catalog, datasets: dict[str, LoadedDataset], scores: dict[str, pd.DataFrame]
+    catalog: Catalog,
+    datasets: dict[str, LoadedDataset],
+    scores: dict[str, pd.DataFrame],
+    config: ProjectConfig,
 ) -> dict[ScoreKey, dict[str, pd.Series]]:
-    # (study, reporter, target, instrument, score) -> {wave: valid scores indexed by participant ID}
+    # (study, reporter, target, instrument, score) -> {occasion: valid scores by participant ID}
+    place = {d.name: k for k, d in enumerate(config.datasets)}
+
+    def order(score: ResolvedScore) -> tuple:
+        c = datasets[score.dataset].config
+        return (wave_order(config, c.study)(c.wave), place[c.name])
+
     found: dict[ScoreKey, dict[str, pd.Series]] = {}
-    for score in catalog.scores:
+    # Each score's occasions in order, which stability and retention keep.
+    for score in sorted(catalog.scores, key=order):
         loaded = datasets[score.dataset]
         ids = loaded.frame[loaded.id_column].to_numpy()
         values = pd.Series(scores[score.dataset][score.key].to_numpy(), index=ids).dropna()
         c = loaded.config
         key = (c.study, c.reporter, score.target, score.instrument_id, score.score_id)
         waves = found.setdefault(key, {})
-        wave = loaded.config.wave
-        values = pd.concat([waves[wave], values]) if wave in waves else values
+        occasion = dataset_occasion(c)
+        values = pd.concat([waves[occasion], values]) if occasion in waves else values
         # An ID that repeats cannot say which value belongs to the person.
-        waves[wave] = values[~values.index.duplicated(keep=False)]
+        waves[occasion] = values[~values.index.duplicated(keep=False)]
     return found
 
 
@@ -595,7 +612,7 @@ def stability(
 ) -> list[ScoreStability]:
     rows = []
     for (study, reporter, target, instrument_id, score_id), waves in found.items():
-        order = sorted(waves, key=wave_order(config, study))
+        order = list(waves)
         for earlier, later in zip(order, order[1:], strict=False):
             both = pd.concat([waves[earlier], waves[later]], axis=1, join="inner")
             r = (
@@ -619,15 +636,13 @@ def stability(
     return rows
 
 
-def retained(
-    found: dict[ScoreKey, dict[str, pd.Series]], config: ProjectConfig
-) -> list[RetainedScore]:
+def retained(found: dict[ScoreKey, dict[str, pd.Series]]) -> list[RetainedScore]:
     rows = []
     for (study, reporter, target, instrument_id, score_id), waves in found.items():
         if len(waves) < 2:
             continue
         everyone = set.intersection(*(set(values.index) for values in waves.values()))
-        for wave in sorted(waves, key=wave_order(config, study)):
+        for wave in waves:
             kept = waves[wave][waves[wave].index.isin(everyone)]
             stats = describe(kept)
             rows.append(

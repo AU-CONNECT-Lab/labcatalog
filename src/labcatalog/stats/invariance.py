@@ -14,7 +14,7 @@ from labcatalog.sources import LoadedDataset
 from labcatalog.stats.cfa import FIT, MIN_ITEMS, ML, MLR, ONE_FACTOR, SUBSCALES, WLSMV, is_total
 from labcatalog.stats.link import link
 from labcatalog.stats.rbridge import run_r
-from labcatalog.stats.summary import wave_order, who
+from labcatalog.stats.summary import dataset_occasion, wave_order, who
 
 R_SCRIPT = Path(__file__).parent / "invariance.R"
 STEPS = ("configural", "thresholds", "metric", "scalar")
@@ -153,11 +153,7 @@ def wave_occasions(
 ) -> dict[str, ByDataset]:
     # A dataset given an occasion is an occasion of its own; the wave's other files are one.
     plain = {n: s for n, s in found.items() if not configs[n].occasion}
-    each = {
-        f"{wave} ({', '.join(configs[n].occasion.values())})": {n: s}
-        for n, s in found.items()
-        if configs[n].occasion
-    }
+    each = {dataset_occasion(configs[n]): {n: s} for n, s in found.items() if configs[n].occasion}
     return ({wave: plain} if plain else {}) | each
 
 

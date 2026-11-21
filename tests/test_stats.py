@@ -1,9 +1,10 @@
 import re
 from dataclasses import replace
+from itertools import pairwise
 
 import pandas as pd
 import pytest
-from conftest import NAMED_WAVES, name_waves
+from conftest import NAMED_WAVES, VISIT, name_waves
 
 from labcatalog.config import DatasetConfig, MissingCode, ProjectConfig
 from labcatalog.data.resolve import Catalog, ResolvedScore, ResolvedVariable, resolve_catalog
@@ -162,6 +163,16 @@ def test_stability_pairs_adjacent_waves_and_retained_scores_need_every_wave(mock
     assert 0 < n <= min(s.n for s in ems)
 
 
+def test_each_dataset_with_an_occasion_is_an_occasion_of_its_own_across_waves(visit_project):
+    summary = summary_for(visit_project)
+    occasions = ["1", "2", *[f"2 ({time}, {interaction})" for _, time, interaction in VISIT], "3"]
+    ems = [s for s in summary.stability if s.score_id == "ems_total"]
+    assert [(s.from_wave, s.to_wave) for s in ems] == list(pairwise(occasions))
+    assert all(s.n > 0 and s.r is not None for s in ems)
+    kept = [r for r in summary.retained if r.score_id == "ems_total"]
+    assert [r.wave for r in kept] == occasions and all(r.n > 0 for r in kept)
+
+
 def test_one_reporter_answering_about_two_targets_has_a_series_for_each():
     totals = {
         "self_w1": [4, 6, 8, 10, 12],
@@ -194,8 +205,10 @@ def test_one_reporter_answering_about_two_targets_has_a_series_for_each():
         ],
     )
     scores = {name: pd.DataFrame({f"x.total@{name}": t}) for name, t in totals.items()}
-    config = ProjectConfig(project={"name": "p"}, studies={"s": {}})
-    found = waves_of_scores(catalog, datasets, scores)
+    config = ProjectConfig(
+        project={"name": "p"}, studies={"s": {}}, datasets=[d.config for d in datasets.values()]
+    )
+    found = waves_of_scores(catalog, datasets, scores, config)
     expected = {
         t: pd.Series(totals[f"{t}_w1"]).corr(pd.Series(totals[f"{t}_w2"]))
         for t in ("self", "child")
@@ -203,7 +216,7 @@ def test_one_reporter_answering_about_two_targets_has_a_series_for_each():
     assert {s.target: (s.r, s.n) for s in stability(found, config)} == {
         t: (pytest.approx(r), 5) for t, r in expected.items()
     }
-    assert {(r.target, r.wave, r.n) for r in retained(found, config)} == {
+    assert {(r.target, r.wave, r.n) for r in retained(found)} == {
         (t, w, 5) for t in ("self", "child") for w in ("1", "2")
     }
 
