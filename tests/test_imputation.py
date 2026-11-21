@@ -1,9 +1,12 @@
 import shutil
+import subprocess
 from glob import glob
 
 import pandas as pd
 import pytest
 
+from labcatalog.charts import plot_code
+from labcatalog.gui import analysis_tables
 from labcatalog.pipeline import run_catalog
 from labcatalog.stats import analysis, imputation
 from labcatalog.stats import analysis_script as script
@@ -90,8 +93,14 @@ def test_pooled_correlations_cover_everyone_and_reuse_the_kept_imputation(result
     _, again = run(result, sample, data, keys, build, tmp_path)
     assert kept.stat().st_mtime_ns == stamp and first["correlations"].equals(again["correlations"])
     assert (first["correlations"]["n"] == len(frame)).all()
+    a, b, c = (v.column for v in variables)
+    assert list(zip(first["correlations"]["x"], first["correlations"]["y"], strict=True)) == [
+        (a, b),
+        (a, c),
+        (b, c),
+    ]
     available, _ = script.run_code(result, sample, frame, script.correlation_code(variables), None)
-    pooled = first["correlations"].drop_duplicates(["r"]).set_index(["x", "y"])["r"]
+    pooled = first["correlations"].set_index(["x", "y"])["r"]
     seen = available["correlations"].set_index(["x", "y"])["r"]
     assert (pooled.reindex(seen.index) - seen).abs().max() < 0.1
 
@@ -142,6 +151,51 @@ def test_pooled_group_comparisons_keep_everyone_whose_group_is_known(
         assert comparison.effect_low < comparison.effect < comparison.effect_high
     else:
         assert comparison.test == script.ANOVA and comparison.df2 > 0
+
+
+@needs_mice
+def test_saved_imputed_scripts_draw_their_figures_from_observed_values(result, sample, tmp_path):
+    data = script.AnalysisData(result, sample)
+    plan = imputation.plan(data, [STRESS, SLEEP, MOOD, GENDER], [], 3, 1)
+    frame = data.frame()
+    file = imputation.file_name(frame, plan)
+    variables = [data.variable(k) for k in (STRESS, SLEEP, MOOD)]
+    group, outcome = data.item(GENDER), data.variable(MOOD)
+    found = imputation.comparison_plan(frame, group, outcome, plan, file)
+    kept = [
+        v
+        for values, _ in group.levels
+        if frame[group.column].isin(values).sum() >= imputation.MIN_GROUP
+        for v in values
+    ]
+    known = frame[group.column].isin(kept)
+    observed = int((known & frame[outcome.column].notna()).sum())
+    assert observed < known.sum()
+    sections = {
+        "correlations": (
+            imputation.correlation_code(variables, "pearson", plan, file),
+            plot_code.correlation({v.column: v.label for v in variables}, "r", False),
+            'cat("cells:", nrow(cells), sum(is.na(cells$x) | is.na(cells$y)), "\\n")\n',
+            "cells: 3 0",
+        ),
+        "groups": (
+            found.code,
+            plot_code.groups(group.label, outcome.label, len(kept)),
+            'cat("drawn:", length(y), sum(is.na(y)), "\\n")\n',
+            f"drawn: {observed} 0",
+        ),
+    }
+    for name, (code, figure, check, expected) in sections.items():
+        folder = tmp_path / name
+        folder.mkdir()
+        texts = analysis_tables.section_files(result, sample, frame, code, figure)
+        texts["analysis.R"] += check
+        for file_name, text in texts.items():
+            (folder / file_name).write_text(text, encoding="utf-8")
+        done = subprocess.run([rscript(), "analysis.R"], cwd=folder, capture_output=True, text=True)
+        assert done.returncode == 0, done.stderr
+        assert expected in done.stdout
+        assert next(folder.glob("*.png")).stat().st_size > 0
 
 
 @needs_mice

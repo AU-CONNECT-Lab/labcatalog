@@ -600,17 +600,23 @@ def test_saved_imputed_r_script_runs_on_its_data(result, tmp_path):
     model = growth()
     long = ml.long_frame(result, model)
     imputing = ml.Imputing(3, 1)
-    r, python = ml.scripts(result, model, long, "EMS", imputing)
+    assert ml.imputed_rows(model, long) > 0
+    r, python = multilevel_view.script_texts(result, model, long, "EMS", imputing)
     assert "mitml::testEstimates" in r and "lme4, lmerTest, performance, mice, mitml" in r
     assert python.count("Multiple imputation runs in R") == 1
     ml.data_frame(long, True).to_csv(tmp_path / ml.DATA_FILE, index=False)
-    (tmp_path / "multilevel.R").write_text(r, encoding="utf-8")
+    check = 'cat("drawn:", nrow(points), "line:", nrow(line), all(is.finite(line$fixed)), "\\n")\n'
+    (tmp_path / "multilevel.R").write_text(r + check, encoding="utf-8")
     done = subprocess.run(
         [rscript(), "multilevel.R"], cwd=tmp_path, capture_output=True, text=True, check=False
     )
     assert done.returncode == 0, done.stderr
     assert "Estimate" in done.stdout
     assert list(tmp_path.glob("imputation_*.rds"))
+    assert (tmp_path / "multilevel.png").stat().st_size > 0
+    # The figure draws the rows with every value observed, as the page does.
+    drawn = f"drawn: {len(long.frame.dropna())} line: {len(CHILD)} TRUE"
+    assert drawn in done.stdout
 
 
 @pytest.fixture

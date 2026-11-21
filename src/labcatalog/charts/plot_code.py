@@ -176,6 +176,32 @@ figure <- ggplot(points, aes(time, y)) +
   {x_scale}labs(x = {x_title}, y = {label}) +
   theme_minimal()
 """
+R_IMPUTED_TRAJECTORIES = """\
+# Each person's line and each wave's mean from the rows with every value observed.
+observed <- d[complete.cases(d[, used]), ]
+points <- data.frame(id = observed[[{person}]], wave = observed[[{wave}]],
+                     time = observed[[{time}]], y = observed[[{y}]])
+means <- aggregate(cbind(time, y) ~ wave, data = points, FUN = mean)
+means <- means[order(means$time), ]
+# The pooled fixed effects' prediction for the rows the model used, averaged over the imputed
+# data sets and within each wave.
+estimates <- pooled$estimates[, "Estimate"]
+predicted <- average(lapply(fits, function(f) {{
+  x <- model.matrix(f)
+  drop(x %*% estimates[colnames(x)])
+}}))
+line <- aggregate(cbind(time, fixed) ~ wave, FUN = mean,
+                  data = data.frame(wave = sets[[1]]$d[[{wave}]], time = sets[[1]]$d[[{time}]],
+                                    fixed = predicted))
+line <- line[order(line$time), ]
+figure <- ggplot(points, aes(time, y)) +
+  geom_line(aes(group = id), colour = "grey60", alpha = 0.35, linewidth = 0.3) +
+  geom_line(data = line, aes(y = fixed), colour = "{colour}", linewidth = 1.2) +
+  geom_point(data = means, shape = 21, size = 3, fill = "white", colour = "{colour}",
+             stroke = 1.2) +
+  {x_scale}labs(x = {x_title}, y = {label}) +
+  theme_minimal()
+"""
 PYTHON_TRAJECTORIES = """\
 d["fixed"] = fit.predict(d)
 # The observed mean and the fixed effects' prediction, averaged within each wave.
@@ -288,9 +314,9 @@ def paired(first_label: str, second_label: str) -> tuple[str, str]:
 
 
 def trajectories(
-    columns: dict[str, str], label: str, x_title: str, by_wave: bool
+    columns: dict[str, str], label: str, x_title: str, by_wave: bool, imputed: bool = False
 ) -> tuple[str, str]:
-    # Reads d and fit after the model; columns name the person, wave, time and outcome columns.
+    # Reads d and fit after the model, or in R used, sets, fits and pooled after an imputed one.
     colour = style.wave_color(0)
     names = {k: text(v) for k, v in columns.items()}
     x_scale = (
@@ -304,7 +330,7 @@ def trajectories(
         else ""
     )
     fields = dict(colour=colour, label=text(label), x_title=text(x_title), **names)
-    r = R_TRAJECTORIES.format(x_scale=x_scale, **fields)
+    r = (R_IMPUTED_TRAJECTORIES if imputed else R_TRAJECTORIES).format(x_scale=x_scale, **fields)
     python = PYTHON_TRAJECTORIES.format(x_ticks=x_ticks, width="7", height="4.2", **fields)
     what = f"each person's {label} over time, the observed mean and the fixed effects"
     return framed(what, "multilevel.png", r, python, 7, 4.2)

@@ -257,6 +257,8 @@ descriptives <- data.frame(
 print(descriptives)
 pooled <- miceadds::micombine.cor(miceadds::datlist_create(completed), variables = variables,
                                   method = "{method}")
+# micombine.cor gives each pair both ways; keep it once, in the order of the variables.
+pooled <- pooled[match(pooled$variable1, variables) < match(pooled$variable2, variables), ]
 correlations <- data.frame(x = pooled$variable1, y = pooled$variable2, n = nrow(d),
                            r = pooled$r, p = pooled$p)
 print(correlations)
@@ -285,6 +287,8 @@ left <- lapply(prepared, function(x) {{
 }})
 pooled <- miceadds::micombine.cor(miceadds::datlist_create(left), variables = variables,
                                   method = "pearson")
+# micombine.cor gives each pair both ways; keep it once, in the order of the variables.
+pooled <- pooled[match(pooled$variable1, variables) < match(pooled$variable2, variables), ]
 p_within <- function(x, y) {{
   fits <- mice::as.mira(lapply(prepared, function(data) lm(data[[y]] ~ data[[x]] + study)))
   summary(mice::pool(fits))$p.value[2]
@@ -399,6 +403,10 @@ groups <- data.frame(group = c({labels}), n = as.vector(table(sets[[1]]$group)),
                      mean = rowMeans(sapply(sets, function(s) tapply(s$y, s$group, mean))),
                      sd = rowMeans(sapply(sets, function(s) tapply(s$y, s$group, sd))))
 print(groups)
+# The people whose outcome is observed, as the figure draws them.
+seen <- keep & !is.na(d[[{outcome}]])
+group <- factor(d[[{group}]][seen], levels = c({values}), labels = c({value_labels}))
+y <- d[[{outcome}]][seen]
 """
 # TODO(review): d's variance in each imputed data set is the hand-written large-sample formula.
 R_STUDENT = """\

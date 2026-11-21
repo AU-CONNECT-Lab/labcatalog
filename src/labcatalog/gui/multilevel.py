@@ -255,7 +255,7 @@ def script_texts(
     by_wave = long.time_label == ml.TIME_LABEL
     columns = {"person": ml.PERSON, "wave": ml.WAVE, "time": ml.TIME, "y": long.outcome}
     r_plot, python_plot = plot_code.trajectories(
-        columns, label, "" if by_wave else long.time_label, by_wave
+        columns, label, "" if by_wave else long.time_label, by_wave, imputing is not None
     )
     return f"{r_text}\n{r_plot}", f"{python_text}\n{python_plot}"
 
