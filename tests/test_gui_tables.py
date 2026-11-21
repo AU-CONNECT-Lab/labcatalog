@@ -3,8 +3,7 @@ from pathlib import Path
 from labcatalog.charts import views
 from labcatalog.gui import datasets, instruments, problems
 from labcatalog.gui import invariance as invariance_view
-from labcatalog.gui.common import split_location
-from labcatalog.issues import Issue
+from labcatalog.issues import Issue, split_location
 from labcatalog.metadata.bibliography import citation
 from labcatalog.metadata.browse import build_index, matches
 from labcatalog.pipeline import run_catalog
@@ -65,7 +64,7 @@ def test_instrument_items_list_each_dataset_column(mock_project):
 
 def test_dataset_issues_cover_its_data_file_only(mock_project):
     result = run_catalog(mock_project)
-    codes = [i.code for i in datasets.dataset_issues(result, "child_w1")]
+    codes = [i.code for i in views.dataset_issues(result, "child_w1")]
     assert sorted(codes) == ["same_answer", "same_answer", "unexpected_value"]
 
 

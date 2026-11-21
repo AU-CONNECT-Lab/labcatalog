@@ -1,7 +1,7 @@
 import secrets
-from http.cookies import SimpleCookie
 from urllib.parse import parse_qs
 
+from starlette.requests import cookie_parser
 from starlette.responses import HTMLResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from starlette.websockets import WebSocketClose
@@ -39,9 +39,10 @@ class Gate:
     def cookie_of(self, scope: Scope) -> str | None:
         for name, value in scope["headers"]:
             if name == b"cookie":
-                found = SimpleCookie(value.decode("latin-1")).get(self.cookie)
+                # Starlette's lenient parser, since other sites on this host may leave odd cookies.
+                found = cookie_parser(value.decode("latin-1")).get(self.cookie)
                 if found is not None:
-                    return found.value
+                    return found
         return None
 
     def query_of(self, scope: Scope) -> str | None:

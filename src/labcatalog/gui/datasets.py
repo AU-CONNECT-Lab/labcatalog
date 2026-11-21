@@ -3,9 +3,8 @@ from dataclasses import dataclass, field
 
 from nicegui import ui
 
-from labcatalog import defaults
 from labcatalog.charts import views
-from labcatalog.config import dataset_by_name, map_name_of
+from labcatalog.config import dataset_by_name
 from labcatalog.datalad.sync import size_text
 from labcatalog.gui import codebook_import, datalad, id_fix, new_dataset, problems, review
 from labcatalog.gui.common import (
@@ -18,11 +17,9 @@ from labcatalog.gui.common import (
     page_head,
     panel,
     table,
-    without_line,
 )
 from labcatalog.gui.database import database_button
 from labcatalog.gui.filter_bar import Filters, filter_bar
-from labcatalog.issues import Issue
 from labcatalog.metadata.browse import build_dataset_index, row_counts, row_matches
 from labcatalog.pipeline import CatalogResult
 from labcatalog.sources.folder_source import FolderSize, folder_size
@@ -235,7 +232,7 @@ def main_panels(
         with panel("Methods"):
             paragraphs(methods)
 
-    issues = dataset_issues(result, summary.dataset)
+    issues = views.dataset_issues(result, summary.dataset)
     with panel("Problems", help_text="In this dataset's file and column map"):
         if issues:
             problems.issue_table(issues, result.project.root, on_edit)
@@ -283,7 +280,7 @@ def facts(
         rows.append(("Collected", summary.collected))
     if summary.snapshot_date:
         rows.append(("Data as of", summary.snapshot_date))
-    path = data_path(result, summary.dataset)
+    path = views.data_path(result, summary.dataset)
     with ui.column().classes("lc-panel lc-summary w-full gap-3"):
         with ui.row().classes("w-full items-center gap-3"):
             ui.label(summary.dataset).classes("lc-summary-title")
@@ -335,43 +332,11 @@ def size_rows(found: FolderSize) -> list[tuple[str, object]]:
     return rows
 
 
-def data_path(result: CatalogResult, dataset: str) -> str | None:
-    return next((f.path for f in result.manifest.files if f.dataset == dataset), None)
-
-
-def issue_datasets(result: CatalogResult) -> list[str | None]:
-    # The dataset each issue is about, by its details or by the file it names.
-    issues = result.report.issues
-    if result.project is None:
-        return [None] * len(issues)
-    names = {d.name for d in result.project.config.datasets}
-    owner = {
-        id(issue): d.name
-        for d in result.project.config.datasets
-        for issue in dataset_issues(result, d.name)
-    }
-    return [
-        found if (found := issue.details.get("dataset")) in names else owner.get(id(issue))
-        for issue in issues
-    ]
-
-
 def issue_levels(result: CatalogResult) -> dict[str, set[str]]:
     return {
-        d.name: {issue.level for issue in dataset_issues(result, d.name)}
+        d.name: {issue.level for issue in views.dataset_issues(result, d.name)}
         for d in result.project.config.datasets
     }
-
-
-def dataset_issues(result: CatalogResult, dataset: str) -> list[Issue]:
-    data = data_path(result, dataset)
-    variable_map = f"{defaults.MAPS_DIR}/{map_name_of(result.project.config, dataset)}.csv"
-    return [
-        issue
-        for issue in result.report.issues
-        if issue.location
-        and (issue.location == data or without_line(issue.location) == variable_map)
-    ]
 
 
 def completeness_table(

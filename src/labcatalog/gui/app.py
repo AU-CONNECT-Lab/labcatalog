@@ -420,7 +420,7 @@ class Window:
     async def open_project(self, root: Path) -> None:
         # Remembered for the next start; a freeze opened from it is not.
         preferences.save_mine({preferences.LAST_PROJECT: str(root)})
-        await self.load(root)
+        await self.load(root, again=False)
 
     async def open_example(self) -> None:
         self.home = None
@@ -436,14 +436,16 @@ class Window:
             await self.load(folder)
         ui.notify("The example is back as installed")
 
-    async def load(self, root: Path) -> None:
+    async def load(self, root: Path, again: bool = True) -> None:
+        # Opening shares another window's catalog of the project; every other load reads it again.
         self.set_busy(True)
         try:
-            times, result = await common.computed(shared.catalog, root)
+            times, result = await common.computed(shared.catalog, root, again)
         except LabCatalogError as err:
             # The project stays open so Set up can make the missing data.
             ui.notify(str(err), type="negative", multi_line=True)
             result, self.error = None, str(err)
+            times = await common.computed(file_times, root)
         else:
             self.error = None
         finally:
@@ -936,7 +938,7 @@ class Window:
             problems.render(
                 self.result.report,
                 project.config if project else None,
-                datasets.issue_datasets(self.result),
+                views.issue_datasets(self.result),
                 self.problem_filters,
                 self.root,
                 self.edit_location,

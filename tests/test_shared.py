@@ -1,10 +1,12 @@
 import os
+import time
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import pytest
 
 from labcatalog.gui import shared
+from labcatalog.project import load_project
 
 
 @pytest.fixture(autouse=True)
@@ -20,6 +22,25 @@ def test_windows_on_one_project_share_its_catalog_until_a_file_changes(mock_proj
     os.utime(config, ns=(later, later))
     changed_times, again = shared.catalog(mock_project)
     assert again is not first and changed_times != times
+
+
+def test_reading_again_sees_a_prepare_step_whose_raw_file_changed(mock_project):
+    step = load_project(mock_project).config.prepare[0]
+    now = time.time()
+    for path, age in [*((p, 1000) for p in step.inputs), *((p, 500) for p in step.outputs)]:
+        os.utime(mock_project / path, (now - age, now - age))
+
+    def outdated(result) -> list[str]:
+        return [i.message for i in result.report.issues if f"{step.name}:" in i.message]
+
+    _, first = shared.catalog(mock_project)
+    assert outdated(first) == []
+    os.utime(mock_project / step.inputs[0], (now + 60, now + 60))
+    # Opening in another window shares the build; a reload reads the files again.
+    assert shared.catalog(mock_project)[1] is first
+    _, again = shared.catalog(mock_project, again=True)
+    assert "run the step again" in outdated(again)[0]
+    assert shared.catalog(mock_project)[1] is again
 
 
 def test_a_fit_runs_once_for_every_window_and_each_choice(mock_project):

@@ -56,6 +56,7 @@ def listing(folder: Path, shown: list[str], kind: str) -> tuple[list[Path], list
 
 async def browse(kind: str, shown: list[str], start: Path) -> Path | None:
     # A browser's own file dialog sees the viewer's computer; the files are where labcatalog runs.
+    start = start if allowed(start) else common.serving
     state: dict[str, Path | None] = {"folder": start if start.is_dir() else start.parent}
     state["picked"] = None if start.is_dir() else start
     with ui.dialog() as dialog, ui.card().classes("w-[44rem] max-w-full"):

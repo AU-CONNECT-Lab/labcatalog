@@ -1,6 +1,5 @@
 import asyncio
 import os
-import re
 import subprocess
 import sys
 from collections.abc import Callable, Iterable, Iterator
@@ -12,13 +11,12 @@ from nicegui import run, ui
 from labcatalog import defaults
 from labcatalog.config import LlmConfig, ProjectConfig
 from labcatalog.gui import preferences
-from labcatalog.gui.look import look, scoped
+from labcatalog.gui.look import Look, look, scoped
 from labcatalog.metadata.bibliography import Bibliography, citation
 from labcatalog.metadata.history import Change
 from labcatalog.stats.cfa import ESTIMATORS
 from labcatalog.stats.summary import wave_order
 
-LINE_SUFFIX = re.compile(r":(\d+)$")
 ROW_KEY = "_row"
 # False when the pages are in a browser, set once at launch.
 native = True
@@ -44,11 +42,15 @@ def keyed(rows: list[dict]) -> list[dict]:
 
 
 async def computed(callback, *args):
-    # NiceGUI gives None in place of the result while the window closes.
-    found = await run.io_bound(scoped, look(), callback, *args)
+    # NiceGUI gives None as the window closes or the app stops; boxed, a callback's None gets by.
+    found = await run.io_bound(boxed, look(), callback, *args)
     if found is None:
         raise asyncio.CancelledError
-    return found
+    return found[0]
+
+
+def boxed(found: Look, callback, *args) -> tuple:
+    return (scoped(found, callback, *args),)
 
 
 @contextmanager
@@ -195,15 +197,6 @@ def unique(values: Iterable[str]) -> list[str]:
 
 def sorted_waves(config: ProjectConfig, study: str, waves: Iterable[str]) -> list[str]:
     return sorted(set(waves), key=wave_order(config, study))
-
-
-def split_location(location: str) -> tuple[str, int | None]:
-    found = LINE_SUFFIX.search(location)
-    return (location[: found.start()], int(found.group(1))) if found else (location, None)
-
-
-def without_line(location: str) -> str:
-    return LINE_SUFFIX.sub("", location)
 
 
 def open_path(path: Path) -> None:

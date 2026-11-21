@@ -298,3 +298,16 @@ def test_the_overview_of_one_study_shows_only_its_own(pilot_project):
     assert facts["people"] == len(people_of(result, "pilot"))
     # The whole project is left as it was.
     assert len(result.project.config.studies) == 2
+
+
+def test_the_overview_of_one_study_counts_its_own_problems(pilot_project):
+    result = run_catalog(pilot_project)
+    owners = dict(zip(map(id, result.report.issues), views.issue_datasets(result), strict=True))
+    others = [i for i in result.report.issues if owners[id(i)] not in (None, "pilot_w1")]
+    assert others
+    pilot = views.for_study(result, "pilot")
+    # As the Problems page narrowed to the study: its datasets' issues and those of none.
+    assert pilot.report.issues == [i for i in result.report.issues if i not in others]
+    shown = {row.kind: row.lead for row in views.next_up(pilot)}
+    warnings = sum(i.level == "warning" for i in pilot.report.issues)
+    assert shown.get(views.WARNINGS, "").startswith(str(warnings))

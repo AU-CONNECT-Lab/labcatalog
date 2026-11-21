@@ -11,8 +11,8 @@ from labcatalog.data.prepare import Session, run_steps
 from labcatalog.exceptions import LabCatalogError
 from labcatalog.gui import cleaning as cleaning_view
 from labcatalog.gui import common, id_fix, preferences
-from labcatalog.gui.common import caption, col, computed, note, split_location, table
-from labcatalog.issues import Issue
+from labcatalog.gui.common import caption, col, computed, note, table
+from labcatalog.issues import Issue, split_location
 from labcatalog.metadata import accepted, changes, fixes
 from labcatalog.metadata.changes import Change
 from labcatalog.pipeline import CatalogResult, run_cleaning_fix

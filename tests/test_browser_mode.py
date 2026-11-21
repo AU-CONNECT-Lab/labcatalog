@@ -47,6 +47,14 @@ def test_the_link_with_the_key_opens_and_is_remembered(client):
         assert ws.receive_text() == "hello"
 
 
+def test_the_key_is_found_after_cookies_other_sites_left(client):
+    for other in ('prefs={"x":[1,2]}', "x=a b", "x=a;b "):
+        sent = {"cookie": f"{other}; labcatalog_8123={TOKEN}"}
+        assert client.get("/", headers=sent).text == "the catalog"
+        with client.websocket_connect("/ws", headers=sent) as ws:
+            assert ws.receive_text() == "hello"
+
+
 def test_the_chooser_reads_the_dialog_file_types():
     assert patterns(("PDF files (*.pdf)",)) == ["*.pdf"]
     assert patterns(("CSV files (*.csv;*.tsv;*.txt)",)) == ["*.csv", "*.tsv", "*.txt"]

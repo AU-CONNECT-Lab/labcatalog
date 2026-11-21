@@ -10,9 +10,9 @@ from labcatalog.ai.documents import read_document
 from labcatalog.charts import mindmap
 from labcatalog.exceptions import EditError, LabCatalogError, MetadataError
 from labcatalog.gui import common, edit_form, references, theme
-from labcatalog.gui.common import LINE_SUFFIX, computed, note, panel
+from labcatalog.gui.common import computed, note, panel
 from labcatalog.gui.files import DOCUMENT_FILES, choose_path
-from labcatalog.issues import Issue
+from labcatalog.issues import LINE_SUFFIX, Issue
 from labcatalog.metadata import editing, records
 from labcatalog.metadata import fields as field_values
 from labcatalog.pipeline import run_instrument_draft

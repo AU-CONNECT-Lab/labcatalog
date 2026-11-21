@@ -1,8 +1,10 @@
+import re
 from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
 IssueLevel = Literal["error", "warning", "info"]
+LINE_SUFFIX = re.compile(r":(\d+)$")
 
 PLAIN_MESSAGES = {
     "extra_forbidden": "unknown key; check the spelling",
@@ -17,6 +19,15 @@ class Issue(BaseModel):
     location: str | None = None
     # What the problem is about, such as the dataset and column, for the Fix panel.
     details: dict[str, Any] = {}
+
+
+def split_location(location: str) -> tuple[str, int | None]:
+    found = LINE_SUFFIX.search(location)
+    return (location[: found.start()], int(found.group(1))) if found else (location, None)
+
+
+def without_line(location: str) -> str:
+    return LINE_SUFFIX.sub("", location)
 
 
 def has_errors(issues: list[Issue]) -> bool:

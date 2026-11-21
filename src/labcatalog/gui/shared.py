@@ -24,13 +24,13 @@ PROJECTS: dict[Path, Shared] = {}
 LOCKS: defaultdict[Path, threading.Lock] = defaultdict(threading.Lock)
 
 
-def catalog(root: Path) -> tuple[dict[Path, int], CatalogResult]:
-    # A second window waits for the first one's build instead of making its own.
+def catalog(root: Path, again: bool = False) -> tuple[dict[Path, int], CatalogResult]:
+    # A second window waits for the first one's build; again rereads what the times do not cover.
     with LOCKS[root]:
         # Taken first, so a save while the catalog builds still shows as a change.
         times = file_times(root)
         found = PROJECTS.get(root)
-        if found is None or found.times != times:
+        if again or found is None or found.times != times:
             found = Shared(times, run_catalog(root))
             PROJECTS[root] = found
         return found.times, found.result

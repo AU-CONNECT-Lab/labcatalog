@@ -11,8 +11,9 @@ import plotly.graph_objects as go
 from labcatalog import defaults
 from labcatalog.charts import matrices, network, plots, scatter
 from labcatalog.charts.style import group_color, natural_key, pair_color, wave_color
-from labcatalog.config import dataset_by_name, missing_labels_for
+from labcatalog.config import dataset_by_name, map_name_of, missing_labels_for
 from labcatalog.data.resolve import ResolvedScore, as_text_dict, missing_cells
+from labcatalog.issues import Issue, without_line
 from labcatalog.metadata.completeness import gaps
 from labcatalog.metadata.studies import wave_status
 from labcatalog.pipeline import CatalogResult
@@ -55,8 +56,16 @@ def for_study(result: CatalogResult, study: str | None) -> CatalogResult:
             "datasets": [d for d in config.datasets if d.name in names],
         }
     )
+    # As the Problems page narrows to a study: issues of its datasets and those of no dataset.
+    owners = issue_datasets(result)
+    issues = [
+        i
+        for i, owner in zip(result.report.issues, owners, strict=True)
+        if owner is None or owner in names
+    ]
     return replace(
         result,
+        report=result.report.model_copy(update={"issues": issues}),
         project=replace(
             project,
             config=scoped,
@@ -70,6 +79,38 @@ def for_study(result: CatalogResult, study: str | None) -> CatalogResult:
             }
         ),
     )
+
+
+def data_path(result: CatalogResult, dataset: str) -> str | None:
+    return next((f.path for f in result.manifest.files if f.dataset == dataset), None)
+
+
+def issue_datasets(result: CatalogResult) -> list[str | None]:
+    # The dataset each issue is about, by its details or by the file it names.
+    issues = result.report.issues
+    if result.project is None:
+        return [None] * len(issues)
+    names = {d.name for d in result.project.config.datasets}
+    owner = {
+        id(issue): d.name
+        for d in result.project.config.datasets
+        for issue in dataset_issues(result, d.name)
+    }
+    return [
+        found if (found := issue.details.get("dataset")) in names else owner.get(id(issue))
+        for issue in issues
+    ]
+
+
+def dataset_issues(result: CatalogResult, dataset: str) -> list[Issue]:
+    data = data_path(result, dataset)
+    variable_map = f"{defaults.MAPS_DIR}/{map_name_of(result.project.config, dataset)}.csv"
+    return [
+        issue
+        for issue in result.report.issues
+        if issue.location
+        and (issue.location == data or without_line(issue.location) == variable_map)
+    ]
 
 
 def wave_name(result: CatalogResult, study: str, wave: str) -> str:

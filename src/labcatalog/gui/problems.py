@@ -13,11 +13,10 @@ from labcatalog.gui.common import (
     note,
     open_path,
     panel,
-    split_location,
     table,
 )
 from labcatalog.gui.filter_bar import Filters, filter_bar
-from labcatalog.issues import Issue, summarize_issues
+from labcatalog.issues import Issue, split_location, summarize_issues
 from labcatalog.metadata import accepted, editing
 from labcatalog.metadata.browse import build_issue_index, row_counts, row_matches
 
