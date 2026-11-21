@@ -52,6 +52,7 @@ A table of every score in every wave: *N*, mean, *SD*, median, observed and poss
 - Box plots of the scores in each wave, and the distribution of the total score.
 - **Scores across waves**: the mean of each score in each wave, for everyone and for the people who took part in every wave.
 - **Stability across waves**: the correlation of the same people's scores one wave apart.
+- In both, each dataset with an `occasion` counts as a time of its own, in the order `labcatalog.yaml` lists the datasets, so a questionnaire given before and after a task in wave 2 has a time for each; the files of one wave without an occasion count together as one time.
 - **Invariance across waves**: whether the score measures the same thing in each wave (configural, metric and scalar invariance). It needs R.
 - **Invariance across reporters**: the same test between reporters who answered the instrument in the same wave, such as a parent and a child rating the child's mood. The reporters of one group are paired through `stats.correlate_by`, so this section appears only when that names a group.
 - **Against other scores**: how this score correlates with every other score measured in the same wave.
